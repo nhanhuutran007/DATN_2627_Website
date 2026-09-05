@@ -1,0 +1,111 @@
+:root {
+  color-scheme: light;
+  --background: #f4f7f5;
+  --surface: #ffffff;
+  --ink: #15332b;
+  --muted: #5c7069;
+  --accent: #157f61;
+  --border: #d8e2de;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, #dff4e9 0, transparent 38rem),
+    var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.shell {
+  width: min(1120px, calc(100% - 2rem));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 7rem 0 5rem;
+}
+
+.hero {
+  max-width: 760px;
+}
+
+.eyebrow {
+  margin: 0 0 1rem;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 7vw, 5.75rem);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.lead {
+  margin: 1.75rem 0 0;
+  color: var(--muted);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  line-height: 1.7;
+}
+
+.serviceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 4.5rem;
+}
+
+.serviceCard {
+  min-height: 220px;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+.serviceCard span {
+  display: inline-block;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  color: var(--accent);
+  background: #e5f4ee;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.serviceCard h2 {
+  margin: 2.5rem 0 0.75rem;
+  font-size: 1.35rem;
+}
+
+.serviceCard p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    padding-top: 4rem;
+  }
+
+  .serviceGrid {
+    grid-template-columns: 1fr;
+    margin-top: 3rem;
+  }
+
+  .serviceCard {
+    min-height: auto;
+  }
+}

@@ -1,0 +1,45 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Node.js
+node_modules/
+.next/
+dist/
+.test-dist/
+coverage/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# AI data and trained artifacts
+ai-service/data/raw/*
+ai-service/data/processed/*
+ai-service/artifacts/*
+ai-service/models/*.pkl
+ai-service/models/*.joblib
+!ai-service/data/raw/.gitkeep
+!ai-service/data/processed/.gitkeep
+!ai-service/artifacts/README.md
+!ai-service/models/README.md
+
+# Runtime files
+.tools/
+logs/
+uploads/
+tmp/
+*.log
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

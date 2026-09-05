@@ -13,6 +13,8 @@
 - [Các mô-đun AI](#các-mô-đun-ai)
 - [Kiến trúc hệ thống](#kiến-trúc-hệ-thống)
 - [Công nghệ dự kiến](#công-nghệ-dự-kiến)
+- [Cấu trúc mã nguồn](#cấu-trúc-mã-nguồn)
+- [Khởi động bộ khung](#khởi-động-bộ-khung)
 - [Yêu cầu phi chức năng](#yêu-cầu-phi-chức-năng)
 - [Kiểm thử và đánh giá](#kiểm-thử-và-đánh-giá)
 - [Kế hoạch thực hiện](#kế-hoạch-thực-hiện)
@@ -214,7 +216,7 @@ Hệ thống gồm ba thành phần chính giao tiếp qua REST API:
 ```mermaid
 flowchart LR
     U[Người dùng] --> FE[Frontend<br/>React / Next.js / TypeScript]
-    FE -->|REST API| BE[Backend<br/>Java Spring Boot]
+    FE -->|REST API| BE[Backend<br/>Node.js / NestJS / TypeScript]
     BE --> DB[(MySQL)]
     BE --> CACHE[(Redis - tùy chọn)]
     BE --> FILES[Lưu trữ tệp]
@@ -226,7 +228,7 @@ flowchart LR
 
 Luồng xử lý điển hình:
 
-1. Next.js gửi yêu cầu đến Spring Boot.
+1. Next.js gửi yêu cầu đến NestJS.
 2. Backend xác thực, phân quyền và xử lý nghiệp vụ.
 3. Backend gọi AI service khi cần xếp hạng, dự đoán hoặc chấm điểm rủi ro.
 4. AI service chỉ nhận các trường đã chuẩn hóa hoặc ẩn danh cần thiết, không tùy ý truy cập toàn bộ cơ sở dữ liệu.
@@ -239,9 +241,9 @@ Trong môi trường triển khai, Nginx có thể làm reverse proxy cho fronte
 | Thành phần | Công nghệ | Vai trò |
 | --- | --- | --- |
 | Frontend | React, Next.js, TypeScript | Giao diện responsive, SSR/SSG, biểu mẫu, xác thực, dashboard và biểu đồ. |
-| Backend | Java, Spring Boot | Nghiệp vụ tài khoản, chiến dịch, giao dịch, thông báo và quản trị. |
-| Bảo mật API | Spring Security, JWT, refresh token | Xác thực và bảo vệ REST API. |
-| Truy cập dữ liệu | Spring Data JPA | Làm việc với cơ sở dữ liệu quan hệ. |
+| Backend | Node.js, NestJS, TypeScript | Nghiệp vụ tài khoản, chiến dịch, giao dịch, thông báo và quản trị. |
+| Bảo mật API | NestJS guards, JWT, refresh token | Xác thực và bảo vệ REST API. |
+| Truy cập dữ liệu | ORM/migration tool sẽ chốt sau ERD | Làm việc với cơ sở dữ liệu quan hệ bằng migration có kiểm soát. |
 | Tài liệu API | OpenAPI | Mô tả và kiểm thử hợp đồng dịch vụ. |
 | AI service | Python, FastAPI | Huấn luyện, đánh giá và cung cấp API suy luận. |
 | Xử lý dữ liệu/ML | pandas, NumPy, scikit-learn | Tiền xử lý dữ liệu và xây dựng mô hình. |
@@ -250,7 +252,71 @@ Trong môi trường triển khai, Nginx có thể làm reverse proxy cho fronte
 | Hạ tầng | VPS/hosting, Nginx, HTTPS | Triển khai và điều phối truy cập dịch vụ. |
 | Quản lý mã nguồn | Git, GitHub | Quản lý phiên bản và hỗ trợ quy trình phát triển. |
 
-> Phiên bản cụ thể của các công nghệ và lệnh cài đặt sẽ được chốt khi mã nguồn từng thành phần được khởi tạo. Repository hiện đang ở giai đoạn mô tả và thiết kế đề tài.
+> Scaffold hiện tại chọn NestJS thay cho Spring Boot để frontend và backend cùng dùng TypeScript. Lý do và hệ quả được ghi tại [`docs/architecture/adr-001-backend-stack.md`](./docs/architecture/adr-001-backend-stack.md). `main.pdf` vẫn là bản mô tả đề tài gốc và chưa được cập nhật theo quyết định này.
+
+## Cấu trúc mã nguồn
+
+```text
+frontend/      Next.js và giao diện người dùng/quản trị
+backend/       NestJS business API và điều phối tích hợp
+ai-service/    FastAPI, model inference và huấn luyện ngoại tuyến
+infra/         Docker Compose và Nginx
+docs/          Kiến trúc, API, database, vận hành và kiểm thử
+```
+
+Xem cây chi tiết và ranh giới trách nhiệm tại [`docs/architecture/project-structure.md`](./docs/architecture/project-structure.md). Các thư mục chức năng đang để trống có chủ đích; chúng chưa được xem là chức năng đã triển khai.
+
+## Khởi động bộ khung
+
+Yêu cầu: Node.js `>=22.22.3` và Python `>=3.12`. Docker là tùy chọn cho môi trường tích hợp. Workspace hiện có Node.js portable `22.22.3` trong `.tools/`; thư mục này được bỏ qua bởi Git.
+
+### Chạy trực tiếp khi phát triển
+
+```powershell
+.\scripts\node-local.cmd --version
+.\scripts\npm-local.cmd install
+Copy-Item frontend/.env.example frontend/.env.local
+Copy-Item backend/.env.example backend/.env
+
+python -m venv ai-service/.venv
+.\scripts\python-ai.cmd -m pip install -r ai-service/requirements-dev.txt
+```
+
+Các wrapper `.cmd` buộc npm dùng đúng Node.js portable và không phụ thuộc chính sách chạy PowerShell script. Khi clone repository sang máy khác, hãy cài Node.js `22.22.3` hoặc đặt bản portable tại đúng đường dẫn `.tools/node-v22.22.3-win-x64`.
+
+Kiểm tra mã nguồn và build production:
+
+```powershell
+.\scripts\npm-local.cmd run check
+.\scripts\npm-local.cmd run build
+
+.\scripts\python-ai.cmd -m pytest -q ai-service
+.\scripts\python-ai.cmd -m ruff check ai-service
+```
+
+Mở ba terminal tại thư mục repository:
+
+```powershell
+.\scripts\npm-local.cmd run dev:frontend
+```
+
+```powershell
+.\scripts\npm-local.cmd run dev:backend
+```
+
+```powershell
+Set-Location ai-service
+..\scripts\python-ai.cmd -m uvicorn app.main:app --reload
+```
+
+### Chạy bằng Docker Compose
+
+```powershell
+Copy-Item .env.example .env
+docker compose --env-file .env -f infra/compose.yaml up --build
+```
+
+Sau khi khởi động, frontend ở `http://localhost:3000`, backend health ở `http://localhost:4000/api/v1/health`, AI docs ở `http://localhost:8000/docs` và reverse proxy ở `http://localhost:8080`.
 
 ## Yêu cầu phi chức năng
 
@@ -318,7 +384,7 @@ Quá trình phát triển được thực hiện theo hướng lặp và tăng t
 ## Sản phẩm dự kiến
 
 - Website dành cho người dùng và trang quản trị.
-- Backend Spring Boot kết nối MySQL.
+- Backend NestJS kết nối MySQL.
 - Dịch vụ AI bằng Python cho ba nhóm chức năng.
 - Bộ dữ liệu thử nghiệm đã được làm sạch hoặc ẩn danh.
 - Tài liệu phân tích thiết kế và sơ đồ kiến trúc.
