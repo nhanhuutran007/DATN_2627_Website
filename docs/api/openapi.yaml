@@ -1,0 +1,35 @@
+openapi: 3.1.0
+info:
+  title: Crowdfunding Platform API
+  version: 0.1.0
+  description: Hợp đồng tối thiểu của scaffold. Các API nghiệp vụ chưa được triển khai.
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Backend local
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Kiểm tra trạng thái business API
+      responses:
+        "200":
+          description: Dịch vụ đang hoạt động
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [service, status, timestamp]
+      properties:
+        service:
+          type: string
+          example: backend
+        status:
+          type: string
+          enum: [ok]
+        timestamp:
+          type: string
+          format: date-time
