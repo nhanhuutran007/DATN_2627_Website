@@ -1,0 +1,413 @@
+/* Áp dụng font và màu cơ bản */
+body {
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  color: #333;
+  margin: 0;
+  padding: 0;
+  line-height: 1.5;
+}
+
+/* Thay thế class container */
+.custom-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 15px;
+}
+
+/* Policy Header */
+.policy-header {
+  background-color: #f8f9fa;
+  padding: 15px 0;
+  border-bottom: 1px solid #e7e7e7;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  background-color: #e9ecef;
+  padding: 8px 15px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  list-style: none;
+  font-size: 0.9rem;
+  border-radius: 4px;
+}
+
+.breadcrumb-item {
+  margin-right: 5px;
+  display: flex;
+  align-items: center;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+  content: "/";
+  padding: 0 5px;
+  color: #6c757d;
+}
+
+.breadcrumb-item a {
+  color: #d10000;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.breadcrumb-item a:hover {
+  color: #a30000;
+  text-decoration: underline;
+}
+
+.breadcrumb-item.active {
+  color: #333;
+}
+
+/* Tiêu đề chính */
+.policy-title-main {
+  color: #000000;
+  font-weight: 600;
+  margin: 10px 0;
+  font-size: 1.8rem;
+  line-height: 1.3;
+}
+
+/* Content Wrapper */
+.content-wrapper {
+  display: flex;
+  flex-direction: row;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  gap: 30px;
+}
+
+.main-content {
+  flex: 7;
+  min-width: 0;
+  order: 0; /* Đảm bảo nội dung chính luôn ở trên */
+}
+
+/* News Section */
+.news-section {
+  margin-bottom: 30px;
+}
+
+.news-item {
+  margin-bottom: 40px;
+}
+
+.news-date {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 10px 0;
+  font-style: italic;
+}
+
+.news-content {
+  line-height: 1.6;
+  font-size: 1rem;
+}
+
+/* Định dạng hình ảnh trong news-content */
+.news-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 15px auto; /* Căn giữa hình ảnh */
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+th,
+td {
+  border: 1px solid #ddd;
+  padding: 12px;
+  text-align: left;
+}
+
+th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+  color: #333;
+}
+
+tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* Images */
+.main-image {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 20px 0;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.image-caption {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 5px;
+  text-align: center;
+  font-style: italic;
+}
+
+/* Sidebar */
+.sidebar {
+  flex: 3;
+  background-color: #f9f9f9;
+  padding: 20px;
+  position: sticky;
+  top: 20px;
+  align-self: flex-start;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-title {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ddd;
+  color: #333;
+}
+
+.category-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.category-list li {
+  margin-bottom: 10px;
+  padding: 5px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+.category-list a {
+  text-decoration: none;
+  color: #333;
+  transition: color 0.2s;
+  display: block;
+  padding: 5px 0;
+}
+
+.category-list a:hover {
+  color: #0066cc;
+  padding-left: 5px;
+}
+
+.advice-section {
+  margin-top: 30px;
+}
+
+.advice-item {
+  display: flex;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 15px;
+  align-items: flex-start;
+}
+
+.advice-image img {
+  width: 80px;
+  height: 60px;
+  margin-right: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.advice-content {
+  flex: 1;
+}
+
+.advice-title {
+  font-weight: bold;
+  margin-bottom: 5px;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.advice-title a {
+  color: #333;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.advice-title a:hover {
+  color: #0066cc;
+}
+
+/* Policy sections */
+.policy-section {
+  margin-bottom: 30px;
+}
+
+.policy-title {
+  color: #d10000;
+  font-weight: 600;
+  margin: 25px 0 15px;
+  font-size: 1.3rem;
+  position: relative;
+  padding-bottom: 8px;
+}
+
+.policy-title::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 50px;
+  height: 3px;
+  background-color: #d10000;
+}
+
+.policy-content {
+  line-height: 1.6;
+  margin-bottom: 15px;
+}
+
+/* Comment box */
+.comment-box {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+  margin-top: 30px;
+}
+
+.comment-box h4 {
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.input-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.input-group input {
+  flex: 1;
+  min-width: 200px;
+  padding: 10px 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+textarea {
+  width: 100%;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  min-height: 120px;
+  resize: vertical;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.submit-btn {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.2s;
+}
+
+.submit-btn:hover {
+  background: #c82333;
+}
+
+/* Responsive styles */
+@media (max-width: 992px) {
+  .content-wrapper {
+      flex-direction: column;
+      gap: 20px;
+      padding: 15px;
+  }
+
+  .sidebar {
+      position: static; /* Bỏ sticky trên mobile */
+      height: auto;
+      order: 1;
+      margin-top: 30px;
+      width: 100%;
+  }
+
+  .policy-title-main {
+      font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .custom-container {
+      padding: 10px;
+  }
+
+  .policy-header {
+      padding: 10px 0;
+  }
+
+  .policy-title-main {
+      font-size: 1.3rem;
+  }
+
+  .policy-title {
+      font-size: 1.1rem;
+  }
+
+  th,
+  td {
+      padding: 8px;
+      font-size: 0.9rem;
+  }
+
+  .advice-item {
+      flex-direction: column;
+  }
+
+  .advice-image img {
+      width: 100%;
+      height: auto;
+      margin-bottom: 10px;
+  }
+
+  .input-group input {
+      min-width: 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .breadcrumb {
+      font-size: 0.8rem;
+      padding: 6px 10px;
+  }
+
+  .policy-title-main {
+      font-size: 1.2rem;
+  }
+
+  .sidebar-title {
+      font-size: 1rem;
+  }
+
+  .advice-title {
+      font-size: 0.9rem;
+  }
+}

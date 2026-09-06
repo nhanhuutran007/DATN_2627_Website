@@ -1,0 +1,55 @@
+RewriteEngine On
+RewriteBase /baocao/
+
+# Truy cập dạng SEO: /trangchu => view/php/trangchu.php
+RewriteRule ^trangchu$ view/php/trangchu.php [L]
+
+# Gửi form đến SEO link: /user/submit => controller/UserController.php
+RewriteRule ^user/submit$ controller/UserController.php [L]
+
+
+RewriteRule ^trangchude$ view/php/trangchude.php [QSA,L]
+RewriteRule ^trangchitiet$ view/php/trangchitiet.php [QSA,L]
+RewriteRule ^chinhsachvanchuyen$ view/php/chinhSachVanChuyen.php [QSA,L]
+RewriteRule ^chinhsachbaomat$ view/php/chinhSachBaoMat.php [QSA,L]
+RewriteRule ^chinhsachdoitra$ view/php/chinhSachDoiTra.php [QSA,L]
+RewriteRule ^dieukhoan$ view/php/dieuKhoan.php [QSA,L]
+RewriteRule ^chinhsach$ view/php/chinhSach.php [QSA,L]
+RewriteRule ^cart$ view/php/cart.php [QSA,L]
+RewriteRule ^login$ view/php/login.php [QSA,L]
+RewriteRule ^taikhoan$ view/php/taiKhoan.php [QSA,L]
+RewriteRule ^quanlytaikhoan$ view/php/quanlytaikhoan.php [QSA,L]
+RewriteRule ^checkout$ view/php/checkout.php [QSA,L]
+RewriteRule ^danhmuctin$ view/php/danhmuctintuc.php [QSA,L]
+RewriteRule ^quanlydanhmuc$ view/php/quanlydanhmuc.php [QSA,L]
+RewriteRule ^add_news$ view/php/add_news.php [QSA,L]
+RewriteRule ^edit_news$ view/php/edit_news.php [QSA,L]
+RewriteRule ^admin$ view/php/admin.php [QSA,L]
+RewriteRule ^delete_product$ view/php/delete_product.php [QSA,L]
+RewriteRule ^edit_product$ view/php/edit_product.php [QSA,L]
+RewriteRule ^banner$ view/php/banner.php [QSA,L]
+RewriteRule ^quanlyvoucher$ view/php/quanlyvoucher.php [QSA,L]
+RewriteRule ^quanlydonhang$ view/php/quanlydonhang.php [QSA,L]
+RewriteRule ^add_product$ view/php/add_product.php [QSA,L]
+RewriteRule ^quanlydonhang$ view/php/quanlydonhang.php [QSA,L]
+RewriteRule ^quanlytintuc$ view/php/quanlytintuc.php [QSA,L]
+RewriteRule ^upload_image$ view/php/upload_image.php [QSA,L]
+RewriteRule ^phuongthuc$ view/php/phuongThuc.php [QSA,L]
+RewriteRule ^submit$ view/php/submit.php [QSA,L]
+RewriteRule ^success$ view/php/success.php [QSA,L]
+RewriteRule ^admin_chat$ view/php/admin_chat.php [QSA,L]
+RewriteRule ^chatbot$ view/php/chatbot.php [QSA,L]
+
+
+# Truy cập trang chủ đề dạng SEO: /trangchude/<category>
+RewriteRule ^trangchude/([^/]+)$ view/php/trangchude.php?category=$1 [QSA,L]
+
+RewriteRule ^trangchitiet/([^/]+)$ view/php/trangchitiet.php?product=$1 [QSA,L]
+
+RewriteRule ^tintuc/([^/]+)$ view/php/chitiettintuc.php?title=$1 [QSA,L]
+RewriteRule ^tag/([^/]+)$ view/php/tag.php?$1 [QSA,L]
+RewriteRule ^delete_product/([^/]+)$ view/php/delete_product.php?table=$1 [QSA,L]
+RewriteRule ^admin_chat/([^/]+)$ view/php/admin_chat.php?table=$1 [QSA,L]
+
+
+

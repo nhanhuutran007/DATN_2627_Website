@@ -1,0 +1,126 @@
+.main-content {
+    margin-left: 250px;
+    padding: 25px;
+}
+
+.nav-link {
+    color: #6c757d;
+    padding: 10px 20px;
+    margin: 3px 0;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+    background-color: #f8f9fa;
+    color: #ff7043;
+}
+
+.nav-link.active {
+    background-color: #fff2f6;
+    color: #ff7043;
+    border-left: 3px solid #ff7043;
+}
+
+.nav-link i {
+    margin-right: 10px;
+    width: 20px;
+}
+
+.sidebar-heading {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #6c757d;
+    font-weight: 600;
+    padding: 15px 20px 5px;
+    margin-top: 10px;
+}
+
+.brand-logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #FF7043;
+}
+
+.pink-text {
+    color: #ff7043;
+}
+
+.btn-pink {
+    background-color: #ff7043 !important;
+    color: white !important;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 20px;
+    transition: all 0.3s ease;
+    /* Thêm các thuộc tính sau để đảm bảo không bị ghi đè */
+    display: inline-block;
+    font-weight: 400;
+    text-align: center;
+    vertical-align: middle;
+    user-select: none;
+    line-height: 1.5;
+  }
+
+  .btn-pink:hover {
+    background-color: #e65100;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(245, 88, 141, 0.3);
+    text-decoration: none;
+  }
+
+.btn-outline-pink {
+    background-color: transparent;
+    color: #FF7043;
+    border: 1px solid #FF7043;
+    border-radius: 8px;
+    padding: 8px 20px;
+    transition: all 0.3s ease;
+}
+
+.btn-outline-pink:hover {
+    background-color: #FF7043;
+    color: white;
+}
+
+.section-title {
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: #343a40;
+    position: relative;
+    display: inline-block;
+}
+
+.section-title::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -8px;
+    height: 3px;
+    width: 40px;
+    background-color: #FF7043;
+    border-radius: 10px;
+}
+
+/* Styles for product image */
+.current-image-container {
+    margin-bottom: 15px;
+    text-align: center;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    background-color: #f8f9fa;
+}
+
+.current-image {
+    max-width: 400px; /* Reduced size for better fit */
+    max-height: 400px;
+    object-fit: contain; /* Maintain aspect ratio */
+    border-radius: 5px;
+    transition: transform 0.3s ease;
+}
+
+.current-image:hover {
+    transform: scale(1.05); /* Slight zoom on hover for interactivity */
+}

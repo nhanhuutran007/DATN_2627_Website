@@ -1,0 +1,235 @@
+/* Reset và kiểu cơ bản */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f5f5f5;
+}
+
+/* Container */
+.container {
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 15px;
+}
+
+/* Tiêu đề tag */
+.tag-header {
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #111213;
+}
+.back-link {
+    display: inline-block;
+    margin-top: 20px;
+    color: #0066cc;
+    text-decoration: none;
+}
+.tag-header h1 {
+    font-size: 24px;
+    color: #111213;
+    margin-bottom: 10px;
+}
+
+.tag-description {
+    font-size: 14px;
+    color: #666;
+    font-style: italic;
+}
+
+/* Danh sách bài viết */
+.article-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.article-item {
+    background-color: white;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease;
+}
+
+.article-item:hover {
+    transform: translateY(-5px);
+}
+
+.article-image {
+    position: relative;
+    width: 300px;
+    height: 200px;
+}
+
+.article-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.article-image:hover img {
+    transform: scale(1.05);
+}
+
+.image-caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 5px 10px;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.article-image:hover .image-caption {
+    opacity: 1;
+}
+
+.article-content {
+    padding: 12px;
+    border-radius: 0 12px 12px 0; /* Bo tròn góc phải */
+}
+
+.article-content h3 {
+    font-size: 18px; /* Tăng kích thước chữ */
+    font-weight: 600; /* Chữ đậm vừa phải */
+    margin-bottom: 6px;
+    line-height: 1.3;
+    color: #111213; /* Màu xanh nổi bật */
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1); /* Bóng chữ nhẹ */
+    transition: color 0.3s ease; /* Hiệu ứng chuyển màu mượt mà */
+}
+
+.article-content h3 a {
+    text-decoration: none; /* Bỏ gạch chân mặc định */
+    color: inherit; /* Kế thừa màu từ h3 */
+    position: relative; /* Để tạo hiệu ứng underline */
+    transition: color 0.3s ease; /* Chuyển màu mượt mà */
+}
+
+.article-content h3 a::after {
+    content: ''; /* Tạo đường underline giả */
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -2px;
+    left: 0;
+    background-color: #cf1d1d; /* Màu đường underline */
+    transition: width 0.3s ease; /* Hiệu ứng mở rộng mượt mà */
+}
+
+.article-content h3 a:hover {
+    color: #e7350d;
+}
+
+.article-meta {
+    color: #666;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.article-desc {
+    font-size: 14px;
+    color: #444;
+    line-height: 1.5;
+}
+
+/* Thông báo không có bài viết */
+.article-list p {
+    font-size: 16px;
+    color: #666;
+    text-align: center;
+    padding: 20px;
+    background-color: white;
+    border-radius: 8px;
+}
+
+/* Tags styles */
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.tag {
+    display: inline-block;
+    padding: 5px 10px;
+    background-color: #f0f0f0;
+    color: #333;
+    text-decoration: none;
+    border-radius: 15px;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.tag:hover {
+    background-color: #f59e0b;
+    color: white;
+}
+
+/* Sidebar section */
+.sidebar-section {
+    margin-bottom: 20px;
+}
+
+.sidebar-title {
+    font-size: 18px;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #f59e0b;
+}
+
+/* Responsive */
+@media screen and (max-width: 992px) {
+    .article-image {
+        width: 250px;
+        height: 180px;
+    }
+
+    .tag-header h1 {
+        font-size: 20px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .article-item {
+        flex-direction: column;
+        margin-bottom: 15px;
+    }
+
+    .article-image {
+        width: 100%;
+        height: 220px;
+    }
+}
+
+@media screen and (max-width: 576px) {
+    .article-image {
+        height: 200px;
+    }
+
+    .tag-header h1 {
+        font-size: 18px;
+    }
+
+    .article-content h3 {
+        font-size: 14px;
+    }
+}
