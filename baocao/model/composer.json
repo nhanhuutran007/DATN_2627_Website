@@ -1,0 +1,6 @@
+{
+    "require": {
+        "tecnickcom/tcpdf": "^6.9",
+        "payos/payos": "^1.0"
+    }
+}

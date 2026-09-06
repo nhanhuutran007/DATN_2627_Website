@@ -1,0 +1,885 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Arial", sans-serif;
+}
+
+body {
+  background-color: #f5f7fa;
+  line-height: 1.6;
+}
+
+.profile-container {
+  display: flex;
+  max-width: 1200px;
+  margin: 20px auto;
+  min-height: 80vh;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 250px;
+  background: #fff;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+}
+
+.sidebar h2 {
+  font-size: 20px;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.sidebar ul {
+  list-style: none;
+}
+
+.sidebar li {
+  padding: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  color: #666;
+  transition: 0.3s;
+}
+
+.sidebar li:hover,
+.sidebar li.active {
+  background: #f59e0b;
+  color: #fff;
+  border-radius: 5px;
+}
+
+/* Thanh gạt 2FA trong sidebar */
+.sidebar .toggle-2fa-container {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Giảm khoảng cách giữa nhãn và thanh gạt */
+  margin-top: 20px; /* Khoảng cách phía trên thanh gạt */
+}
+
+.toggle-2fa-label {
+  font-size: 16px; /* Giảm kích thước chữ của nhãn */
+  color: #333;
+  white-space: nowrap;
+}
+
+.toggle-2fa {
+  display: none; /* Ẩn checkbox mặc định */
+}
+
+.toggle-2fa-slider {
+  position: relative;
+  width: 40px; /* Giảm chiều rộng thanh gạt */
+  height: 20px; /* Giảm chiều cao thanh gạt */
+  background: #ccc;
+  border-radius: 10px; /* Giảm border-radius để phù hợp */
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.toggle-2fa-slider::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px; /* Giảm kích thước nút tròn */
+  height: 16px; /* Giảm kích thước nút tròn */
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+.toggle-2fa:checked + .toggle-2fa-slider {
+  background: #f59e0b; /* Màu cam khi bật */
+}
+
+.toggle-2fa:checked + .toggle-2fa-slider::before {
+  transform: translateX(20px); /* Điều chỉnh vị trí nút tròn khi bật */
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  padding: 20px;
+  background: #fff;
+  margin-left: 20px;
+  border-radius: 5px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.content-section {
+  display: none;
+}
+
+.content-section.active {
+  display: block;
+}
+
+.content-section h3 {
+  font-size: 24px;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+/* Thông tin tài khoản */
+.info-item {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.info-item label {
+  width: 150px;
+  font-weight: bold;
+  color: #666;
+}
+
+.info-item span {
+  flex: 1;
+  color: #333;
+}
+
+.edit-btn {
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.edit-btn:hover {
+  background: #d97706;
+}
+/* Avatar Section */
+.avatar-section .avatar-container {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.avatar-section img#user-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ddd;
+  transition: 0.3s;
+}
+
+.avatar-section img#user-avatar:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+/* Nút "Đăng xuất" */
+.logout-btn {
+  margin-left: 10px;
+  padding: 8px 16px;
+  background-color: #dc3545; /* Màu đỏ cho nút đăng xuất */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background-color: #c82333; /* Màu khi hover */
+}
+/* Nút "Thay đổi ảnh" */
+.change-avatar-btn {
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: 0.3s;
+}
+
+.change-avatar-btn i {
+  font-size: 16px;
+}
+
+.change-avatar-btn:hover {
+  background: #d97706;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+/* Đơn hàng của bạn */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+table th,
+table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+table th {
+  background: #f59e0b;
+  color: #fff;
+}
+
+table td {
+  color: #333;
+}
+
+table .status {
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+table .status.delivered {
+  background: #28a745;
+  color: #fff;
+}
+
+table .status.pending {
+  background: #ffc107;
+  color: #333;
+}
+
+table .details-btn {
+  background: none;
+  border: none;
+  color: #f59e0b;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+table .details-btn:hover {
+  color: #d97706;
+}
+
+/* Số địa chỉ */
+.add-address-btn {
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: 0.3s;
+}
+
+.add-address-btn:hover {
+  background: #d97706;
+}
+
+#address-list {
+  list-style: none;
+}
+
+#address-list li {
+  padding: 10px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#address-list li .address-actions button {
+  background: none;
+  border: none;
+  color: #f59e0b;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+#address-list li .address-actions button:hover {
+  color: #d97706;
+}
+
+/* Đổi mật khẩu */
+.form-group {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.form-group label {
+  width: 150px;
+  font-weight: bold;
+  color: #666;
+}
+
+/* .form-group input {
+  flex: 1;
+  max-width: 300px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+} */
+ /* Password container */
+.password-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 300px;
+}
+
+.password-container input {
+  width: 100%;
+  padding-right: 40px; /* Chừa chỗ cho icon */
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 8px;
+  font-size: 14px;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 10px;
+  cursor: pointer;
+  font-size: 18px;
+  color: #007bff;
+  transition: color 0.2s;
+}
+
+.toggle-password:hover {
+  color: #f59e0b; /* Màu khi hover, khớp với theme */
+}
+
+.submit-btn {
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.submit-btn:hover {
+  background: #d97706;
+}
+
+/* Định dạng ô input trong chế độ chỉnh sửa */
+.info-item input {
+  width: 100%;
+  max-width: 300px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+/* Nút "Lưu" */
+.save-btn {
+  background: #28a745 !important;
+}
+
+.save-btn:hover {
+  background: #218838 !important;
+}
+
+/* Nút "Hủy" */
+.cancel-btn {
+  background: #dc3545;
+  color: #fff;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: 0.3s;
+}
+
+.cancel-btn:hover {
+  background: #c82333;
+}
+
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  overflow: auto;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background-color: #fff;
+  margin: 10% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 90%;
+  max-width: 500px;
+  border-radius: 5px;
+  position: relative;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  /* max-height: 80vh; 
+  overflow-y: auto; */
+}
+
+#order-details-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+#order-details-table thead {
+  display: table-header-group !important; /* Đảm bảo thead hiển thị */
+}
+
+#order-details-table th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+  padding: 10px 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+}
+
+#order-details-table td {
+  padding: 10px 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+#order-details-table img {
+  max-width: 50px;
+  height: auto;
+}
+
+.order-details-icon {
+  color: #007bff;
+  font-size: 18px;
+  transition: color 0.2s;
+  cursor: pointer;
+}
+
+.order-details-icon:hover {
+  color: #0056b3;
+}
+
+.close-btn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 24px;
+  cursor: pointer;
+  color: #333;
+}
+
+
+/* Responsive */
+@media (max-width: 768px) {
+  .profile-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    margin-bottom: 20px;
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+
+  .avatar-section .avatar-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .avatar-section img#user-avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .change-avatar-btn {
+    margin-top: 10px;
+  }
+}
+.address-actions {
+  display: flex;
+  gap: 10px;
+}
+.edit-address,
+.delete-address,
+.set-default-address {
+  padding: 5px 10px;
+  border: none;
+  cursor: pointer;
+}
+
+.modal-content h3 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.modal-content .form-group {
+  margin-bottom: 15px;
+}
+
+.modal-content .form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #666;
+}
+
+.modal-content .form-group input,
+.modal-content .form-group textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.modal-content .form-group input[type="checkbox"] {
+  width: auto;
+  margin-right: 5px;
+}
+
+.modal-content .form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modal-content .form-actions button {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.modal-content .form-actions .submit-btn {
+  background: #f59e0b;
+  color: #fff;
+}
+
+.modal-content .form-actions .submit-btn:hover {
+  background: #d97706;
+}
+
+.modal-content .form-actions .cancel-btn {
+  background: #dc3545;
+  color: #fff;
+}
+
+.modal-content .form-actions .cancel-btn:hover {
+  background: #c82333;
+}
+
+/* CSS cho phần hiển thị thông tin tiền trong modal */
+#orderDetailsMoney {
+  margin-top: 20px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.money-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.money-label {
+  color: #333;
+  font-weight: normal;
+}
+
+.money-value {
+  font-weight: bold;
+  color: #333;
+}
+
+.money-total .money-value {
+  color: red;
+}
+
+.money-divider {
+  border: 0;
+  border-top: 1px solid #ccc;
+  margin: 10px 0;
+}
+
+
+/* Modal */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  overflow: auto;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 10px;
+}
+
+.modal-content {
+  background-color: #fff;
+  margin: 5% auto; /* Giảm margin để modal hiển thị tốt hơn trên màn hình nhỏ */
+  padding: 20px;
+  border: 1px solid #888;
+  width: 90%;
+  max-width: 600px; /* Tăng max-width để bảng rộng hơn */
+  max-height: 80vh; /* Giới hạn chiều cao tối đa của modal */
+  overflow-y: auto; /* Cho phép cuộn nếu nội dung vượt quá */
+  border-radius: 5px;
+  position: relative;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Bảng chi tiết đơn hàng */
+#order-details-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+#order-details-table thead {
+  display: table-header-group;
+  background-color: #f2f2f2;
+  position: sticky; /* Giữ tiêu đề cố định khi cuộn */
+  top: 0;
+  z-index: 1;
+}
+
+#order-details-table th {
+  font-weight: bold;
+  padding: 10px 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+}
+
+#order-details-table tbody {
+  display: block; /* Cho phép cuộn riêng phần thân */
+  max-height: 300px; /* Giới hạn chiều cao của tbody */
+  overflow-y: auto; /* Thêm thanh cuộn dọc */
+}
+
+#order-details-table tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed; /* Đảm bảo các cột có chiều rộng cố định */
+}
+
+#order-details-table td {
+  padding: 10px 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+#order-details-table img {
+  max-width: 50px;
+  height: auto;
+}
+
+/* Phần tiền */
+#order-details-money {
+  margin-top: 20px;
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: right;
+  padding: 10px;
+  border-top: 1px solid #ccc;
+}
+
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal-content {
+    max-width: 95%;
+    max-height: 90vh; /* Tăng chiều cao tối đa trên thiết bị nhỏ */
+  }
+
+  #order-details-table tbody {
+    max-height: 200px; /* Giảm chiều cao tối đa của tbody trên mobile */
+  }
+
+  #order-details-table th,
+  #order-details-table td {
+    font-size: 12px; /* Giảm kích thước chữ */
+    padding: 8px 6px;
+  }
+
+  #order-details-table img {
+    max-width: 40px;
+  }
+}
+
+/* Đơn hàng của bạn */
+#orders table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+#orders table thead {
+  display: table-header-group;
+  background: #f59e0b;
+  color: #fff;
+  position: sticky; /* Giữ tiêu đề cố định khi cuộn */
+  top: 0;
+  z-index: 1;
+}
+
+#orders table th {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+  font-weight: bold;
+}
+
+#orders table tbody {
+  display: block; /* Cho phép cuộn riêng phần thân */
+  max-height: 400px; /* Giới hạn chiều cao của tbody */
+  overflow-y: auto; /* Thêm thanh cuộn dọc */
+}
+
+#orders table tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed; /* Đảm bảo các cột có chiều rộng cố định */
+}
+
+#orders table td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+  color: #333;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  #orders table tbody {
+    max-height: 300px; /* Giảm chiều cao tối đa trên thiết bị nhỏ */
+  }
+
+  #orders table th,
+  #orders table td {
+    font-size: 12px; /* Giảm kích thước chữ */
+    padding: 8px 6px;
+  }
+}
+
+/* Container bọc bảng để xử lý cuộn */
+.order-details-table-container {
+  max-height: 300px; /* Giới hạn chiều cao của container */
+  overflow-y: auto; /* Thêm thanh cuộn dọc */
+  margin-top: 20px;
+}
+
+/* Bảng chi tiết đơn hàng */
+#order-details-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#order-details-table thead {
+  background-color: #f2f2f2;
+  position: sticky; /* Giữ tiêu đề cố định khi cuộn */
+  top: 0;
+  z-index: 1;
+}
+
+#order-details-table th {
+  font-weight: bold;
+  padding: 10px 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+}
+
+#order-details-table td {
+  padding: 10px 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+#order-details-table img {
+  max-width: 50px;
+  height: auto;
+}
+
+/* Đảm bảo tbody không bị ảnh hưởng bởi cuộn */
+#order-details-table tbody {
+  display: table-row-group; /* Khôi phục cấu trúc bảng mặc định */
+}
+
+/* Đảm bảo các hàng trong bảng có cùng chiều rộng */
+#order-details-table tr {
+  display: table-row;
+  width: 100%;
+  table-layout: fixed; /* Đảm bảo các cột có chiều rộng cố định */
+}
+
+/* Phần tiền */
+#order-details-money {
+  margin-top: 20px;
+  font-size: 16px;
+  line-height: 1.5;
+  text-align: right;
+  padding: 10px;
+  border-top: 1px solid #ccc;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal-content {
+    max-width: 95%;
+    max-height: 90vh; /* Tăng chiều cao tối đa trên thiết bị nhỏ */
+  }
+
+  .order-details-table-container {
+    max-height: 200px; /* Giảm chiều cao tối đa trên mobile */
+  }
+
+  #order-details-table th,
+  #order-details-table td {
+    font-size: 12px; /* Giảm kích thước chữ */
+    padding: 8px 6px;
+  }
+
+  #order-details-table img {
+    max-width: 40px;
+  }
+}
+
+
