@@ -33,7 +33,7 @@ export function CampaignCard({ campaign, showAiReason = false }: CampaignCardPro
         </button>
       </div>
       <div className="campaign-card-content">
-        {showAiReason && (
+        {showAiReason && campaign.aiReason && (
           <div className="ai-reason"><Icon name="sparkles" size={15} /> {campaign.aiReason}</div>
         )}
         <div className="campaign-card-meta">

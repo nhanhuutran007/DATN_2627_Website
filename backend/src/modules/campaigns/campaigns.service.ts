@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -25,12 +26,19 @@ const PUBLIC_STATUSES = [
   CampaignStatus.APPROVED,
   CampaignStatus.ACTIVE,
   CampaignStatus.SUCCESS,
+  CampaignStatus.ENDED,
 ];
 
-const EDITABLE_STATUSES = [
+const OWNER_EDITABLE_STATUSES = [
   CampaignStatus.DRAFT,
-  CampaignStatus.PENDING,
   CampaignStatus.REJECTED,
+  CampaignStatus.NEEDS_INFO,
+];
+
+const SUBMITTABLE_STATUSES = [
+  CampaignStatus.DRAFT,
+  CampaignStatus.REJECTED,
+  CampaignStatus.NEEDS_INFO,
 ];
 
 export type CampaignListResult = {
@@ -127,9 +135,9 @@ export class CampaignsService {
     const campaign = await this.findById(id);
     this.assertCanManage(campaign, currentUser);
 
-    if (campaign.status !== CampaignStatus.DRAFT) {
+    if (!OWNER_EDITABLE_STATUSES.includes(campaign.status)) {
       throw new ForbiddenException(
-        "Only draft campaigns can be edited while waiting for approval",
+        "Only draft, rejected or needs-info campaigns can be edited before approval",
       );
     }
 
@@ -141,9 +149,9 @@ export class CampaignsService {
     const campaign = await this.findById(id);
     this.assertCanManage(campaign, currentUser);
 
-    if (!EDITABLE_STATUSES.includes(campaign.status)) {
+    if (!SUBMITTABLE_STATUSES.includes(campaign.status)) {
       throw new ForbiddenException(
-        "Only draft or rejected campaigns can be submitted for review",
+        "Only draft, rejected or needs-info campaigns can be submitted for review",
       );
     }
 
@@ -162,9 +170,19 @@ export class CampaignsService {
     }
 
     const campaign = await this.findById(id);
+    const needsReason = [
+      CampaignStatus.REJECTED,
+      CampaignStatus.NEEDS_INFO,
+    ].includes(dto.status);
+
+    if (needsReason && !dto.reason?.trim()) {
+      throw new BadRequestException(
+        "A reason is required for rejected or needs-info campaigns",
+      );
+    }
+
     campaign.status = dto.status;
-    campaign.rejectionReason =
-      dto.status === CampaignStatus.REJECTED ? dto.reason : undefined;
+    campaign.rejectionReason = needsReason ? dto.reason : undefined;
     return this.campaignRepo.save(campaign);
   }
 

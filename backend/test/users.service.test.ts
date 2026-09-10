@@ -1,7 +1,11 @@
 import { equal, ok } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
-import { UsersService } from "../src/modules/users/users.service";
+import {
+  LOGIN_LOCK_MINUTES,
+  MAX_LOGIN_ATTEMPTS,
+  UsersService,
+} from "../src/modules/users/users.service";
 import { UserRole } from "../src/modules/users/entities/user.entity";
 
 function createMockRepo() {
@@ -131,6 +135,59 @@ describe("UsersService", () => {
         .catch((err) => {
           equal(err.status, 404);
         });
+    });
+  });
+
+  describe("recordLoginFailure", () => {
+    it("should lock the account after max attempts", async () => {
+      userRepo.save = async (u: any) => u;
+
+      let user: any = { id: "123", failedLoginCount: 0, lockedUntil: null as Date | null };
+
+      for (let i = 0; i < MAX_LOGIN_ATTEMPTS; i += 1) {
+        user = await usersService.recordLoginFailure(user);
+      }
+
+      ok(user.lockedUntil instanceof Date);
+      const lockMs = new Date(user.lockedUntil).getTime() - Date.now();
+      ok(lockMs > (LOGIN_LOCK_MINUTES - 1) * 60_000 * 0.9);
+      equal(user.failedLoginCount, 0);
+    });
+
+    it("should not lock before max attempts", async () => {
+      userRepo.save = async (u: any) => u;
+
+      const user = await usersService.recordLoginFailure({
+        id: "123",
+        failedLoginCount: 1,
+        lockedUntil: null,
+      } as any);
+
+      ok(!user.lockedUntil);
+      equal(user.failedLoginCount, 2);
+    });
+  });
+
+  describe("recordLoginSuccess", () => {
+    it("should reset failed attempts and lock", async () => {
+      userRepo.save = async (u: any) => u;
+
+      const user = await usersService.recordLoginSuccess({
+        id: "123",
+        failedLoginCount: 3,
+        lockedUntil: new Date(Date.now() + 60_000),
+      } as any);
+
+      equal(user.failedLoginCount, 0);
+      equal(user.lockedUntil, null);
+    });
+
+    it("should return the user unchanged when nothing to reset", async () => {
+      userRepo.save = async (u: any) => u;
+
+      const base = { id: "123", failedLoginCount: 0, lockedUntil: null };
+      const user = await usersService.recordLoginSuccess(base as any);
+      equal(user, base);
     });
   });
 });

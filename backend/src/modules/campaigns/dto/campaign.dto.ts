@@ -121,7 +121,13 @@ export class CampaignQueryDto {
 }
 
 export class ModerateCampaignDto {
-  @IsIn([CampaignStatus.APPROVED, CampaignStatus.ACTIVE, CampaignStatus.REJECTED])
+  @IsIn([
+    CampaignStatus.APPROVED,
+    CampaignStatus.ACTIVE,
+    CampaignStatus.REJECTED,
+    CampaignStatus.NEEDS_INFO,
+    CampaignStatus.ENDED,
+  ])
   status!: CampaignStatus;
 
   @IsOptional()
