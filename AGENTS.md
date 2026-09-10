@@ -52,8 +52,8 @@ cd ai-service && ..\scripts\python-ai.cmd -m uvicorn app.main:app --reload  # Te
 .\scripts\npm-local.cmd run check
 .\scripts\npm-local.cmd run build
 
-# Backend
-cd backend && ..\scripts\npm-local.cmd run lint
+# Backend (không có script lint; dùng typecheck)
+cd backend && ..\scripts\npm-local.cmd run typecheck
 cd backend && ..\scripts\npm-local.cmd run test
 cd backend && ..\scripts\npm-local.cmd run build
 
@@ -145,12 +145,12 @@ export class Controller {
 | Module | Status | Priorities |
 |--------|--------|------------|
 | `database` | ✅ Cơ bản | ERD, entities (users/campaigns/donations/milestones/notifications/reports/audit_logs), migration, seed |
-| `auth` | ✅ Cơ bản | JWT, login, register, refresh, JwtAuthGuard, RolesGuard |
-| `users` | ✅ Cơ bản | CRUD, profiles, roles, ownership check |
-| `campaigns` | 🔶 Entities only | CRUD, lifecycle, approval |
-| `donations` | 🔶 Entities only | Transactions, receipts |
-| `payments` | ❌ Trống | Sandbox integration |
-| `progress` | ❌ Trống | Milestones, updates |
+| `auth` | ✅ Hoàn thiện | JWT, login, register, refresh, JwtAuthGuard, RolesGuard, rate limit, chống brute-force (lock 5 lần/15p) |
+| `users` | ✅ Hoàn thiện | CRUD, profiles, roles, ownership check, theo dõi đăng nhập thất bại |
+| `campaigns` | ✅ Hoàn thiện | CRUD, vòng đời (draft→pending→needs_info→approved/active→ended), submit, moderate, lọc/sort |
+| `donations` | ✅ Cơ bản | Transactions, idempotency key, webhook cập nhật, chặn campaign hết hạn |
+| `payments` | 🔶 Cơ bản | DemoWalletGateway sandbox (Ví demo) |
+| `progress` | ✅ Cơ bản | Milestones, updates, progress summary sinh từ giao dịch |
 | `notifications` | 🔶 Entities only | Email, in-app |
 | `moderation` | 🔶 Entities only | Reports, flags |
 | `admin` | ❌ Trống | Dashboard, stats |

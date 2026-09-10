@@ -5,8 +5,10 @@ export type CampaignStatus =
   | "Đã đạt mục tiêu"
   | "Bản nháp"
   | "Chờ duyệt"
+  | "Cần bổ sung"
   | "Bị từ chối"
   | "Tạm dừng"
+  | "Kết thúc"
   | "Đã kết thúc";
 
 export type Campaign = {

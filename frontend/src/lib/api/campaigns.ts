@@ -6,11 +6,13 @@ export type ApiCampaignStatus =
   | "pending"
   | "approved"
   | "rejected"
+  | "needs_info"
   | "active"
   | "paused"
   | "success"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "ended";
 
 export type ApiOwner = {
   id: string;
@@ -148,6 +150,8 @@ function statusToDisplay(status: ApiCampaignStatus): CampaignStatus {
       return "Bản nháp";
     case "pending":
       return "Chờ duyệt";
+    case "needs_info":
+      return "Cần bổ sung";
     case "approved":
     case "active":
       return "Đang gây quỹ";
@@ -157,6 +161,8 @@ function statusToDisplay(status: ApiCampaignStatus): CampaignStatus {
       return "Tạm dừng";
     case "success":
       return "Đã đạt mục tiêu";
+    case "ended":
+      return "Kết thúc";
     case "failed":
     case "cancelled":
       return "Đã kết thúc";

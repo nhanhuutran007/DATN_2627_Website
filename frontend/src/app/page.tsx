@@ -3,7 +3,10 @@ import Link from "next/link";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
-import { campaigns, categoryMeta } from "@/lib/data/campaigns";
+import { apiCampaignToView, fetchCampaigns } from "@/lib/api/campaigns";
+import { campaigns as mockCampaigns, categoryMeta, type Campaign } from "@/lib/data/campaigns";
+
+export const dynamic = "force-dynamic";
 
 const trustItems = [
   { icon: "shield" as const, title: "Hồ sơ được kiểm duyệt", text: "Xác minh chủ dự án trước khi phát hành" },
@@ -18,9 +21,35 @@ const steps = [
   { number: "03", title: "Theo dấu từng thay đổi", text: "Nhận cập nhật, xem chứng từ và tiến độ sử dụng nguồn quỹ sau chiến dịch." },
 ];
 
-export default function Home() {
-  const featured = campaigns.slice(0, 4);
-  const recommended = campaigns.slice(2, 5);
+type HomeCampaigns = {
+  featured: Campaign[];
+  ending: Campaign[];
+  recommended: Campaign[];
+};
+
+async function loadCampaigns(): Promise<HomeCampaigns> {
+  try {
+    const [featuredRes, endingRes, newestRes] = await Promise.all([
+      fetchCampaigns({ sort: "popular", limit: 4 }),
+      fetchCampaigns({ sort: "ending", limit: 4 }),
+      fetchCampaigns({ sort: "newest", limit: 3 }),
+    ]);
+    return {
+      featured: featuredRes.items.map(apiCampaignToView),
+      ending: endingRes.items.map(apiCampaignToView),
+      recommended: newestRes.items.map(apiCampaignToView),
+    };
+  } catch {
+    return {
+      featured: mockCampaigns.slice(0, 4),
+      ending: [mockCampaigns[2], mockCampaigns[3], mockCampaigns[1], mockCampaigns[4]],
+      recommended: mockCampaigns.slice(2, 5),
+    };
+  }
+}
+
+export default async function Home() {
+  const { featured, ending, recommended } = await loadCampaigns();
 
   return (
     <main>
@@ -69,6 +98,20 @@ export default function Home() {
           />
           <div className="campaign-grid">
             {featured.map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
+          </div>
+        </div>
+      </section>
+
+      <section className="section section-featured">
+        <div className="container">
+          <SectionHeading
+            eyebrow="Cơ hội chung tay trước khi đóng quỹ"
+            title="Sắp kết thúc"
+            description="Những chiến dịch đang cán đích — sự ủng hộ của bạn lúc này có ý nghĩa rất lớn."
+            href="/du-an"
+          />
+          <div className="campaign-grid">
+            {ending.map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
           </div>
         </div>
       </section>

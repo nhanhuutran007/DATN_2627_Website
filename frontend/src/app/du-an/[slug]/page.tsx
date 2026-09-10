@@ -128,7 +128,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
         </div>
 
         <aside className="detail-sidebar" id="tai-tro">
-          <DonationPanel campaignTitle={campaign.title} />
+          <DonationPanel campaignId={campaign.slug} campaignTitle={campaign.title} />
           <div className="transparency-card" id="minh-chung">
             <div className="transparency-score"><span>{campaign.transparencyScore}</span><small>/100</small></div>
             <div><p className="eyebrow">Chỉ số minh bạch</p><h2>Hồ sơ rất tốt</h2></div>

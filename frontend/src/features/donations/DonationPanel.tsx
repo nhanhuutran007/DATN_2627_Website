@@ -3,21 +3,31 @@
 import { FormEvent, useMemo, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
+import { ApiError, hasSession } from "@/lib/api";
+import {
+  confirmDonation,
+  createDonation,
+  generateIdempotencyKey,
+  type ApiDonation,
+} from "@/lib/api/donations";
 import { formatCurrency } from "@/lib/data/campaigns";
 
 type DonationPanelProps = {
+  campaignId: string;
   campaignTitle: string;
 };
 
 const presets = [100_000, 300_000, 500_000, 1_000_000];
 
-export function DonationPanel({ campaignTitle }: DonationPanelProps) {
+export function DonationPanel({ campaignId, campaignTitle }: DonationPanelProps) {
   const [amount, setAmount] = useState(300_000);
   const [customAmount, setCustomAmount] = useState("");
   const [anonymous, setAnonymous] = useState(false);
-  const [payment, setPayment] = useState("payos");
+  const [payment, setPayment] = useState("wallet");
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [donation, setDonation] = useState<ApiDonation | null>(null);
 
   const effectiveAmount = useMemo(() => {
     if (!customAmount) return amount;
@@ -25,29 +35,64 @@ export function DonationPanel({ campaignTitle }: DonationPanelProps) {
     return Number.isFinite(parsed) ? parsed : 0;
   }, [amount, customAmount]);
 
-  const submitDonation = (event: FormEvent<HTMLFormElement>) => {
+  const submitDonation = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage("");
+
+    if (!hasSession()) {
+      setMessage("Vui lòng đăng nhập để tài trợ.");
+      return;
+    }
+
     if (effectiveAmount < 20_000) {
       setMessage("Số tiền tài trợ tối thiểu là 20.000 ₫.");
       return;
     }
-    setSubmitted(true);
+
+    setLoading(true);
+    try {
+      const idempotencyKey = generateIdempotencyKey();
+      const created = await createDonation({
+        campaignId,
+        amount: effectiveAmount,
+        paymentMethod: payment,
+        message: message || undefined,
+        isAnonymous: anonymous,
+        idempotencyKey,
+      });
+
+      const confirmed = await confirmDonation({
+        donationId: created.id,
+        status: "completed",
+      });
+
+      setDonation(confirmed);
+      setSubmitted(true);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setMessage(error.message);
+      } else {
+        setMessage("Có lỗi xảy ra. Vui lòng thử lại.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (submitted) {
+  if (submitted && donation) {
     return (
       <div className="donation-panel donation-confirmation" aria-live="polite">
         <span className="confirmation-icon"><Icon name="check" size={26} /></span>
-        <p className="eyebrow">Đơn tài trợ demo đã sẵn sàng</p>
+        <p className="eyebrow">Tài trợ thành công</p>
         <h2>{formatCurrency(effectiveAmount)}</h2>
-        <p>Bạn đang tài trợ cho “{campaignTitle}”. Đây là mô phỏng sandbox nên chưa có khoản tiền hay giao dịch thật nào được ghi nhận.</p>
+        <p>Bạn đã tài trợ cho &ldquo;{campaignTitle}&rdquo;. Cảm ơn bạn!</p>
         <div className="sandbox-receipt">
-          <span>Mã đơn mô phỏng</span><b>GM-DEMO-260909</b>
-          <span>Phương thức</span><b>{payment === "payos" ? "PayOS Sandbox" : "Ví demo"}</b>
-          <span>Hiển thị tên</span><b>{anonymous ? "Ẩn danh" : "Người tài trợ demo"}</b>
+          <span>Mã giao dịch</span><b>{donation.transactionId ?? donation.id}</b>
+          <span>Phương thức</span><b>{donation.paymentMethod === "payos" ? "PayOS Sandbox" : "Ví demo"}</b>
+          <span>Hiển thị tên</span><b>{donation.isAnonymous ? "Ẩn danh" : "Bạn"}</b>
+          <span>Trạng thái</span><b>{donation.status === "completed" ? "Đã xác nhận" : "Đang xử lý"}</b>
         </div>
-        <button className="button button-primary full-button" type="button" onClick={() => setSubmitted(false)}>Quay lại chỉnh sửa</button>
+        <button className="button button-primary full-button" type="button" onClick={() => { setSubmitted(false); setDonation(null); }}>Quay lại chỉnh sửa</button>
       </div>
     );
   }
@@ -102,8 +147,12 @@ export function DonationPanel({ campaignTitle }: DonationPanelProps) {
 
       {message && <p className="form-error" role="alert">{message}</p>}
 
-      <button className="button button-primary full-button donation-submit" type="submit">
-        Tiếp tục với {formatCurrency(effectiveAmount)} <Icon name="arrow-right" size={18} />
+      <button
+        className="button button-primary full-button donation-submit"
+        type="submit"
+        disabled={loading}
+      >
+        {loading ? "Đang xử lý..." : <>Tiếp tục với {formatCurrency(effectiveAmount)} <Icon name="arrow-right" size={18} /></>}
       </button>
       <p className="payment-note"><Icon name="shield" size={15} /> Không lưu dữ liệu thẻ. Số tiền chỉ được ghi nhận sau webhook có chữ ký hợp lệ.</p>
     </form>

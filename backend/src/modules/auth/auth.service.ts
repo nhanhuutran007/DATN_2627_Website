@@ -1,9 +1,13 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
 
-import { User, UserRole } from "../users/entities/user.entity";
-import { UsersService } from "../users/users.service";
+import { User, UserRole, UserStatus } from "../users/entities/user.entity";
+import { isUserLocked, UsersService } from "../users/users.service";
 import { LoginDto, RegisterDto, TokenResponseDto } from "./dto/auth.dto";
 
 @Injectable()
@@ -36,29 +40,50 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials");
     }
 
+    if (user.status === UserStatus.BANNED) {
+      throw new ForbiddenException("Account has been banned");
+    }
+
+    if (isUserLocked(user)) {
+      const retryAfterSeconds = Math.max(
+        0,
+        Math.ceil((new Date(user.lockedUntil!).getTime() - Date.now()) / 1000),
+      );
+      throw new ForbiddenException(
+        `Account temporarily locked, try again in ${retryAfterSeconds}s`,
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
+      await this.usersService.recordLoginFailure(user);
       throw new UnauthorizedException("Invalid credentials");
     }
 
+    await this.usersService.recordLoginSuccess(user);
     return this.generateTokens(user);
   }
 
   async refreshTokens(refreshToken: string): Promise<TokenResponseDto> {
+    let payload: { sub: string };
     try {
-      const payload = this.jwtService.verify(refreshToken, {
+      payload = this.jwtService.verify(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET,
       });
-
-      const user = await this.usersService.findById(payload.sub);
-      if (!user) {
-        throw new UnauthorizedException("User not found");
-      }
-
-      return this.generateTokens(user);
     } catch {
       throw new UnauthorizedException("Invalid refresh token");
     }
+
+    const user = await this.usersService.findById(payload.sub);
+    if (!user) {
+      throw new UnauthorizedException("User not found");
+    }
+
+    if (user.status === UserStatus.BANNED) {
+      throw new ForbiddenException("Account has been banned");
+    }
+
+    return this.generateTokens(user);
   }
 
   async validateUser(userId: string): Promise<User> {

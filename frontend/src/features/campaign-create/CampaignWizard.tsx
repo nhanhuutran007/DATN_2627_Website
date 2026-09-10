@@ -7,9 +7,18 @@ import { FormEvent, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api";
 import { createCampaign, submitCampaign, type ApiCampaign } from "@/lib/api/campaigns";
+import type { CreateMilestonePayload } from "@/lib/api/progress";
+import { createMilestone } from "@/lib/api/progress";
 import { useAuthUser } from "@/lib/auth";
 
 const steps = ["Thông tin cơ bản", "Câu chuyện & ngân sách", "Mốc thực hiện", "Kiểm tra & gửi duyệt"];
+
+type DraftMilestone = {
+  title: string;
+  deadline: string;
+  budget: string;
+  output: string;
+};
 
 type Draft = {
   title: string;
@@ -22,6 +31,12 @@ type Draft = {
   budget: string;
   risks: string;
 };
+
+const initialMilestones: DraftMilestone[] = [
+  { title: "Chuẩn bị và khảo sát", deadline: "", budget: "", output: "" },
+  { title: "Triển khai hoạt động chính", deadline: "", budget: "", output: "" },
+  { title: "Đánh giá và công bố báo cáo", deadline: "", budget: "", output: "" },
+];
 
 const initialDraft: Draft = {
   title: "",
@@ -49,6 +64,7 @@ export function CampaignWizard() {
   const user = useAuthUser();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState(initialDraft);
+  const [milestones, setMilestones] = useState<DraftMilestone[]>(initialMilestones);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -63,6 +79,44 @@ export function CampaignWizard() {
   const update = (key: keyof Draft, value: string) => {
     setDraft((current) => ({ ...current, [key]: value }));
     setNotice("");
+  };
+
+  const updateMilestone = (index: number, key: keyof DraftMilestone, value: string) => {
+    setMilestones((current) =>
+      current.map((milestone, i) => (i === index ? { ...milestone, [key]: value } : milestone)),
+    );
+    setNotice("");
+  };
+
+  const addMilestone = () => {
+    setMilestones((current) => [...current, { title: "", deadline: "", budget: "", output: "" }]);
+  };
+
+  const removeMilestone = (index: number) => {
+    setMilestones((current) => current.filter((_, i) => i !== index));
+  };
+
+  const saveMilestones = async (campaignId: string): Promise<void> => {
+    const valid = milestones
+      .map((milestone, index) => {
+        if (!milestone.title.trim()) return null;
+        let targetDate: string | undefined;
+        if (milestone.deadline) {
+          targetDate = new Date(`${milestone.deadline}T23:59:59`).toISOString();
+        }
+        const budget = milestone.budget ? Number(milestone.budget) : undefined;
+        const payload: CreateMilestonePayload = {
+          title: milestone.title.trim(),
+          targetDate,
+          budget,
+          sortOrder: index,
+        };
+        if (milestone.output.trim()) payload.description = milestone.output.trim();
+        return payload;
+      })
+      .filter((item): item is CreateMilestonePayload => item !== null);
+
+    await Promise.all(valid.map((payload) => createMilestone(campaignId, payload)));
   };
 
   const validateCurrentStep = () => {
@@ -109,7 +163,8 @@ export function CampaignWizard() {
     setNotice("");
     setBusy(true);
     try {
-      await createCampaign(toPayload());
+      const campaign = await createCampaign(toPayload());
+      await saveMilestones(campaign.id);
       setNotice("Bản nháp đã được lưu trên hệ thống. Bạn có thể tiếp tục hoàn thiện hoặc gửi duyệt ở bước cuối.");
     } catch (err) {
       setError(messageFor(err));
@@ -133,6 +188,7 @@ export function CampaignWizard() {
     setBusy(true);
     try {
       const campaign: ApiCampaign = await createCampaign(toPayload());
+      await saveMilestones(campaign.id);
       await submitCampaign(campaign.id);
       setCreatedId(campaign.id);
       setSubmitted(true);
@@ -214,18 +270,21 @@ export function CampaignWizard() {
         {step === 2 && (
           <fieldset className="wizard-fieldset">
             <legend><span>03</span><div><h2>Mốc thực hiện</h2><p>Chia dự án thành các đầu ra có thời hạn và ngân sách rõ ràng.</p></div></legend>
-            {[1, 2, 3].map((item) => (
-              <div className="milestone-editor" key={item}>
-                <span>{item}</span>
+            {milestones.map((milestone, index) => (
+              <div className="milestone-editor" key={index}>
+                <span>{index + 1}</span>
                 <div className="form-grid">
-                  <label className="form-field form-field-wide"><span>Tên mốc {item}</span><input defaultValue={item === 1 ? "Chuẩn bị và khảo sát" : item === 2 ? "Triển khai hoạt động chính" : "Đánh giá và công bố báo cáo"} /></label>
-                  <label className="form-field"><span>Hạn hoàn thành</span><input type="date" /></label>
-                  <label className="form-field"><span>Ngân sách dự kiến</span><input type="number" placeholder="0" /></label>
-                  <label className="form-field form-field-wide"><span>Kết quả đầu ra</span><input placeholder="Sản phẩm hoặc chỉ số có thể kiểm chứng" /></label>
+                  <label className="form-field form-field-wide"><span>Tên mốc {index + 1}</span><input value={milestone.title} placeholder="Ví dụ: Chuẩn bị và khảo sát" onChange={(event) => updateMilestone(index, "title", event.target.value)} /></label>
+                  <label className="form-field"><span>Hạn hoàn thành</span><input type="date" value={milestone.deadline} onChange={(event) => updateMilestone(index, "deadline", event.target.value)} /></label>
+                  <label className="form-field"><span>Ngân sách dự kiến</span><input type="number" placeholder="0" value={milestone.budget} onChange={(event) => updateMilestone(index, "budget", event.target.value)} /></label>
+                  <label className="form-field form-field-wide"><span>Kết quả đầu ra</span><input value={milestone.output} placeholder="Sản phẩm hoặc chỉ số có thể kiểm chứng" onChange={(event) => updateMilestone(index, "output", event.target.value)} /></label>
                 </div>
+                {milestones.length > 1 && (
+                  <button className="remove-milestone-button" type="button" onClick={() => removeMilestone(index)}>Xóa mốc</button>
+                )}
               </div>
             ))}
-            <button className="add-milestone-button" type="button">+ Thêm mốc công việc</button>
+            <button className="add-milestone-button" type="button" onClick={addMilestone}>+ Thêm mốc công việc</button>
           </fieldset>
         )}
 

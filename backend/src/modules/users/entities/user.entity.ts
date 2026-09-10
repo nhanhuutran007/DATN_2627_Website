@@ -46,6 +46,12 @@ export class User extends BaseEntity {
   @Column({ name: "email_verified", default: false })
   emailVerified!: boolean;
 
+  @Column({ name: "failed_login_count", default: 0 })
+  failedLoginCount!: number;
+
+  @Column({ name: "locked_until", type: "datetime", nullable: true })
+  lockedUntil?: Date | null;
+
   @OneToMany("Campaign", "owner")
   campaigns!: any[];
 

@@ -7,11 +7,13 @@ export enum CampaignStatus {
   PENDING = "pending",
   APPROVED = "approved",
   REJECTED = "rejected",
+  NEEDS_INFO = "needs_info",
   ACTIVE = "active",
   PAUSED = "paused",
   SUCCESS = "success",
   FAILED = "failed",
   CANCELLED = "cancelled",
+  ENDED = "ended",
 }
 
 @Entity("campaigns")
