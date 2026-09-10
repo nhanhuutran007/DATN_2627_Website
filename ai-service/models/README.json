@@ -1,0 +1,79 @@
+{
+  "model_version": "2026.09.1",
+  "trained_at": "2026-09-09T01:59:50+00:00",
+  "artifacts": {
+    "success_model": "models/success_model.pkl",
+    "success_metrics": "models/success_metrics.json",
+    "success_features": "models/success_features.json",
+    "fraud_model": "models/fraud_isolation.pkl",
+    "fraud_scaler": "models/fraud_scaler.pkl",
+    "fraud_metrics": "models/fraud_metrics.json"
+  },
+  "features": [
+    "category_id",
+    "goal_amount",
+    "duration_days",
+    "profile_score",
+    "content_length",
+    "image_count",
+    "has_video",
+    "story_word_count",
+    "owner_campaign_count",
+    "owner_credential_approved",
+    "has_budget_report",
+    "early_views",
+    "early_backers"
+  ],
+  "dataset": {
+    "rows": 1000,
+    "file": "data\\synthetic_campaigns.csv",
+    "sha256": "cebbf34a13c78381bfacdd0961f7c474a95db8d37aecc826eb5256b239fac69e",
+    "size_bytes": 96612
+  },
+  "success_metrics": {
+    "best_model": "random_forest",
+    "chosen": {
+      "roc_auc": 0.6850567782132448,
+      "f1": 0.6272189349112426,
+      "precision": 0.6973684210526315,
+      "recall": 0.5698924731182796,
+      "confusion_matrix": {
+        "tn": 84,
+        "fp": 23,
+        "fn": 40,
+        "tp": 53
+      }
+    },
+    "models": {
+      "logistic_regression": {
+        "roc_auc": 0.5729072455029645,
+        "f1": 0.5222222222222223,
+        "precision": 0.5402298850574713,
+        "recall": 0.5053763440860215,
+        "confusion_matrix": {
+          "tn": 67,
+          "fp": 40,
+          "fn": 46,
+          "tp": 47
+        }
+      },
+      "random_forest": {
+        "roc_auc": 0.6850567782132448,
+        "f1": 0.6272189349112426,
+        "precision": 0.6973684210526315,
+        "recall": 0.5698924731182796,
+        "confusion_matrix": {
+          "tn": 84,
+          "fp": 23,
+          "fn": 40,
+          "tp": 53
+        }
+      }
+    }
+  },
+  "fraud_metrics": {
+    "contamination": 0.02,
+    "detection_rate": 0.975,
+    "false_positive_rate": 0.001
+  }
+}

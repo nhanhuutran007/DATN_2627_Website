@@ -1,4 +1,0 @@
-interface:
-  display_name: "Phát triển nền tảng gây quỹ"
-  short_description: "Xây dựng, kiểm thử và phát hành nền tảng AI"
-  default_prompt: "Use $build-crowdfunding-platform để triển khai và kiểm chứng phần việc tiếp theo của nền tảng gây quỹ."

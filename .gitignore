@@ -43,3 +43,7 @@ tmp/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# AI coding agent skills (local only, do not push)
+.codex/
+.opencode/
