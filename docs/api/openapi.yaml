@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Crowdfunding Platform API
-  version: 0.1.0
-  description: Hợp đồng tối thiểu của scaffold. Các API nghiệp vụ chưa được triển khai.
+  version: 0.2.0
+  description: API cho nền tảng gây quỹ cộng đồng Góp Mầm.
 servers:
   - url: http://localhost:4000/api/v1
     description: Backend local
@@ -18,7 +18,183 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /auth/register:
+    post:
+      operationId: register
+      summary: Đăng ký tài khoản mới
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Đăng ký thành công, trả về token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Email đã được đăng ký
+  /auth/login:
+    post:
+      operationId: login
+      summary: Đăng nhập
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Đăng nhập thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Sai email hoặc mật khẩu
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      summary: Làm mới access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: Làm mới token thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Refresh token không hợp lệ
+  /users:
+    get:
+      operationId: listUsers
+      summary: Danh sách người dùng
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Danh sách người dùng
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+  /users/me:
+    get:
+      operationId: getMe
+      summary: Lấy thông tin người dùng hiện tại
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Thông tin người dùng hiện tại
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /users/{id}:
+    get:
+      operationId: getUserById
+      summary: Lấy thông tin người dùng theo id
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Thông tin người dùng
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      summary: Cập nhật thông tin người dùng
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deleteUser
+      summary: Xóa người dùng (chỉ admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Xóa thành công
+  /users/{id}/role:
+    patch:
+      operationId: updateUserRole
+      summary: Cập nhật vai trò người dùng (chỉ admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleRequest"
+      responses:
+        "200":
+          description: Cập nhật vai trò thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     HealthResponse:
       type: object
@@ -33,3 +209,112 @@ components:
         timestamp:
           type: string
           format: date-time
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 2
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        role:
+          type: string
+          enum: [user, campaign_owner, admin]
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    TokenResponse:
+      type: object
+      required: [accessToken, refreshToken, user]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        user:
+          $ref: "#/components/schemas/UserSummary"
+    UserSummary:
+      type: object
+      required: [id, email, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [user, campaign_owner, admin]
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [user, campaign_owner, admin]
+        status:
+          type: string
+          enum: [active, inactive, banned]
+        avatar:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        organization:
+          type: string
+          nullable: true
+        emailVerified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+        bio:
+          type: string
+        phone:
+          type: string
+        organization:
+          type: string
+        avatar:
+          type: string
+    UpdateRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [user, campaign_owner, admin]

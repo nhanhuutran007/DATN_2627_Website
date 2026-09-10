@@ -1,6 +1,10 @@
 # Database
 
-MySQL là nguồn dữ liệu nghiệp vụ chính. Schema và migration chưa được tạo trong scaffold vì cần hoàn thành ERD, quy tắc phân quyền, vòng đời chiến dịch và transaction ledger trước.
+MySQL là nguồn dữ liệu nghiệp vụ chính. Schema và migration được quản lý bằng TypeORM migration (`.ts`) tại `backend/database/migrations/`. Khi khởi tạo thủ công trên hosting (Vietnix), dùng các file SQL sinh sẵn:
+
+- **Schema:** [`docs/database/schema.sql`](./schema.sql)
+- **Seed:** [`docs/database/seed.sql`](./seed.sql)
+- **Hướng dẫn hosting:** [`docs/operations/vietnix-database.md`](../operations/vietnix-database.md)
 
 Nguyên tắc bắt buộc:
 

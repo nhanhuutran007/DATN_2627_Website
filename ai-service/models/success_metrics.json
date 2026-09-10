@@ -1,0 +1,113 @@
+{
+  "model_version": "2026.09.1",
+  "best_model": "random_forest",
+  "chosen_by": "roc_auc",
+  "trained_at": "2026-09-09T01:59:49+00:00",
+  "dataset": {
+    "rows": 1000,
+    "file": "data\\synthetic_campaigns.csv",
+    "sha256": "cebbf34a13c78381bfacdd0961f7c474a95db8d37aecc826eb5256b239fac69e",
+    "size_bytes": 96612
+  },
+  "features": [
+    "category_id",
+    "goal_amount",
+    "duration_days",
+    "profile_score",
+    "content_length",
+    "image_count",
+    "has_video",
+    "story_word_count",
+    "owner_campaign_count",
+    "owner_credential_approved",
+    "has_budget_report",
+    "early_views",
+    "early_backers"
+  ],
+  "split": {
+    "strategy": "time_order",
+    "train_rows": 800,
+    "test_rows": 200,
+    "threshold": 0.8,
+    "semantics": "Tập train là 80% đầu tiên theo thứ tự thời gian tạo dự án (những dự án 'trước'), tập test là 19% xuất hiện sau ('sau'), mô phỏng việc dự đoán các dự án trong tương lai."
+  },
+  "models": {
+    "logistic_regression": {
+      "roc_auc": 0.5729072455029645,
+      "f1": 0.5222222222222223,
+      "precision": 0.5402298850574713,
+      "recall": 0.5053763440860215,
+      "confusion_matrix": {
+        "tn": 67,
+        "fp": 40,
+        "fn": 46,
+        "tp": 47
+      }
+    },
+    "random_forest": {
+      "roc_auc": 0.6850567782132448,
+      "f1": 0.6272189349112426,
+      "precision": 0.6973684210526315,
+      "recall": 0.5698924731182796,
+      "confusion_matrix": {
+        "tn": 84,
+        "fp": 23,
+        "fn": 40,
+        "tp": 53
+      }
+    }
+  },
+  "chosen": {
+    "roc_auc": 0.6850567782132448,
+    "f1": 0.6272189349112426,
+    "precision": 0.6973684210526315,
+    "recall": 0.5698924731182796,
+    "confusion_matrix": {
+      "tn": 84,
+      "fp": 23,
+      "fn": 40,
+      "tp": 53
+    }
+  },
+  "feature_impact": {
+    "category_id": {
+      "corr": -0.005073
+    },
+    "goal_amount": {
+      "corr": -0.131583
+    },
+    "duration_days": {
+      "corr": 0.061363
+    },
+    "profile_score": {
+      "corr": 0.210281
+    },
+    "content_length": {
+      "corr": -0.100654
+    },
+    "image_count": {
+      "corr": 0.119308
+    },
+    "has_video": {
+      "corr": 0.031763
+    },
+    "story_word_count": {
+      "corr": -0.016323
+    },
+    "owner_campaign_count": {
+      "corr": 0.132586
+    },
+    "owner_credential_approved": {
+      "corr": 0.179318
+    },
+    "has_budget_report": {
+      "corr": 0.111424
+    },
+    "early_views": {
+      "corr": 0.048328
+    },
+    "early_backers": {
+      "corr": 0.019332
+    }
+  }
+}

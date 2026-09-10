@@ -1,0 +1,21 @@
+{
+  "model_version": "2026.09.1",
+  "feature_schema_version": "1.0.0",
+  "trained_at": "2026-09-09T01:59:49+00:00",
+  "features": [
+    "category_id",
+    "goal_amount",
+    "duration_days",
+    "profile_score",
+    "content_length",
+    "image_count",
+    "has_video",
+    "story_word_count",
+    "owner_campaign_count",
+    "owner_credential_approved",
+    "has_budget_report",
+    "early_views",
+    "early_backers"
+  ],
+  "best_model": "random_forest"
+}
