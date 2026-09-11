@@ -46,4 +46,6 @@ Thumbs.db
 
 # AI coding agent skills (local only, do not push)
 .codex/
-.opencode/
+.opencode/*
+!.opencode/skills/
+!.opencode/.gitignore
