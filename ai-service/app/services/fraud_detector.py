@@ -36,7 +36,9 @@ def _as_finite(value: object) -> float | None:
 
 
 @lru_cache(maxsize=8)
-def _load_fraud_artifacts(model_path_str: str, scaler_path_str: str) -> tuple[Any | None, Any | None]:
+def _load_fraud_artifacts(
+    model_path_str: str, scaler_path_str: str
+) -> tuple[Any | None, Any | None]:
     try:
         model = joblib.load(Path(model_path_str))
         scaler = joblib.load(Path(scaler_path_str))
@@ -142,7 +144,9 @@ class FraudDetectorService:
         self._model_path = Path(model_path) if model_path else settings.fraud_model_path
         self._scaler_path = Path(scaler_path) if scaler_path else settings.fraud_scaler_path
 
-    def score(self, entity_type: str, entity_id: int | None, features: dict[str, float]) -> FraudResponse:
+    def score(
+        self, entity_type: str, entity_id: str | None, features: dict[str, float]
+    ) -> FraudResponse:
         rule_results = _apply_rules(features)
         rule_score = max((result.score for result in rule_results), default=0.0)
         ml_risk = self._ml_risk(features)

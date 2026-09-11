@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class CampaignFeature(BaseModel):
-    campaign_id: int
+    campaign_id: str
     category: str = ""
     title: str = ""
     keywords: list[str] = Field(default_factory=list)
@@ -24,21 +24,21 @@ class CampaignFeature(BaseModel):
 
 
 class UserEvent(BaseModel):
-    campaign_id: int
+    campaign_id: str
     event_type: str
     category: str = ""
 
 
 class RecommendRequest(BaseModel):
-    user_id: int | None = None
+    user_id: str | None = None
     preferences: list[str] = Field(default_factory=list)
-    exclude_ids: list[int] = Field(default_factory=list)
+    exclude_ids: list[str] = Field(default_factory=list)
     candidates: list[CampaignFeature] = Field(default_factory=list)
     history: list[UserEvent] = Field(default_factory=list)
 
 
 class RecommendItem(BaseModel):
-    campaign_id: int
+    campaign_id: str
     score: float
     reason: str
 

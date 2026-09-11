@@ -1,9 +1,10 @@
 """Offline training pipeline for the crowdfunding AI service.
 
-Generates a deterministic synthetic campaign dataset plus a synthetic fraud
-feature matrix, trains LogisticRegression / RandomForest success models and an
-IsolationForest fraud model, evaluates them on a time-ordered split and writes
-evaluated artifacts + metadata into ``models/``.
+Trains LogisticRegression / RandomForest success models and an IsolationForest
+fraud model, evaluates them on a time-ordered split and writes evaluated
+artifacts + metadata into ``models/``. Dataset generation is shared with other
+tools via :mod:`training.datasets` (deterministic synthetic CSVs under
+``data/``; replace them with scraped data later, see ``data/README.md``).
 
 Run from the ``ai-service`` directory either as:
 
@@ -16,7 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
@@ -37,18 +38,21 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.services.catalog import CATEGORIES, FRAUD_FEATURES, SUCCESS_FEATURES
+from app.services.catalog import FRAUD_FEATURES, SUCCESS_FEATURES  # noqa: E402
+from training.datasets import (  # noqa: E402
+    CAMPAIGNS_CSV,
+    FRAUD_CONTAMINATION,
+    FRAUD_CSV,
+    generate_campaigns,
+    generate_fraud_frame,
+    write_missing,
+)
 
 SEED = 42
 MODEL_VERSION = "2026.09.1"
-ROWS = 1000
-FRAUD_ROWS = 2000
-FRAUD_CONTAMINATION = 0.02
 TRAIN_FRACTION = 0.8
 
 MODELS_DIR = ROOT / "models"
-DATA_DIR = ROOT / "data"
-CAMPAIGN_CSV = DATA_DIR / "synthetic_campaigns.csv"
 
 
 def sha256_of(path: Path) -> str:
@@ -58,66 +62,12 @@ def sha256_of(path: Path) -> str:
 
 
 def now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def confusion_numbers(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, int]:
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
     return {"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)}
-
-
-def generate_campaigns() -> pd.DataFrame:
-    rng = np.random.default_rng(SEED)
-    n = ROWS
-
-    profile_score = np.clip(rng.normal(62.0, 20.0, n), 0.0, 100.0)
-    image_count = np.clip(np.round(rng.normal(5.0, 3.0, n)), 0.0, 15.0).astype(int)
-    goal_amount = np.clip(np.exp(rng.normal(18.6, 0.95, n)), 1e6, 5e8)
-    duration_days = rng.integers(7, 121, size=n)
-    owner_credential_approved = rng.binomial(1, 0.5, size=n).astype(float)
-    has_budget_report = rng.binomial(1, 0.4, size=n).astype(float)
-    has_video = rng.binomial(1, 0.35, size=n).astype(float)
-    owner_campaign_count = np.clip(np.round(rng.normal(1.2, 1.6, n)), 0, 8).astype(int)
-    early_backers = rng.poisson(8, size=n)
-
-    logit = (
-        -3.8
-        + 0.03 * profile_score
-        + 0.12 * np.minimum(image_count, 8)
-        + 0.8 * owner_credential_approved
-        + 0.6 * has_budget_report
-        + 0.2 * np.minimum(owner_campaign_count, 4)
-        + 0.3 * has_video
-        + 0.008 * np.minimum(duration_days, 90)
-        - 0.9 * np.clip((goal_amount - 2e7) / 4e8, 0.0, 1.0)
-        + 0.3 * np.minimum(early_backers, 15) / 15.0
-    )
-    success_prob = 1.0 / (1.0 + np.exp(-logit))
-    success = rng.binomial(1, success_prob, size=n)
-
-    frame = pd.DataFrame(
-        {
-            "campaign_id": np.arange(1, n + 1),
-            "category": rng.choice(CATEGORIES, size=n, replace=True),
-            "category_id": None,
-            "goal_amount": goal_amount,
-            "duration_days": duration_days,
-            "profile_score": profile_score,
-            "content_length": rng.integers(500, 20000, size=n),
-            "image_count": image_count,
-            "has_video": has_video,
-            "story_word_count": rng.integers(200, 5000, size=n),
-            "owner_campaign_count": owner_campaign_count,
-            "owner_credential_approved": owner_credential_approved,
-            "has_budget_report": has_budget_report,
-            "early_views": rng.poisson(300, size=n),
-            "early_backers": early_backers,
-            "success": success,
-            "launch_seq": np.arange(n),
-        }
-    )
-    frame["category_id"] = frame["category"].map({cat: idx for idx, cat in enumerate(CATEGORIES)})
-    return frame
 
 
 def build_features(frame: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
@@ -128,8 +78,8 @@ def build_features(frame: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
 
 def train_success_models() -> dict:
     frame = generate_campaigns()
-    CAMPAIGN_CSV.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(CAMPAIGN_CSV, index=False, encoding="utf-8")
+    CAMPAIGNS_CSV.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(CAMPAIGNS_CSV, index=False, encoding="utf-8")
 
     x, y = build_features(frame)
     seq = frame["launch_seq"].to_numpy()
@@ -200,9 +150,9 @@ def train_success_models() -> dict:
         "trained_at": now_iso(),
         "dataset": {
             "rows": int(len(frame)),
-            "file": str(CAMPAIGN_CSV.relative_to(ROOT)),
-            "sha256": sha256_of(CAMPAIGN_CSV),
-            "size_bytes": CAMPAIGN_CSV.stat().st_size,
+            "file": str(CAMPAIGNS_CSV.relative_to(ROOT)),
+            "sha256": sha256_of(CAMPAIGNS_CSV),
+            "size_bytes": CAMPAIGNS_CSV.stat().st_size,
         },
         "features": list(SUCCESS_FEATURES),
         "split": {
@@ -230,55 +180,10 @@ def train_success_models() -> dict:
     return metrics
 
 
-def generate_fraud_frame() -> pd.DataFrame:
-    rng = np.random.default_rng(SEED + 1)
-    n = FRAUD_ROWS
-    n_anomaly = int(FRAUD_CONTAMINATION * n)
-
-    normal = pd.DataFrame(
-        {
-            "contribution_count_1h": rng.poisson(0.5, n),
-            "failed_payment_count": rng.poisson(0.08, n),
-            "total_payment_count": rng.poisson(2, n),
-            "device_shared_accounts": rng.poisson(0.2, n),
-            "amount_z_score": rng.normal(0.0, 0.8, n),
-            "ip_country_changes": rng.poisson(0.2, n),
-            "new_account_days": rng.uniform(20.0, 400.0, n),
-            "profile_change_frequency": rng.poisson(0.3, n),
-            "is_anomaly": 0,
-        }
-    )
-    pattern = rng.integers(0, 3, size=n_anomaly)
-    cluster_a = pattern == 0
-    cluster_b = pattern == 1
-    cluster_c = pattern == 2
-    anomaly = pd.DataFrame(
-        {
-            "contribution_count_1h": np.where(cluster_a, rng.uniform(15, 60, n_anomaly), rng.poisson(0.5, n_anomaly)),
-            "failed_payment_count": np.where(
-                cluster_b, rng.integers(4, 20, n_anomaly), rng.poisson(0.08, n_anomaly)
-            ),
-            "total_payment_count": np.where(
-                cluster_b, rng.integers(3, 25, n_anomaly), rng.poisson(2, n_anomaly)
-            ),
-            "device_shared_accounts": np.where(
-                cluster_c, rng.integers(5, 20, n_anomaly), rng.poisson(0.2, n_anomaly)
-            ),
-            "amount_z_score": rng.normal(3.5, 1.5, n_anomaly),
-            "ip_country_changes": np.where(
-                cluster_c, rng.integers(3, 8, n_anomaly), rng.poisson(0.2, n_anomaly)
-            ),
-            "new_account_days": rng.uniform(0.0, 2.0, n_anomaly),
-            "profile_change_frequency": rng.poisson(0.3, n_anomaly),
-            "is_anomaly": 1,
-        }
-    )
-    frame = pd.concat([normal, anomaly], ignore_index=True)
-    return frame.sample(frac=1.0, random_state=SEED).reset_index(drop=True)
-
-
 def train_fraud_model() -> dict:
     frame = generate_fraud_frame()
+    FRAUD_CSV.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(FRAUD_CSV, index=False, encoding="utf-8")
     x = frame[FRAUD_FEATURES].to_numpy(dtype=float)
     labels = frame["is_anomaly"].to_numpy()
 
@@ -360,6 +265,7 @@ def write_model_readme(metrics: dict, fraud_metrics: dict) -> None:
 
 
 def main() -> None:
+    write_missing()
     success_metrics = train_success_models()
     fraud_metrics = train_fraud_model()
     write_success_metadata(success_metrics)
@@ -370,7 +276,7 @@ def main() -> None:
     chosen = success_metrics["chosen"]
     print("== Báo cáo huấn luyện (training report) ==")
     print(f"Nhãn model version: {MODEL_VERSION}")
-    print(f"Dữ liệu campaign: {success_metrics['dataset']['rows']} dòng -> {CAMPAIGN_CSV.name}")
+    print(f"Dữ liệu campaign: {success_metrics['dataset']['rows']} dòng -> {CAMPAIGNS_CSV.name}")
     print(f"Split: {success_metrics['split']['semantics']}")
     print(f"LogisticRegression - ROC-AUC={lr['roc_auc']:.4f} F1={lr['f1']:.4f} "
           f"Precision={lr['precision']:.4f} Recall={lr['recall']:.4f}")

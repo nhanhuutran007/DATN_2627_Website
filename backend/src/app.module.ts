@@ -4,6 +4,8 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { getDatabaseConfig } from "./config/database.config";
 import { RateLimitModule } from "./common/rate-limit/rate-limit.module";
+import { AdminModule } from "./modules/admin/admin.module";
+import { AiModule } from "./modules/ai/ai.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CampaignsModule } from "./modules/campaigns/campaigns.module";
 import { DonationsModule } from "./modules/donations/donations.module";
@@ -18,6 +20,8 @@ import { UsersModule } from "./modules/users/users.module";
     }),
     TypeOrmModule.forRoot(getDatabaseConfig()),
     RateLimitModule,
+    AdminModule,
+    AiModule,
     AuthModule,
     UsersModule,
     CampaignsModule,

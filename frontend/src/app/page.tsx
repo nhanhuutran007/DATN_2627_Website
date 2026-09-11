@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AiRecommendations } from "@/components/ai/AiRecommendations";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
@@ -151,21 +152,7 @@ export default async function Home() {
         <p className="demo-note container">* Số liệu mô phỏng phục vụ bản demo đồ án.</p>
       </section>
 
-      <section className="section ai-section">
-        <div className="container">
-          <div className="ai-heading-row">
-            <SectionHeading
-              eyebrow="Dành riêng cho bạn"
-              title="Có thể bạn sẽ quan tâm"
-              description="Danh sách demo minh họa cách AI giải thích lý do gợi ý và tự động chuyển sang dự án phổ biến khi dịch vụ gián đoạn."
-            />
-            <div className="ai-label"><Icon name="sparkles" size={18} /> Gợi ý có giải thích</div>
-          </div>
-          <div className="campaign-grid campaign-grid-three">
-            {recommended.map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} showAiReason />)}
-          </div>
-        </div>
-      </section>
+      <AiRecommendations fallback={recommended} />
 
       <section className="section how-section" id="cach-hoat-dong">
         <div className="container how-grid">

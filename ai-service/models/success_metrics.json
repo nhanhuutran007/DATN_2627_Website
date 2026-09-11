@@ -2,7 +2,7 @@
   "model_version": "2026.09.1",
   "best_model": "random_forest",
   "chosen_by": "roc_auc",
-  "trained_at": "2026-09-09T01:59:49+00:00",
+  "trained_at": "2026-09-11T04:57:02+00:00",
   "dataset": {
     "rows": 1000,
     "file": "data\\synthetic_campaigns.csv",
@@ -29,7 +29,7 @@
     "train_rows": 800,
     "test_rows": 200,
     "threshold": 0.8,
-    "semantics": "Tập train là 80% đầu tiên theo thứ tự thời gian tạo dự án (những dự án 'trước'), tập test là 19% xuất hiện sau ('sau'), mô phỏng việc dự đoán các dự án trong tương lai."
+    "semantics": "Tập train là 80% đầu tiên theo thứ tự thời gian tạo dự án (những dự án 'trước'), tập test là 20% xuất hiện sau ('sau'), mô phỏng việc dự đoán các dự án trong tương lai."
   },
   "models": {
     "logistic_regression": {

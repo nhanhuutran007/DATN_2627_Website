@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { ProgressBar } from "@/components/campaign/ProgressBar";
+import { AiPredictCard } from "@/components/ai/AiPredictCard";
 import { Icon } from "@/components/ui/Icon";
 import { DonationPanel } from "@/features/donations/DonationPanel";
 import { apiCampaignToView, fetchCampaign, fetchCampaigns } from "@/lib/api/campaigns";
@@ -129,6 +130,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
 
         <aside className="detail-sidebar" id="tai-tro">
           <DonationPanel campaignId={campaign.slug} campaignTitle={campaign.title} />
+          <AiPredictCard campaignId={campaign.slug} />
           <div className="transparency-card" id="minh-chung">
             <div className="transparency-score"><span>{campaign.transparencyScore}</span><small>/100</small></div>
             <div><p className="eyebrow">Chỉ số minh bạch</p><h2>Hồ sơ rất tốt</h2></div>
