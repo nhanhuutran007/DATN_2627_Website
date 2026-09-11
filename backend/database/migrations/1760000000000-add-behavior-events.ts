@@ -19,10 +19,8 @@ export class AddBehaviorEvents1760000000000 implements MigrationInterface {
       ) ENGINE=InnoDB;
     `);
 
-    await queryRunner.query(`
-      CREATE INDEX idx_behavior_user_type ON behavior_events(user_id, event_type);
-      CREATE INDEX idx_behavior_campaign ON behavior_events(campaign_id);
-    `);
+    await queryRunner.query(`CREATE INDEX idx_behavior_user_type ON behavior_events(user_id, event_type)`);
+    await queryRunner.query(`CREATE INDEX idx_behavior_campaign ON behavior_events(campaign_id)`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
