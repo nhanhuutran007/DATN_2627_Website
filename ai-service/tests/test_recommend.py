@@ -5,7 +5,7 @@ from app.services.recommender import RecommenderService
 def _candidates() -> list[CampaignFeature]:
     return [
         CampaignFeature(
-            campaign_id=101,
+            campaign_id="camp-101",
             category="Giáo dục",
             title="Sách lập trình cho trẻ",
             views=500,
@@ -14,7 +14,7 @@ def _candidates() -> list[CampaignFeature]:
             days_left=20,
         ),
         CampaignFeature(
-            campaign_id=102,
+            campaign_id="camp-102",
             category="Y tế",
             title="Quỹ hỗ trợ bệnh viện",
             views=900,
@@ -23,7 +23,7 @@ def _candidates() -> list[CampaignFeature]:
             days_left=5,
         ),
         CampaignFeature(
-            campaign_id=103,
+            campaign_id="camp-103",
             category="Công nghệ",
             title="Thiết bị IoT nông nghiệp",
             views=1200,
@@ -36,7 +36,9 @@ def _candidates() -> list[CampaignFeature]:
 
 def test_cold_start_returns_ranked_items_without_history() -> None:
     service = RecommenderService()
-    request = RecommendRequest(user_id=7, preferences=[], history=[], candidates=_candidates())
+    request = RecommendRequest(
+        user_id="user-7", preferences=[], history=[], candidates=_candidates()
+    )
     response = service.recommend(request)
 
     assert response.source == "COLD_START"
@@ -49,37 +51,37 @@ def test_cold_start_returns_ranked_items_without_history() -> None:
 def test_exclude_ids_are_respected() -> None:
     service = RecommenderService()
     request = RecommendRequest(
-        user_id=7,
+        user_id="user-7",
         preferences=[],
-        exclude_ids=[101, 103],
+        exclude_ids=["camp-101", "camp-103"],
         history=[],
         candidates=_candidates(),
     )
     response = service.recommend(request)
 
     returned_ids = {item.campaign_id for item in response.items}
-    assert 101 not in returned_ids
-    assert 103 not in returned_ids
+    assert "camp-101" not in returned_ids
+    assert "camp-103" not in returned_ids
 
 
 def test_history_drives_collaborative_source() -> None:
     service = RecommenderService()
     request = RecommendRequest(
-        user_id=7,
+        user_id="user-7",
         preferences=[],
-        history=[UserEvent(campaign_id=1, event_type="CONTRIBUTE", category="Giáo dục")],
+        history=[UserEvent(campaign_id="camp-1", event_type="CONTRIBUTE", category="Giáo dục")],
         candidates=_candidates(),
     )
     response = service.recommend(request)
 
     assert response.source == "COLLABORATIVE"
-    assert response.items[0].campaign_id == 101
+    assert response.items[0].campaign_id == "camp-101"
 
 
 def test_preferences_drive_content_source() -> None:
     service = RecommenderService()
     request = RecommendRequest(
-        user_id=7,
+        user_id="user-7",
         preferences=["Y tế"],
         history=[],
         candidates=_candidates(),
@@ -87,4 +89,4 @@ def test_preferences_drive_content_source() -> None:
     response = service.recommend(request)
 
     assert response.source == "CONTENT"
-    assert response.items[0].campaign_id == 102
+    assert response.items[0].campaign_id == "camp-102"

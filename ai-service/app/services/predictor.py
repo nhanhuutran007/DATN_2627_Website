@@ -114,9 +114,11 @@ class PredictorService:
     ) -> None:
         self._model_path = Path(model_path) if model_path else settings.model_path
         self._metrics_path = Path(metrics_path) if metrics_path else settings.success_metrics_path
-        self._features_path = Path(features_path) if features_path else settings.success_features_path
+        self._features_path = (
+            Path(features_path) if features_path else settings.success_features_path
+        )
 
-    def predict(self, features: PredictFeatures, campaign_id: int | None = None) -> PredictResponse:
+    def predict(self, features: PredictFeatures, campaign_id: str | None = None) -> PredictResponse:
         model, trained_features, version = _load_model_artifacts(
             str(self._model_path), str(self._features_path)
         )
@@ -144,7 +146,9 @@ class PredictorService:
 
         return self._heuristic_response(features, metrics)
 
-    def _feature_vector(self, features: PredictFeatures, trained_features: list[str] | None) -> list[float]:
+    def _feature_vector(
+        self, features: PredictFeatures, trained_features: list[str] | None
+    ) -> list[float]:
         source = {
             "category_id": float(features.category_id),
             "goal_amount": max(float(features.goal_amount), 0.0),
@@ -226,7 +230,9 @@ class PredictorService:
                     pass
         return self._perturb_direction(model, vector, names, name)
 
-    def _perturb_direction(self, model: Any, vector: list[float], names: list[str], name: str) -> str:
+    def _perturb_direction(
+        self, model: Any, vector: list[float], names: list[str], name: str
+    ) -> str:
         try:
             index = names.index(name)
             lo = np.asarray(vector, dtype=float).copy()
@@ -242,7 +248,9 @@ class PredictorService:
             pass
         return "UP"
 
-    def _heuristic_response(self, features: PredictFeatures, metrics: dict | None) -> PredictResponse:
+    def _heuristic_response(
+        self, features: PredictFeatures, metrics: dict | None
+    ) -> PredictResponse:
         total = 0.0
         contributions: list[tuple[str, float, str]] = []
         for name, coefficient, scale, note_up in HEURISTIC_TERMS:

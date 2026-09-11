@@ -3,7 +3,7 @@ from app.services.fraud_detector import FraudDetectorService
 
 def test_high_volume_rule_triggers_high_risk() -> None:
     service = FraudDetectorService()
-    response = service.score("USER", 999, {"contribution_count_1h": 12.0})
+    response = service.score("USER", "user-999", {"contribution_count_1h": 12.0})
 
     assert response.risk_score >= 0.7
     assert response.level == "HIGH"

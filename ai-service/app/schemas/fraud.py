@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class FraudRequest(BaseModel):
     entity_type: Literal["USER", "CAMPAIGN", "CONTRIBUTION", "TRANSACTION"] = "USER"
-    entity_id: int | None = None
+    entity_id: str | None = None
     features: dict[str, float] = Field(default_factory=dict)
 
 

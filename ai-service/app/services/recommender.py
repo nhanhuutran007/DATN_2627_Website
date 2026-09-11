@@ -105,7 +105,14 @@ class RecommenderService:
         return RecommendResponse(
             source=source,
             fallback=False,
-            items=[RecommendItem(campaign_id=i.campaign_id, score=i.score, reason=i.reason) for i in items],
+            items=[
+                RecommendItem(
+                    campaign_id=item.campaign_id,
+                    score=item.score,
+                    reason=item.reason,
+                )
+                for item in items
+            ],
             detail=detail,
         )
 
@@ -172,7 +179,8 @@ class RecommenderService:
         return 0.35 * best
 
     def _popular_fallback(self, request: RecommendRequest, detail: str) -> RecommendResponse:
-        candidates = [c for c in request.candidates if c.campaign_id not in set(request.exclude_ids or [])]
+        excluded = set(request.exclude_ids or [])
+        candidates = [c for c in request.candidates if c.campaign_id not in excluded]
         scored: list[RecommendItem] = []
         for candidate in candidates:
             popularity = _to_float(candidate.views) * 0.7 + _to_float(candidate.backers_count) * 1.5

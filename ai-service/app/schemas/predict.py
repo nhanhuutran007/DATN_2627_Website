@@ -22,7 +22,7 @@ class PredictFeatures(BaseModel):
 
 
 class PredictRequest(BaseModel):
-    campaign_id: int | None = None
+    campaign_id: str | None = None
     features: PredictFeatures = Field(default_factory=PredictFeatures)
 
 

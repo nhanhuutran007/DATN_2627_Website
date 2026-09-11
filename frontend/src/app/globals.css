@@ -1080,6 +1080,13 @@ button.header-action {
   font-weight: 750;
 }
 
+.ai-note {
+  margin: 15px 0 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.55;
+}
+
 /* How it works */
 .how-section {
   background: var(--cream);
