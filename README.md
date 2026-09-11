@@ -17,6 +17,7 @@
 - [Khởi động bộ khung](#khởi-động-bộ-khung)
 - [Yêu cầu phi chức năng](#yêu-cầu-phi-chức-năng)
 - [Kiểm thử và đánh giá](#kiểm-thử-và-đánh-giá)
+- [Tiến độ triển khai](#tiến-độ-triển-khai)
 - [Kế hoạch thực hiện](#kế-hoạch-thực-hiện)
 - [Sản phẩm dự kiến](#sản-phẩm-dự-kiến)
 - [Hạn chế và hướng phát triển](#hạn-chế-và-hướng-phát-triển)
@@ -369,6 +370,25 @@ Sau khi khởi động, frontend ở `http://localhost:3000`, backend health ở
 - Báo cáo chỉ số đánh giá, ma trận nhầm lẫn và các trường hợp dự đoán chưa tốt.
 - Quản lý phiên bản mô hình, tập đặc trưng và kết quả đánh giá để có thể tái lập.
 - Theo dõi tỷ lệ cảnh báo sai và chất lượng xếp hạng.
+
+## Tiến độ triển khai
+
+> Cập nhật ngày **11/09/2026**. Trạng thái dưới đây phản ánh mã nguồn và kiểm thử hiện có, không đồng nghĩa hệ thống đã sẵn sàng vận hành production.
+
+| Hạng mục | Trạng thái | Kết quả hiện tại |
+| --- | --- | --- |
+| Cơ sở dữ liệu | Đã có nền tảng | Entities, migration và seed cho tài khoản, chiến dịch, tài trợ, tiến độ, thông báo, báo cáo, hành vi và cảnh báo rủi ro. |
+| Xác thực và người dùng | Đã triển khai lõi | Đăng ký, đăng nhập, refresh token, JWT guards, phân quyền, CRUD hồ sơ, giới hạn tần suất và khóa tạm khi đăng nhập sai nhiều lần. |
+| Chiến dịch | Đã triển khai lõi | CRUD, quyền sở hữu, quy trình gửi duyệt/kiểm duyệt, lọc và sắp xếp; frontend có khám phá, trang chi tiết và luồng tạo chiến dịch. |
+| Tài trợ và thanh toán | Đã triển khai cơ bản | Tạo giao dịch, idempotency, webhook có xác minh, lịch sử người tài trợ và cổng Ví demo; chưa tích hợp thanh toán production. |
+| Tiến độ và minh bạch | Đã triển khai cơ bản | Mốc tiến độ, bài cập nhật, tổng hợp số liệu từ giao dịch và khu vực minh bạch trên giao diện dự án. |
+| Quản trị và cảnh báo | Đã triển khai cơ bản | Dashboard tổng quan, danh sách chiến dịch/tài trợ/người dùng, tạo và xử lý cảnh báo rủi ro; quy trình moderation nội dung đầy đủ vẫn đang hoàn thiện. |
+| Dịch vụ AI | Đã triển khai cơ bản | FastAPI cho gợi ý, dự đoán thành công và phát hiện bất thường; có giải thích, fallback, model metadata, metrics và kiểm thử API. |
+| Giao diện người dùng | Đang hoàn thiện | Trang chủ, khám phá, chi tiết dự án, xác thực, dashboard, tạo chiến dịch và admin đã có; hệ thống font, header, card và trang chi tiết đã được chuẩn hóa responsive. |
+| Thông báo và moderation | Chưa hoàn thiện | Hiện mới có entity nền tảng; chưa có đầy đủ service, controller, giao diện và kiểm thử tích hợp. |
+| Tích hợp và triển khai | Đang chuẩn bị | Có Docker Compose/Nginx cho local; E2E toàn luồng, staging, HTTPS, giám sát và backup/restore vẫn cần hoàn thiện. |
+
+Trọng tâm tiếp theo là hoàn thiện notifications/moderation, bổ sung kiểm thử tích hợp và E2E, sau đó chuẩn hóa môi trường staging trước khi triển khai demo trực tuyến.
 
 ## Kế hoạch thực hiện
 

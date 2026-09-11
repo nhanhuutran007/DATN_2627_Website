@@ -11,8 +11,8 @@ import { useAuthUser } from "@/lib/auth";
 const navigation = [
   { href: "/", label: "Trang chủ" },
   { href: "/du-an", label: "Khám phá dự án" },
-  { href: "/du-an?category=Môi+trường", label: "Dự án xã hội" },
-  { href: "/du-an?category=Khởi+nghiệp", label: "Khởi nghiệp" },
+  { href: `/du-an?category=${encodeURIComponent("Môi trường")}`, label: "Dự án xã hội" },
+  { href: `/du-an?category=${encodeURIComponent("Khởi nghiệp")}`, label: "Khởi nghiệp" },
   { href: "/#cach-hoat-dong", label: "Cách hoạt động" },
   { href: "/#minh-bach", label: "Minh bạch" },
 ];
@@ -34,7 +34,7 @@ export function SiteHeader() {
       <div className="announcement">
         <div className="container announcement-inner">
           <span><Icon name="shield" size={15} /> Mọi khoản đóng góp đều được truy vết minh bạch</span>
-          <span className="announcement-help">Hỗ trợ: 1900 6868 · 08:00–21:00</span>
+          <span className="announcement-help">AI chỉ hỗ trợ · Quyết định luôn có con người kiểm duyệt</span>
         </div>
       </div>
 
@@ -62,32 +62,42 @@ export function SiteHeader() {
           </form>
 
           <div className="header-actions">
-            <Link className="header-action" href="/dashboard">
-              <Icon name="bell" size={21} /><span>Thông báo</span>{user ? null : <i>3</i>}
-            </Link>
             {user ? (
-              <div className="header-account">
-                <Link className="header-action" href="/dashboard" aria-label="Trang quản lý">
-                  <Icon name="user" size={21} /><span>{user.name.split(" ").pop()}</span>
+              <>
+                <Link className="header-action header-notification" href="/dashboard" aria-label="Thông báo">
+                  <Icon name="bell" size={21} /><span>Thông báo</span>
                 </Link>
-                <button className="header-action header-logout" type="button" onClick={handleLogout} aria-label="Đăng xuất">
-                  <Icon name="x" size={19} />
-                </button>
-              </div>
+                <div className="header-account">
+                  <Link className="header-action" href="/dashboard" aria-label="Trang quản lý">
+                    <Icon name="user" size={21} /><span>{user.name.split(" ").pop()}</span>
+                  </Link>
+                  <button className="header-action header-logout" type="button" onClick={handleLogout} aria-label="Đăng xuất">
+                    <Icon name="x" size={18} />
+                  </button>
+                </div>
+              </>
             ) : (
               <Link className="header-action" href="/dang-nhap">
-                <Icon name="user" size={21} /><span>Tài khoản</span>
+                <Icon name="user" size={21} /><span>Đăng nhập</span>
               </Link>
             )}
-            <Link className="button button-primary header-cta" href="/tao-chien-dich">Bắt đầu dự án</Link>
+            <Link className="button button-primary header-cta" href="/tao-chien-dich">Tạo chiến dịch</Link>
           </div>
         </div>
       </div>
 
       <nav className={`primary-nav ${open ? "is-open" : ""}`} aria-label="Điều hướng chính">
         <div className="container primary-nav-inner">
+          <form className="mobile-nav-search" action="/du-an" role="search" onSubmit={() => setOpen(false)}>
+            <label className="sr-only" htmlFor="mobile-global-search">Tìm kiếm chiến dịch</label>
+            <Icon name="search" size={18} />
+            <input id="mobile-global-search" name="q" placeholder="Tìm dự án, lĩnh vực, địa điểm..." />
+            <button type="submit" aria-label="Tìm kiếm"><Icon name="arrow-right" size={18} /></button>
+          </form>
           {navigation.map((item) => {
-            const active = item.href === "/" ? pathname === "/" : item.href.startsWith(pathname) && pathname !== "/";
+            const active = item.href === "/"
+              ? pathname === "/"
+              : !item.href.includes("?") && !item.href.includes("#") && pathname.startsWith(item.href);
             return (
               <Link
                 className={active ? "active" : ""}
@@ -100,6 +110,12 @@ export function SiteHeader() {
             );
           })}
           <Link className="nav-admin-link" href="/admin" onClick={() => setOpen(false)}>Quản trị demo</Link>
+          <div className="mobile-nav-actions">
+            <Link className="button button-outline" href={user ? "/dashboard" : "/dang-nhap"} onClick={() => setOpen(false)}>
+              <Icon name="user" size={18} /> {user ? "Trang quản lý" : "Đăng nhập"}
+            </Link>
+            <Link className="button button-primary" href="/tao-chien-dich" onClick={() => setOpen(false)}>Tạo chiến dịch</Link>
+          </div>
         </div>
       </nav>
     </header>

@@ -140,21 +140,21 @@ export class Controller {
 }
 ```
 
-## 📊 Tiến độ hiện tại
+## 📊 Tiến độ hiện tại (cập nhật 11/09/2026)
 
 | Module | Status | Priorities |
 |--------|--------|------------|
 | `database` | ✅ Cơ bản | ERD, entities (users/campaigns/donations/milestones/notifications/reports/audit_logs), migration, seed |
-| `auth` | ✅ Hoàn thiện | JWT, login, register, refresh, JwtAuthGuard, RolesGuard, rate limit, chống brute-force (lock 5 lần/15p) |
-| `users` | ✅ Hoàn thiện | CRUD, profiles, roles, ownership check, theo dõi đăng nhập thất bại |
-| `campaigns` | ✅ Hoàn thiện | CRUD, vòng đời (draft→pending→needs_info→approved/active→ended), submit, moderate, lọc/sort |
+| `auth` | ✅ Lõi | JWT, login, register, refresh, JwtAuthGuard, RolesGuard, rate limit, chống brute-force (lock 5 lần/15p) |
+| `users` | ✅ Lõi | CRUD, profiles, roles, ownership check, theo dõi đăng nhập thất bại |
+| `campaigns` | ✅ Lõi | CRUD, vòng đời (draft→pending→needs_info→approved/active→ended), submit, moderate, lọc/sort |
 | `donations` | ✅ Cơ bản | Transactions, idempotency key, webhook cập nhật, chặn campaign hết hạn |
 | `payments` | 🔶 Cơ bản | DemoWalletGateway sandbox (Ví demo) |
 | `progress` | ✅ Cơ bản | Milestones, updates, progress summary sinh từ giao dịch |
 | `notifications` | 🔶 Entities only | Email, in-app |
 | `moderation` | 🔶 Entities only | Reports, flags |
-| `admin` | ❌ Trống | Dashboard, stats |
-| `ai` | ❌ Trống | AI service integration |
+| `admin` | ✅ Cơ bản | Dashboard tổng quan, danh sách quản trị, khóa/mở người dùng, tạo và xử lý risk alerts |
+| `ai` | ✅ Cơ bản | NestJS proxy, FastAPI recommend/predict/fraud, explainability, fallback, metrics và tests |
 
 ## ✅ Checklist trước khi hoàn thành
 

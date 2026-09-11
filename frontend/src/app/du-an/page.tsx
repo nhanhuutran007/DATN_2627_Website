@@ -24,7 +24,11 @@ export default async function DiscoveryPage({ searchParams }: DiscoveryPageProps
         </div>
       </section>
       <section className="container explorer-section">
-        <CampaignExplorer initialQuery={params.q} initialCategory={params.category} />
+        <CampaignExplorer
+          key={`${params.q ?? ""}:${params.category ?? ""}`}
+          initialQuery={params.q}
+          initialCategory={params.category}
+        />
       </section>
     </main>
   );
