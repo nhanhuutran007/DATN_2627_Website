@@ -57,16 +57,16 @@ export default async function Home() {
       <section className="home-hero">
         <div className="container home-hero-grid">
           <div className="hero-copy">
-            <p className="eyebrow eyebrow-light"><span /> Nền tảng gây quỹ minh bạch</p>
+            <p className="eyebrow eyebrow-light"><span /> Gây quỹ cộng đồng minh bạch</p>
             <h1>Mỗi ý tưởng tử tế<br /><em>đều xứng đáng</em><br />được bắt đầu.</h1>
-            <p className="hero-lead">Kết nối những dự án xã hội và khởi nghiệp giàu tác động với cộng đồng sẵn lòng chung tay.</p>
+            <p className="hero-lead">Góp Mầm kết nối những dự án xã hội và khởi nghiệp giàu tác động với cộng đồng sẵn lòng chung tay.</p>
             <div className="hero-actions">
-              <Link className="button button-light" href="/du-an">Khám phá dự án <Icon name="arrow-right" size={19} /></Link>
-              <Link className="button button-ghost-light" href="/tao-chien-dich">Bắt đầu gây quỹ</Link>
+              <Link className="button button-primary button-large" href="/du-an">Khám phá dự án <Icon name="arrow-right" size={19} /></Link>
+              <Link className="button button-outline button-large" href="/tao-chien-dich">Bắt đầu gây quỹ</Link>
             </div>
             <div className="hero-proof">
               <div className="avatar-stack"><i>M</i><i>A</i><i>H</i><i>+</i></div>
-              <p><b>12.500+ người</b><span>đã cùng tạo nên thay đổi</span></p>
+              <p><b>12.500+ thành viên</b><span>đang cùng gieo những thay đổi tích cực</span></p>
             </div>
           </div>
           <div className="hero-visual" aria-label="Những dự án cộng đồng tiêu biểu">

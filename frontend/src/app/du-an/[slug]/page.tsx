@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { ProgressBar } from "@/components/campaign/ProgressBar";
-import { AiPredictCard } from "@/components/ai/AiPredictCard";
 import { Icon } from "@/components/ui/Icon";
 import { DonationPanel } from "@/features/donations/DonationPanel";
 import { apiCampaignToView, fetchCampaign, fetchCampaigns } from "@/lib/api/campaigns";
@@ -68,7 +67,6 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
       <section className="container campaign-detail-hero">
         <div className={`detail-media atlas atlas-${campaign.image}`}>
           <span className="detail-category">{campaign.category}</span>
-          <button className="detail-media-button" type="button"><Icon name="heart" size={18} /> Lưu dự án</button>
         </div>
         <div className="detail-summary">
           <div className="detail-status"><span>{campaign.status}</span><span><Icon name="shield" size={15} /> Đã kiểm duyệt</span></div>
@@ -87,13 +85,16 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           </div>
           <div className="detail-actions">
             <a className="button button-primary button-large" href="#tai-tro">Tài trợ dự án <Icon name="arrow-right" size={19} /></a>
-            <button className="button button-outline" type="button">Chia sẻ</button>
           </div>
         </div>
       </section>
 
       <nav className="detail-tabs" aria-label="Nội dung dự án">
-        <div className="container"><a className="active" href="#cau-chuyen">Câu chuyện</a><a href="#ke-hoach">Kế hoạch</a><a href="#cap-nhat">Cập nhật <i>{Math.max(1, campaign.milestones.length)}</i></a><a href="#minh-chung">Minh chứng</a><a href="#binh-luan">Bình luận <i>24</i></a></div>
+        <div className="container">
+          <a className="active" href="#cau-chuyen">Câu chuyện</a>
+          <a href="#ke-hoach">Kế hoạch</a>
+          <a href="#cap-nhat">Cập nhật</a>
+        </div>
       </nav>
 
       <section className="container detail-content-grid">
@@ -102,21 +103,24 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             <p className="eyebrow">Câu chuyện dự án</p>
             <h2>Một thay đổi bền vững bắt đầu từ cộng đồng địa phương.</h2>
             {campaign.story.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-            <div className={`story-image atlas atlas-${campaign.image}`} />
-            <blockquote>“Chúng tôi không chỉ hoàn thành một hoạt động. Mục tiêu là để cộng đồng có thể tiếp tục vận hành sau khi chiến dịch kết thúc.”<span>— {campaign.owner}</span></blockquote>
           </article>
 
           <article className="content-block" id="ke-hoach">
-            <div className="content-heading-row"><div><p className="eyebrow">Kế hoạch thực hiện</p><h2>Mốc công việc & ngân sách</h2></div><span className="version-label"><Icon name="document" size={15} /> Kế hoạch đang được công bố</span></div>
-            <div className="milestone-list">
-              {campaign.milestones.map((milestone, index) => (
-                <div className="milestone-row" key={`${milestone.title}-${index}`}>
-                  <span className={`milestone-dot milestone-${milestone.status === "Hoàn thành" ? "done" : milestone.status === "Đang thực hiện" ? "active" : "next"}`}><Icon name={milestone.status === "Hoàn thành" ? "check" : "clock"} size={15} /></span>
-                  <div><small>Mốc {index + 1} · {milestone.date}</small><h3>{milestone.title}</h3><p>Ngân sách dự kiến: <b>{formatCurrency(milestone.budget)}</b></p></div>
-                  <span className="milestone-status">{milestone.status}</span>
-                </div>
-              ))}
-            </div>
+            <p className="eyebrow">Kế hoạch thực hiện</p>
+            <h2>Mốc công việc & ngân sách</h2>
+            {campaign.milestones.length > 0 ? (
+              <div className="milestone-list">
+                {campaign.milestones.map((milestone, index) => (
+                  <div className="milestone-row" key={`${milestone.title}-${index}`}>
+                    <span className={`milestone-dot milestone-${milestone.status === "Hoàn thành" ? "done" : milestone.status === "Đang thực hiện" ? "active" : "next"}`}><Icon name={milestone.status === "Hoàn thành" ? "check" : "clock"} size={15} /></span>
+                    <div><small>Mốc {index + 1} · {milestone.date}</small><h3>{milestone.title}</h3><p>Ngân sách dự kiến: <b>{formatCurrency(milestone.budget)}</b></p></div>
+                    <span className="milestone-status">{milestone.status}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="detail-empty-note">Kế hoạch chi tiết đang được chủ dự án cập nhật.</p>
+            )}
           </article>
 
           <article className="content-block update-block" id="cap-nhat">
@@ -124,13 +128,11 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             <small>{campaign.latestUpdate.date}</small>
             <h2>{campaign.latestUpdate.title}</h2>
             <p>{campaign.latestUpdate.excerpt}</p>
-            <button className="text-link link-button" type="button">Đọc toàn bộ cập nhật <Icon name="arrow-right" size={17} /></button>
           </article>
         </div>
 
         <aside className="detail-sidebar" id="tai-tro">
           <DonationPanel campaignId={campaign.slug} campaignTitle={campaign.title} />
-          <AiPredictCard campaignId={campaign.slug} />
           <div className="transparency-card" id="minh-chung">
             <div className="transparency-score"><span>{campaign.transparencyScore}</span><small>/100</small></div>
             <div><p className="eyebrow">Chỉ số minh bạch</p><h2>Hồ sơ rất tốt</h2></div>

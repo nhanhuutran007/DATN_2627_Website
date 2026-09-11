@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 
 import "./globals.css";
 import "./pages.css";
+import "./design-system.css";
 
 const bodyFont = Be_Vietnam_Pro({
   subsets: ["vietnamese", "latin"],
