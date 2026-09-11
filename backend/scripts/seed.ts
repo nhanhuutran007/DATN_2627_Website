@@ -4,6 +4,10 @@ import * as bcrypt from "bcryptjs";
 
 import { User, UserRole } from "../src/modules/users/entities/user.entity";
 import { Campaign, CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
+import {
+  Donation,
+  DonationStatus,
+} from "../src/modules/donations/entities/donation.entity";
 
 config({ path: ".env" });
 
@@ -119,7 +123,90 @@ async function seed() {
   ]);
   await dataSource.getRepository(Campaign).save(campaigns);
 
-  console.log(`Seeded: ${4} users, ${campaigns.length} campaigns.`);
+  const [libraryCampaign, farmCampaign, eduTechCampaign] = campaigns;
+
+  const donorId = user1.id;
+  const nowMs = Date.now();
+  const day = 86400000;
+  const hoursAgo = (count: number) => new Date(nowMs - count * 3600000);
+  const daysAgo = (count: number, hour = 10) =>
+    new Date(nowMs - count * day + hour * 3600000);
+
+  const donationRows: Array<Partial<Donation>> = [];
+  let txSeq = 0;
+  const addDonation = (
+    campaign: Campaign,
+    amount: number,
+    status: DonationStatus,
+    createdAt: Date,
+  ) => {
+    txSeq += 1;
+    donationRows.push({
+      userId: donorId,
+      campaignId: campaign.id,
+      amount,
+      currency: "VND",
+      status,
+      paymentMethod: "wallet_demo",
+      transactionId: `TX-SEED-${String(txSeq).padStart(6, "0")}`,
+      idempotencyKey: `idem-${txSeq}-${campaign.id.slice(0, 8)}`,
+      isAnonymous: txSeq % 3 === 0,
+      completedAt: status === DonationStatus.COMPLETED ? createdAt : undefined,
+      createdAt,
+      updatedAt: createdAt,
+    });
+  };
+
+  const completedFundingPairs: Array<[Campaign, number, number]> = [
+    [libraryCampaign, 1500000, 160],
+    [libraryCampaign, 2000000, 152],
+    [libraryCampaign, 1200000, 145],
+    [libraryCampaign, 1800000, 138],
+    [libraryCampaign, 1000000, 130],
+    [libraryCampaign, 2500000, 122],
+    [libraryCampaign, 1500000, 114],
+    [libraryCampaign, 2200000, 105],
+    [libraryCampaign, 900000, 96],
+    [libraryCampaign, 2600000, 87],
+    [libraryCampaign, 1300000, 78],
+    [libraryCampaign, 2100000, 70],
+    [libraryCampaign, 1600000, 63],
+    [libraryCampaign, 2400000, 55],
+    [libraryCampaign, 1100000, 48],
+    [libraryCampaign, 1900000, 41],
+    [libraryCampaign, 2700000, 34],
+    [libraryCampaign, 1400000, 28],
+    [libraryCampaign, 2300000, 21],
+    [libraryCampaign, 1700000, 14],
+    [libraryCampaign, 2500000, 8],
+    [libraryCampaign, 1200000, 4],
+    [libraryCampaign, 2000000, 2],
+    [libraryCampaign, 1500000, 1],
+
+    [farmCampaign, 1200000, 22],
+    [farmCampaign, 1800000, 15],
+    [farmCampaign, 1500000, 9],
+    [farmCampaign, 1100000, 4],
+    [farmCampaign, 1600000, 1],
+  ];
+
+  for (const [campaign, amount, d] of completedFundingPairs) {
+    addDonation(campaign, amount, DonationStatus.COMPLETED, daysAgo(d));
+  }
+
+  addDonation(eduTechCampaign, 1000000, DonationStatus.COMPLETED, daysAgo(7));
+  addDonation(eduTechCampaign, 500000, DonationStatus.COMPLETED, daysAgo(5));
+  addDonation(eduTechCampaign, 700000, DonationStatus.COMPLETED, hoursAgo(0.3));
+  addDonation(eduTechCampaign, 900000, DonationStatus.COMPLETED, hoursAgo(0.5));
+  addDonation(eduTechCampaign, 500000, DonationStatus.COMPLETED, hoursAgo(0.8));
+  addDonation(eduTechCampaign, 500000, DonationStatus.FAILED, hoursAgo(0.2));
+  addDonation(eduTechCampaign, 300000, DonationStatus.FAILED, hoursAgo(0.6));
+
+  await dataSource.getRepository(Donation).save(donationRows);
+
+  console.log(
+    `Seeded: ${4} users, ${campaigns.length} campaigns, ${donationRows.length} donations.`,
+  );
   await dataSource.destroy();
   console.log("Done!");
 }

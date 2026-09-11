@@ -145,12 +145,10 @@ export class InitSchema1746800000000 implements MigrationInterface {
       ) ENGINE=InnoDB;
     `);
 
-    await queryRunner.query(`
-      CREATE INDEX idx_campaigns_status ON campaigns(status);
-      CREATE INDEX idx_campaigns_category ON campaigns(category);
-      CREATE INDEX idx_donations_user ON donations(user_id);
-      CREATE INDEX idx_donations_campaign ON donations(campaign_id);
-    `);
+    await queryRunner.query(`CREATE INDEX idx_campaigns_status ON campaigns(status)`);
+    await queryRunner.query(`CREATE INDEX idx_campaigns_category ON campaigns(category)`);
+    await queryRunner.query(`CREATE INDEX idx_donations_user ON donations(user_id)`);
+    await queryRunner.query(`CREATE INDEX idx_donations_campaign ON donations(campaign_id)`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

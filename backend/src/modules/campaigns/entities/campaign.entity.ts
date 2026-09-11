@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, OneToMany } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
 
@@ -31,6 +31,7 @@ export class Campaign extends BaseEntity {
   ownerId!: string;
 
   @ManyToOne("User", "campaigns")
+  @JoinColumn({ name: "owner_id" })
   owner!: any;
 
   @Column({

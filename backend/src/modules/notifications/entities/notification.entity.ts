@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
 
@@ -16,6 +16,7 @@ export class Notification extends BaseEntity {
   userId!: string;
 
   @ManyToOne("User")
+  @JoinColumn({ name: "user_id" })
   user!: any;
 
   @Column({ type: "enum", enum: NotificationType })

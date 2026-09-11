@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
 
@@ -23,12 +23,14 @@ export class Report extends BaseEntity {
   reporterId!: string;
 
   @ManyToOne("User")
+  @JoinColumn({ name: "reporter_id" })
   reporter!: any;
 
   @Column({ name: "campaign_id", nullable: true })
   campaignId?: string;
 
   @ManyToOne("Campaign", { nullable: true })
+  @JoinColumn({ name: "campaign_id" })
   campaign?: any;
 
   @Column({ type: "enum", enum: ReportReason })

@@ -24,10 +24,8 @@ export class AddRiskAlerts1760000000001 implements MigrationInterface {
       ) ENGINE=InnoDB;
     `);
 
-    await queryRunner.query(`
-      CREATE INDEX idx_risk_status ON risk_alerts(status);
-      CREATE INDEX idx_risk_entity ON risk_alerts(entity_type, entity_id);
-    `);
+    await queryRunner.query(`CREATE INDEX idx_risk_status ON risk_alerts(status)`);
+    await queryRunner.query(`CREATE INDEX idx_risk_entity ON risk_alerts(entity_type, entity_id)`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

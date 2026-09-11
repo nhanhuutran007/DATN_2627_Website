@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
 
@@ -8,6 +8,7 @@ export class MilestoneUpdate extends BaseEntity {
   milestoneId!: string;
 
   @ManyToOne("Milestone", "updates")
+  @JoinColumn({ name: "milestone_id" })
   milestone!: any;
 
   @Column({ type: "text" })

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -22,7 +23,7 @@ export class DonationsService {
     @InjectRepository(Campaign)
     private readonly campaignRepo: Repository<Campaign>,
     private readonly dataSource: DataSource,
-    private readonly paymentGateway: PaymentGateway,
+    @Inject("PaymentGateway") private readonly paymentGateway: PaymentGateway,
   ) {}
 
   async create(dto: CreateDonationDto, user: User): Promise<Donation> {
