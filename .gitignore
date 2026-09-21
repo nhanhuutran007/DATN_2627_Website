@@ -31,6 +31,16 @@ ai-service/models/*.joblib
 !ai-service/artifacts/README.md
 !ai-service/models/README.md
 
+# Terraform (state có thể chứa mật khẩu/secret; lock file .terraform.lock.hcl vẫn được commit)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+override.tf
+override.tf.json
+
 # Runtime files
 .tools/
 logs/
@@ -43,3 +53,7 @@ tmp/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Mã nguồn/dữ liệu của dự án cũ, không thuộc đồ án này
+baocao/
+nhlsports*.sql
