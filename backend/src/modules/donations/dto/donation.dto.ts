@@ -34,6 +34,11 @@ export class CreateDonationDto {
   idempotencyKey!: string;
 }
 
+export class ConfirmDonationDto {
+  @IsIn(["completed", "failed"])
+  status!: "completed" | "failed";
+}
+
 export class WebhookDonationDto {
   @IsUUID()
   donationId!: string;

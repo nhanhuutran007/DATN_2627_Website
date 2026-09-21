@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   ParseUUIDPipe,
   Post,
@@ -12,7 +13,11 @@ import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.module";
 import { User } from "../users/entities/user.entity";
-import { CreateDonationDto, WebhookDonationDto } from "./dto/donation.dto";
+import {
+  ConfirmDonationDto,
+  CreateDonationDto,
+  WebhookDonationDto,
+} from "./dto/donation.dto";
 import { DonationsService } from "./donations.service";
 
 @Controller("donations")
@@ -28,8 +33,21 @@ export class DonationsController {
   @Post("webhook")
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 30, windowMs: 60_000, keyPrefix: "donation-webhook" })
-  webhook(@Body() dto: WebhookDonationDto) {
-    return this.donationsService.handleWebhook(dto);
+  webhook(
+    @Body() dto: WebhookDonationDto,
+    @Headers("x-signature") signature?: string,
+  ) {
+    return this.donationsService.handleWebhook(dto, signature);
+  }
+
+  @Post(":id/confirm")
+  @UseGuards(JwtAuthGuard)
+  confirm(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: ConfirmDonationDto,
+    @GetCurrentUser() user: User,
+  ) {
+    return this.donationsService.confirmDemoPayment(id, dto.status, user);
   }
 
   @Get("mine")

@@ -1,8 +1,10 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
@@ -10,6 +12,7 @@ import { DataSource, Repository } from "typeorm";
 import {
   PaymentGateway,
 } from "../../integrations/payment/payment.gateway";
+import { AuditService } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { User } from "../users/entities/user.entity";
 import { CreateDonationDto, WebhookDonationDto } from "./dto/donation.dto";
@@ -24,6 +27,7 @@ export class DonationsService {
     private readonly campaignRepo: Repository<Campaign>,
     private readonly dataSource: DataSource,
     @Inject("PaymentGateway") private readonly paymentGateway: PaymentGateway,
+    private readonly auditService: AuditService,
   ) {}
 
   async create(dto: CreateDonationDto, user: User): Promise<Donation> {
@@ -71,7 +75,66 @@ export class DonationsService {
     return this.donationRepo.save(donation);
   }
 
-  async handleWebhook(dto: WebhookDonationDto): Promise<Donation> {
+  /**
+   * Webhook từ cổng thanh toán. Chữ ký được kiểm tra TRƯỚC mọi truy vấn để không
+   * lộ việc khoản tài trợ có tồn tại hay không; chữ ký sai bị ghi audit.
+   */
+  async handleWebhook(
+    dto: WebhookDonationDto,
+    signature: string | undefined,
+  ): Promise<Donation> {
+    const valid = this.paymentGateway.verifyWebhookSignature(
+      {
+        donationId: dto.donationId,
+        status: dto.status,
+        transactionId: dto.transactionId,
+      },
+      signature ?? "",
+    );
+    if (!valid) {
+      await this.auditService.record({
+        action: "donation.webhook.rejected",
+        entity: "donation",
+        entityId: dto.donationId,
+        newValues: { reason: "invalid-signature", claimedStatus: dto.status },
+      });
+      throw new UnauthorizedException("Invalid webhook signature");
+    }
+    return this.applyPaymentResult(dto, "payment-webhook");
+  }
+
+  /**
+   * Mô phỏng cổng sandbox gọi lại cho ví demo. Chỉ chủ khoản tài trợ đã đăng nhập
+   * mới xác nhận được, và chỉ khi cổng đang ở chế độ demo (không dùng với cổng thật).
+   */
+  async confirmDemoPayment(
+    donationId: string,
+    status: "completed" | "failed",
+    user: User,
+  ): Promise<Donation> {
+    if (this.paymentGateway.mode !== "demo") {
+      throw new ForbiddenException(
+        "Client-side confirmation is only available with the demo wallet",
+      );
+    }
+    const donation = await this.donationRepo.findOne({
+      where: { id: donationId },
+    });
+    if (!donation || donation.userId !== user.id) {
+      throw new NotFoundException("Donation not found");
+    }
+    return this.applyPaymentResult(
+      { donationId, status, transactionId: donation.transactionId },
+      "demo-wallet",
+      user.id,
+    );
+  }
+
+  private async applyPaymentResult(
+    dto: WebhookDonationDto,
+    source: "payment-webhook" | "demo-wallet",
+    actorId?: string,
+  ): Promise<Donation> {
     const donation = await this.donationRepo.findOne({
       where: { id: dto.donationId },
     });
@@ -82,11 +145,7 @@ export class DonationsService {
       return donation;
     }
 
-    if (!this.paymentGateway.verifyWebhookSignature({}, "")) {
-      throw new ConflictException("Invalid webhook signature");
-    }
-
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       donation.status =
         dto.status === "completed"
           ? DonationStatus.COMPLETED
@@ -116,6 +175,22 @@ export class DonationsService {
 
       return donation;
     });
+
+    await this.auditService.record({
+      userId: actorId,
+      action: `donation.payment.${result.status}`,
+      entity: "donation",
+      entityId: result.id,
+      oldValues: { status: DonationStatus.PENDING },
+      newValues: {
+        status: result.status,
+        amount: result.amount,
+        campaignId: result.campaignId,
+        transactionId: result.transactionId ?? null,
+        source,
+      },
+    });
+    return result;
   }
 
   async findById(id: string): Promise<Donation> {

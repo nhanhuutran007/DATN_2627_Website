@@ -154,7 +154,7 @@ export function DonationPanel({ campaignId, campaignTitle }: DonationPanelProps)
       >
         {loading ? "Đang xử lý..." : <>Tiếp tục với {formatCurrency(effectiveAmount)} <Icon name="arrow-right" size={18} /></>}
       </button>
-      <p className="payment-note"><Icon name="shield" size={15} /> Không lưu dữ liệu thẻ. Số tiền chỉ được ghi nhận sau webhook có chữ ký hợp lệ.</p>
+      <p className="payment-note"><Icon name="shield" size={15} /> Không lưu dữ liệu thẻ. Số tiền chỉ được ghi nhận khi máy chủ xác nhận thanh toán (ví demo sandbox, không dùng tiền thật).</p>
     </form>
   );
 }

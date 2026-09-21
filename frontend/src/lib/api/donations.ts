@@ -35,18 +35,24 @@ export type CreateDonationPayload = {
   idempotencyKey: string;
 };
 
-export type WebhookPayload = {
+export type ConfirmDonationPayload = {
   donationId: string;
   status: "completed" | "failed";
-  transactionId?: string;
 };
 
 export async function createDonation(payload: CreateDonationPayload): Promise<ApiDonation> {
   return api.post<ApiDonation>("/donations", payload);
 }
 
-export async function confirmDonation(payload: WebhookPayload): Promise<ApiDonation> {
-  return api.post<ApiDonation>("/donations/webhook", payload);
+/**
+ * Xác nhận thanh toán ví demo (sandbox). Webhook thật `/donations/webhook` cần chữ ký
+ * HMAC do cổng thanh toán gửi từ server nên trình duyệt không được gọi trực tiếp.
+ */
+export async function confirmDonation(payload: ConfirmDonationPayload): Promise<ApiDonation> {
+  return api.post<ApiDonation>(
+    `/donations/${encodeURIComponent(payload.donationId)}/confirm`,
+    { status: payload.status },
+  );
 }
 
 export async function fetchMyDonations(): Promise<ApiDonation[]> {

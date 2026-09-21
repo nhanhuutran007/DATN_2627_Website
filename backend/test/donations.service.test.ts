@@ -1,7 +1,10 @@
 import { equal, ok } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
-import { DemoWalletGateway } from "../src/integrations/payment/payment.gateway";
+import {
+  DemoWalletGateway,
+  signWebhookPayload,
+} from "../src/integrations/payment/payment.gateway";
 import { DonationsService } from "../src/modules/donations/donations.service";
 import {
   Donation,
@@ -9,6 +12,9 @@ import {
 } from "../src/modules/donations/entities/donation.entity";
 import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import { UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
+import { makeAuditRecorder } from "./helpers/audit";
+
+const WEBHOOK_SECRET = "test-webhook-secret";
 
 function makeUser(id = "11111111-1111-1111-1111-111111111111") {
   return {
@@ -101,15 +107,18 @@ describe("DonationsService", () => {
   let service: DonationsService;
   let repos: ReturnType<typeof createMockRepos>;
   let gateway: DemoWalletGateway;
+  let audit: ReturnType<typeof makeAuditRecorder>;
 
   beforeEach(() => {
     repos = createMockRepos();
-    gateway = new DemoWalletGateway();
+    gateway = new DemoWalletGateway(WEBHOOK_SECRET);
+    audit = makeAuditRecorder();
     service = new DonationsService(
       repos.donationRepo,
       repos.campaignRepo,
       { transaction: repos.mockTransaction } as any,
       gateway,
+      audit.service,
     );
   });
 
@@ -207,23 +216,86 @@ describe("DonationsService", () => {
   });
 
   describe("handleWebhook", () => {
-    it("should complete a pending donation", async () => {
-      const dto = {
-        donationId: "22222222-2222-2222-2222-222222222222",
-        status: "completed" as const,
-      };
-      const donation = await service.handleWebhook(dto);
+    const DONATION_ID = "22222222-2222-2222-2222-222222222222";
+
+    function signed(status: "completed" | "failed", donationId = DONATION_ID) {
+      const dto = { donationId, status };
+      return { dto, signature: signWebhookPayload(WEBHOOK_SECRET, dto) };
+    }
+
+    async function expectStatus(promise: Promise<unknown>, status: number) {
+      await promise
+        .then(() => {
+          throw new Error("should have thrown");
+        })
+        .catch((err) => {
+          equal(err.status, status);
+        });
+    }
+
+    it("should complete a pending donation with a valid signature", async () => {
+      const { dto, signature } = signed("completed");
+      const donation = await service.handleWebhook(dto, signature);
       equal(donation.status, DonationStatus.COMPLETED);
       ok(donation.completedAt);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "donation.payment.completed");
+      equal(audit.entries[0].userId, undefined);
+      equal(audit.entries[0].newValues?.source, "payment-webhook");
     });
 
-    it("should fail a pending donation", async () => {
-      const dto = {
-        donationId: "22222222-2222-2222-2222-222222222222",
-        status: "failed" as const,
-      };
-      const donation = await service.handleWebhook(dto);
+    it("should fail a pending donation with a valid signature", async () => {
+      const { dto, signature } = signed("failed");
+      const donation = await service.handleWebhook(dto, signature);
       equal(donation.status, DonationStatus.FAILED);
+    });
+
+    it("should reject a webhook without a signature and audit the attempt", async () => {
+      const { dto } = signed("completed");
+      await expectStatus(service.handleWebhook(dto, undefined), 401);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "donation.webhook.rejected");
+      equal(audit.entries[0].entityId, DONATION_ID);
+    });
+
+    it("should reject a signature that does not match the payload", async () => {
+      const { signature } = signed("failed");
+      await expectStatus(
+        service.handleWebhook({ donationId: DONATION_ID, status: "completed" }, signature),
+        401,
+      );
+    });
+
+    it("should reject a signature made with another secret", async () => {
+      const dto = { donationId: DONATION_ID, status: "completed" as const };
+      const forged = signWebhookPayload("attacker-secret", dto);
+      await expectStatus(service.handleWebhook(dto, forged), 401);
+    });
+
+    it("should not look up the donation before verifying the signature", async () => {
+      let lookups = 0;
+      repos.donationRepo.findOne = async () => {
+        lookups += 1;
+        return repos.mockDonation;
+      };
+      await expectStatus(
+        service.handleWebhook({ donationId: DONATION_ID, status: "completed" }, "bad"),
+        401,
+      );
+      equal(lookups, 0);
+    });
+
+    it("should reject every webhook when no secret is configured", async () => {
+      const unsecured = new DonationsService(
+        repos.donationRepo,
+        repos.campaignRepo,
+        { transaction: repos.mockTransaction } as any,
+        new DemoWalletGateway(),
+        audit.service,
+      );
+      const { dto, signature } = signed("completed");
+      await expectStatus(unsecured.handleWebhook(dto, signature), 401);
+      await expectStatus(unsecured.handleWebhook(dto, ""), 401);
     });
 
     it("should return existing donation if already processed", async () => {
@@ -231,23 +303,58 @@ describe("DonationsService", () => {
         ...repos.mockDonation,
         status: DonationStatus.COMPLETED,
       });
-      const dto = {
-        donationId: "22222222-2222-2222-2222-222222222222",
-        status: "completed" as const,
-      };
-      const donation = await service.handleWebhook(dto);
+      const { dto, signature } = signed("completed");
+      const donation = await service.handleWebhook(dto, signature);
       equal(donation.status, DonationStatus.COMPLETED);
+      equal(audit.entries.length, 0);
     });
 
     it("should throw NotFoundException for missing donation", async () => {
       repos.donationRepo.findOne = async () => null;
+      const { dto, signature } = signed("completed", "missing");
+      await expectStatus(service.handleWebhook(dto, signature), 404);
+    });
+  });
+
+  describe("confirmDemoPayment", () => {
+    const DONATION_ID = "22222222-2222-2222-2222-222222222222";
+
+    it("should let the donation owner confirm a demo wallet payment", async () => {
+      const donation = await service.confirmDemoPayment(DONATION_ID, "completed", makeUser());
+      equal(donation.status, DonationStatus.COMPLETED);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "donation.payment.completed");
+      equal(audit.entries[0].userId, makeUser().id);
+      equal(audit.entries[0].newValues?.source, "demo-wallet");
+    });
+
+    it("should hide donations that belong to someone else", async () => {
       await service
-        .handleWebhook({ donationId: "missing", status: "completed" })
+        .confirmDemoPayment(DONATION_ID, "completed", makeUser("99999999-9999-9999-9999-999999999999"))
         .then(() => {
           throw new Error("should have thrown");
         })
         .catch((err) => {
           equal(err.status, 404);
+        });
+      equal(audit.entries.length, 0);
+    });
+
+    it("should be unavailable when the gateway is not the demo wallet", async () => {
+      const live = new DonationsService(
+        repos.donationRepo,
+        repos.campaignRepo,
+        { transaction: repos.mockTransaction } as any,
+        Object.assign(new DemoWalletGateway(WEBHOOK_SECRET), { mode: "live" as const }),
+        audit.service,
+      );
+      await live
+        .confirmDemoPayment(DONATION_ID, "completed", makeUser())
+        .then(() => {
+          throw new Error("should have thrown");
+        })
+        .catch((err) => {
+          equal(err.status, 403);
         });
     });
   });

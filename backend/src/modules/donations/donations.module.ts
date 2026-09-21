@@ -12,7 +12,10 @@ import { Donation } from "./entities/donation.entity";
   controllers: [DonationsController],
   providers: [
     DonationsService,
-    { provide: "PaymentGateway", useClass: DemoWalletGateway },
+    {
+      provide: "PaymentGateway",
+      useFactory: () => new DemoWalletGateway(process.env.PAYMENT_WEBHOOK_SECRET),
+    },
   ],
   exports: [DonationsService],
 })
