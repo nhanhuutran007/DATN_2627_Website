@@ -11,6 +11,7 @@ import {
   Repository,
 } from "typeorm";
 
+import { AuditService } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
 import { User, UserRole, UserStatus } from "../users/entities/user.entity";
@@ -55,6 +56,7 @@ export class AdminService {
     private readonly donationRepo: Repository<Donation>,
     @InjectRepository(RiskAlert)
     private readonly riskAlertRepo: Repository<RiskAlert>,
+    private readonly auditService: AuditService,
   ) {}
 
   async getOverview(): Promise<Record<string, unknown>> {
@@ -292,8 +294,18 @@ export class AdminService {
       throw new NotFoundException("User not found");
     }
 
+    const previousStatus = user.status;
     user.status = dto.status;
-    return this.userRepo.save(user);
+    const saved = await this.userRepo.save(user);
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "user.status.update",
+      entity: "user",
+      entityId: saved.id,
+      oldValues: { status: previousStatus },
+      newValues: { status: saved.status },
+    });
+    return saved;
   }
 
   private campaignOrder(

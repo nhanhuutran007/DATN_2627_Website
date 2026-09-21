@@ -4,6 +4,7 @@ import { beforeEach, describe, it } from "node:test";
 import { CampaignsService } from "../src/modules/campaigns/campaigns.service";
 import { Campaign, CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import { UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
+import { makeAuditRecorder } from "./helpers/audit";
 
 function createMockRepo() {
   const mockCampaign = {
@@ -54,11 +55,13 @@ function makeUser(role: UserRole = UserRole.USER, id = "123e4567-e89b-12d3-a456-
 describe("CampaignsService", () => {
   let campaignsService: CampaignsService;
   let repo: any;
+  let audit: ReturnType<typeof makeAuditRecorder>;
 
   beforeEach(() => {
     const created = createMockRepo();
     repo = created.repo;
-    campaignsService = new CampaignsService(repo as any);
+    audit = makeAuditRecorder();
+    campaignsService = new CampaignsService(repo as any, audit.service);
   });
 
   describe("create", () => {
@@ -119,6 +122,11 @@ describe("CampaignsService", () => {
         makeUser(),
       );
       equal(campaign.status, CampaignStatus.PENDING);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "campaign.submit");
+      equal(audit.entries[0].userId, "123e4567-e89b-12d3-a456-426614174001");
+      equal(audit.entries[0].oldValues?.status, CampaignStatus.DRAFT);
+      equal(audit.entries[0].newValues?.status, CampaignStatus.PENDING);
     });
 
     it("should allow resubmission from needs_info", async () => {
@@ -172,6 +180,10 @@ describe("CampaignsService", () => {
         makeUser(),
       );
       equal(campaign.title, "Updated title");
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "campaign.update");
+      equal(audit.entries[0].oldValues?.title, "Test campaign");
+      equal(audit.entries[0].newValues?.title, "Updated title");
     });
 
     it("should reject editing an active campaign", async () => {
@@ -209,6 +221,11 @@ describe("CampaignsService", () => {
         makeUser(UserRole.ADMIN),
       );
       equal(campaign.status, CampaignStatus.NEEDS_INFO);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "campaign.moderate");
+      equal(audit.entries[0].oldValues?.status, CampaignStatus.PENDING);
+      equal(audit.entries[0].newValues?.status, CampaignStatus.NEEDS_INFO);
+      equal(audit.entries[0].newValues?.rejectionReason, "Cần bổ sung chứng từ");
     });
 
     it("should require a reason for needs_info", async () => {
@@ -247,7 +264,10 @@ describe("CampaignsService", () => {
     it("should allow the owner to remove a campaign", async () => {
       repo.findOne = async () => ({ ...createMockRepo().mockCampaign });
       await campaignsService.remove("123e4567-e89b-12d3-a456-426614174000", makeUser());
-      ok(true);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "campaign.delete");
+      equal(audit.entries[0].entityId, "123e4567-e89b-12d3-a456-426614174000");
+      equal(audit.entries[0].oldValues?.title, "Test campaign");
     });
 
     it("should throw ForbiddenException for a non-owner", async () => {

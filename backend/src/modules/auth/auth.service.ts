@@ -6,6 +6,7 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
 
+import { AuditService } from "../../common/audit/audit.service";
 import { User, UserRole, UserStatus } from "../users/entities/user.entity";
 import { isUserLocked, UsersService } from "../users/users.service";
 import { LoginDto, RegisterDto, TokenResponseDto } from "./dto/auth.dto";
@@ -15,9 +16,15 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly auditService: AuditService,
   ) {}
 
   async register(dto: RegisterDto): Promise<TokenResponseDto> {
+    // Chặn leo thang đặc quyền: tự đăng ký không bao giờ được là admin.
+    if (dto.role === UserRole.ADMIN) {
+      throw new ForbiddenException("Admin accounts cannot be self-registered");
+    }
+
     const existingUser = await this.usersService.findByEmail(dto.email);
     if (existingUser) {
       throw new UnauthorizedException("Email already registered");
@@ -31,6 +38,13 @@ export class AuthService {
       role: dto.role ?? UserRole.USER,
     });
 
+    await this.auditService.record({
+      userId: user.id,
+      action: "auth.register",
+      entity: "user",
+      entityId: user.id,
+      newValues: { role: user.role },
+    });
     return this.generateTokens(user);
   }
 
@@ -41,10 +55,12 @@ export class AuthService {
     }
 
     if (user.status === UserStatus.BANNED) {
+      await this.recordLoginBlocked(user, "banned");
       throw new ForbiddenException("Account has been banned");
     }
 
     if (isUserLocked(user)) {
+      await this.recordLoginBlocked(user, "locked");
       const retryAfterSeconds = Math.max(
         0,
         Math.ceil((new Date(user.lockedUntil!).getTime() - Date.now()) / 1000),
@@ -57,11 +73,37 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
       await this.usersService.recordLoginFailure(user);
+      await this.auditService.record({
+        userId: user.id,
+        action: "auth.login.failed",
+        entity: "user",
+        entityId: user.id,
+        newValues: { reason: "invalid-password" },
+      });
       throw new UnauthorizedException("Invalid credentials");
     }
 
     await this.usersService.recordLoginSuccess(user);
+    await this.auditService.record({
+      userId: user.id,
+      action: "auth.login.success",
+      entity: "user",
+      entityId: user.id,
+    });
     return this.generateTokens(user);
+  }
+
+  private async recordLoginBlocked(
+    user: User,
+    reason: "banned" | "locked",
+  ): Promise<void> {
+    await this.auditService.record({
+      userId: user.id,
+      action: "auth.login.blocked",
+      entity: "user",
+      entityId: user.id,
+      newValues: { reason },
+    });
   }
 
   async refreshTokens(refreshToken: string): Promise<TokenResponseDto> {

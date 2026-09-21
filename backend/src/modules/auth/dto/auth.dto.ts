@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
+import { IsEmail, IsIn, IsOptional, IsString, MinLength } from "class-validator";
 
 import { UserRole } from "../../users/entities/user.entity";
 
@@ -14,8 +14,9 @@ export class RegisterDto {
   @MinLength(8)
   password!: string;
 
+  /** Chỉ cho phép tự chọn vai trò không đặc quyền; admin phải do quản trị cấp. */
   @IsOptional()
-  @IsEnum(UserRole)
+  @IsIn([UserRole.USER, UserRole.CAMPAIGN_OWNER])
   role?: UserRole;
 }
 

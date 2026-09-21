@@ -6,6 +6,7 @@ import { Campaign, CampaignStatus } from "../src/modules/campaigns/entities/camp
 import { Donation, DonationStatus } from "../src/modules/donations/entities/donation.entity";
 import { RiskAlertLevel, RiskAlertStatus } from "../src/modules/admin/entities/risk-alert.entity";
 import { User, UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
+import { makeAuditRecorder } from "./helpers/audit";
 
 const USER_ID = "123e4567-e89b-12d3-a456-426614174001";
 const OTHER_ID = "123e4567-e89b-12d3-a456-426614174002";
@@ -144,23 +145,28 @@ function createMockRepos() {
 
 function makeService() {
   const repos = createMockRepos();
+  const audit = makeAuditRecorder();
   const service = new AdminService(
     repos.userRepo as any,
     repos.campaignRepo as any,
     repos.donationRepo as any,
     repos.riskAlertRepo as any,
+    audit.service,
   );
-  return { service, repos };
+  return { service, repos, audit };
 }
 
 describe("AdminService", () => {
   let service: AdminService;
   let repos: { userRepo: MockRepo; campaignRepo: MockRepo; donationRepo: MockRepo; riskAlertRepo: MockRepo & { seed: any[] } };
 
+  let audit: ReturnType<typeof makeAuditRecorder>;
+
   beforeEach(() => {
     const built = makeService();
     service = built.service;
     repos = built.repos;
+    audit = built.audit;
   });
 
   describe("getOverview", () => {
@@ -282,6 +288,12 @@ describe("AdminService", () => {
         makeUser(),
       );
       equal(user.status, UserStatus.BANNED);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "user.status.update");
+      equal(audit.entries[0].userId, USER_ID);
+      equal(audit.entries[0].entityId, OTHER_ID);
+      equal(audit.entries[0].oldValues?.status, UserStatus.ACTIVE);
+      equal(audit.entries[0].newValues?.status, UserStatus.BANNED);
     });
 
     it("should prevent an admin from banning themselves", async () => {

@@ -13,6 +13,7 @@ import {
   Repository,
 } from "typeorm";
 
+import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { User, UserRole } from "../users/entities/user.entity";
 import {
   CampaignQueryDto,
@@ -53,6 +54,7 @@ export class CampaignsService {
   constructor(
     @InjectRepository(Campaign)
     private readonly campaignRepo: Repository<Campaign>,
+    private readonly auditService: AuditService,
   ) {}
 
   async findAll(
@@ -141,8 +143,25 @@ export class CampaignsService {
       );
     }
 
+    const current = campaign as unknown as Record<string, unknown>;
+    const oldValues: Record<string, unknown> = {};
+    const newValues: Record<string, unknown> = {};
+    for (const [field, value] of Object.entries(dto)) {
+      oldValues[field] = truncateForAudit(current[field]);
+      newValues[field] = truncateForAudit(value);
+    }
+
     Object.assign(campaign, dto);
-    return this.campaignRepo.save(campaign);
+    const saved = await this.campaignRepo.save(campaign);
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "campaign.update",
+      entity: "campaign",
+      entityId: saved.id,
+      oldValues,
+      newValues,
+    });
+    return saved;
   }
 
   async submitForReview(id: string, currentUser: User): Promise<Campaign> {
@@ -155,9 +174,19 @@ export class CampaignsService {
       );
     }
 
+    const previousStatus = campaign.status;
     campaign.status = CampaignStatus.PENDING;
     campaign.rejectionReason = undefined;
-    return this.campaignRepo.save(campaign);
+    const saved = await this.campaignRepo.save(campaign);
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "campaign.submit",
+      entity: "campaign",
+      entityId: saved.id,
+      oldValues: { status: previousStatus },
+      newValues: { status: saved.status },
+    });
+    return saved;
   }
 
   async moderate(
@@ -181,15 +210,45 @@ export class CampaignsService {
       );
     }
 
+    const previous = {
+      status: campaign.status,
+      rejectionReason: campaign.rejectionReason ?? null,
+    };
     campaign.status = dto.status;
     campaign.rejectionReason = needsReason ? dto.reason : undefined;
-    return this.campaignRepo.save(campaign);
+    const saved = await this.campaignRepo.save(campaign);
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "campaign.moderate",
+      entity: "campaign",
+      entityId: saved.id,
+      oldValues: previous,
+      newValues: {
+        status: saved.status,
+        rejectionReason: saved.rejectionReason ?? null,
+      },
+    });
+    return saved;
   }
 
   async remove(id: string, currentUser: User): Promise<void> {
     const campaign = await this.findById(id);
     this.assertCanManage(campaign, currentUser);
+    const snapshot = {
+      title: campaign.title,
+      status: campaign.status,
+      ownerId: campaign.ownerId,
+      goalAmount: campaign.goalAmount,
+    };
+    const campaignId = campaign.id;
     await this.campaignRepo.remove(campaign);
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "campaign.delete",
+      entity: "campaign",
+      entityId: campaignId,
+      oldValues: snapshot,
+    });
   }
 
   private assertCanManage(campaign: Campaign, user: User): void {

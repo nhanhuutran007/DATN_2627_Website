@@ -10,6 +10,8 @@ import {
   UseGuards,
 } from "@nestjs/common";
 
+import { AuditLogQueryDto } from "../../common/audit/audit.dto";
+import { AuditService } from "../../common/audit/audit.service";
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -33,6 +35,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly riskAlertService: RiskAlertService,
+    private readonly auditService: AuditService,
   ) {}
 
   @Get("overview")
@@ -53,6 +56,11 @@ export class AdminController {
   @Get("users")
   users(@Query() query: AdminUserQueryDto) {
     return this.adminService.listUsers(query);
+  }
+
+  @Get("audit-logs")
+  auditLogs(@Query() query: AuditLogQueryDto) {
+    return this.auditService.list(query);
   }
 
   @Get("risks")

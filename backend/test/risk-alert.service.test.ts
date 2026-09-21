@@ -13,6 +13,7 @@ import {
   RiskMethod,
 } from "../src/modules/admin/entities/risk-alert.entity";
 import { User, UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
+import { makeAuditRecorder } from "./helpers/audit";
 
 const CAMPAIGN_ID = "123e4567-e89b-12d3-a456-426614174010";
 const ADMIN_ID = "123e4567-e89b-12d3-a456-426614174001";
@@ -128,10 +129,12 @@ function makeService(opts: {
 
   const campaignRepo: any = { find: async () => opts.campaigns ?? [makeCampaign()] };
 
-  const service = new RiskAlertService(campaignRepo, donationRepo, riskAlertRepo, aiService);
+  const audit = makeAuditRecorder();
+  const service = new RiskAlertService(campaignRepo, donationRepo, riskAlertRepo, aiService, audit.service);
 
   return {
     service,
+    audit,
     saved,
     created,
     finalAlerts,
@@ -148,7 +151,7 @@ describe("RiskAlertService", () => {
 
   describe("generateWarnings", () => {
     it("should flag campaigns with a medium/high AI score", async () => {
-      const { service, created } = makeService({
+      const { service, created, audit } = makeService({
         aiResult: () => ({
           available: true,
           entityType: "CAMPAIGN",
@@ -168,6 +171,10 @@ describe("RiskAlertService", () => {
       equal(result.aiAvailable, true);
       equal(result.scanned, 1);
       equal(result.flagged, 1);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "risk_alert.generate");
+      equal(audit.entries[0].userId, ADMIN_ID);
+      equal(audit.entries[0].newValues?.flagged, 1);
       equal(created.length, 1);
       equal(created[0].level, RiskAlertLevel.HIGH);
       equal(created[0].method, RiskMethod.RULE);
@@ -268,7 +275,7 @@ describe("RiskAlertService", () => {
   describe("list", () => {
     it("should return a paged list of alerts", async () => {
       const { makeListRepo } = buildListRepo();
-      const service = new RiskAlertService(null as any, null as any, makeListRepo() as any, makeAiService(async () => ({ available: false })));
+      const service = new RiskAlertService(null as any, null as any, makeListRepo() as any, makeAiService(async () => ({ available: false })), makeAuditRecorder().service);
       const result = await service.list({ limit: 10, offset: 0 });
       ok(Array.isArray(result.items));
       equal(result.total, 1);
@@ -283,10 +290,15 @@ describe("RiskAlertService", () => {
         findOneBy: async () => alert,
         save: async (value: RiskAlert) => value,
       };
-      const service = new RiskAlertService({} as any, {} as any, riskAlertRepo, makeAiService(async () => ({ available: false })));
+      const audit = makeAuditRecorder();
+      const service = new RiskAlertService({} as any, {} as any, riskAlertRepo, makeAiService(async () => ({ available: false })), audit.service);
 
       const updated = await service.updateStatus(alert.id, { status: RiskAlertStatus.RESOLVED }, user);
       equal(updated.status, RiskAlertStatus.RESOLVED);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "risk_alert.status.update");
+      equal(audit.entries[0].userId, ADMIN_ID);
+      equal(audit.entries[0].newValues?.status, RiskAlertStatus.RESOLVED);
       equal(updated.resolvedBy, ADMIN_ID);
       ok(updated.resolvedAt instanceof Date);
     });
@@ -295,7 +307,7 @@ describe("RiskAlertService", () => {
       const riskAlertRepo: any = {
         findOneBy: async () => null,
       };
-      const service = new RiskAlertService({} as any, {} as any, riskAlertRepo, makeAiService(async () => ({ available: false })));
+      const service = new RiskAlertService({} as any, {} as any, riskAlertRepo, makeAiService(async () => ({ available: false })), makeAuditRecorder().service);
 
       await service
         .updateStatus("missing", { status: RiskAlertStatus.DISMISSED }, user)

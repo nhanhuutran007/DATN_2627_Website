@@ -4,6 +4,7 @@ import { beforeEach, describe, it } from "node:test";
 import { AuthService } from "../src/modules/auth/auth.service";
 import { UsersService } from "../src/modules/users/users.service";
 import { User, UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
+import { makeAuditRecorder } from "./helpers/audit";
 
 const VALID_PASSWORD = "password123";
 const VALID_HASH = "$2b$10$Qq7wrSzkoXP2uWmxSBVvzuJbKTjEfr1dTt.Z7PsuSGVGvxkpbxKJm";
@@ -44,13 +45,15 @@ describe("AuthService", () => {
   let usersService: UsersService;
   let jwtService: any;
   let mockUser: Partial<User>;
+  let audit: ReturnType<typeof makeAuditRecorder>;
 
   beforeEach(() => {
     const deps = createMockDependencies();
     usersService = deps.usersService;
     jwtService = deps.jwtService;
     mockUser = deps.mockUser;
-    authService = new AuthService(usersService, jwtService);
+    audit = makeAuditRecorder();
+    authService = new AuthService(usersService, jwtService, audit.service);
   });
 
   describe("register", () => {
@@ -65,6 +68,33 @@ describe("AuthService", () => {
 
       ok(result.accessToken);
       equal(result.user.email, mockUser.email);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "auth.register");
+      equal(audit.entries[0].entityId, mockUser.id);
+    });
+
+    it("should refuse self-registration as admin", async () => {
+      let created = false;
+      (usersService as any).findByEmail = async () => null;
+      (usersService as any).create = async () => {
+        created = true;
+        return mockUser;
+      };
+
+      await authService
+        .register({
+          name: "Attacker",
+          email: "attacker@example.com",
+          password: "password123",
+          role: UserRole.ADMIN as any,
+        })
+        .then(() => {
+          throw new Error("should have thrown");
+        })
+        .catch((err) => {
+          equal(err.status, 403);
+        });
+      equal(created, false);
     });
 
     it("should throw when email already registered", async () => {
@@ -113,6 +143,8 @@ describe("AuthService", () => {
         .catch((err) => {
           equal(err.status, 403);
         });
+      equal(audit.entries[0].action, "auth.login.blocked");
+      equal(audit.entries[0].newValues?.reason, "banned");
     });
 
     it("should throw ForbiddenException when account is locked", async () => {
@@ -129,6 +161,8 @@ describe("AuthService", () => {
         .catch((err) => {
           equal(err.status, 403);
         });
+      equal(audit.entries[0].action, "auth.login.blocked");
+      equal(audit.entries[0].newValues?.reason, "locked");
     });
 
     it("should record a failure and throw on wrong password", async () => {
@@ -147,6 +181,10 @@ describe("AuthService", () => {
           equal(err.status, 401);
           ok(failedCalled, "recordLoginFailure should have been called");
         });
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "auth.login.failed");
+      equal(audit.entries[0].userId, mockUser.id);
+      equal(JSON.stringify(audit.entries[0]).includes("wrong-password"), false);
     });
 
     it("should record success and return tokens on valid credentials", async () => {
@@ -163,6 +201,8 @@ describe("AuthService", () => {
 
       ok(result.accessToken);
       ok(successCalled, "recordLoginSuccess should have been called");
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "auth.login.success");
     });
   });
 

@@ -16,13 +16,13 @@ export class AuditLog extends BaseEntity {
   @Column({ name: "entity_id", length: 36, nullable: true })
   entityId?: string;
 
-  @Column({ type: "json", nullable: true })
+  @Column({ name: "old_values", type: "json", nullable: true })
   oldValues?: Record<string, unknown>;
 
-  @Column({ type: "json", nullable: true })
+  @Column({ name: "new_values", type: "json", nullable: true })
   newValues?: Record<string, unknown>;
 
-  @Column({ length: 45, nullable: true })
+  @Column({ name: "ip_address", length: 45, nullable: true })
   ipAddress?: string;
 
   @Column({ name: "user_agent", length: 500, nullable: true })

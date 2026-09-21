@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { getDatabaseConfig } from "./config/database.config";
+import { AuditModule } from "./common/audit/audit.module";
 import { RateLimitModule } from "./common/rate-limit/rate-limit.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AiModule } from "./modules/ai/ai.module";
@@ -20,6 +21,7 @@ import { UsersModule } from "./modules/users/users.module";
     }),
     TypeOrmModule.forRoot(getDatabaseConfig()),
     RateLimitModule,
+    AuditModule,
     AdminModule,
     AiModule,
     AuthModule,

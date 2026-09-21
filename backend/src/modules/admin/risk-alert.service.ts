@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { FindOptionsWhere, In, MoreThan, Repository } from "typeorm";
 
+import { AuditService } from "../../common/audit/audit.service";
 import type { AiFraudResponse } from "../../integrations/ai/ai.types";
 import { AiService } from "../ai/ai.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
@@ -47,6 +48,7 @@ export class RiskAlertService {
     @InjectRepository(RiskAlert)
     private readonly riskAlertRepo: Repository<RiskAlert>,
     private readonly aiService: AiService,
+    private readonly auditService: AuditService,
   ) {}
 
   async generateWarnings(admin: User, limit = 20): Promise<GenerateWarningsResult> {
@@ -106,7 +108,18 @@ export class RiskAlertService {
 
     await this.resolveStaleOpenAlerts(admin, keptIds);
 
-    return { aiAvailable, scanned: campaigns.length, flagged: keptIds.length };
+    const summary = {
+      aiAvailable,
+      scanned: campaigns.length,
+      flagged: keptIds.length,
+    };
+    await this.auditService.record({
+      userId: admin.id,
+      action: "risk_alert.generate",
+      entity: "risk_alert",
+      newValues: { ...summary, alertIds: keptIds },
+    });
+    return summary;
   }
 
   async list(query: RiskQueryDto) {
@@ -136,10 +149,20 @@ export class RiskAlertService {
       throw new NotFoundException("Risk alert not found");
     }
 
+    const previousStatus = alert.status;
     alert.status = dto.status;
     alert.resolvedBy = admin.id;
     alert.resolvedAt = new Date();
-    return this.riskAlertRepo.save(alert);
+    const saved = await this.riskAlertRepo.save(alert);
+    await this.auditService.record({
+      userId: admin.id,
+      action: "risk_alert.status.update",
+      entity: "risk_alert",
+      entityId: saved.id,
+      oldValues: { status: previousStatus },
+      newValues: { status: saved.status },
+    });
+    return saved;
   }
 
   private async upsertCampaignAlert(
