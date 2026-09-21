@@ -1,149 +1,58 @@
-# Nền tảng gây quỹ cộng đồng cho dự án xã hội và khởi nghiệp
+# Nền tảng gây quỹ cộng đồng cho dự án xã hội và khởi nghiệp (DATN_2627)
 
 > Nền tảng web hỗ trợ toàn bộ vòng đời của một chiến dịch gây quỹ, từ khởi tạo, xét duyệt, kêu gọi tài trợ và thanh toán đến cập nhật tiến độ, minh bạch việc sử dụng quỹ và báo cáo; đồng thời tích hợp AI để gợi ý dự án, dự đoán khả năng thành công và phát hiện dấu hiệu bất thường.
 
 ## Mục lục
 
 - [Tổng quan](#tổng-quan)
-- [Mục tiêu](#mục-tiêu)
-- [Phạm vi đề tài](#phạm-vi-đề-tài)
+- [Mục tiêu & Phạm vi](#mục-tiêu--phạm-vi)
 - [Đối tượng sử dụng](#đối-tượng-sử-dụng)
 - [Chức năng chính](#chức-năng-chính)
 - [Vòng đời chiến dịch](#vòng-đời-chiến-dịch)
 - [Các mô-đun AI](#các-mô-đun-ai)
 - [Kiến trúc hệ thống](#kiến-trúc-hệ-thống)
-- [Công nghệ dự kiến](#công-nghệ-dự-kiến)
-- [Cấu trúc mã nguồn](#cấu-trúc-mã-nguồn)
-- [Khởi động bộ khung](#khởi-động-bộ-khung)
-- [Yêu cầu phi chức năng](#yêu-cầu-phi-chức-năng)
-- [Kiểm thử và đánh giá](#kiểm-thử-và-đánh-giá)
+- [Cấu trúc mã nguồn & Công nghệ](#cấu-trúc-mã-nguồn--công-nghệ)
+- [Khởi động Môi trường Local (Dev)](#khởi-động-môi-trường-local-dev)
+- [Triển khai AWS Production (Terraform)](#triển-khai-aws-production-terraform)
 - [Tiến độ triển khai](#tiến-độ-triển-khai)
-- [Kế hoạch thực hiện](#kế-hoạch-thực-hiện)
-- [Sản phẩm dự kiến](#sản-phẩm-dự-kiến)
-- [Hạn chế và hướng phát triển](#hạn-chế-và-hướng-phát-triển)
+
+---
 
 ## Tổng quan
 
-Gây quỹ cộng đồng giúp các nhóm khởi nghiệp, tổ chức xã hội, câu lạc bộ sinh viên và cá nhân huy động nguồn lực từ cộng đồng thay vì phụ thuộc hoàn toàn vào một nhà đầu tư hoặc tổ chức tài trợ lớn. Bên cạnh nguồn vốn, hình thức này còn giúp kiểm chứng nhu cầu thị trường, xây dựng cộng đồng người dùng ban đầu và lan tỏa giá trị xã hội của dự án.
+Gây quỹ cộng đồng giúp các nhóm khởi nghiệp, tổ chức xã hội, câu lạc bộ sinh viên huy động nguồn lực từ cộng đồng thay vì phụ thuộc vào một nhà đầu tư lớn. Đề tài tập trung giải quyết các vấn đề:
+- Người tài trợ khó tìm dự án phù hợp.
+- Chủ dự án thiếu công cụ đánh giá chất lượng hồ sơ.
+- Quản trị viên cần công cụ phát hiện gian lận tự động.
+- Thiếu tính minh bạch trong quá trình giải ngân và thực hiện dự án.
 
-Đề tài tập trung giải quyết các vấn đề phổ biến của nền tảng gây quỹ:
+## Mục tiêu & Phạm vi
 
-- Người tài trợ khó tìm được dự án phù hợp giữa nhiều chiến dịch.
-- Chủ dự án thiếu công cụ đánh giá chất lượng nội dung và khả năng đạt mục tiêu trước khi phát hành.
-- Quản trị viên cần nhận diện thông tin sai lệch, giao dịch bất thường và chiến dịch có dấu hiệu gian lận.
-- Việc cập nhật tiến độ và sử dụng nguồn tiền sau gây quỹ chưa đủ minh bạch.
+**Mục tiêu:** Xây dựng cổng thông tin gây quỹ tích hợp AI (gợi ý, dự đoán, phát hiện gian lận) với giao diện responsive, dữ liệu minh bạch và kiến trúc Cloud-native có khả năng mở rộng.
 
-Giải pháp được định hướng là một website responsive, có dữ liệu truy vết, quy trình nghiệp vụ đầy đủ và các kết quả AI có thể đo lường, giải thích.
-
-## Mục tiêu
-
-### Mục tiêu tổng quát
-
-Phân tích, thiết kế và triển khai một hệ thống web gây quỹ cộng đồng theo kiến trúc nhiều lớp, có các dịch vụ AI độc lập, giao diện thân thiện, dữ liệu minh bạch và khả năng mở rộng.
-
-### Mục tiêu cụ thể
-
-- Xây dựng cổng thông tin để khám phá, tìm kiếm, theo dõi và tài trợ dự án xã hội hoặc khởi nghiệp.
-- Cung cấp không gian quản lý chiến dịch cho chủ dự án.
-- Xây dựng quy trình kiểm duyệt và bảng điều khiển dành cho quản trị viên.
-- Cá nhân hóa danh sách dự án theo sở thích và hành vi người dùng.
-- Dự đoán xác suất chiến dịch đạt mục tiêu và giải thích các yếu tố ảnh hưởng.
-- Kết hợp luật nghiệp vụ với học máy để phát hiện dấu hiệu bất thường.
-- Đánh giá cả chất lượng phần mềm và chất lượng mô hình AI.
-
-## Phạm vi đề tài
-
-### Trong phạm vi
-
-- Website responsive, sử dụng được trên trình duyệt máy tính và thiết bị di động.
-- Quản lý tài khoản, hồ sơ chủ dự án và phân quyền.
-- Quản lý toàn bộ vòng đời chiến dịch gây quỹ.
-- Tìm kiếm, tương tác cộng đồng, tài trợ và quản lý giao dịch.
-- Theo dõi tiến độ và minh bạch việc sử dụng nguồn quỹ.
-- Quản trị, kiểm duyệt, xử lý báo cáo và xuất thống kê.
-- Ba mô-đun AI: gợi ý, dự đoán thành công và phát hiện bất thường.
-- Tích hợp cổng thanh toán trong môi trường thử nghiệm (sandbox) hoặc mô phỏng.
-- Thu thập và kiểm tra hồ sơ minh chứng ở mức phù hợp với đồ án.
-
-### Ngoài phạm vi hiện tại
-
-- Xử lý tiền thật khi chưa đáp ứng đầy đủ yêu cầu pháp lý và hợp đồng với đơn vị trung gian thanh toán.
-- Xác minh danh tính chuyên sâu thay cho dịch vụ KYC chuyên nghiệp.
-- Tự động kết luận gian lận hoặc tự động từ chối chiến dịch chỉ dựa trên kết quả AI.
-
-> **Lưu ý:** AI chỉ hỗ trợ ra quyết định. Mọi chiến dịch hoặc giao dịch bị đánh dấu đều cần quản trị viên xem xét trước khi áp dụng biện pháp khóa, tạm dừng hoặc từ chối.
+**Phạm vi:**
+- Hỗ trợ toàn bộ vòng đời chiến dịch (Nháp -> Chờ duyệt -> Đang gây quỹ -> Thành công/Thất bại).
+- Tích hợp cổng thanh toán Sandbox (mô phỏng).
+- AI chỉ đóng vai trò **hỗ trợ quyết định (Human-in-the-loop)**, không tự động khóa/xóa dự án.
+- *Ngoài phạm vi:* Xử lý tiền thật, eKYC chuyên sâu.
 
 ## Đối tượng sử dụng
 
 | Tác nhân | Nhu cầu và quyền chính |
 | --- | --- |
-| **Khách truy cập** | Xem, tìm kiếm và lọc dự án; xem số liệu gây quỹ; đăng ký tài khoản. |
-| **Người tài trợ** | Nhận gợi ý cá nhân hóa; theo dõi và tài trợ dự án; xem giao dịch, biên nhận và tiến độ; bình luận, báo cáo hoặc khiếu nại. |
-| **Chủ dự án** | Tạo và gửi duyệt chiến dịch; theo dõi số liệu; phản hồi cộng đồng; cập nhật tiến độ, chứng từ và báo cáo kết quả. |
-| **Quản trị viên** | Xét duyệt hồ sơ và chiến dịch; quản lý người dùng, danh mục, giao dịch và nội dung; xử lý khiếu nại; xem cảnh báo AI và audit log. |
-
-Một tài khoản có thể đồng thời đảm nhiệm vai trò người tài trợ và chủ dự án.
-
-Hệ thống còn giao tiếp với các dịch vụ ngoài như cổng thanh toán, email/thông báo và lưu trữ tệp. Các tích hợp được đóng gói qua giao diện dịch vụ để có thể thay đổi nhà cung cấp mà ít ảnh hưởng đến nghiệp vụ lõi.
+| **Khách truy cập** | Xem, tìm kiếm và lọc dự án; xem số liệu gây quỹ; đăng ký. |
+| **Người tài trợ** | Nhận gợi ý cá nhân hóa; tài trợ; xem giao dịch/biên nhận; báo cáo. |
+| **Chủ dự án** | Tạo chiến dịch; theo dõi dashboard số liệu; cập nhật tiến độ, chứng từ. |
+| **Quản trị viên** | Xét duyệt hồ sơ; quản lý người dùng/giao dịch; xem cảnh báo AI; audit log. |
 
 ## Chức năng chính
 
-### 1. Tài khoản và phân quyền
-
-- Đăng ký bằng email, xác minh tài khoản, đăng nhập và đăng xuất.
-- Đặt lại mật khẩu và cập nhật hồ sơ cá nhân.
-- Phân quyền theo vai trò và quyền hạn cụ thể.
-- Xác thực lại hoặc xác thực hai bước cho thao tác nhạy cảm.
-- Quản lý hồ sơ cá nhân/tổ chức, tài liệu minh chứng và trạng thái xét duyệt của chủ dự án.
-- Băm mật khẩu an toàn; lưu phiên đăng nhập, lịch sử truy cập quan trọng và nhật ký quản trị.
-
-### 2. Chiến dịch gây quỹ
-
-- Tạo chiến dịch theo từng bước: thông tin cơ bản, danh mục, ảnh/video, câu chuyện, mục tiêu tài chính, thời gian, kế hoạch, dự toán sử dụng vốn, rủi ro và mức tài trợ.
-- Kiểm tra dữ liệu bắt buộc trước khi gửi xét duyệt.
-- Cho phép quản trị viên duyệt, từ chối kèm lý do hoặc yêu cầu bổ sung.
-- Hạn chế hoặc xét duyệt lại các thay đổi quan trọng sau khi phát hành.
-- Dashboard theo dõi tổng tiền, tỷ lệ hoàn thành, số người ủng hộ, lượt xem, tỷ lệ chuyển đổi và diễn biến theo thời gian.
-
-### 3. Khám phá, tìm kiếm và tương tác
-
-- Hiển thị dự án nổi bật, mới phát hành, sắp kết thúc và dự án được cá nhân hóa.
-- Tìm kiếm toàn văn; lọc theo danh mục, địa điểm, mục tiêu vốn, tỷ lệ hoàn thành, thời gian còn lại và trạng thái.
-- Sắp xếp theo mức độ phổ biến hoặc thời gian.
-- Trang chi tiết gồm câu chuyện, thông tin chủ dự án, số liệu gây quỹ, mốc tiến độ, minh chứng, cập nhật, bình luận và dự án liên quan.
-- Theo dõi, chia sẻ, bình luận, đặt câu hỏi và nhận thông báo.
-- Báo cáo nội dung vi phạm và hỗ trợ kiểm duyệt.
-- Ghi nhận có kiểm soát các sự kiện xem, nhấp, theo dõi, tìm kiếm và tài trợ để cải thiện gợi ý.
-- Cho phép người dùng quản lý sự đồng ý đối với dữ liệu cá nhân hóa.
-
-### 4. Tài trợ và giao dịch
-
-- Chọn số tiền, mức tài trợ và phương thức thanh toán.
-- Tạo đơn tài trợ và chuyển hướng đến cổng thanh toán.
-- Chỉ cập nhật kết quả sau khi xác minh chữ ký phản hồi hoặc webhook.
-- Xử lý giao dịch thành công, thất bại, hết hạn, bị hủy, lặp và hoàn tiền.
-- Sử dụng mã giao dịch duy nhất và cơ chế idempotency để tránh ghi nhận trùng.
-- Gửi thông báo, lưu lịch sử và cung cấp biên nhận sau giao dịch.
-- Hỗ trợ quản trị viên đối soát, lọc, xuất báo cáo và kiểm tra giao dịch bị cảnh báo.
-- Không lưu trực tiếp dữ liệu thẻ ngân hàng trong hệ thống.
-
-### 5. Tiến độ và minh bạch nguồn quỹ
-
-- Quản lý mốc công việc, thời hạn, ngân sách dự kiến và kết quả đầu ra.
-- Đăng tỷ lệ hoàn thành, bài viết, hình ảnh, chứng từ và báo cáo chi tiêu.
-- Hiển thị dòng thời gian cập nhật cho người tài trợ.
-- Thông báo khi dự án đạt mốc, đổi lịch hoặc có báo cáo mới.
-- Nhắc giải trình và hiển thị trạng thái minh bạch khi chiến dịch chậm tiến độ.
-- Tính số liệu quan trọng từ dữ liệu giao dịch thay vì cho nhập tùy ý.
-- Lưu thời gian, người thực hiện và lịch sử phiên bản của thay đổi quan trọng.
-
-### 6. Quản trị và báo cáo
-
-- Tổng hợp tài khoản, chiến dịch, tiền tài trợ, tỷ lệ thành công, giao dịch lỗi, khiếu nại và cảnh báo rủi ro.
-- Quản lý danh mục, nội dung trang, chiến dịch nổi bật và mẫu thông báo.
-- Ghi chú quá trình xét duyệt và xử lý báo cáo vi phạm.
-- Tạm dừng chiến dịch hoặc tài khoản khi có căn cứ.
-- Xuất thống kê theo thời gian và danh mục, đồng thời ẩn dữ liệu cá nhân không cần thiết.
+1. **Tài khoản và phân quyền:** Đăng ký, đăng nhập JWT, phân quyền Admin/Owner/Donor, quản lý hồ sơ.
+2. **Chiến dịch gây quỹ:** Trình tạo chiến dịch (Wizard), duyệt/từ chối, dashboard số liệu thống kê.
+3. **Khám phá và tương tác:** Trang chủ cá nhân hóa, tìm kiếm/lọc, bình luận, theo dõi dự án.
+4. **Tài trợ và giao dịch:** Tạo đơn, thanh toán Sandbox, webhook bảo mật (idempotency key), xuất biên nhận.
+5. **Tiến độ và minh bạch:** Cập nhật mốc thời gian, chứng từ chi tiêu, tính toán tỷ lệ tự động từ giao dịch.
+6. **Quản trị:** Dashboard tổng hợp, xét duyệt, xử lý khiếu nại, cảnh báo rủi ro.
 
 ## Vòng đời chiến dịch
 
@@ -165,10 +74,10 @@ stateDiagram-v2
     TamDung: Tạm dừng
     TamDung --> DangGayQuy: Cho phép tiếp tục
     DangGayQuy --> ThanhCong: Đạt mục tiêu
-    DangGayQuy --> KhongDat: Hết hạn, chưa đạt mục tiêu
+    DangGayQuy --> KhongDat: Hết hạn, chưa đạt
     ThanhCong: Thành công
     KhongDat: Không đạt mục tiêu
-    ThanhCong --> KetThuc: Hoàn tất và báo cáo
+    ThanhCong --> KetThuc: Hoàn tất báo cáo
     KhongDat --> KetThuc: Đóng chiến dịch
     KetThuc: Kết thúc
     KetThuc --> [*]
@@ -176,262 +85,112 @@ stateDiagram-v2
 
 ## Các mô-đun AI
 
-### Gợi ý dự án phù hợp
-
-Mô-đun xếp hạng các dự án mà người dùng có khả năng quan tâm:
-
-- **Cold start:** dùng danh mục sở thích, nội dung dự án và độ phổ biến khi chưa có đủ lịch sử.
-- **Khi có dữ liệu:** kết hợp lọc dựa trên nội dung và lọc cộng tác từ hành vi xem, theo dõi và tài trợ.
-- **Điều chỉnh xếp hạng:** xét trạng thái, thời gian còn lại và tính đa dạng của danh sách.
-- **Khả năng giải thích:** trả về lý do ngắn gọn cho từng đề xuất.
-- **Fallback:** dùng danh sách dự án phổ biến khi dịch vụ AI gián đoạn.
-- **Đánh giá:** `Precision@K`, `Recall@K`, `NDCG@K`; có thể A/B testing bằng tỷ lệ nhấp và theo dõi khi đủ điều kiện.
-
-### Dự đoán khả năng thành công
-
-Bài toán được xây dựng dưới dạng phân loại nhị phân hoặc ước lượng xác suất chiến dịch đạt mục tiêu trước hạn.
-
-Đặc trưng dự kiến gồm danh mục, mục tiêu vốn, thời lượng, mức hoàn thiện hồ sơ, chất lượng nội dung, số lượng hình ảnh, lịch sử chủ dự án và tương tác trong những ngày đầu. Các mô hình nền như Logistic Regression được so sánh với Random Forest hoặc Gradient Boosting.
-
-Kết quả được sử dụng để:
-
-- Cung cấp báo cáo cho chủ dự án trước khi phát hành.
-- Giúp quản trị viên nhận diện chiến dịch cần tư vấn thêm.
-- Giải thích các yếu tố tích cực hoặc bất lợi thay vì chỉ đưa ra một con số.
-
-Các chỉ số đánh giá gồm `ROC-AUC`, `F1-score`, `precision`, `recall` và độ hiệu chỉnh xác suất. Dữ liệu được chia theo thời gian để hạn chế rò rỉ thông tin. Dự đoán không phải cam kết về kết quả và không được dùng làm căn cứ duy nhất để từ chối chiến dịch.
-
-### Phát hiện gian lận và bất thường
-
-Mô-đun phân tích tài khoản, chiến dịch và giao dịch theo hai tầng:
-
-1. **Luật nghiệp vụ:** phát hiện nhiều giao dịch trong thời gian ngắn, nhiều tài khoản có chung đặc điểm thiết bị, thay đổi hồ sơ bất thường, giá trị tài trợ đột biến hoặc tỷ lệ thanh toán thất bại cao.
-2. **Học máy:** dùng mô hình phân loại khi có dữ liệu gán nhãn; khi thiếu nhãn có thể sử dụng Isolation Forest hoặc phương pháp phát hiện ngoại lệ để tạo điểm rủi ro.
-
-Mỗi cảnh báo gồm điểm rủi ro, nhóm nguyên nhân, dữ liệu liên quan và trạng thái xử lý. Quản trị viên xác nhận, bác bỏ hoặc yêu cầu xác minh thêm; phản hồi này được lưu để cải thiện mô hình. Hệ thống ưu tiên quy trình **human-in-the-loop**, theo dõi `precision`/`recall` tại từng ngưỡng và không tự động công khai cáo buộc gian lận.
+1. **Gợi ý dự án phù hợp:** Lọc cộng tác và nội dung. Fallback về danh sách phổ biến khi AI lỗi. Có giải thích lý do gợi ý.
+2. **Dự đoán khả năng thành công:** Phân loại nhị phân (Logistic Regression / Random Forest) dựa trên mục tiêu, nội dung, tương tác đầu. Phục vụ tư vấn chủ dự án.
+3. **Phát hiện gian lận:** 2 tầng (Luật nghiệp vụ + Isolation Forest). Đưa ra cảnh báo rủi ro cho Admin xét duyệt (Human-in-the-loop).
 
 ## Kiến trúc hệ thống
 
-Hệ thống gồm ba thành phần chính giao tiếp qua REST API:
+Dự án được xây dựng theo kiến trúc Microservices cơ bản, giao tiếp qua REST API.
 
 ```mermaid
 flowchart LR
-    U[Người dùng] --> FE[Frontend<br/>React / Next.js / TypeScript]
-    FE -->|REST API| BE[Backend<br/>Node.js / NestJS / TypeScript]
-    BE --> DB[(MySQL)]
-    BE --> CACHE[(Redis - tùy chọn)]
-    BE --> FILES[Lưu trữ tệp]
-    BE -->|Dữ liệu chuẩn hóa / ẩn danh| AI[AI Service<br/>Python / FastAPI]
-    BE --> PAY[Cổng thanh toán<br/>Sandbox]
-    BE --> NOTIFY[Email / Thông báo]
-    PAY -->|Webhook đã ký| BE
+    U[Người dùng] --> ALB[AWS ALB<br/>Load Balancer]
+    ALB --> FE[Frontend: Next.js<br/>ECS Fargate]
+    ALB --> BE[Backend: NestJS<br/>ECS Fargate]
+    ALB --> AI[AI Service: FastAPI<br/>ECS Fargate]
+    BE --> DB[(Amazon RDS<br/>MySQL 8)]
+    BE --> CACHE[(Redis<br/>Fargate)]
+    BE --> AI
+    BE --> PAY[Cổng thanh toán Sandbox]
 ```
 
-Luồng xử lý điển hình:
+## Cấu trúc mã nguồn & Công nghệ
 
-1. Next.js gửi yêu cầu đến NestJS.
-2. Backend xác thực, phân quyền và xử lý nghiệp vụ.
-3. Backend gọi AI service khi cần xếp hạng, dự đoán hoặc chấm điểm rủi ro.
-4. AI service chỉ nhận các trường đã chuẩn hóa hoặc ẩn danh cần thiết, không tùy ý truy cập toàn bộ cơ sở dữ liệu.
-5. Các tác vụ nặng như huấn luyện mô hình, gửi email và tổng hợp báo cáo được tách khỏi luồng yêu cầu chính.
-
-Trong môi trường triển khai, Nginx có thể làm reverse proxy cho frontend, backend và AI service. Hệ thống sử dụng HTTPS, có sao lưu MySQL, quản lý tệp, theo dõi log và quy trình khôi phục sự cố.
-
-## Công nghệ dự kiến
-
-| Thành phần | Công nghệ | Vai trò |
+| Thư mục/Thành phần | Công nghệ sử dụng | Chức năng |
 | --- | --- | --- |
-| Frontend | React, Next.js, TypeScript | Giao diện responsive, SSR/SSG, biểu mẫu, xác thực, dashboard và biểu đồ. |
-| Backend | Node.js, NestJS, TypeScript | Nghiệp vụ tài khoản, chiến dịch, giao dịch, thông báo và quản trị. |
-| Bảo mật API | NestJS guards, JWT, refresh token | Xác thực và bảo vệ REST API. |
-| Truy cập dữ liệu | ORM/migration tool sẽ chốt sau ERD | Làm việc với cơ sở dữ liệu quan hệ bằng migration có kiểm soát. |
-| Tài liệu API | OpenAPI | Mô tả và kiểm thử hợp đồng dịch vụ. |
-| AI service | Python, FastAPI | Huấn luyện, đánh giá và cung cấp API suy luận. |
-| Xử lý dữ liệu/ML | pandas, NumPy, scikit-learn | Tiền xử lý dữ liệu và xây dựng mô hình. |
-| Cơ sở dữ liệu | MySQL | Lưu dữ liệu nghiệp vụ có cấu trúc. |
-| Cache/tác vụ ngắn | Redis (tùy chọn) | Cache, phiên hoặc hàng đợi tác vụ ngắn. |
-| Hạ tầng | VPS/hosting, Nginx, HTTPS | Triển khai và điều phối truy cập dịch vụ. |
-| Quản lý mã nguồn | Git, GitHub | Quản lý phiên bản và hỗ trợ quy trình phát triển. |
+| `frontend/` | React 19, Next.js 16, Tailwind | Giao diện SSR/SSG, User & Admin Dashboard |
+| `backend/` | Node.js, NestJS 12, TypeORM | Core API, Business logic, Auth, DB interaction |
+| `ai-service/` | Python 3.12, FastAPI, scikit-learn | Model inference, training offline, gợi ý & dự đoán |
+| `infra/terraform/` | Terraform (AWS Provider) | Infrastructure as Code (IaC) để tự động hóa AWS |
+| `infra/` | Docker, Docker Compose, Nginx | Môi trường chạy local tổng hợp |
 
-> Scaffold hiện tại chọn NestJS thay cho Spring Boot để frontend và backend cùng dùng TypeScript. Lý do và hệ quả được ghi tại [`docs/architecture/adr-001-backend-stack.md`](./docs/architecture/adr-001-backend-stack.md). `main.pdf` vẫn là bản mô tả đề tài gốc và chưa được cập nhật theo quyết định này.
-
-## Cấu trúc mã nguồn
-
-```text
-frontend/      Next.js và giao diện người dùng/quản trị
-backend/       NestJS business API và điều phối tích hợp
-ai-service/    FastAPI, model inference và huấn luyện ngoại tuyến
-infra/         Docker Compose và Nginx
-docs/          Kiến trúc, API, database, vận hành và kiểm thử
-```
-
-Xem cây chi tiết và ranh giới trách nhiệm tại [`docs/architecture/project-structure.md`](./docs/architecture/project-structure.md). Các thư mục chức năng đang để trống có chủ đích; chúng chưa được xem là chức năng đã triển khai.
-
-## Khởi động bộ khung
-
-Yêu cầu: Node.js `>=22.22.3` và Python `>=3.12`. Docker là tùy chọn cho môi trường tích hợp. Workspace hiện có Node.js portable `22.22.3` trong `.tools/`; thư mục này được bỏ qua bởi Git.
-
-### Chạy trực tiếp khi phát triển
-
-```powershell
-.\scripts\node-local.cmd --version
-.\scripts\npm-local.cmd install
-Copy-Item frontend/.env.example frontend/.env.local
-Copy-Item backend/.env.example backend/.env
-
-python -m venv ai-service/.venv
-.\scripts\python-ai.cmd -m pip install -r ai-service/requirements-dev.txt
-```
-
-Các wrapper `.cmd` buộc npm dùng đúng Node.js portable và không phụ thuộc chính sách chạy PowerShell script. Khi clone repository sang máy khác, hãy cài Node.js `22.22.3` hoặc đặt bản portable tại đúng đường dẫn `.tools/node-v22.22.3-win-x64`.
-
-Kiểm tra mã nguồn và build production:
-
-```powershell
-.\scripts\npm-local.cmd run check
-.\scripts\npm-local.cmd run build
-
-.\scripts\python-ai.cmd -m pytest -q ai-service
-.\scripts\python-ai.cmd -m ruff check ai-service
-```
-
-Mở ba terminal tại thư mục repository:
-
-```powershell
-.\scripts\npm-local.cmd run dev:frontend
-```
-
-```powershell
-.\scripts\npm-local.cmd run dev:backend
-```
-
-```powershell
-Set-Location ai-service
-..\scripts\python-ai.cmd -m uvicorn app.main:app --reload
-```
-
-### Chạy bằng Docker Compose
-
-```powershell
-Copy-Item .env.example .env
-docker compose --env-file .env -f infra/compose.yaml up --build
-```
-
-Sau khi khởi động, frontend ở `http://localhost:3000`, backend health ở `http://localhost:4000/api/v1/health`, AI docs ở `http://localhost:8000/docs` và reverse proxy ở `http://localhost:8080`.
-
-## Yêu cầu phi chức năng
-
-### Hiệu năng và mở rộng
-
-- Tối ưu thời gian phản hồi cho các trang phổ biến.
-- Phân trang các API trả về danh sách lớn.
-- Cache dữ liệu ít thay đổi.
-- Thiết kế dịch vụ không lưu trạng thái để hỗ trợ mở rộng ngang.
-
-### Bảo mật và độ tin cậy
-
-- Áp dụng nguyên tắc quyền tối thiểu.
-- Kiểm tra dữ liệu đầu vào; phòng chống XSS, CSRF và SQL injection.
-- Giới hạn tần suất truy cập và quản lý bí mật ngoài mã nguồn.
-- Mã hóa dữ liệu truyền tải bằng HTTPS.
-- Ghi audit log cho thao tác quan trọng.
-- Xác minh webhook thanh toán và bảo đảm idempotency.
-- Có retry cho tác vụ nền, sao lưu dữ liệu và phương án phục hồi dịch vụ.
-
-### Riêng tư và đạo đức AI
-
-- Chỉ thu thập dữ liệu cần thiết và công bố rõ mục đích sử dụng.
-- Hỗ trợ xóa hoặc ẩn dữ liệu theo chính sách.
-- Hạn chế sử dụng các đặc trưng nhạy cảm.
-- Giải thích kết quả AI và giám sát độ lệch của mô hình.
-- Luôn duy trì khả năng can thiệp của con người.
-
-### Khả dụng và bảo trì
-
-- Giao diện nhất quán, thích ứng với nhiều kích thước màn hình.
-- Thông báo lỗi rõ ràng, dễ hiểu.
-- Mã nguồn được chia mô-đun.
-- Có tài liệu API, migration cơ sở dữ liệu và kiểm thử tự động.
-
-## Kiểm thử và đánh giá
-
-### Phần mềm
-
-- Kiểm thử đơn vị cho quy tắc nghiệp vụ và phân quyền backend.
-- Kiểm thử các luồng quan trọng trên frontend.
-- Kiểm thử tích hợp cho thanh toán, webhook và giao tiếp với AI service.
-- Kiểm thử bảo mật, hiệu năng, khả dụng và khả năng phục hồi.
-- Kịch bản end-to-end: đăng ký chủ dự án → nộp hồ sơ → xét duyệt → phát hành → nhận tài trợ → cập nhật tiến độ → xem báo cáo.
-
-### Mô hình AI
-
-- So sánh với baseline phù hợp.
-- Công bố cách chia tập dữ liệu và ngăn ngừa data leakage.
-- Báo cáo chỉ số đánh giá, ma trận nhầm lẫn và các trường hợp dự đoán chưa tốt.
-- Quản lý phiên bản mô hình, tập đặc trưng và kết quả đánh giá để có thể tái lập.
-- Theo dõi tỷ lệ cảnh báo sai và chất lượng xếp hạng.
-
-## Tiến độ triển khai
-
-> Cập nhật ngày **11/09/2026**. Trạng thái dưới đây phản ánh mã nguồn và kiểm thử hiện có, không đồng nghĩa hệ thống đã sẵn sàng vận hành production.
-
-| Hạng mục | Trạng thái | Kết quả hiện tại |
-| --- | --- | --- |
-| Cơ sở dữ liệu | Đã có nền tảng | Entities, migration và seed cho tài khoản, chiến dịch, tài trợ, tiến độ, thông báo, báo cáo, hành vi và cảnh báo rủi ro. |
-| Xác thực và người dùng | Đã triển khai lõi | Đăng ký, đăng nhập, refresh token, JWT guards, phân quyền, CRUD hồ sơ, giới hạn tần suất và khóa tạm khi đăng nhập sai nhiều lần. |
-| Chiến dịch | Đã triển khai lõi | CRUD, quyền sở hữu, quy trình gửi duyệt/kiểm duyệt, lọc và sắp xếp; frontend có khám phá, trang chi tiết và luồng tạo chiến dịch. |
-| Tài trợ và thanh toán | Đã triển khai cơ bản | Tạo giao dịch, idempotency, webhook có xác minh, lịch sử người tài trợ và cổng Ví demo; chưa tích hợp thanh toán production. |
-| Tiến độ và minh bạch | Đã triển khai cơ bản | Mốc tiến độ, bài cập nhật, tổng hợp số liệu từ giao dịch và khu vực minh bạch trên giao diện dự án. |
-| Quản trị và cảnh báo | Đã triển khai cơ bản | Dashboard tổng quan, danh sách chiến dịch/tài trợ/người dùng, tạo và xử lý cảnh báo rủi ro; quy trình moderation nội dung đầy đủ vẫn đang hoàn thiện. |
-| Dịch vụ AI | Đã triển khai cơ bản | FastAPI cho gợi ý, dự đoán thành công và phát hiện bất thường; có giải thích, fallback, model metadata, metrics và kiểm thử API. |
-| Giao diện người dùng | Đang hoàn thiện | Trang chủ, khám phá, chi tiết dự án, xác thực, dashboard, tạo chiến dịch và admin đã có; hệ thống font, header, card và trang chi tiết đã được chuẩn hóa responsive. |
-| Thông báo và moderation | Chưa hoàn thiện | Hiện mới có entity nền tảng; chưa có đầy đủ service, controller, giao diện và kiểm thử tích hợp. |
-| Tích hợp và triển khai | Đang chuẩn bị | Có Docker Compose/Nginx cho local; E2E toàn luồng, staging, HTTPS, giám sát và backup/restore vẫn cần hoàn thiện. |
-
-Trọng tâm tiếp theo là hoàn thiện notifications/moderation, bổ sung kiểm thử tích hợp và E2E, sau đó chuẩn hóa môi trường staging trước khi triển khai demo trực tuyến.
-
-## Kế hoạch thực hiện
-
-- [ ] **Khảo sát và phân tích:** xác định yêu cầu, actor, use case, rủi ro và tiêu chí nghiệm thu.
-- [ ] **Thiết kế:** hoàn thiện UI/UX, kiến trúc, cơ sở dữ liệu, API, phân quyền, thanh toán và dữ liệu thử nghiệm.
-- [ ] **Phát triển chức năng lõi:** tài khoản, chiến dịch, xét duyệt, tìm kiếm, tài trợ, tiến độ, thông báo và quản trị.
-- [ ] **Phát triển AI:** pipeline dữ liệu, mô hình nền, đánh giá, API suy luận và giao diện giải thích.
-- [ ] **Tích hợp và kiểm thử:** kiểm thử đơn vị, tích hợp, bảo mật, hiệu năng và đánh giá mô hình.
-- [ ] **Triển khai và báo cáo:** cấu hình VPS/hosting, tên miền, HTTPS, demo trực tuyến và hoàn thiện tài liệu.
-
-Quá trình phát triển được thực hiện theo hướng lặp và tăng trưởng. Mỗi giai đoạn có sản phẩm kiểm chứng; việc chuẩn bị dữ liệu và mô hình AI được thực hiện song song với hệ thống web.
-
-## Sản phẩm dự kiến
-
-- Website dành cho người dùng và trang quản trị.
-- Backend NestJS kết nối MySQL.
-- Dịch vụ AI bằng Python cho ba nhóm chức năng.
-- Bộ dữ liệu thử nghiệm đã được làm sạch hoặc ẩn danh.
-- Tài liệu phân tích thiết kế và sơ đồ kiến trúc.
-- Đặc tả API và hướng dẫn cài đặt, sử dụng.
-- Bộ kiểm thử và báo cáo đánh giá mô hình.
-- Bản demo triển khai trên VPS/hosting, sử dụng tên miền và HTTPS.
-
-## Hạn chế và hướng phát triển
-
-### Hạn chế
-
-- Chất lượng AI phụ thuộc vào quy mô, độ tin cậy và độ cân bằng của dữ liệu.
-- Nền tảng mới có ít dữ liệu lịch sử nên cần dữ liệu công khai hoặc dữ liệu mô phỏng có kiểm soát.
-- Kết quả mô hình không thay thế đánh giá của chuyên gia hoặc quản trị viên.
-- Thanh toán, KYC, hoàn tiền và giải ngân thực tế chịu ràng buộc pháp lý, bảo mật và quy trình của nhà cung cấp.
-
-### Hướng phát triển
-
-- Ứng dụng di động, đa ngôn ngữ và đa tiền tệ.
-- Gây quỹ định kỳ.
-- Ký quỹ và giải ngân theo từng mốc tiến độ.
-- Tích hợp nhà cung cấp KYC chuyên nghiệp.
-- Phân tích mạng lưới để nhận diện nhóm tài khoản thông đồng.
-- Cập nhật mô hình trực tuyến và giám sát model drift.
-- Đánh giá tính công bằng giữa các nhóm dự án.
-- Bổ sung cơ chế giải thích AI trực quan.
+> **Lưu ý Lệch chuẩn (ADR):** Đề cương ban đầu ghi Backend dùng Spring Boot, tuy nhiên thực tế nhóm chọn NestJS để dùng chung TypeScript với Frontend (xem `docs/architecture/adr-001-backend-stack.md`).
 
 ---
 
-Tài liệu này được xây dựng theo nội dung mô tả đề tài trong [`main.pdf`](./main.pdf). README sẽ tiếp tục được cập nhật cùng quá trình phân tích, phát triển, kiểm thử và triển khai hệ thống.
+## Khởi động Môi trường Local (Dev)
+
+Chạy trên máy tính cá nhân bằng Docker Compose (Dành cho Dev/Test).
+
+1. **Chuẩn bị file môi trường:**
+   ```powershell
+   Copy-Item frontend/.env.example frontend/.env.local
+   Copy-Item backend/.env.example backend/.env
+   Copy-Item .env.example .env
+   ```
+
+2. **Chạy toàn bộ hệ thống bằng Docker Compose:**
+   ```powershell
+   docker compose -f infra/compose.yaml up --build -d
+   ```
+   *Frontend: `http://localhost:3000` | Backend: `http://localhost:4000/api/v1` | AI: `http://localhost:8000`*
+
+3. **Chạy từng service (Development mode):**
+   ```powershell
+   .\scripts\npm-local.cmd run dev:frontend
+   .\scripts\npm-local.cmd run dev:backend
+   cd ai-service && ..\scripts\python-ai.cmd -m uvicorn app.main:app --reload
+   ```
+
+---
+
+## Triển khai AWS Production (Terraform)
+
+Hệ thống hạ tầng (Infrastructure as Code) đã được viết sẵn bằng Terraform tại thư mục `infra/terraform`. Kiến trúc này triển khai toàn bộ dự án lên mạng AWS với các tính năng:
+- **Tối ưu chi phí đồ án:** Sử dụng **Public Subnet** cho Fargate Task để tránh tốn $32/tháng tiền NAT Gateway, nhưng khóa hoàn toàn inbound traffic bằng **Security Group** (chỉ cho phép Load Balancer gọi vào). Dùng Redis trên Fargate thay cho ElastiCache.
+- **AWS Application Load Balancer (ALB):** Tự động chia tải và định tuyến API.
+- **Amazon RDS:** Dành cho MySQL 8 (Dùng bản t4g.micro siêu tiết kiệm).
+
+### Các bước triển khai:
+
+1. **Khởi tạo và tạo kho chứa Docker (Amazon ECR):**
+   ```bash
+   cd infra/terraform
+   terraform init
+   terraform apply -target="aws_ecr_repository.frontend" -target="aws_ecr_repository.backend" -target="aws_ecr_repository.ai_service"
+   ```
+
+2. **Build và Push Docker Images:**
+   Đăng nhập vào AWS ECR, build 3 image từ 3 `Dockerfile` ở thư mục gốc và push lên các kho ECR vừa tạo.
+
+3. **Tạo toàn bộ hệ thống (Cluster, Load Balancer, RDS, Container):**
+   ```bash
+   terraform apply
+   ```
+   *Khi chạy xong, terminal sẽ in ra URL truy cập của Load Balancer (Ví dụ: `gopmam-alb-xxx.ap-southeast-1.elb.amazonaws.com`).*
+
+4. **Tạm dừng / Dọn dẹp (Để không tốn tiền khi đi ngủ):**
+   ```bash
+   terraform destroy
+   ```
+
+---
+
+## Tiến độ triển khai
+
+> Cập nhật mới nhất: **Tháng 9/2026**
+
+| Hạng mục | Trạng thái | Ghi chú |
+| --- | --- | --- |
+| **Cơ sở dữ liệu** | ✅ Đã hoàn thành | Entities, migration, seed (User, Campaign, Donation, Progress, Audit log). |
+| **Xác thực & Bảo mật** | ✅ Đã hoàn thành | JWT, Rate limit, chống Brute-force login, RolesGuard. |
+| **Core: Chiến dịch** | ✅ Đã hoàn thành | Đầy đủ vòng đời, luồng kiểm duyệt, lọc/tìm kiếm. |
+| **Core: Tài trợ** | ✅ Đã hoàn thành | Giao dịch Idempotency, chặn tài trợ hết hạn, Webhook xử lý thanh toán. |
+| **Core: Tiến độ** | ✅ Đã hoàn thành | Mốc thời gian, tính tự động % hoàn thành. |
+| **Dịch vụ AI** | ✅ Đã hoàn thành | FastAPI routes (recommend, predict, fraud), model registry. |
+| **Giao diện (Frontend)** | 🔶 Đang hoàn thiện | Nối API trang chủ, dashboard, quy trình tạo chiến dịch. (Đang hoàn thiện phần Admin). |
+| **Hạ tầng & Triển khai** | ✅ Đã hoàn thành | **AWS Terraform (ECS Fargate, ALB, RDS)** hoàn tất. Có Docker Compose cho môi trường Local. |
+| **Kiểm thử** | 🔶 Đang tiến hành | Unit tests API backend đạt ~80%. Cần viết thêm E2E. |
+
+*Tài liệu README này mô tả chuẩn xác thực trạng hệ thống ở thời điểm hiện tại và sẽ được cập nhật liên tục.*
