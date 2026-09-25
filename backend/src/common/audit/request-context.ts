@@ -18,8 +18,10 @@ const MAX_USER_AGENT_LENGTH = 500;
 
 /**
  * Middleware Express, đăng ký bằng `app.use()` trong `main.ts`.
- * Lưu ý: sau reverse proxy (Nginx/ALB) `req.ip` là IP của proxy trừ khi bật
- * `trust proxy`; cấu hình đó ảnh hưởng cả rate limit nên chưa bật ở đây.
+ * Lưu ý: sau reverse proxy (Nginx/ALB), `req.ip` chỉ đúng là IP của client khi
+ * `trust proxy` được bật đúng số hop — cấu hình qua `TRUST_PROXY_HOPS`
+ * (`app.config.ts`, áp dụng trong `main.ts`); giá trị này ảnh hưởng cả
+ * rate limit theo IP (`common/rate-limit`).
  */
 export function requestContextMiddleware(
   req: Request,
