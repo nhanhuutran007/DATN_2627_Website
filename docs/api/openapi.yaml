@@ -209,6 +209,7 @@ paths:
       description: >-
         Không cần đăng nhập. Mặc định chỉ trả chiến dịch ở trạng thái công
         khai (`approved`, `active`, `success`, `ended`) trừ khi lọc `status`.
+        Lọc `status` chỉ nhận trạng thái đã công khai; draft/pending/needs_info/rejected/cancelled trả 400.
       parameters:
         - $ref: "#/components/parameters/CampaignQ"
         - $ref: "#/components/parameters/CampaignCategory"
@@ -303,7 +304,10 @@ paths:
     delete:
       operationId: deleteCampaign
       summary: Xóa chiến dịch
-      description: Chỉ chủ dự án hoặc admin. Ghi audit `campaign.delete`.
+      description: >-
+        Chỉ chủ dự án hoặc admin, và chỉ khi chiến dịch ở `draft`, `rejected` hoặc `needs_info`
+        (chưa từng công khai). Chiến dịch đã phát hành trả 409 — kết thúc qua luồng moderate.
+        Ghi audit `campaign.delete`.
       security:
         - bearerAuth: []
       parameters:
@@ -315,6 +319,8 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: Chiến dịch đã phát hành, không được xóa
   /campaigns/{id}/submit:
     post:
       operationId: submitCampaign
@@ -1115,6 +1121,47 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: Chuyển trạng thái không hợp lệ hoặc chiến dịch không tạm dừng được
+
+  /campaigns/stats:
+    get:
+      operationId: getPlatformStats
+      summary: Thống kê công khai toàn nền tảng (sổ quỹ chung)
+      description: >-
+        Tính trực tiếp từ bảng campaigns trên các chiến dịch đã công khai. `totalRaised` chỉ gồm
+        tiền từ giao dịch đã được cổng thanh toán xác nhận (currentAmount chỉ tăng khi webhook/confirm hợp lệ).
+      responses:
+        "200":
+          description: Số liệu tổng hợp
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformStats"
+  /campaigns/{id}/donations:
+    get:
+      operationId: getCampaignLedger
+      summary: Sổ cái giao dịch công khai của một chiến dịch
+      description: >-
+        Chỉ giao dịch `completed`, mới nhất trước. Không trả email, lời nhắn hay mã giao dịch đầy đủ
+        (`reference` chỉ giữ 6 ký tự cuối). Người chọn ẩn danh có `donorName = null`.
+        Chiến dịch chưa công khai trả 404.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        "200":
+          description: Danh sách giao dịch đã xác nhận
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignLedger"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
   securitySchemes:
@@ -2147,3 +2194,45 @@ components:
           type: integer
         offset:
           type: integer
+    PlatformStats:
+      type: object
+      properties:
+        totalRaised:
+          type: number
+        totalBackers:
+          type: integer
+        publicCampaigns:
+          type: integer
+        activeCampaigns:
+          type: integer
+        successfulCampaigns:
+          type: integer
+    CampaignLedger:
+      type: object
+      properties:
+        total:
+          type: integer
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              donorName:
+                type: string
+                nullable: true
+              amount:
+                type: number
+              currency:
+                type: string
+              paymentMethod:
+                type: string
+                nullable: true
+              reference:
+                type: string
+                example: "•••7D6C5B"
+              completedAt:
+                type: string
+                format: date-time

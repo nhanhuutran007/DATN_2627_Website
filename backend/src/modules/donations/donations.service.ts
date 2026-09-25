@@ -262,4 +262,67 @@ export class DonationsService {
       order: { createdAt: "DESC" },
     });
   }
+
+  /**
+   * Sổ cái công khai của một chiến dịch: chỉ giao dịch đã được xác nhận, trả
+   * về đối tượng thu gọn (không email, không lời nhắn, mã giao dịch bị che).
+   * Người chọn ẩn danh hiển thị `donorName = null`.
+   */
+  async listPublicLedger(campaignId: string, limit = 20): Promise<PublicLedger> {
+    const campaign = await this.campaignRepo.findOneBy({ id: campaignId });
+    if (!campaign || !LEDGER_VISIBLE_STATUSES.includes(campaign.status)) {
+      throw new NotFoundException("Campaign not found");
+    }
+
+    const take = Math.min(Math.max(1, limit), 50);
+    const [donations, total] = await this.donationRepo.findAndCount({
+      where: { campaignId, status: DonationStatus.COMPLETED },
+      relations: { user: true },
+      order: { completedAt: "DESC", createdAt: "DESC" },
+      take,
+    });
+
+    return {
+      total,
+      items: donations.map((donation) => ({
+        id: donation.id,
+        donorName: donation.isAnonymous ? null : (donation.user?.name ?? null),
+        amount: Number(donation.amount),
+        currency: donation.currency,
+        paymentMethod: donation.paymentMethod ?? null,
+        reference: maskReference(donation.transactionId ?? donation.id),
+        completedAt: donation.completedAt ?? donation.createdAt,
+      })),
+    };
+  }
+}
+
+const LEDGER_VISIBLE_STATUSES = [
+  CampaignStatus.APPROVED,
+  CampaignStatus.ACTIVE,
+  CampaignStatus.PAUSED,
+  CampaignStatus.SUCCESS,
+  CampaignStatus.FAILED,
+  CampaignStatus.ENDED,
+];
+
+export type PublicLedgerEntry = {
+  id: string;
+  donorName: string | null;
+  amount: number;
+  currency: string;
+  paymentMethod: string | null;
+  reference: string;
+  completedAt: Date;
+};
+
+export type PublicLedger = {
+  items: PublicLedgerEntry[];
+  total: number;
+};
+
+/** Chỉ giữ 6 ký tự cuối để đối chiếu, không lộ toàn bộ mã giao dịch. */
+function maskReference(value: string): string {
+  const tail = value.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase();
+  return `•••${tail}`;
 }

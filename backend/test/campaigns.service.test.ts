@@ -1,5 +1,7 @@
-import { equal, ok } from "node:assert/strict";
+import { equal, ok, rejects } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
+
+import { BadRequestException } from "@nestjs/common";
 
 import { CampaignsService } from "../src/modules/campaigns/campaigns.service";
 import { Campaign, CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
@@ -88,6 +90,20 @@ describe("CampaignsService", () => {
       equal(result.total, 1);
       equal(result.limit, 9);
       equal(result.offset, 0);
+    });
+
+    it("should reject non-public status filters on the public listing", async () => {
+      for (const status of [CampaignStatus.DRAFT, CampaignStatus.PENDING, CampaignStatus.REJECTED]) {
+        await rejects(campaignsService.findAll({ status }), BadRequestException);
+      }
+    });
+
+    it("should still let owners filter their own drafts", async () => {
+      const result = await campaignsService.findAll(
+        { status: CampaignStatus.DRAFT },
+        "123e4567-e89b-12d3-a456-426614174001",
+      );
+      equal(result.total, 1);
     });
   });
 
@@ -332,6 +348,19 @@ describe("CampaignsService", () => {
         .catch((err) => {
           equal(err.status, 403);
         });
+    });
+
+    it("should refuse to delete a published campaign (it may hold donations)", async () => {
+      for (const status of [CampaignStatus.ACTIVE, CampaignStatus.PAUSED, CampaignStatus.SUCCESS, CampaignStatus.PENDING]) {
+        repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status });
+        let removed = false;
+        repo.remove = async () => { removed = true; };
+        await rejects(
+          campaignsService.remove("123e4567-e89b-12d3-a456-426614174000", makeUser(UserRole.ADMIN)),
+          (err: { status?: number }) => err.status === 409,
+        );
+        equal(removed, false);
+      }
     });
   });
 });

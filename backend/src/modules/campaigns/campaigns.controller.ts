@@ -37,6 +37,12 @@ export class CampaignsController {
     return this.campaignsService.findAll(query, user.id);
   }
 
+  /** Thống kê công khai toàn nền tảng (tính từ dữ liệu thật, không số mô phỏng). */
+  @Get("stats")
+  stats() {
+    return this.campaignsService.getPlatformStats();
+  }
+
   @Get(":id")
   findOne(@Param("id", ParseUUIDPipe) id: string) {
     return this.campaignsService.findById(id);

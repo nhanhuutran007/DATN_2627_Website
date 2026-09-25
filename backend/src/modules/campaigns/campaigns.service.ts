@@ -67,6 +67,25 @@ const MODERATE_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
   [CampaignStatus.ENDED]: [],
 };
 
+/** Chiến dịch đã công khai (người dùng nhìn thấy được), dùng cho thống kê. */
+const STATS_STATUSES = [
+  CampaignStatus.APPROVED,
+  CampaignStatus.ACTIVE,
+  CampaignStatus.PAUSED,
+  CampaignStatus.SUCCESS,
+  CampaignStatus.FAILED,
+  CampaignStatus.ENDED,
+];
+
+export type PlatformStats = {
+  /** Tổng tiền đã ghi nhận — chỉ tăng khi giao dịch được cổng thanh toán xác nhận. */
+  totalRaised: number;
+  totalBackers: number;
+  publicCampaigns: number;
+  activeCampaigns: number;
+  successfulCampaigns: number;
+};
+
 export type CampaignListResult = {
   items: Campaign[];
   total: number;
@@ -88,6 +107,14 @@ export class CampaignsService {
   ): Promise<CampaignListResult> {
     const limit = query.limit ?? 9;
     const offset = query.offset ?? 0;
+
+    // Danh sách công khai chỉ được lọc trong các trạng thái đã công khai; nếu
+    // không, `?status=draft` sẽ lộ hồ sơ nháp/chờ duyệt của người khác.
+    if (!ownerId && query.status && !STATS_STATUSES.includes(query.status)) {
+      throw new BadRequestException(
+        `status must be one of: ${STATS_STATUSES.join(", ")}`,
+      );
+    }
 
     const base: FindOptionsWhere<Campaign> = ownerId
       ? { ownerId, ...(query.status ? { status: query.status } : {}) }
@@ -267,6 +294,13 @@ export class CampaignsService {
   async remove(id: string, currentUser: User): Promise<void> {
     const campaign = await this.findById(id);
     this.assertCanManage(campaign, currentUser);
+    // Chỉ xóa được hồ sơ chưa từng công khai; chiến dịch đã phát hành có thể đã
+    // nhận tiền nên phải kết thúc qua luồng kiểm duyệt (moderate → ended) để giữ sổ cái.
+    if (!OWNER_EDITABLE_STATUSES.includes(campaign.status)) {
+      throw new ConflictException(
+        "Only draft, rejected or needs-info campaigns can be deleted; end published campaigns instead",
+      );
+    }
     const snapshot = {
       title: campaign.title,
       status: campaign.status,
@@ -282,6 +316,28 @@ export class CampaignsService {
       entityId: campaignId,
       oldValues: snapshot,
     });
+  }
+
+  async getPlatformStats(): Promise<PlatformStats> {
+    const row = await this.campaignRepo
+      .createQueryBuilder("c")
+      .select("COALESCE(SUM(c.currentAmount), 0)", "totalRaised")
+      .addSelect("COALESCE(SUM(c.backerCount), 0)", "totalBackers")
+      .addSelect("COUNT(*)", "publicCampaigns")
+      .addSelect("SUM(CASE WHEN c.status = :active THEN 1 ELSE 0 END)", "activeCampaigns")
+      .addSelect("SUM(CASE WHEN c.status = :success THEN 1 ELSE 0 END)", "successfulCampaigns")
+      .where("c.status IN (:...statuses)", { statuses: STATS_STATUSES })
+      .setParameters({ active: CampaignStatus.ACTIVE, success: CampaignStatus.SUCCESS })
+      .getRawOne<Record<keyof PlatformStats, string | number | null>>();
+
+    const num = (value: string | number | null | undefined) => Number(value ?? 0) || 0;
+    return {
+      totalRaised: num(row?.totalRaised),
+      totalBackers: num(row?.totalBackers),
+      publicCampaigns: num(row?.publicCampaigns),
+      activeCampaigns: num(row?.activeCampaigns),
+      successfulCampaigns: num(row?.successfulCampaigns),
+    };
   }
 
   private assertCanManage(campaign: Campaign, user: User): void {
