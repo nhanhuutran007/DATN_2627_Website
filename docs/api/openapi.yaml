@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Crowdfunding Platform API
-  version: 0.2.0
+  version: 0.3.0
   description: API cho nền tảng gây quỹ cộng đồng Góp Mầm.
 servers:
   - url: http://localhost:4000/api/v1
@@ -22,6 +22,9 @@ paths:
     post:
       operationId: register
       summary: Đăng ký tài khoản mới
+      description: >-
+        Không cho tự chọn vai trò `admin` khi đăng ký. Rate limit 3 lần/phút
+        theo IP.
       requestBody:
         required: true
         content:
@@ -37,10 +40,15 @@ paths:
                 $ref: "#/components/schemas/TokenResponse"
         "401":
           description: Email đã được đăng ký
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /auth/login:
     post:
       operationId: login
       summary: Đăng nhập
+      description: >-
+        Rate limit 5 lần/phút theo IP; khóa tài khoản 5 lần sai liên tiếp
+        trong 15 phút.
       requestBody:
         required: true
         content:
@@ -55,11 +63,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/TokenResponse"
         "401":
-          description: Sai email hoặc mật khẩu
+          description: Sai email hoặc mật khẩu, hoặc tài khoản đang bị khóa
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /auth/refresh:
     post:
       operationId: refreshToken
       summary: Làm mới access token
+      description: Rate limit 10 lần/phút theo IP.
       requestBody:
         required: true
         content:
@@ -75,10 +86,12 @@ paths:
                 $ref: "#/components/schemas/TokenResponse"
         "401":
           description: Refresh token không hợp lệ
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /users:
     get:
       operationId: listUsers
-      summary: Danh sách người dùng
+      summary: Danh sách người dùng (chỉ admin)
       security:
         - bearerAuth: []
       responses:
@@ -90,6 +103,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/User"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /users/me:
     get:
       operationId: getMe
@@ -106,16 +121,11 @@ paths:
   /users/{id}:
     get:
       operationId: getUserById
-      summary: Lấy thông tin người dùng theo id
+      summary: Lấy thông tin người dùng theo id (chỉ admin)
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: "#/components/parameters/IdPath"
       responses:
         "200":
           description: Thông tin người dùng
@@ -123,18 +133,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "403":
+          $ref: "#/components/responses/Forbidden"
     patch:
       operationId: updateUser
       summary: Cập nhật thông tin người dùng
+      description: Chỉ chủ tài khoản hoặc admin mới sửa được. Ghi audit `user.update`.
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: "#/components/parameters/IdPath"
       requestBody:
         required: true
         content:
@@ -148,34 +156,34 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
     delete:
       operationId: deleteUser
       summary: Xóa người dùng (chỉ admin)
+      description: Ghi audit `user.delete` (không log mật khẩu).
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: "#/components/parameters/IdPath"
       responses:
         "200":
           description: Xóa thành công
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /users/{id}/role:
     patch:
       operationId: updateUserRole
       summary: Cập nhật vai trò người dùng (chỉ admin)
+      description: Ghi audit `user.role.update`.
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
+        - $ref: "#/components/parameters/IdPath"
       requestBody:
         required: true
         content:
@@ -189,12 +197,866 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /campaigns:
+    get:
+      operationId: listCampaigns
+      summary: Danh sách chiến dịch công khai
+      description: >-
+        Không cần đăng nhập. Mặc định chỉ trả chiến dịch ở trạng thái công
+        khai (`approved`, `active`, `success`, `ended`) trừ khi lọc `status`.
+      parameters:
+        - $ref: "#/components/parameters/CampaignQ"
+        - $ref: "#/components/parameters/CampaignCategory"
+        - $ref: "#/components/parameters/CampaignStatusFilter"
+        - $ref: "#/components/parameters/CampaignSort"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Danh sách chiến dịch có phân trang
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignList"
+    post:
+      operationId: createCampaign
+      summary: Tạo chiến dịch mới (trạng thái `draft`)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignRequest"
+      responses:
+        "201":
+          description: Đã tạo chiến dịch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+  /campaigns/mine:
+    get:
+      operationId: listMyCampaigns
+      summary: Danh sách chiến dịch của chính chủ dự án đang đăng nhập
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CampaignStatusFilter"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Danh sách chiến dịch của tôi (mọi trạng thái)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignList"
+  /campaigns/{id}:
+    get:
+      operationId: getCampaignById
+      summary: Chi tiết chiến dịch
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Thông tin chiến dịch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateCampaign
+      summary: Cập nhật chiến dịch
+      description: >-
+        Chỉ chủ dự án hoặc admin. Chỉ sửa được khi ở `draft`, `rejected` hoặc
+        `needs_info`. Ghi audit `campaign.update`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCampaignRequest"
+      responses:
+        "200":
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "403":
+          description: Không có quyền, hoặc chiến dịch không ở trạng thái được sửa
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteCampaign
+      summary: Xóa chiến dịch
+      description: Chỉ chủ dự án hoặc admin. Ghi audit `campaign.delete`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Xóa thành công
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /campaigns/{id}/submit:
+    post:
+      operationId: submitCampaign
+      summary: Gửi chiến dịch để admin xét duyệt
+      description: >-
+        Chỉ khi đang ở `draft`, `rejected` hoặc `needs_info` → chuyển sang
+        `pending`. Ghi audit `campaign.submit`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Đã gửi duyệt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "403":
+          description: Không có quyền, hoặc chiến dịch không ở trạng thái gửi duyệt được
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /campaigns/{id}/moderate:
+    patch:
+      operationId: moderateCampaign
+      summary: Admin duyệt/từ chối/tạm dừng/kết thúc chiến dịch
+      description: >-
+        Chỉ admin. Bắt buộc theo ma trận chuyển trạng thái (vd. không thể
+        chuyển `draft` → `ended`); bắt buộc `reason` khi chuyển sang
+        `rejected`, `needs_info` hoặc `paused`. Ghi audit `campaign.moderate`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerateCampaignRequest"
+      responses:
+        "200":
+          description: Đã cập nhật trạng thái
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "400":
+          description: Thiếu `reason` bắt buộc
+        "403":
+          description: Không phải admin
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Chuyển trạng thái không hợp lệ theo vòng đời chiến dịch
+
+  /donations:
+    post:
+      operationId: createDonation
+      summary: Tạo đơn tài trợ (trạng thái `pending`)
+      description: >-
+        Idempotent theo `idempotencyKey` — gọi lại với cùng khóa trả về đơn cũ.
+        Chặn nếu chiến dịch không ở trạng thái `active` hoặc đã hết hạn.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDonationRequest"
+      responses:
+        "201":
+          description: Đơn tài trợ đã tạo (hoặc đơn cũ nếu trùng idempotency key)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+        "404":
+          description: Chiến dịch không tồn tại
+        "409":
+          description: Chiến dịch không ở trạng thái `active` hoặc đã hết hạn
+  /donations/webhook:
+    post:
+      operationId: donationWebhook
+      summary: Webhook xác nhận thanh toán từ cổng sandbox
+      description: >-
+        Không cần Bearer token — xác thực bằng chữ ký HMAC-SHA256 ở header
+        `X-Signature` (`donationId.status.transactionId.timestamp` ký bằng
+        `PAYMENT_WEBHOOK_SECRET`). `timestamp` (epoch ms) phải nằm trong 5
+        phút gần nhất, chống replay. Idempotent theo trạng thái đơn tài trợ —
+        cập nhật có điều kiện, chống race khi 2 webhook đến gần như đồng
+        thời. Rate limit 30 lần/phút theo IP. Trình duyệt không bao giờ được
+        gọi endpoint này trực tiếp.
+      parameters:
+        - name: X-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookDonationRequest"
+      responses:
+        "200":
+          description: Đã cập nhật (hoặc đã được một request khác xử lý trước — idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+        "401":
+          description: Chữ ký sai, thiếu chữ ký, hoặc `timestamp` quá cũ (ghi audit `donation.webhook.rejected`)
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /donations/{id}/confirm:
+    post:
+      operationId: confirmDemoDonation
+      summary: Xác nhận thanh toán ví demo (sandbox)
+      description: >-
+        Chỉ hoạt động khi cổng thanh toán đang ở chế độ `demo`. Chỉ chủ đơn
+        tài trợ mới xác nhận được (404 thay vì 403 để không lộ sự tồn tại của
+        đơn thuộc người khác).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmDonationRequest"
+      responses:
+        "200":
+          description: Đã xác nhận (hoặc trả về đơn đã xử lý trước đó nếu trùng)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+        "403":
+          description: Cổng thanh toán hiện không ở chế độ demo
+        "404":
+          description: Không tìm thấy đơn tài trợ thuộc về người dùng hiện tại
+  /donations/mine:
+    get:
+      operationId: listMyDonations
+      summary: Lịch sử tài trợ của tôi
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Danh sách đơn tài trợ (không phân trang)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Donation"
+  /donations/{id}:
+    get:
+      operationId: getDonationById
+      summary: Chi tiết một đơn tài trợ
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Chi tiết đơn tài trợ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /campaigns/{id}/milestones:
+    get:
+      operationId: listCampaignMilestones
+      summary: Danh sách mốc tiến độ của một chiến dịch
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Danh sách mốc
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MilestoneListResult"
+    post:
+      operationId: createMilestone
+      summary: Tạo mốc tiến độ mới
+      description: >-
+        Chỉ chủ dự án hoặc admin; chặn khi chiến dịch đã kết thúc
+        (`success`/`failed`/`cancelled`/`ended`). Ghi audit `milestone.create`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMilestoneRequest"
+      responses:
+        "201":
+          description: Đã tạo mốc
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Milestone"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Chiến dịch đã kết thúc, không thể sửa mốc
+  /campaigns/{id}/progress:
+    get:
+      operationId: getCampaignProgress
+      summary: Tổng hợp tiến độ chiến dịch (tính từ giao dịch đã hoàn tất)
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Tổng hợp tiến độ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignProgress"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /milestones/{id}:
+    patch:
+      operationId: updateMilestone
+      summary: Cập nhật một mốc tiến độ
+      description: Ghi audit `milestone.update`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMilestoneRequest"
+      responses:
+        "200":
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Milestone"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Chiến dịch đã kết thúc, không thể sửa mốc
+    delete:
+      operationId: removeMilestone
+      summary: Xóa một mốc tiến độ
+      description: Ghi audit `milestone.delete`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Đã xóa
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Chiến dịch đã kết thúc, không thể sửa mốc
+  /milestones/{id}/complete:
+    post:
+      operationId: completeMilestone
+      summary: Đánh dấu mốc đã hoàn thành
+      description: Ghi audit `milestone.complete`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Đã đánh dấu hoàn thành
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Milestone"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /milestones/{id}/updates:
+    get:
+      operationId: listMilestoneUpdates
+      summary: Danh sách bài cập nhật/chứng từ chi tiêu của một mốc
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Danh sách bài cập nhật
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MilestoneUpdate"
+    post:
+      operationId: addMilestoneUpdate
+      summary: Thêm bài cập nhật/chứng từ chi tiêu cho một mốc
+      description: Ghi audit `milestone_update.create`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMilestoneUpdateRequest"
+      responses:
+        "201":
+          description: Đã thêm bài cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MilestoneUpdate"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Chiến dịch đã kết thúc, không thể thêm cập nhật
+
+  /ai/health:
+    get:
+      operationId: aiHealth
+      summary: Kiểm tra AI service có sẵn sàng không (qua NestJS proxy)
+      responses:
+        "200":
+          description: Trạng thái AI service
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiHealthResult"
+  /ai/recommend:
+    post:
+      operationId: aiRecommend
+      summary: Gợi ý chiến dịch
+      description: >-
+        Đăng nhập tùy chọn (`OptionalJwtAuthGuard`) — có JWT thì dùng lịch sử
+        hành vi/tài trợ để cá nhân hóa. Luôn trả `available: true`: lỗi/timeout
+        AI service sẽ tự rơi về `source: POPULAR_FALLBACK` (xếp theo độ phổ
+        biến), không bao giờ trả lỗi cho client.
+      security:
+        - bearerAuth: []
+        - {}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecommendRequest"
+      responses:
+        "200":
+          description: Danh sách gợi ý (có lý do ngắn cho mỗi gợi ý)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendResult"
+  /ai/predict:
+    post:
+      operationId: aiPredict
+      summary: Dự đoán khả năng thành công của một chiến dịch
+      description: >-
+        `data` chỉ có khi `available: true` (AI service phản hồi được);
+        `false` khi AI service lỗi/timeout — không dùng làm căn cứ từ chối,
+        chỉ hỗ trợ tham khảo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PredictRequest"
+      responses:
+        "200":
+          description: "Kết quả dự đoán (hoặc `available: false` nếu AI service lỗi)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictResult"
+        "404":
+          description: Chiến dịch không tồn tại
+  /ai/fraud:
+    post:
+      operationId: aiFraud
+      summary: Chấm điểm rủi ro gian lận cho chiến dịch hoặc tài khoản (chỉ admin)
+      description: Phải cung cấp ít nhất `campaignId` hoặc `userId`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FraudRequest"
+      responses:
+        "200":
+          description: "Điểm rủi ro (hoặc `available: false` nếu AI service lỗi)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FraudResult"
+        "400":
+          description: Thiếu cả `campaignId` lẫn `userId`
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /ai/events:
+    post:
+      operationId: recordBehaviorEvent
+      summary: Ghi sự kiện hành vi (xem/theo dõi/tài trợ) phục vụ cá nhân hóa
+      description: Chỉ ghi khi người dùng đã đồng ý cá nhân hóa (xử lý ở tầng FE).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBehaviorEventRequest"
+      responses:
+        "201":
+          description: Đã ghi sự kiện
+        "404":
+          description: Chiến dịch không tồn tại
+
+  /admin/overview:
+    get:
+      operationId: adminOverview
+      summary: Số liệu tổng quan cho dashboard admin
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Tổng quan hệ thống
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/campaigns:
+    get:
+      operationId: adminListCampaigns
+      summary: Danh sách chiến dịch cho admin (mọi trạng thái, kèm chủ dự án)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CampaignQ"
+        - $ref: "#/components/parameters/CampaignStatusFilter"
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, ending, raised, backers]
+            default: newest
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Danh sách chiến dịch (admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/donations:
+    get:
+      operationId: adminListDonations
+      summary: Danh sách giao dịch cho admin (kèm người tài trợ và chiến dịch)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/DonationStatus"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Danh sách giao dịch (admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DonationList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      summary: Danh sách người dùng cho admin (lọc/tìm kiếm)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CampaignQ"
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [user, campaign_owner, admin]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, banned]
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Danh sách người dùng (admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/audit-logs:
+    get:
+      operationId: adminListAuditLogs
+      summary: Xem nhật ký kiểm toán (append-only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: action
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - name: entity
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - name: entityId
+          in: query
+          schema:
+            type: string
+            maxLength: 36
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Danh sách bản ghi audit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/risks:
+    get:
+      operationId: adminListRisks
+      summary: Danh sách cảnh báo rủi ro AI
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, resolved, dismissed]
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high]
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Danh sách cảnh báo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskAlertList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/risks/generate:
+    post:
+      operationId: adminGenerateRisks
+      summary: Quét lại cảnh báo rủi ro cho các chiến dịch đang hoạt động
+      description: >-
+        Gọi AI fraud detection; nếu AI service lỗi thì tự rơi về bộ luật dự
+        phòng (`aiAvailable: false`) thay vì báo lỗi cho admin.
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Kết quả quét
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateRisksResult"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/risks/{id}/status:
+    patch:
+      operationId: adminUpdateRiskStatus
+      summary: Xác nhận đã xử lý hoặc bỏ qua một cảnh báo (human-in-the-loop)
+      description: Ghi audit `risk_alert.status.update`, lưu `resolvedBy`/`resolvedAt`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRiskStatusRequest"
+      responses:
+        "200":
+          description: Đã cập nhật cảnh báo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskAlert"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/users/{id}/status:
+    patch:
+      operationId: adminUpdateUserStatus
+      summary: Khóa/mở khóa tài khoản người dùng
+      description: >-
+        Admin không tự khóa chính mình. Ghi audit `user.status.update`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserStatusRequest"
+      responses:
+        "200":
+          description: Đã cập nhật trạng thái tài khoản
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Admin cố tự khóa chính mình
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    CampaignQ:
+      name: q
+      in: query
+      description: Tìm kiếm toàn văn (tiêu đề/mô tả/địa điểm hoặc tên/email tùy endpoint)
+      schema:
+        type: string
+        maxLength: 200
+    CampaignCategory:
+      name: category
+      in: query
+      schema:
+        type: string
+        maxLength: 100
+    CampaignStatusFilter:
+      name: status
+      in: query
+      schema:
+        $ref: "#/components/schemas/CampaignStatus"
+    CampaignSort:
+      name: sort
+      in: query
+      schema:
+        type: string
+        enum: [popular, ending, newest, progress, latest]
+        default: popular
+  responses:
+    Forbidden:
+      description: Không có quyền thực hiện hành động này
+    NotFound:
+      description: Không tìm thấy tài nguyên
+    TooManyRequests:
+      description: Vượt giới hạn rate limit, thử lại sau
   schemas:
     HealthResponse:
       type: object
@@ -318,3 +1180,754 @@ components:
         role:
           type: string
           enum: [user, campaign_owner, admin]
+    UpdateUserStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, inactive, banned]
+    UserList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/User"
+
+    PageInfo:
+      type: object
+      required: [total, limit, offset]
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    CampaignStatus:
+      type: string
+      enum:
+        - draft
+        - pending
+        - approved
+        - rejected
+        - needs_info
+        - active
+        - paused
+        - success
+        - failed
+        - cancelled
+        - ended
+    Campaign:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        ownerId:
+          type: string
+          format: uuid
+        owner:
+          nullable: true
+          $ref: "#/components/schemas/UserSummary"
+        goalAmount:
+          type: number
+        currentAmount:
+          type: number
+          description: Sinh từ tổng giao dịch `completed`, không nhận nhập tay
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/CampaignStatus"
+        imageUrl:
+          type: string
+          nullable: true
+        videoUrl:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        backerCount:
+          type: integer
+        viewCount:
+          type: integer
+        rejectionReason:
+          type: string
+          nullable: true
+          description: Dùng chung cho lý do từ chối, yêu cầu bổ sung hoặc tạm dừng
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateCampaignRequest:
+      type: object
+      required: [title, description, category, goalAmount, endDate]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        category:
+          type: string
+          maxLength: 100
+        goalAmount:
+          type: number
+          minimum: 1000
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        imageUrl:
+          type: string
+          format: uri
+        location:
+          type: string
+          maxLength: 255
+    UpdateCampaignRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        category:
+          type: string
+          maxLength: 100
+        goalAmount:
+          type: number
+          minimum: 1000
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        imageUrl:
+          type: string
+          format: uri
+        location:
+          type: string
+          maxLength: 255
+    ModerateCampaignRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [approved, active, paused, rejected, needs_info, ended]
+        reason:
+          type: string
+          description: Bắt buộc khi `status` là `rejected`, `needs_info` hoặc `paused`
+    CampaignList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Campaign"
+
+    DonationStatus:
+      type: string
+      enum: [pending, completed, failed, refunded]
+    Donation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        currency:
+          type: string
+          example: VND
+        status:
+          $ref: "#/components/schemas/DonationStatus"
+        paymentMethod:
+          type: string
+          nullable: true
+        transactionId:
+          type: string
+          nullable: true
+        idempotencyKey:
+          type: string
+        message:
+          type: string
+          nullable: true
+        isAnonymous:
+          type: boolean
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    CreateDonationRequest:
+      type: object
+      required: [campaignId, amount, paymentMethod, idempotencyKey]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          minimum: 20000
+        paymentMethod:
+          type: string
+          enum: [wallet, payos]
+        message:
+          type: string
+          maxLength: 500
+        isAnonymous:
+          type: boolean
+          default: false
+        idempotencyKey:
+          type: string
+          maxLength: 255
+    WebhookDonationRequest:
+      type: object
+      required: [donationId, status, timestamp]
+      properties:
+        donationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [completed, failed]
+        transactionId:
+          type: string
+          maxLength: 255
+        timestamp:
+          type: integer
+          description: Epoch ms lúc cổng thanh toán tạo webhook — nằm trong nội dung được ký
+    ConfirmDonationRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [completed, failed]
+    DonationList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Donation"
+
+    Milestone:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        targetDate:
+          type: string
+          format: date-time
+          nullable: true
+        budget:
+          type: number
+          nullable: true
+        sortOrder:
+          type: integer
+        isCompleted:
+          type: boolean
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    CreateMilestoneRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        targetDate:
+          type: string
+          format: date-time
+        budget:
+          type: number
+          minimum: 0
+        sortOrder:
+          type: integer
+          minimum: 0
+          maximum: 10000
+    UpdateMilestoneRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        targetDate:
+          type: string
+          format: date-time
+        budget:
+          type: number
+          minimum: 0
+        sortOrder:
+          type: integer
+          minimum: 0
+          maximum: 10000
+    MilestoneListResult:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Milestone"
+        total:
+          type: integer
+    MilestoneUpdate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        milestoneId:
+          type: string
+          format: uuid
+        content:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        expenseAmount:
+          type: number
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    CreateMilestoneUpdateRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+        expenseAmount:
+          type: number
+          minimum: 0
+    CampaignProgress:
+      type: object
+      required:
+        [totalMilestones, completedMilestones, totalBudget, totalExpense, totalRaised, backerCount]
+      properties:
+        totalMilestones:
+          type: integer
+        completedMilestones:
+          type: integer
+        totalBudget:
+          type: number
+        totalExpense:
+          type: number
+        totalRaised:
+          type: number
+          description: Tổng giao dịch `completed`, không tính từ counter người dùng nhập
+        backerCount:
+          type: integer
+
+    AiHealthResult:
+      type: object
+      required: [available]
+      properties:
+        available:
+          type: boolean
+        detail:
+          type: string
+    RecommendRequest:
+      type: object
+      properties:
+        preferences:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 100
+        excludeIds:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 20
+    RecommendResult:
+      type: object
+      required: [available, items]
+      properties:
+        available:
+          type: boolean
+        source:
+          type: string
+          enum: [COLLABORATIVE, CONTENT, COLD_START, POPULAR_FALLBACK]
+        items:
+          type: array
+          items:
+            type: object
+            required: [campaign, score, reason]
+            properties:
+              campaign:
+                $ref: "#/components/schemas/Campaign"
+              score:
+                type: number
+              reason:
+                type: string
+                description: Lý do gợi ý ngắn, hiển thị trực tiếp cho người dùng
+        detail:
+          type: string
+    PredictRequest:
+      type: object
+      required: [campaignId]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+    AiPredictFactor:
+      type: object
+      properties:
+        feature:
+          type: string
+        label:
+          type: string
+        direction:
+          type: string
+          enum: [UP, DOWN]
+        weight:
+          type: number
+        note:
+          type: string
+    PredictResult:
+      type: object
+      required: [available, campaignId]
+      properties:
+        available:
+          type: boolean
+        campaignId:
+          type: string
+          format: uuid
+        data:
+          nullable: true
+          type: object
+          description: Chỉ có khi `available` là `true`
+          properties:
+            probability:
+              type: number
+            prediction:
+              type: string
+              enum: [LIKELY, UNLIKELY]
+            confidence:
+              type: number
+            model:
+              type: string
+              nullable: true
+            fallback:
+              type: boolean
+            metrics:
+              type: object
+              nullable: true
+              additionalProperties: true
+            factors:
+              type: array
+              items:
+                $ref: "#/components/schemas/AiPredictFactor"
+    FraudRequest:
+      type: object
+      description: Cần ít nhất một trong `campaignId` hoặc `userId`
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+    FraudResult:
+      type: object
+      required: [available, entityType, entityId]
+      properties:
+        available:
+          type: boolean
+        entityType:
+          type: string
+          enum: [CAMPAIGN, USER]
+        entityId:
+          type: string
+          format: uuid
+        data:
+          nullable: true
+          type: object
+          description: Chỉ có khi `available` là `true`
+          properties:
+            riskScore:
+              type: number
+            level:
+              type: string
+              enum: [HIGH, MEDIUM, LOW]
+            method:
+              type: string
+              enum: [ENSEMBLE, RULE]
+            reasons:
+              type: array
+              items:
+                $ref: "#/components/schemas/RiskReason"
+            evidences:
+              type: object
+              additionalProperties:
+                type: number
+            fallback:
+              type: boolean
+    CreateBehaviorEventRequest:
+      type: object
+      required: [campaignId, eventType]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        eventType:
+          type: string
+          enum: [view, follow, contribute]
+
+    AdminOverview:
+      type: object
+      properties:
+        users:
+          type: object
+          properties:
+            total: { type: integer }
+            active: { type: integer }
+            banned: { type: integer }
+            owners: { type: integer }
+            newThisMonth: { type: integer }
+        campaigns:
+          type: object
+          properties:
+            total: { type: integer }
+            draft: { type: integer }
+            pending: { type: integer }
+            needsInfo: { type: integer }
+            approved: { type: integer }
+            active: { type: integer }
+            ended: { type: integer }
+            success: { type: integer }
+            failed: { type: integer }
+            rejected: { type: integer }
+        donations:
+          type: object
+          properties:
+            total: { type: integer }
+            completed: { type: integer }
+            failed: { type: integer }
+            pending: { type: integer }
+            refunded: { type: integer }
+            completedAmount: { type: number }
+            failedAmount: { type: number }
+        successRate:
+          type: number
+          description: Tỷ lệ `success / (success + failed)` trong các chiến dịch đã kết thúc
+        risks:
+          type: object
+          properties:
+            open: { type: integer }
+            high: { type: integer }
+            medium: { type: integer }
+        topCategories:
+          type: array
+          items:
+            type: object
+            properties:
+              category: { type: string }
+              campaigns: { type: integer }
+              raised: { type: number }
+        monthly:
+          type: array
+          description: 6 tháng gần nhất, tính đến tháng hiện tại
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+                example: "2026-09"
+              raised: { type: number }
+              donations: { type: integer }
+
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Bỏ trống khi hành động do hệ thống/webhook thực hiện
+        action:
+          type: string
+        entity:
+          type: string
+        entityId:
+          type: string
+          nullable: true
+        oldValues:
+          type: object
+          nullable: true
+          additionalProperties: true
+        newValues:
+          type: object
+          nullable: true
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    AuditLogList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/AuditLog"
+
+    RiskReason:
+      type: object
+      properties:
+        group:
+          type: string
+        label:
+          type: string
+        weight:
+          type: number
+    RiskAlert:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        entityType:
+          type: string
+          enum: [campaign, user]
+        entityId:
+          type: string
+          format: uuid
+        entityName:
+          type: string
+        level:
+          type: string
+          enum: [low, medium, high]
+        score:
+          type: number
+        method:
+          type: string
+          enum: [ai, rule]
+        reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/RiskReason"
+        evidences:
+          type: object
+          additionalProperties:
+            type: number
+        status:
+          type: string
+          enum: [open, resolved, dismissed]
+        resolvedBy:
+          type: string
+          format: uuid
+          nullable: true
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    RiskAlertList:
+      allOf:
+        - $ref: "#/components/schemas/PageInfo"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/RiskAlert"
+    UpdateRiskStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [open, resolved, dismissed]
+    GenerateRisksResult:
+      type: object
+      required: [aiAvailable, scanned, flagged]
+      properties:
+        aiAvailable:
+          type: boolean
+          description: "false nghĩa là đã dùng bộ luật dự phòng thay vì mô hình AI"
+        scanned:
+          type: integer
+        flagged:
+          type: integer

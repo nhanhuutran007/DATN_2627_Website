@@ -179,15 +179,15 @@ Hệ thống hạ tầng (Infrastructure as Code) đã được viết sẵn b�
 
 ## Tiến độ triển khai
 
-> Cập nhật mới nhất: **Tháng 9/2026**
+> Cập nhật mới nhất: **23/09/2026**
 
 | Hạng mục | Trạng thái | Ghi chú |
 | --- | --- | --- |
 | **Cơ sở dữ liệu** | ✅ Đã hoàn thành | Entities, migration, seed (User, Campaign, Donation, Progress, Audit log). |
-| **Xác thực & Bảo mật** | ✅ Đã hoàn thành | JWT, Rate limit, chống Brute-force login, RolesGuard. |
-| **Core: Chiến dịch** | ✅ Đã hoàn thành | Đầy đủ vòng đời, luồng kiểm duyệt, lọc/tìm kiếm. |
-| **Core: Tài trợ** | ✅ Đã hoàn thành | Giao dịch Idempotency, chặn tài trợ hết hạn, Webhook xử lý thanh toán. |
-| **Core: Tiến độ** | ✅ Đã hoàn thành | Mốc thời gian, tính tự động % hoàn thành. |
+| **Xác thực & Bảo mật** | ✅ Đã hoàn thành | JWT, Rate limit (Redis khi có, tự rơi về bộ nhớ), chống Brute-force login, RolesGuard, helmet, CORS thu hẹp. |
+| **Core: Chiến dịch** | ✅ Đã hoàn thành | Đầy đủ vòng đời, ma trận chuyển trạng thái khi kiểm duyệt, job cron tự động chốt `active` hết hạn → success/failed, lọc/tìm kiếm. |
+| **Core: Tài trợ** | ✅ Đã hoàn thành | Giao dịch Idempotency, chặn tài trợ hết hạn, Webhook HMAC chống replay (timestamp) + chống race khi xử lý đồng thời. |
+| **Core: Tiến độ** | ✅ Đã hoàn thành | Mốc thời gian, tính tự động % hoàn thành, audit log cho mọi thay đổi mốc/bài cập nhật. |
 | **Dịch vụ AI** | ✅ Đã hoàn thành | FastAPI routes (recommend, predict, fraud), model registry. |
 | **Giao diện (Frontend)** | 🔶 Đang hoàn thiện | Nối API trang chủ, dashboard, quy trình tạo chiến dịch. (Đang hoàn thiện phần Admin). |
 | **Hạ tầng & Triển khai** | ✅ Đã hoàn thành | **AWS Terraform (ECS Fargate, ALB, RDS)** hoàn tất. Có Docker Compose cho môi trường Local. |
