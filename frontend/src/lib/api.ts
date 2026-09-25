@@ -25,8 +25,21 @@ export class ApiError extends Error {
 
 export const AUTH_EVENT = "gopmam:auth";
 
-const API_BASE_URL =
+const PUBLIC_API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
+
+/**
+ * Trình duyệt gọi `NEXT_PUBLIC_API_URL` (có thể là đường dẫn tương đối
+ * `/api/v1` sau Nginx). Server component (SSR) không phân giải được URL tương
+ * đối nên dùng `API_INTERNAL_URL` (vd. `http://backend:4000/api/v1` trong
+ * Docker) nếu có.
+ */
+function apiBaseUrl(): string {
+  if (!isBrowser() && process.env.API_INTERNAL_URL) {
+    return process.env.API_INTERNAL_URL;
+  }
+  return PUBLIC_API_URL;
+}
 
 const ACCESS_TOKEN_KEY = "gopmam.accessToken";
 const REFRESH_TOKEN_KEY = "gopmam.refreshToken";
@@ -116,7 +129,7 @@ async function refreshAccessToken(): Promise<boolean> {
   const refreshToken = readStorage(REFRESH_TOKEN_KEY);
   if (!refreshToken) return false;
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    const response = await fetch(`${apiBaseUrl()}/auth/refresh`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -151,7 +164,7 @@ export async function apiFetch<T>(
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  const response = await fetch(`${apiBaseUrl()}${path}`, { ...options, headers });
 
   if (response.status === 401 && withAuth && retry) {
     const refreshed = await refreshAccessToken();

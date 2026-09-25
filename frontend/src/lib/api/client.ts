@@ -4,7 +4,11 @@ export type HealthResponse = {
   timestamp: string;
 };
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000/api/v1";
+// Server-side ưu tiên API_INTERNAL_URL (xem lib/api.ts#apiBaseUrl).
+const apiUrl =
+  (typeof window === "undefined" ? process.env.API_INTERNAL_URL : undefined) ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:4000/api/v1";
 
 export async function getBackendHealth(
   signal?: AbortSignal,

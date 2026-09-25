@@ -22,6 +22,8 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
     environment:
       NODE_ENV: production
+      # SSR gọi thẳng backend trong mạng Docker (URL tương đối /api/v1 chỉ dùng được ở trình duyệt)
+      API_INTERNAL_URL: http://backend:4000/api/v1
     ports:
       - "3000:3000"
     healthcheck:
@@ -44,7 +46,8 @@ services:
       DB_PASSWORD: ${MYSQL_PASSWORD:-local-only-change-me}
       DB_DATABASE: ${MYSQL_DATABASE:-crowdfunding}
       REDIS_URL: redis://redis:6379
-      AI_SERVICE_URL: http://ai-service:8000/api/v1
+      # Gốc service, không kèm /api/v1: ai.gateway.ts tự nối "/api/v1/..."
+      AI_SERVICE_URL: http://ai-service:8000
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-local-access-secret-change-me}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-refresh-secret-change-me}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-local-webhook-secret-change-me}
