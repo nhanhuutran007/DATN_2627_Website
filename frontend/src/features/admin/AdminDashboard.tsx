@@ -10,6 +10,7 @@ import {
   fetchAdminOverview,
   fetchAdminRisks,
   fetchAdminUsers,
+  fetchAuditLogs,
   generateRiskWarnings,
   moderateCampaign,
   setRiskStatus,
@@ -20,6 +21,7 @@ import {
   type AdminRiskAlert,
   type AdminUser,
   type AdminUserStatus,
+  type AuditLogEntry,
   type ModerateDecision,
   type RiskStatus,
 } from "@/lib/api/admin";
@@ -93,6 +95,16 @@ const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
   dismissed: "Đã bỏ qua",
 };
 
+const AUDIT_ENTITY_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "", label: "Tất cả đối tượng" },
+  { value: "campaign", label: "Chiến dịch" },
+  { value: "donation", label: "Giao dịch" },
+  { value: "user", label: "Người dùng (gồm đăng nhập/đăng ký)" },
+  { value: "milestone", label: "Mốc tiến độ" },
+  { value: "milestone_update", label: "Bài cập nhật" },
+  { value: "risk_alert", label: "Cảnh báo rủi ro" },
+];
+
 function money(value: number | string): string {
   return formatCurrency(Number(value) || 0);
 }
@@ -140,10 +152,12 @@ export function AdminDashboard() {
   const [donations, setDonations] = useState<AdminDonation[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [risks, setRisks] = useState<AdminRiskAlert[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   const [campaignFilter, setCampaignFilter] = useState<ApiCampaignStatus | "">("pending");
   const [donationFilter, setDonationFilter] = useState<AdminDonation["status"] | "">("completed");
   const [riskFilter, setRiskFilter] = useState<RiskStatus | "">("open");
+  const [auditEntityFilter, setAuditEntityFilter] = useState<string>("");
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -155,12 +169,13 @@ export function AdminDashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const [ov, camps, dons, usrs, riskList] = await Promise.all([
+        const [ov, camps, dons, usrs, riskList, audit] = await Promise.all([
           fetchAdminOverview(),
           fetchAdminCampaigns({ status: "pending", limit: 20 }),
           fetchAdminDonations({ status: "completed", limit: 20 }),
           fetchAdminUsers({ limit: 20 }),
           fetchAdminRisks({ status: "open", limit: 50 }),
+          fetchAuditLogs({ limit: 50 }),
         ]);
         if (cancelled) return;
         setOverview(ov);
@@ -168,6 +183,7 @@ export function AdminDashboard() {
         setDonations(dons.items);
         setUsers(usrs.items);
         setRisks(riskList.items);
+        setAuditLogs(audit.items);
         setError(null);
       } catch (err) {
         if (cancelled) return;
@@ -278,6 +294,23 @@ export function AdminDashboard() {
   async function changeRiskFilter(status: RiskStatus | "") {
     setRiskFilter(status);
     await loadRisks(status);
+  }
+
+  async function changeAuditFilter(entity: string) {
+    setAuditEntityFilter(entity);
+    try {
+      const result = await fetchAuditLogs({ entity: entity || undefined, limit: 50 });
+      setAuditLogs(result.items);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không tải được nhật ký kiểm toán");
+    }
+  }
+
+  function auditActorLabel(entry: AuditLogEntry): string {
+    if (!entry.userId) return "Hệ thống";
+    const match = users.find((candidate) => candidate.id === entry.userId);
+    return match ? `${match.name} (${match.email})` : entry.userId.slice(0, 8).toUpperCase();
   }
 
   async function handleGenerateRisks() {
@@ -440,6 +473,7 @@ export function AdminDashboard() {
             <a href="#rui-ro"><Icon name="shield" size={19} /> Cảnh báo rủi ro {(overview?.risks.open ?? 0) > 0 && <i>{overview?.risks.open}</i>}</a>
             <a href="#giao-dich"><Icon name="receipt" size={19} /> Giao dịch</a>
             <a href="#nguoi-dung"><Icon name="users" size={19} /> Người dùng</a>
+            <a href="#nhat-ky-kiem-toan"><Icon name="clock" size={19} /> Nhật ký kiểm toán</a>
           </nav>
           <div className="admin-policy"><Icon name="shield" size={22} /><p><b>AI không tự động xử phạt</b><span>Mọi cảnh báo phải có quản trị viên xem xét và lưu lý do quyết định.</span></p></div>
         </aside>
@@ -666,6 +700,52 @@ export function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          </section>
+
+          <section className="admin-card admin-table-card" id="nhat-ky-kiem-toan">
+            <div className="card-heading">
+              <div><p className="eyebrow">Truy vết thay đổi</p><h2>Nhật ký kiểm toán</h2></div>
+              <select
+                className="filter-button"
+                aria-label="Lọc theo đối tượng"
+                value={auditEntityFilter}
+                onChange={(event) => changeAuditFilter(event.target.value)}
+              >
+                {AUDIT_ENTITY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="table-scroll">
+              <table>
+                <thead><tr><th>Thời gian</th><th>Hành động</th><th>Đối tượng</th><th>Người thực hiện</th><th>IP</th><th /></tr></thead>
+                <tbody>
+                  {auditLogs.map((entry) => (
+                    <tr key={entry.id}>
+                      <td>{formatDate(entry.createdAt)}</td>
+                      <td><code>{entry.action}</code></td>
+                      <td>{entry.entity}{entry.entityId ? ` · ${entry.entityId.slice(0, 8).toUpperCase()}` : ""}</td>
+                      <td>{auditActorLabel(entry)}</td>
+                      <td>{entry.ipAddress ?? "—"}</td>
+                      <td>
+                        {(entry.oldValues || entry.newValues) && (
+                          <details>
+                            <summary>Chi tiết</summary>
+                            <pre className="audit-detail">
+                              {JSON.stringify({ old: entry.oldValues, new: entry.newValues }, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {auditLogs.length === 0 && (
+                    <tr><td colSpan={6}><span className="table-muted">Không có bản ghi audit nào khớp bộ lọc.</span></td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="risk-footnote"><Icon name="shield" size={15} /> Nhật ký chỉ ghi thêm, không thể sửa/xóa — dùng để truy vết duyệt hồ sơ, thanh toán, đăng nhập và hành động quản trị.</p>
           </section>
         </div>
       </div>

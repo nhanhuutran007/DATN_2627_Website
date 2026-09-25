@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 
+import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { CreateUserDto, UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
 import { User } from "./entities/user.entity";
 
@@ -17,6 +18,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    private readonly auditService: AuditService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -38,33 +40,68 @@ export class UsersService {
     return this.userRepo.findOneBy({ email });
   }
 
-  async update(id: string, dto: UpdateUserDto): Promise<User> {
+  async update(id: string, dto: UpdateUserDto, currentUser: User): Promise<User> {
     const user = await this.findById(id);
     if (!user) {
       throw new NotFoundException("User not found");
+    }
+
+    const current = user as unknown as Record<string, unknown>;
+    const oldValues: Record<string, unknown> = {};
+    const newValues: Record<string, unknown> = {};
+    for (const [field, value] of Object.entries(dto)) {
+      oldValues[field] = truncateForAudit(current[field]);
+      newValues[field] = truncateForAudit(value);
     }
 
     Object.assign(user, dto);
-    return this.userRepo.save(user);
+    const saved = await this.userRepo.save(user);
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "user.update",
+      entity: "user",
+      entityId: saved.id,
+      oldValues,
+      newValues,
+    });
+    return saved;
   }
 
-  async updateRole(id: string, dto: UpdateRoleDto): Promise<User> {
+  async updateRole(id: string, dto: UpdateRoleDto, currentUser: User): Promise<User> {
     const user = await this.findById(id);
     if (!user) {
       throw new NotFoundException("User not found");
     }
 
+    const previousRole = user.role;
     user.role = dto.role;
-    return this.userRepo.save(user);
+    const saved = await this.userRepo.save(user);
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "user.role.update",
+      entity: "user",
+      entityId: saved.id,
+      oldValues: { role: previousRole },
+      newValues: { role: saved.role },
+    });
+    return saved;
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, currentUser: User): Promise<void> {
     const user = await this.findById(id);
     if (!user) {
       throw new NotFoundException("User not found");
     }
 
+    const snapshot = { email: user.email, role: user.role, status: user.status };
     await this.userRepo.remove(user);
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "user.delete",
+      entity: "user",
+      entityId: id,
+      oldValues: snapshot,
+    });
   }
 
   async recordLoginFailure(user: User): Promise<User> {

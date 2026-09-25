@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 
+import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
 import { User, UserRole } from "../users/entities/user.entity";
@@ -46,6 +47,7 @@ export class ProgressService {
     private readonly campaignRepo: Repository<Campaign>,
     @InjectRepository(Donation)
     private readonly donationRepo: Repository<Donation>,
+    private readonly auditService: AuditService,
   ) {}
 
   async findCampaignMilestones(
@@ -83,7 +85,20 @@ export class ProgressService {
       sortOrder,
       isCompleted: false,
     });
-    return this.milestoneRepo.save(milestone);
+    const saved = await this.milestoneRepo.save(milestone);
+    await this.auditService.record({
+      userId: user.id,
+      action: "milestone.create",
+      entity: "milestone",
+      entityId: saved.id,
+      newValues: {
+        campaignId,
+        title: saved.title,
+        budget: saved.budget,
+        targetDate: saved.targetDate ?? null,
+      },
+    });
+    return saved;
   }
 
   async updateMilestone(
@@ -96,11 +111,28 @@ export class ProgressService {
     this.assertCanManage(campaign, user);
     this.assertEditable(campaign);
 
+    const current = milestone as unknown as Record<string, unknown>;
+    const oldValues: Record<string, unknown> = {};
+    const newValues: Record<string, unknown> = {};
+    for (const [field, value] of Object.entries(dto)) {
+      oldValues[field] = truncateForAudit(current[field]);
+      newValues[field] = truncateForAudit(value);
+    }
+
     Object.assign(milestone, {
       ...dto,
       targetDate: dto.targetDate ? new Date(dto.targetDate) : milestone.targetDate,
     });
-    return this.milestoneRepo.save(milestone);
+    const saved = await this.milestoneRepo.save(milestone);
+    await this.auditService.record({
+      userId: user.id,
+      action: "milestone.update",
+      entity: "milestone",
+      entityId: saved.id,
+      oldValues,
+      newValues,
+    });
+    return saved;
   }
 
   async removeMilestone(id: string, user: User): Promise<void> {
@@ -109,7 +141,20 @@ export class ProgressService {
     this.assertCanManage(campaign, user);
     this.assertEditable(campaign);
 
+    const snapshot = {
+      campaignId: milestone.campaignId,
+      title: milestone.title,
+      budget: milestone.budget,
+      isCompleted: milestone.isCompleted,
+    };
     await this.milestoneRepo.remove(milestone);
+    await this.auditService.record({
+      userId: user.id,
+      action: "milestone.delete",
+      entity: "milestone",
+      entityId: id,
+      oldValues: snapshot,
+    });
   }
 
   async completeMilestone(id: string, user: User): Promise<Milestone> {
@@ -120,7 +165,15 @@ export class ProgressService {
 
     milestone.isCompleted = true;
     milestone.completedAt = new Date();
-    return this.milestoneRepo.save(milestone);
+    const saved = await this.milestoneRepo.save(milestone);
+    await this.auditService.record({
+      userId: user.id,
+      action: "milestone.complete",
+      entity: "milestone",
+      entityId: saved.id,
+      newValues: { isCompleted: true, completedAt: saved.completedAt },
+    });
+    return saved;
   }
 
   async addMilestoneUpdate(
@@ -139,7 +192,19 @@ export class ProgressService {
       imageUrl: dto.imageUrl,
       expenseAmount: dto.expenseAmount,
     });
-    return this.milestoneUpdateRepo.save(update);
+    const saved = await this.milestoneUpdateRepo.save(update);
+    await this.auditService.record({
+      userId: user.id,
+      action: "milestone_update.create",
+      entity: "milestone_update",
+      entityId: saved.id,
+      newValues: {
+        milestoneId,
+        expenseAmount: saved.expenseAmount ?? null,
+        content: truncateForAudit(saved.content),
+      },
+    });
+    return saved;
   }
 
   async listMilestoneUpdates(milestoneId: string): Promise<MilestoneUpdate[]> {

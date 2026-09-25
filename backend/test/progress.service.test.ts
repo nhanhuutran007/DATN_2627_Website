@@ -6,6 +6,7 @@ import { Milestone } from "../src/modules/progress/entities/milestone.entity";
 import { ProgressService } from "../src/modules/progress/progress.service";
 import { DonationStatus } from "../src/modules/donations/entities/donation.entity";
 import { UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
+import { makeAuditRecorder } from "./helpers/audit";
 
 const CAMPAIGN_ID = "123e4567-e89b-12d3-a456-426614174000";
 const OWNER_ID = "123e4567-e89b-12d3-a456-426614174001";
@@ -106,14 +107,17 @@ function createMockRepos() {
 describe("ProgressService", () => {
   let service: ProgressService;
   let repos: ReturnType<typeof createMockRepos>;
+  let audit: ReturnType<typeof makeAuditRecorder>;
 
   beforeEach(() => {
     repos = createMockRepos();
+    audit = makeAuditRecorder();
     service = new ProgressService(
       repos.milestoneRepo,
       repos.updateRepo,
       repos.campaignRepo,
       repos.donationRepo,
+      audit.service,
     );
   });
 
@@ -134,6 +138,8 @@ describe("ProgressService", () => {
       );
       equal(milestone.title, "Mốc mới");
       equal(milestone.campaignId, CAMPAIGN_ID);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "milestone.create");
     });
 
     it("should deny non-owner, non-admin", async () => {
@@ -172,6 +178,10 @@ describe("ProgressService", () => {
         makeUser(),
       );
       equal(milestone.title, "Đổi tên");
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "milestone.update");
+      equal(audit.entries[0].oldValues?.title, "Khảo sát");
+      equal(audit.entries[0].newValues?.title, "Đổi tên");
     });
 
     it("should throw NotFoundException for missing milestone", async () => {
@@ -187,11 +197,33 @@ describe("ProgressService", () => {
     });
   });
 
+  describe("removeMilestone", () => {
+    it("should remove a milestone and record an audit entry", async () => {
+      await service.removeMilestone(MILESTONE_ID, makeUser());
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "milestone.delete");
+      equal(audit.entries[0].entityId, MILESTONE_ID);
+    });
+
+    it("should deny non-owner, non-admin", async () => {
+      await service
+        .removeMilestone(MILESTONE_ID, makeUser(UserRole.USER, "other-user"))
+        .then(() => {
+          throw new Error("should have thrown");
+        })
+        .catch((err) => {
+          equal(err.status, 403);
+        });
+    });
+  });
+
   describe("completeMilestone", () => {
     it("should mark milestone complete", async () => {
       const milestone = await service.completeMilestone(MILESTONE_ID, makeUser());
       equal(milestone.isCompleted, true);
       ok(milestone.completedAt);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "milestone.complete");
     });
 
     it("should deny non-owner", async () => {
@@ -214,6 +246,8 @@ describe("ProgressService", () => {
         makeUser(),
       );
       equal(update.milestoneId, MILESTONE_ID);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "milestone_update.create");
     });
   });
 

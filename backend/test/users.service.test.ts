@@ -7,6 +7,12 @@ import {
   UsersService,
 } from "../src/modules/users/users.service";
 import { UserRole } from "../src/modules/users/entities/user.entity";
+import { makeAuditRecorder } from "./helpers/audit";
+
+const ADMIN_ID = "123e4567-e89b-12d3-a456-426614174099";
+function makeAdmin() {
+  return { id: ADMIN_ID, role: UserRole.ADMIN } as any;
+}
 
 function createMockRepo() {
   const mockUser = {
@@ -32,11 +38,13 @@ function createMockRepo() {
 describe("UsersService", () => {
   let usersService: UsersService;
   let userRepo: any;
+  let audit: ReturnType<typeof makeAuditRecorder>;
 
   beforeEach(() => {
     const { repo, mockUser } = createMockRepo();
     userRepo = repo;
-    usersService = new UsersService(repo);
+    audit = makeAuditRecorder();
+    usersService = new UsersService(repo, audit.service);
   });
 
   describe("create", () => {
@@ -79,15 +87,19 @@ describe("UsersService", () => {
       });
       userRepo.save = async (u: any) => u;
 
-      const result = await usersService.update("123", { name: "New Name" } as any);
+      const result = await usersService.update("123", { name: "New Name" } as any, makeAdmin());
       equal(result.name, "New Name");
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "user.update");
+      equal(audit.entries[0].oldValues?.name, "Old");
+      equal(audit.entries[0].newValues?.name, "New Name");
     });
 
     it("should throw NotFoundException when user not found", async () => {
       userRepo.findOneBy = async () => null;
 
       await usersService
-        .update("missing", { name: "New" } as any)
+        .update("missing", { name: "New" } as any, makeAdmin())
         .then(() => {
           throw new Error("should have thrown");
         })
@@ -108,8 +120,12 @@ describe("UsersService", () => {
       });
       userRepo.save = async (u: any) => u;
 
-      const result = await usersService.updateRole("123", { role: UserRole.ADMIN });
+      const result = await usersService.updateRole("123", { role: UserRole.ADMIN }, makeAdmin());
       equal(result.role, UserRole.ADMIN);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "user.role.update");
+      equal(audit.entries[0].oldValues?.role, UserRole.USER);
+      equal(audit.entries[0].newValues?.role, UserRole.ADMIN);
     });
   });
 
@@ -117,18 +133,22 @@ describe("UsersService", () => {
     it("should remove a user", async () => {
       userRepo.findOneBy = async () => ({
         id: "123",
+        email: "test@example.com",
+        role: UserRole.USER,
       });
       userRepo.remove = async () => undefined;
 
-      await usersService.remove("123");
-      ok(true);
+      await usersService.remove("123", makeAdmin());
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "user.delete");
+      equal(audit.entries[0].entityId, "123");
     });
 
     it("should throw NotFoundException when user not found", async () => {
       userRepo.findOneBy = async () => null;
 
       await usersService
-        .remove("missing")
+        .remove("missing", makeAdmin())
         .then(() => {
           throw new Error("should have thrown");
         })

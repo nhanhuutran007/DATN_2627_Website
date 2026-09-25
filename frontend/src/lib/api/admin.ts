@@ -96,6 +96,35 @@ export type AdminUserList = {
   offset: number;
 };
 
+export type AuditLogEntry = {
+  id: string;
+  userId?: string | null;
+  action: string;
+  entity: string;
+  entityId?: string | null;
+  oldValues?: Record<string, unknown> | null;
+  newValues?: Record<string, unknown> | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
+};
+
+export type AuditLogList = {
+  items: AuditLogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type AuditLogQuery = {
+  action?: string;
+  entity?: string;
+  entityId?: string;
+  userId?: string;
+  limit?: number;
+  offset?: number;
+};
+
 export type ModerateDecision = Extract<
   ApiCampaignStatus,
   "approved" | "active" | "rejected" | "needs_info" | "ended"
@@ -199,6 +228,11 @@ export async function setUserStatus(
   status: AdminUserStatus,
 ): Promise<AdminUser> {
   return api.patch<AdminUser>(`/admin/users/${encodeURIComponent(id)}/status`, { status });
+}
+
+export async function fetchAuditLogs(query: AuditLogQuery = {}): Promise<AuditLogList> {
+  const params = toParams(query);
+  return api.get<AuditLogList>(`/admin/audit-logs${params ? `?${params}` : ""}`);
 }
 
 export async function moderateCampaign(

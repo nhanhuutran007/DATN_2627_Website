@@ -3584,6 +3584,19 @@
   font-size: 0.68rem;
 }
 
+.audit-detail {
+  max-width: 320px;
+  max-height: 200px;
+  overflow: auto;
+  margin-top: 0.4rem;
+  padding: 0.5rem;
+  background: #f4f6f4;
+  border-radius: 8px;
+  font-size: 0.65rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .table-project-image.avatar-tone {
   display: grid;
   place-items: center;

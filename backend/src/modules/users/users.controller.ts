@@ -49,7 +49,7 @@ export class UsersController {
     if (currentUser.id !== id && currentUser.role !== UserRole.ADMIN) {
       throw new ForbiddenException("You can only update your own profile");
     }
-    return this.usersService.update(id, dto);
+    return this.usersService.update(id, dto, currentUser);
   }
 
   @Patch(":id/role")
@@ -57,13 +57,14 @@ export class UsersController {
   updateRole(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateRoleDto,
+    @GetCurrentUser() currentUser: User,
   ) {
-    return this.usersService.updateRole(id, dto);
+    return this.usersService.updateRole(id, dto, currentUser);
   }
 
   @Delete(":id")
   @Roles(UserRole.ADMIN)
-  remove(@Param("id", ParseUUIDPipe) id: string) {
-    return this.usersService.remove(id);
+  remove(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() currentUser: User) {
+    return this.usersService.remove(id, currentUser);
   }
 }
