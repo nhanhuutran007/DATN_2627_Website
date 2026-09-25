@@ -119,7 +119,12 @@ resource "aws_ecs_task_definition" "backend" {
       { name = "NODE_ENV", value = "production" },
       { name = "PORT", value = "4000" },
       { name = "CORS_ORIGINS", value = "http://${aws_lb.main.dns_name}" },
-      { name = "DATABASE_URL", value = "mysql://crowdfunding_app:${var.db_password}@${aws_db_instance.mysql.endpoint}/crowdfunding" },
+      # Backend đọc DB_* (backend/src/config/database.config.ts), không đọc DATABASE_URL
+      { name = "DB_HOST", value = aws_db_instance.mysql.address },
+      { name = "DB_PORT", value = tostring(aws_db_instance.mysql.port) },
+      { name = "DB_USERNAME", value = aws_db_instance.mysql.username },
+      { name = "DB_PASSWORD", value = var.db_password },
+      { name = "DB_DATABASE", value = aws_db_instance.mysql.db_name },
       { name = "REDIS_URL", value = "redis://redis.local:6379" }, # Sẽ cần Cloud Map/Service Discovery cho tên miền nội bộ, tạm thời giả định có Service Discovery hoặc IP
       { name = "AI_SERVICE_URL", value = "http://${aws_lb.main.dns_name}/api/v1" }, # Gọi vòng ra ALB
       { name = "JWT_ACCESS_SECRET", value = var.jwt_access_secret },

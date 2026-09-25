@@ -37,12 +37,18 @@ services:
       NODE_ENV: ${APP_ENV:-development}
       PORT: 4000
       CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
-      DATABASE_URL: mysql://${MYSQL_USER:-crowdfunding_app}:${MYSQL_PASSWORD:-local-only-change-me}@mysql:3306/${MYSQL_DATABASE:-crowdfunding}
+      # Backend đọc DB_* (backend/src/config/database.config.ts), không đọc DATABASE_URL
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USERNAME: ${MYSQL_USER:-crowdfunding_app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-local-only-change-me}
+      DB_DATABASE: ${MYSQL_DATABASE:-crowdfunding}
       REDIS_URL: redis://redis:6379
       AI_SERVICE_URL: http://ai-service:8000/api/v1
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-local-access-secret-change-me}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-refresh-secret-change-me}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-local-webhook-secret-change-me}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     depends_on:
