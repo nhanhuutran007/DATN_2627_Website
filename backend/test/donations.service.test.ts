@@ -92,15 +92,17 @@ function createMockRepos() {
     increment: async () => undefined,
   };
 
-  const mockTransaction = async (fn: any) => {
-    const manager = {
-      save: async (d: any) => d,
-      increment: async () => undefined,
-    };
-    return fn(manager);
+  // Expose để test override `update`/`findOne`, mô phỏng donation đã bị một
+  // lời gọi khác xử lý trước (race condition).
+  const txManager: any = {
+    save: async (d: any) => d,
+    increment: async () => undefined,
+    update: async () => ({ affected: 1 }),
+    findOne: async () => mockDonation,
   };
+  const mockTransaction = async (fn: any) => fn(txManager);
 
-  return { donationRepo, campaignRepo, mockDonation, mockCampaign, mockTransaction };
+  return { donationRepo, campaignRepo, mockDonation, mockCampaign, mockTransaction, txManager };
 }
 
 describe("DonationsService", () => {
@@ -219,7 +221,7 @@ describe("DonationsService", () => {
     const DONATION_ID = "22222222-2222-2222-2222-222222222222";
 
     function signed(status: "completed" | "failed", donationId = DONATION_ID) {
-      const dto = { donationId, status };
+      const dto = { donationId, status, timestamp: Date.now() };
       return { dto, signature: signWebhookPayload(WEBHOOK_SECRET, dto) };
     }
 
@@ -261,13 +263,16 @@ describe("DonationsService", () => {
     it("should reject a signature that does not match the payload", async () => {
       const { signature } = signed("failed");
       await expectStatus(
-        service.handleWebhook({ donationId: DONATION_ID, status: "completed" }, signature),
+        service.handleWebhook(
+          { donationId: DONATION_ID, status: "completed", timestamp: Date.now() },
+          signature,
+        ),
         401,
       );
     });
 
     it("should reject a signature made with another secret", async () => {
-      const dto = { donationId: DONATION_ID, status: "completed" as const };
+      const dto = { donationId: DONATION_ID, status: "completed" as const, timestamp: Date.now() };
       const forged = signWebhookPayload("attacker-secret", dto);
       await expectStatus(service.handleWebhook(dto, forged), 401);
     });
@@ -279,10 +284,43 @@ describe("DonationsService", () => {
         return repos.mockDonation;
       };
       await expectStatus(
-        service.handleWebhook({ donationId: DONATION_ID, status: "completed" }, "bad"),
+        service.handleWebhook(
+          { donationId: DONATION_ID, status: "completed", timestamp: Date.now() },
+          "bad",
+        ),
         401,
       );
       equal(lookups, 0);
+    });
+
+    it("should reject a valid signature whose timestamp is too old (replay)", async () => {
+      const dto = {
+        donationId: DONATION_ID,
+        status: "completed" as const,
+        timestamp: Date.now() - 6 * 60_000,
+      };
+      const signature = signWebhookPayload(WEBHOOK_SECRET, dto);
+      await expectStatus(service.handleWebhook(dto, signature), 401);
+      equal(audit.entries.length, 1);
+      equal(audit.entries[0].action, "donation.webhook.rejected");
+      equal(audit.entries[0].newValues?.reason, "stale-timestamp");
+    });
+
+    it("should only apply the payment once when two webhook calls race on the same donation", async () => {
+      const { dto, signature } = signed("completed");
+      // Mô phỏng: một request khác đã thắng update có điều kiện trước —
+      // `update` trả `affected: 0`, `findOne` trả trạng thái đã COMPLETED.
+      repos.txManager.update = async () => ({ affected: 0 });
+      repos.txManager.findOne = async () => ({
+        ...repos.mockDonation,
+        status: DonationStatus.COMPLETED,
+      });
+
+      const donation = await service.handleWebhook(dto, signature);
+      equal(donation.status, DonationStatus.COMPLETED);
+      // Chữ ký/timestamp hợp lệ nên qua được guard PENDING, nhưng update có
+      // điều kiện không ảnh hưởng dòng nào -> không ghi audit thanh toán lần 2.
+      equal(audit.entries.length, 0);
     });
 
     it("should reject every webhook when no secret is configured", async () => {

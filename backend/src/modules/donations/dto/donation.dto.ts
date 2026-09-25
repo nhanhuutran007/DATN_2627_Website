@@ -1,8 +1,10 @@
 import {
   IsBoolean,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   IsUUID,
   MaxLength,
@@ -50,4 +52,9 @@ export class WebhookDonationDto {
   @IsString()
   @MaxLength(255)
   transactionId?: string;
+
+  /** Epoch ms lúc cổng thanh toán tạo webhook; dùng để chống replay. */
+  @IsInt()
+  @IsPositive()
+  timestamp!: number;
 }

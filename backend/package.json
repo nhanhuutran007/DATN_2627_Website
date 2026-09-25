@@ -16,7 +16,8 @@
     "migration:run": "typeorm-ts-node-commonjs -d typeorm.config.ts migration:run",
     "migration:revert": "typeorm-ts-node-commonjs -d typeorm.config.ts migration:revert",
     "migration:generate": "typeorm-ts-node-commonjs -d typeorm.config.ts migration:generate",
-    "seed": "ts-node scripts/seed.ts"
+    "seed": "ts-node scripts/seed.ts",
+    "sign-webhook": "ts-node scripts/sign-webhook.ts"
   },
   "dependencies": {
     "@nestjs/common": "12.0.1",

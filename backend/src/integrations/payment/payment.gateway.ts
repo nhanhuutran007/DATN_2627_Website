@@ -11,7 +11,12 @@ export type WebhookSignedFields = {
   donationId: string;
   status: string;
   transactionId?: string;
+  /** Epoch ms lúc cổng thanh toán tạo webhook — ký kèm để chống replay. */
+  timestamp: number;
 };
+
+/** Webhook cũ hơn khoảng này (so với giờ server) bị từ chối dù chữ ký đúng. */
+export const WEBHOOK_MAX_SKEW_MS = 5 * 60_000;
 
 export interface PaymentGateway {
   /**
@@ -32,7 +37,12 @@ export interface PaymentGateway {
 
 /** Chuỗi chuẩn hóa dùng để ký, tránh phụ thuộc thứ tự khóa/khoảng trắng của JSON. */
 export function webhookSigningString(payload: WebhookSignedFields): string {
-  return [payload.donationId, payload.status, payload.transactionId ?? ""].join(".");
+  return [
+    payload.donationId,
+    payload.status,
+    payload.transactionId ?? "",
+    String(payload.timestamp),
+  ].join(".");
 }
 
 /** HMAC-SHA256 (hex) của nội dung webhook. Dùng cho cổng gọi lại và cho test/demo. */

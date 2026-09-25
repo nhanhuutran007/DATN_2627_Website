@@ -11,6 +11,7 @@ import { DataSource, Repository } from "typeorm";
 
 import {
   PaymentGateway,
+  WEBHOOK_MAX_SKEW_MS,
 } from "../../integrations/payment/payment.gateway";
 import { AuditService } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
@@ -78,6 +79,8 @@ export class DonationsService {
   /**
    * Webhook từ cổng thanh toán. Chữ ký được kiểm tra TRƯỚC mọi truy vấn để không
    * lộ việc khoản tài trợ có tồn tại hay không; chữ ký sai bị ghi audit.
+   * `timestamp` nằm trong nội dung được ký nên cũng chống được replay: một
+   * webhook hợp lệ nhưng quá cũ bị từ chối dù chữ ký khớp.
    */
   async handleWebhook(
     dto: WebhookDonationDto,
@@ -88,6 +91,7 @@ export class DonationsService {
         donationId: dto.donationId,
         status: dto.status,
         transactionId: dto.transactionId,
+        timestamp: dto.timestamp,
       },
       signature ?? "",
     );
@@ -100,6 +104,17 @@ export class DonationsService {
       });
       throw new UnauthorizedException("Invalid webhook signature");
     }
+
+    if (Math.abs(Date.now() - dto.timestamp) > WEBHOOK_MAX_SKEW_MS) {
+      await this.auditService.record({
+        action: "donation.webhook.rejected",
+        entity: "donation",
+        entityId: dto.donationId,
+        newValues: { reason: "stale-timestamp", claimedStatus: dto.status },
+      });
+      throw new UnauthorizedException("Webhook timestamp is too old");
+    }
+
     return this.applyPaymentResult(dto, "payment-webhook");
   }
 
@@ -124,7 +139,12 @@ export class DonationsService {
       throw new NotFoundException("Donation not found");
     }
     return this.applyPaymentResult(
-      { donationId, status, transactionId: donation.transactionId },
+      {
+        donationId,
+        status,
+        transactionId: donation.transactionId,
+        timestamp: Date.now(),
+      },
       "demo-wallet",
       user.id,
     );
@@ -145,20 +165,38 @@ export class DonationsService {
       return donation;
     }
 
-    const result = await this.dataSource.transaction(async (manager) => {
-      donation.status =
-        dto.status === "completed"
-          ? DonationStatus.COMPLETED
-          : DonationStatus.FAILED;
-      if (dto.transactionId) {
-        donation.transactionId = dto.transactionId;
-      }
-      if (dto.status === "completed") {
-        donation.completedAt = new Date();
-      }
-      await manager.save(donation);
+    const nextStatus =
+      dto.status === "completed"
+        ? DonationStatus.COMPLETED
+        : DonationStatus.FAILED;
+    const nextTransactionId = dto.transactionId ?? donation.transactionId;
+    const completedAt =
+      nextStatus === DonationStatus.COMPLETED
+        ? new Date()
+        : donation.completedAt;
 
-      if (dto.status === "completed") {
+    const outcome = await this.dataSource.transaction(async (manager) => {
+      // Update có điều kiện trên chính cột `status`: chỉ ghi khi donation vẫn
+      // còn PENDING tại thời điểm này. Guard `status !== PENDING` ở trên đọc
+      // ngoài transaction nên không đủ để chống race — nếu update vô điều kiện
+      // như trước, hai webhook (hoặc webhook đua với xác nhận ví demo) cùng đọc
+      // PENDING rồi cùng ghi sẽ cùng cộng tiền/backer trùng lặp cho một donation.
+      const updateResult = await manager.update(
+        Donation,
+        { id: donation.id, status: DonationStatus.PENDING },
+        { status: nextStatus, transactionId: nextTransactionId, completedAt },
+      );
+
+      if (!updateResult.affected) {
+        // Một request khác đã xử lý donation này trước — trả lại bản ghi hiện
+        // tại, không cộng tiền/backer lần nữa, không ghi audit trùng.
+        const current = await manager.findOne(Donation, {
+          where: { id: donation.id },
+        });
+        return { applied: false as const, donation: current ?? donation };
+      }
+
+      if (nextStatus === DonationStatus.COMPLETED) {
         await manager.increment(
           Campaign,
           { id: donation.campaignId },
@@ -173,9 +211,22 @@ export class DonationsService {
         );
       }
 
-      return donation;
+      return {
+        applied: true as const,
+        donation: {
+          ...donation,
+          status: nextStatus,
+          transactionId: nextTransactionId,
+          completedAt,
+        } as Donation,
+      };
     });
 
+    if (!outcome.applied) {
+      return outcome.donation;
+    }
+
+    const result = outcome.donation;
     await this.auditService.record({
       userId: actorId,
       action: `donation.payment.${result.status}`,
