@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  SerializeOptions,
   UseGuards,
 } from "@nestjs/common";
 
@@ -16,7 +17,7 @@ import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
-import { User, UserRole } from "../users/entities/user.entity";
+import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entity";
 import { AdminService } from "./admin.service";
 import {
   AdminCampaignQueryDto,
@@ -31,6 +32,7 @@ import { RiskAlertService } from "./risk-alert.service";
 @Controller("admin")
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
+@SerializeOptions({ groups: [USER_PRIVATE_GROUP] })
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,

@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  SerializeOptions,
   UseGuards,
 } from "@nestjs/common";
 
@@ -14,12 +15,14 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
-import { User, UserRole } from "./entities/user.entity";
+import { USER_PRIVATE_GROUP, User, UserRole } from "./entities/user.entity";
 import { UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
 import { UsersService } from "./users.service";
 
 @Controller("users")
 @UseGuards(JwtAuthGuard, RolesGuard)
+// Mọi route ở đây chỉ dành cho chính chủ hoặc admin → được thấy email/phone
+@SerializeOptions({ groups: [USER_PRIVATE_GROUP] })
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 

@@ -1,5 +1,5 @@
-import { ValidationPipe } from "@nestjs/common";
-import { NestFactory } from "@nestjs/core";
+import { ClassSerializerInterceptor, ValidationPipe } from "@nestjs/common";
+import { NestFactory, Reflector } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import helmet from "helmet";
 
@@ -34,6 +34,9 @@ async function bootstrap(): Promise<void> {
       whitelist: true,
     }),
   );
+  // Áp dụng @Exclude/@Expose của entity khi trả response (vd. không bao giờ
+  // trả passwordHash, ẩn email/phone của owner trong API công khai).
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
   app.enableShutdownHooks();
 
   await app.listen(config.port, "0.0.0.0");
