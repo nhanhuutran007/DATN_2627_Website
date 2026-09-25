@@ -258,6 +258,58 @@ describe("CampaignsService", () => {
           equal(err.status, 403);
         });
     });
+
+    it("should reject a transition outside the allowed matrix (draft -> ended)", async () => {
+      repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.DRAFT });
+      await campaignsService
+        .moderate(
+          "123e4567-e89b-12d3-a456-426614174000",
+          { status: CampaignStatus.ENDED } as any,
+          makeUser(UserRole.ADMIN),
+        )
+        .then(() => {
+          throw new Error("should have thrown");
+        })
+        .catch((err) => {
+          equal(err.status, 409);
+        });
+    });
+
+    it("should allow pausing an active campaign with a reason", async () => {
+      repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.ACTIVE });
+      const campaign = await campaignsService.moderate(
+        "123e4567-e89b-12d3-a456-426614174000",
+        { status: CampaignStatus.PAUSED, reason: "Đang rà soát chứng từ" } as any,
+        makeUser(UserRole.ADMIN),
+      );
+      equal(campaign.status, CampaignStatus.PAUSED);
+    });
+
+    it("should require a reason to pause a campaign", async () => {
+      repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.ACTIVE });
+      await campaignsService
+        .moderate(
+          "123e4567-e89b-12d3-a456-426614174000",
+          { status: CampaignStatus.PAUSED } as any,
+          makeUser(UserRole.ADMIN),
+        )
+        .then(() => {
+          throw new Error("should have thrown");
+        })
+        .catch((err) => {
+          equal(err.status, 400);
+        });
+    });
+
+    it("should allow resuming a paused campaign without a reason", async () => {
+      repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.PAUSED });
+      const campaign = await campaignsService.moderate(
+        "123e4567-e89b-12d3-a456-426614174000",
+        { status: CampaignStatus.ACTIVE } as any,
+        makeUser(UserRole.ADMIN),
+      );
+      equal(campaign.status, CampaignStatus.ACTIVE);
+    });
   });
 
   describe("remove", () => {

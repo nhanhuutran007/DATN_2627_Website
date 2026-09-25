@@ -124,6 +124,7 @@ export class ModerateCampaignDto {
   @IsIn([
     CampaignStatus.APPROVED,
     CampaignStatus.ACTIVE,
+    CampaignStatus.PAUSED,
     CampaignStatus.REJECTED,
     CampaignStatus.NEEDS_INFO,
     CampaignStatus.ENDED,

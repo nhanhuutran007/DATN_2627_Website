@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { getDatabaseConfig } from "./config/database.config";
@@ -20,6 +21,7 @@ import { UsersModule } from "./modules/users/users.module";
       isGlobal: true,
     }),
     TypeOrmModule.forRoot(getDatabaseConfig()),
+    ScheduleModule.forRoot(),
     RateLimitModule,
     AuditModule,
     AdminModule,

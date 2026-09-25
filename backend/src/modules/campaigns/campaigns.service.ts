@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -41,6 +42,30 @@ const SUBMITTABLE_STATUSES = [
   CampaignStatus.REJECTED,
   CampaignStatus.NEEDS_INFO,
 ];
+
+/**
+ * Ma trận chuyển trạng thái cho phép khi admin duyệt (`moderate`), theo vòng đời
+ * README: draft → pending ⇄ needs_info → approved → active → (paused ⇄ active)
+ * → success | failed → ended; từ pending có thể rejected. Chuyển ngoài bảng này
+ * bị từ chối, kể cả khi status đích hợp lệ theo DTO.
+ */
+const MODERATE_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
+  [CampaignStatus.DRAFT]: [],
+  [CampaignStatus.PENDING]: [
+    CampaignStatus.APPROVED,
+    CampaignStatus.REJECTED,
+    CampaignStatus.NEEDS_INFO,
+  ],
+  [CampaignStatus.APPROVED]: [CampaignStatus.ACTIVE],
+  [CampaignStatus.REJECTED]: [],
+  [CampaignStatus.NEEDS_INFO]: [],
+  [CampaignStatus.ACTIVE]: [CampaignStatus.PAUSED, CampaignStatus.ENDED],
+  [CampaignStatus.PAUSED]: [CampaignStatus.ACTIVE],
+  [CampaignStatus.SUCCESS]: [CampaignStatus.ENDED],
+  [CampaignStatus.FAILED]: [CampaignStatus.ENDED],
+  [CampaignStatus.CANCELLED]: [],
+  [CampaignStatus.ENDED]: [],
+};
 
 export type CampaignListResult = {
   items: Campaign[];
@@ -199,14 +224,22 @@ export class CampaignsService {
     }
 
     const campaign = await this.findById(id);
+
+    if (!MODERATE_TRANSITIONS[campaign.status].includes(dto.status)) {
+      throw new ConflictException(
+        `Cannot move campaign from "${campaign.status}" to "${dto.status}"`,
+      );
+    }
+
     const needsReason = [
       CampaignStatus.REJECTED,
       CampaignStatus.NEEDS_INFO,
+      CampaignStatus.PAUSED,
     ].includes(dto.status);
 
     if (needsReason && !dto.reason?.trim()) {
       throw new BadRequestException(
-        "A reason is required for rejected or needs-info campaigns",
+        "A reason is required for rejected, needs-info or paused campaigns",
       );
     }
 
