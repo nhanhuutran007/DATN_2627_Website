@@ -179,18 +179,19 @@ Hệ thống hạ tầng (Infrastructure as Code) đã được viết sẵn b�
 
 ## Tiến độ triển khai
 
-> Cập nhật mới nhất: **23/09/2026**
+> Cập nhật mới nhất: **25/09/2026**
 
 | Hạng mục | Trạng thái | Ghi chú |
 | --- | --- | --- |
 | **Cơ sở dữ liệu** | ✅ Đã hoàn thành | Entities, migration, seed (User, Campaign, Donation, Progress, Audit log). |
-| **Xác thực & Bảo mật** | ✅ Đã hoàn thành | JWT, Rate limit (Redis khi có, tự rơi về bộ nhớ), chống Brute-force login, RolesGuard, helmet, CORS thu hẹp. |
+| **Xác thực & Bảo mật** | ✅ Đã hoàn thành | JWT, Rate limit (Redis khi có, tự rơi về bộ nhớ), chống Brute-force login, RolesGuard, helmet, CORS thu hẹp, không trả hash mật khẩu/email ra API công khai (ClassSerializerInterceptor). |
 | **Core: Chiến dịch** | ✅ Đã hoàn thành | Đầy đủ vòng đời, ma trận chuyển trạng thái khi kiểm duyệt, job cron tự động chốt `active` hết hạn → success/failed, lọc/tìm kiếm. |
 | **Core: Tài trợ** | ✅ Đã hoàn thành | Giao dịch Idempotency, chặn tài trợ hết hạn, Webhook HMAC chống replay (timestamp) + chống race khi xử lý đồng thời. |
 | **Core: Tiến độ** | ✅ Đã hoàn thành | Mốc thời gian, tính tự động % hoàn thành, audit log cho mọi thay đổi mốc/bài cập nhật. |
 | **Dịch vụ AI** | ✅ Đã hoàn thành | FastAPI routes (recommend, predict, fraud), model registry. |
+| **Kiểm duyệt (Moderation)** | ✅ Cơ bản | Người dùng báo cáo vi phạm chiến dịch; admin xem xét, kết luận có lý do, có thể tạm dừng chiến dịch; toàn bộ ghi audit (human-in-the-loop). |
 | **Giao diện (Frontend)** | 🔶 Đang hoàn thiện | Nối API trang chủ, dashboard, quy trình tạo chiến dịch. (Đang hoàn thiện phần Admin). |
-| **Hạ tầng & Triển khai** | ✅ Đã hoàn thành | **AWS Terraform (ECS Fargate, ALB, RDS)** hoàn tất. Có Docker Compose cho môi trường Local. |
+| **Hạ tầng & Triển khai** | ✅ Đã hoàn thành | **AWS Terraform (ECS Fargate, ALB, RDS)** hoàn tất. Docker Compose local đã chạy đủ 6 service (nginx, frontend, backend, AI, MySQL, Redis) và qua smoke test. |
 | **Kiểm thử** | 🔶 Đang tiến hành | Unit tests API backend đạt ~80%. Cần viết thêm E2E. |
 
 *Tài liệu README này mô tả chuẩn xác thực trạng hệ thống ở thời điểm hiện tại và sẽ được cập nhật liên tục.*
