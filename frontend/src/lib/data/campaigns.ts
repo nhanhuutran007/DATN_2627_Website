@@ -25,6 +25,10 @@ export type Campaign = {
   daysLeft: number;
   status: CampaignStatus;
   image: "mangrove" | "startup" | "library" | "health";
+  /** Ảnh do chủ dự án cung cấp; không có thì giao diện hiển thị dạng chữ, không dùng ảnh minh họa. */
+  imageUrl?: string | null;
+  /** Ngày kết thúc dạng dd/mm/yyyy. */
+  endDate?: string;
   aiReason: string;
   story: string[];
   transparencyScore: number;
@@ -310,27 +314,6 @@ export const campaigns: Campaign[] = [
       title: "14 giống đầu tiên đã được kiểm tra nảy mầm",
       excerpt: "Kết quả và biên bản mẫu đã được đăng trong mục minh chứng.",
     },
-  },
-];
-
-export const categoryMeta = [
-  {
-    name: "Môi trường",
-    description: "Phục hồi thiên nhiên, khí hậu và lối sống xanh",
-    icon: "leaf" as const,
-    image: "mangrove" as const,
-  },
-  {
-    name: "Khởi nghiệp",
-    description: "Ý tưởng tạo sinh kế và giá trị kinh tế bền vững",
-    icon: "rocket" as const,
-    image: "startup" as const,
-  },
-  {
-    name: "Giáo dục & Y tế",
-    description: "Cơ hội học tập và chăm sóc sức khỏe công bằng",
-    icon: "heart" as const,
-    image: "library" as const,
   },
 ];
 

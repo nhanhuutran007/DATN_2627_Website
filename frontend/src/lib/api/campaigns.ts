@@ -245,6 +245,8 @@ export function apiCampaignToView(api: ApiCampaign): Campaign {
     daysLeft,
     status: statusToDisplay(api.status),
     image: imageByCategory(api.category),
+    imageUrl: api.imageUrl ?? null,
+    endDate: formatDate(api.endDate),
     aiReason: "",
     story: toStory(api.description),
     transparencyScore: milestones.length > 0 ? 95 : 86,
@@ -258,4 +260,16 @@ export function apiCampaignToView(api: ApiCampaign): Campaign {
           : "Thông tin chi tiết, chứng từ và tiến độ sẽ được công bố công khai tại mục cập nhật.",
     },
   };
+}
+export type PlatformStats = {
+  totalRaised: number;
+  totalBackers: number;
+  publicCampaigns: number;
+  activeCampaigns: number;
+  successfulCampaigns: number;
+};
+
+/** Thống kê thật toàn nền tảng (tổng tiền đã được cổng thanh toán xác nhận). */
+export async function fetchPlatformStats(): Promise<PlatformStats> {
+  return api.get<PlatformStats>("/campaigns/stats");
 }

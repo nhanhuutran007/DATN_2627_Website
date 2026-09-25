@@ -66,3 +66,25 @@ export async function fetchDonation(id: string): Promise<ApiDonation> {
 export function generateIdempotencyKey(): string {
   return `donation-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
+
+export type LedgerEntry = {
+  id: string;
+  donorName: string | null;
+  amount: number;
+  currency: string;
+  paymentMethod: string | null;
+  reference: string;
+  completedAt: string;
+};
+
+export type CampaignLedger = {
+  items: LedgerEntry[];
+  total: number;
+};
+
+/** Sổ cái công khai: chỉ giao dịch đã xác nhận, ẩn danh được tôn trọng. */
+export async function fetchCampaignLedger(campaignId: string, limit = 20): Promise<CampaignLedger> {
+  return api.get<CampaignLedger>(
+    `/campaigns/${encodeURIComponent(campaignId)}/donations?limit=${limit}`,
+  );
+}

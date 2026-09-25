@@ -4,43 +4,45 @@ import { Icon } from "@/components/ui/Icon";
 
 export function SiteFooter() {
   return (
-    <footer className="site-footer">
-      <div className="container footer-grid">
-        <div className="footer-brand-column">
-          <Link className="brand brand-inverse" href="/">
-            <span className="brand-mark"><Icon name="leaf" size={23} /></span>
-            <span className="brand-copy"><b>GÓP MẦM</b><small>Góp niềm tin · Gieo thay đổi</small></span>
+    <footer className="site-footer-new">
+      <div className="container footer-cols">
+        <div className="footer-about">
+          <Link className="logo logo-light" href="/" aria-label="Góp Mầm – Trang chủ">
+            <span className="logo-mark"><Icon name="leaf" size={22} /></span>
+            <span className="logo-text">GÓP <b>MẦM</b></span>
           </Link>
-          <p>Nền tảng kết nối những ý tưởng tử tế với cộng đồng sẵn lòng chung tay, có theo dõi tiến độ và minh bạch nguồn quỹ.</p>
-          <div className="footer-cert"><Icon name="shield" size={20} /> Thanh toán sandbox · Không lưu dữ liệu thẻ</div>
+          <p>
+            Nền tảng gây quỹ cộng đồng cho dự án xã hội và khởi nghiệp. Hồ sơ được kiểm duyệt trước khi phát hành,
+            giao dịch được xác nhận và chủ dự án báo cáo chi tiêu theo từng mốc.
+          </p>
         </div>
-        <div>
-          <h2>Khám phá</h2>
+        <nav aria-labelledby="footer-explore">
+          <h2 id="footer-explore">Khám phá</h2>
           <Link href="/du-an">Tất cả dự án</Link>
+          <Link href="/du-an?category=Giáo+dục">Giáo dục</Link>
           <Link href="/du-an?category=Môi+trường">Môi trường</Link>
           <Link href="/du-an?category=Khởi+nghiệp">Khởi nghiệp</Link>
-          <Link href="/du-an?category=Giáo+dục">Giáo dục</Link>
-        </div>
+        </nav>
+        <nav aria-labelledby="footer-owner">
+          <h2 id="footer-owner">Chủ dự án</h2>
+          <Link href="/tao-chien-dich">Tạo chiến dịch</Link>
+          <Link href="/dashboard">Quản lý chiến dịch</Link>
+          <Link href="/#quy-trinh">Quy trình gây quỹ</Link>
+        </nav>
         <div>
-          <h2>Dành cho bạn</h2>
-          <Link href="/tao-chien-dich">Bắt đầu chiến dịch</Link>
-          <Link href="/dashboard">Trung tâm chủ dự án</Link>
-          <Link href="/#cach-hoat-dong">Cách hoạt động</Link>
-          <Link href="/#minh-bach">Cam kết minh bạch</Link>
-        </div>
-        <div>
-          <h2>Nhận tin tốt mỗi tuần</h2>
-          <p>Những dự án mới và báo cáo tác động, gửi vừa đủ.</p>
-          <form className="newsletter-form">
-            <label className="sr-only" htmlFor="newsletter-email">Email nhận bản tin</label>
-            <input id="newsletter-email" type="email" placeholder="Email của bạn" />
-            <button type="submit" aria-label="Đăng ký"><Icon name="arrow-right" /></button>
-          </form>
+          <h2>Cam kết</h2>
+          <ul className="footer-points">
+            <li><Icon name="check" size={15} /> Kiểm duyệt trước khi phát hành</li>
+            <li><Icon name="check" size={15} /> Sổ cái giao dịch công khai</li>
+            <li><Icon name="check" size={15} /> Không lưu dữ liệu thẻ</li>
+          </ul>
         </div>
       </div>
-      <div className="container footer-bottom">
-        <span>© 2026 Góp Mầm · Sản phẩm demo đồ án tốt nghiệp</span>
-        <span>Điều khoản · Quyền riêng tư · Trung tâm trợ giúp</span>
+      <div className="footer-bar">
+        <div className="container footer-bar-inner">
+          <span>© 2026 Góp Mầm · Đồ án tốt nghiệp DATN_2627</span>
+          <span>Bản demo sử dụng thanh toán sandbox, không phát sinh tiền thật.</span>
+        </div>
       </div>
     </footer>
   );

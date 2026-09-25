@@ -2,19 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AiPredictCard } from "@/components/ai/AiPredictCard";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { ProgressBar } from "@/components/campaign/ProgressBar";
+import { PageBanner } from "@/components/layout/PageBanner";
 import { Icon } from "@/components/ui/Icon";
+import { CampaignLedger } from "@/features/donations/CampaignLedger";
 import { DonationPanel } from "@/features/donations/DonationPanel";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
 import { apiCampaignToView, fetchCampaign, fetchCampaigns } from "@/lib/api/campaigns";
-import {
-  campaignProgress,
-  campaigns as mockCampaigns,
-  findCampaign,
-  formatCurrency,
-  type Campaign,
-} from "@/lib/data/campaigns";
+import { fetchCampaignProgress, type CampaignProgress } from "@/lib/api/progress";
+import { coverFor } from "@/lib/covers";
+import { campaignProgress, campaigns as mockCampaigns, findCampaign, type Campaign } from "@/lib/data/campaigns";
+import { formatVnd, isLiveId } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -22,138 +22,212 @@ type CampaignDetailPageProps = {
   params: Promise<{ slug: string }>;
 };
 
-async function loadCampaign(slug: string): Promise<Campaign | undefined> {
+type Loaded = { campaign: Campaign; live: boolean };
+
+async function loadCampaign(slug: string): Promise<Loaded | undefined> {
+  if (isLiveId(slug)) {
+    try {
+      return { campaign: apiCampaignToView(await fetchCampaign(slug)), live: true };
+    } catch {
+      return undefined;
+    }
+  }
+  const sample = findCampaign(slug);
+  return sample ? { campaign: sample, live: false } : undefined;
+}
+
+async function loadProgress(id: string): Promise<CampaignProgress | null> {
   try {
-    const apiCampaign = await fetchCampaign(encodeURIComponent(slug));
-    return apiCampaignToView(apiCampaign);
+    return await fetchCampaignProgress(id);
   } catch {
-    return findCampaign(slug);
+    return null;
   }
 }
 
-async function loadRelated(current: Campaign): Promise<Campaign[]> {
+async function loadRelated(current: Campaign, live: boolean): Promise<Campaign[]> {
+  if (!live) return mockCampaigns.filter((item) => item.slug !== current.slug).slice(0, 3);
   try {
-    const response = await fetchCampaigns({ limit: 20, sort: "latest" });
-    const list = response.items.map(apiCampaignToView);
-    const sameCategory = list.filter((item) => item.slug !== current.slug && item.category === current.category);
-    const candidates = sameCategory.length > 0 ? sameCategory : list;
-    return candidates.filter((item) => item.slug !== current.slug).slice(0, 3);
+    const response = await fetchCampaigns({ limit: 12, sort: "popular" });
+    const others = response.items.map(apiCampaignToView).filter((item) => item.slug !== current.slug);
+    const same = others.filter((item) => item.category === current.category);
+    return (same.length > 0 ? same : others).slice(0, 3);
   } catch {
-    return mockCampaigns.filter((item) => item.slug !== current.slug).slice(0, 3);
+    return [];
   }
 }
 
 export async function generateMetadata({ params }: CampaignDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const campaign = await loadCampaign(slug);
-  return campaign
-    ? { title: campaign.title, description: campaign.summary }
-    : { title: "Không tìm thấy dự án" };
+  const loaded = await loadCampaign(slug);
+  if (!loaded) return { title: "Không tìm thấy dự án", robots: { index: false } };
+  const { campaign, live } = loaded;
+  const cover = coverFor(campaign);
+  return {
+    title: campaign.title,
+    description: campaign.summary,
+    alternates: { canonical: `/du-an/${campaign.slug}` },
+    robots: live ? undefined : { index: false },
+    openGraph: {
+      type: "article",
+      title: campaign.title,
+      description: campaign.summary,
+      images: [{ url: cover.src, alt: cover.alt }],
+    },
+  };
 }
 
 export default async function CampaignDetailPage({ params }: CampaignDetailPageProps) {
   const { slug } = await params;
-  const campaign = await loadCampaign(slug);
-  if (!campaign) notFound();
+  const loaded = await loadCampaign(slug);
+  if (!loaded) notFound();
 
-  const progress = campaignProgress(campaign);
-  const related = await loadRelated(campaign);
+  const { campaign, live } = loaded;
+  const [progress, related] = await Promise.all([
+    live ? loadProgress(campaign.slug) : Promise.resolve(null),
+    loadRelated(campaign, live),
+  ]);
+  const percent = campaignProgress(campaign);
+  const open = campaign.status === "Đang gây quỹ";
+  const plannedBudget = campaign.milestones.reduce((sum, milestone) => sum + milestone.budget, 0);
+  const totalMilestones = progress?.totalMilestones ?? campaign.milestones.length;
+  const budget = progress?.totalBudget ?? plannedBudget;
+  const cover = coverFor(campaign);
 
   return (
-    <main className="page-surface campaign-detail-page">
-      <div className="container breadcrumb">
-        <Link href="/">Trang chủ</Link><span>/</span><Link href="/du-an">Dự án</Link><span>/</span><b>{campaign.category}</b>
-      </div>
+    <main>
+      <PageBanner
+        title={campaign.title}
+        crumbs={[{ href: "/", label: "Trang chủ" }, { href: "/du-an", label: "Dự án" }, { label: campaign.category }]}
+        image={cover}
+      >
+        <ul className="banner-meta">
+          <li><Icon name="document" size={15} /> {campaign.category}</li>
+          <li><Icon name="location" size={15} /> {campaign.location}</li>
+          <li><Icon name="user" size={15} /> {campaign.owner}</li>
+          <li className={open ? "is-open" : ""}>{campaign.status}</li>
+        </ul>
+      </PageBanner>
 
-      <section className="container campaign-detail-hero">
-        <div className={`detail-media atlas atlas-${campaign.image}`}>
-          <span className="detail-category">{campaign.category}</span>
-        </div>
-        <div className="detail-summary">
-          <div className="detail-status"><span>{campaign.status}</span><span><Icon name="shield" size={15} /> Đã kiểm duyệt</span></div>
-          <h1>{campaign.title}</h1>
-          <p>{campaign.summary}</p>
-          <div className="detail-owner">
-            <span className="detail-owner-avatar">{campaign.owner.charAt(0)}</span>
-            <div><small>Khởi tạo bởi</small><b>{campaign.owner} {campaign.verified && <i><Icon name="check" size={10} /></i>}</b></div>
-            <span className="detail-location"><Icon name="location" size={16} /> {campaign.location}</span>
-          </div>
-          <ProgressBar value={progress} label={`Đã huy động ${progress}%`} />
-          <div className="detail-numbers">
-            <div><strong>{formatCurrency(campaign.raised)}</strong><span>đã góp trên mục tiêu {formatCurrency(campaign.target)}</span></div>
-            <div><strong>{campaign.backers.toLocaleString("vi-VN")}</strong><span>người tài trợ</span></div>
-            <div><strong>{campaign.daysLeft || "Đủ"}</strong><span>{campaign.daysLeft ? "ngày còn lại" : "mục tiêu"}</span></div>
-          </div>
-          <div className="detail-actions">
-            <a className="button button-primary button-large" href="#tai-tro">Tài trợ dự án <Icon name="arrow-right" size={19} /></a>
-            <ReportCampaignButton campaignId={campaign.slug} campaignSlug={campaign.slug} />
-          </div>
-        </div>
-      </section>
+      <div className="container detail-layout">
+        {!live && <p className="notice-sample">Dữ liệu mẫu — không phải chiến dịch thật trên hệ thống.</p>}
 
-      <nav className="detail-tabs" aria-label="Nội dung dự án">
-        <div className="container">
-          <a className="active" href="#cau-chuyen">Câu chuyện</a>
-          <a href="#ke-hoach">Kế hoạch</a>
-          <a href="#cap-nhat">Cập nhật</a>
-        </div>
-      </nav>
+        <div className="detail-main">
+          <section className="panel" aria-labelledby="gioi-thieu-du-an">
+            <h2 id="gioi-thieu-du-an">Giới thiệu dự án</h2>
+            <div className="detail-story">
+              {campaign.story.map((paragraph, index) => (
+                <p className={index === 0 ? "detail-lead" : undefined} key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+            {cover.illustrative && <p className="hint">Ảnh đầu trang là ảnh minh họa theo lĩnh vực.</p>}
+          </section>
 
-      <section className="container detail-content-grid">
-        <div className="detail-main-column">
-          <article className="content-block" id="cau-chuyen">
-            <p className="eyebrow">Câu chuyện dự án</p>
-            <h2>Một thay đổi bền vững bắt đầu từ cộng đồng địa phương.</h2>
-            {campaign.story.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-          </article>
-
-          <article className="content-block" id="ke-hoach">
-            <p className="eyebrow">Kế hoạch thực hiện</p>
-            <h2>Mốc công việc & ngân sách</h2>
+          <section className="panel" aria-labelledby="ke-hoach">
+            <h2 id="ke-hoach">Kế hoạch và ngân sách</h2>
             {campaign.milestones.length > 0 ? (
-              <div className="milestone-list">
-                {campaign.milestones.map((milestone, index) => (
-                  <div className="milestone-row" key={`${milestone.title}-${index}`}>
-                    <span className={`milestone-dot milestone-${milestone.status === "Hoàn thành" ? "done" : milestone.status === "Đang thực hiện" ? "active" : "next"}`}><Icon name={milestone.status === "Hoàn thành" ? "check" : "clock"} size={15} /></span>
-                    <div><small>Mốc {index + 1} · {milestone.date}</small><h3>{milestone.title}</h3><p>Ngân sách dự kiến: <b>{formatCurrency(milestone.budget)}</b></p></div>
-                    <span className="milestone-status">{milestone.status}</span>
-                  </div>
-                ))}
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">#</th>
+                      <th scope="col">Mốc công việc</th>
+                      <th scope="col">Hạn</th>
+                      <th scope="col" className="num">Ngân sách</th>
+                      <th scope="col">Tình trạng</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaign.milestones.map((milestone, index) => (
+                      <tr key={`${milestone.title}-${index}`}>
+                        <td>{index + 1}</td>
+                        <td>{milestone.title}</td>
+                        <td className="nowrap">{milestone.date}</td>
+                        <td className="num">{formatVnd(milestone.budget)}</td>
+                        <td><span className={`tag ${milestone.status === "Hoàn thành" ? "tag-green" : ""}`}>{milestone.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3}>Tổng ngân sách dự kiến</td>
+                      <td className="num">{formatVnd(plannedBudget)}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             ) : (
-              <p className="detail-empty-note">Kế hoạch chi tiết đang được chủ dự án cập nhật.</p>
+              <p className="hint">Chủ dự án chưa công bố kế hoạch theo mốc.</p>
             )}
-          </article>
+          </section>
 
-          <article className="content-block update-block" id="cap-nhat">
-            <p className="eyebrow">Cập nhật mới nhất</p>
-            <small>{campaign.latestUpdate.date}</small>
-            <h2>{campaign.latestUpdate.title}</h2>
-            <p>{campaign.latestUpdate.excerpt}</p>
-          </article>
+          <section className="panel" aria-labelledby="so-cai">
+            <h2 id="so-cai">Sổ cái giao dịch</h2>
+            <p className="hint">Các khoản ủng hộ đã được cổng thanh toán xác nhận, mới nhất ở trên.</p>
+            {live ? <CampaignLedger campaignId={campaign.slug} /> : <p className="hint">Dữ liệu mẫu không có sổ cái.</p>}
+          </section>
         </div>
 
-        <aside className="detail-sidebar" id="tai-tro">
-          <DonationPanel campaignId={campaign.slug} campaignTitle={campaign.title} />
-          <div className="transparency-card" id="minh-chung">
-            <div className="transparency-score"><span>{campaign.transparencyScore}</span><small>/100</small></div>
-            <div><p className="eyebrow">Chỉ số minh bạch</p><h2>Hồ sơ rất tốt</h2></div>
-            <ul>
-              <li><Icon name="check" size={14} /> Danh tính chủ dự án đã xác minh</li>
-              <li><Icon name="check" size={14} /> Kế hoạch ngân sách có phiên bản</li>
-              <li><Icon name="check" size={14} /> Tiến độ cập nhật đúng lịch</li>
+        <aside className="detail-side">
+          <section className="panel fund-card" aria-label="Tiến độ gây quỹ">
+            <p className="fund-amount">{formatVnd(campaign.raised)}</p>
+            <p className="fund-target">đã nhận / mục tiêu {formatVnd(campaign.target)}</p>
+            <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
+            <ul className="fund-stats">
+              <li><strong>{percent}%</strong><span>hoàn thành</span></li>
+              <li><strong>{campaign.backers.toLocaleString("vi-VN")}</strong><span>lượt ủng hộ</span></li>
+              <li><strong>{open ? campaign.daysLeft : "—"}</strong><span>{open ? "ngày còn lại" : campaign.status}</span></li>
             </ul>
-            <p className="transparency-note">Chỉ số hỗ trợ tham khảo, không phải bảo đảm tuyệt đối về kết quả dự án.</p>
-          </div>
-        </aside>
-      </section>
+            {open && <a className="button button-primary button-block" href="#ung-ho">Ủng hộ ngay</a>}
+            {live && <div className="fund-report"><ReportCampaignButton campaignId={campaign.slug} campaignSlug={campaign.slug} /></div>}
+          </section>
 
-      <section className="section related-section">
-        <div className="container">
-          <div className="section-heading"><div><p className="eyebrow">Tiếp tục khám phá</p><h2>Dự án liên quan</h2></div><Link className="text-link" href="/du-an">Xem tất cả <Icon name="arrow-right" size={18} /></Link></div>
-          <div className="campaign-grid campaign-grid-three">{related.map((item) => <CampaignCard campaign={item} key={item.slug} />)}</div>
-        </div>
-      </section>
+          {open && (
+            <div className="panel" id="ung-ho">
+              <DonationPanel campaignId={campaign.slug} campaignTitle={campaign.title} enabled={live} />
+            </div>
+          )}
+
+          <section className="panel" aria-labelledby="thong-tin-ho-so">
+            <h2 id="thong-tin-ho-so" className="panel-title-sm">Thông tin hồ sơ</h2>
+            <ul className="facts">
+              <li><span>Kiểm duyệt</span><span>Đã được quản trị viên duyệt</span></li>
+              <li>
+                <span>Kế hoạch</span>
+                <span>
+                  {totalMilestones === 0
+                    ? "Chưa có mốc"
+                    : progress
+                      ? `${progress.completedMilestones}/${totalMilestones} mốc hoàn thành`
+                      : `${totalMilestones} mốc`}
+                </span>
+              </li>
+              <li><span>Chi tiêu đã báo cáo</span><span>{progress && progress.totalExpense > 0 ? formatVnd(progress.totalExpense) : "Chưa có"}</span></li>
+              <li><span>Ngân sách kế hoạch</span><span>{budget > 0 ? formatVnd(budget) : "—"}</span></li>
+              {campaign.endDate && <li><span>Hạn gây quỹ</span><span>{campaign.endDate}</span></li>}
+            </ul>
+          </section>
+
+          {live && <AiPredictCard campaignId={campaign.slug} />}
+        </aside>
+      </div>
+
+      {related.length > 0 && (
+        <section className="block block-soft" aria-labelledby="lien-quan">
+          <div className="container">
+            <div className="block-head block-head-split">
+              <div>
+                <span className="pill">Dự án liên quan</span>
+                <h2 id="lien-quan">Có thể bạn cũng quan tâm</h2>
+              </div>
+              <Link className="link-arrow" href="/du-an">Xem tất cả <Icon name="arrow-right" size={16} /></Link>
+            </div>
+            <div className="card-grid">
+              {related.map((item) => <CampaignCard campaign={item} key={item.slug} />)}
+            </div>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

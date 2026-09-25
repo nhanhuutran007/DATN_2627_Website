@@ -190,7 +190,7 @@ Hệ thống hạ tầng (Infrastructure as Code) đã được viết sẵn b�
 | **Core: Tiến độ** | ✅ Đã hoàn thành | Mốc thời gian, tính tự động % hoàn thành, audit log cho mọi thay đổi mốc/bài cập nhật. |
 | **Dịch vụ AI** | ✅ Đã hoàn thành | FastAPI routes (recommend, predict, fraud), model registry. |
 | **Kiểm duyệt (Moderation)** | ✅ Cơ bản | Người dùng báo cáo vi phạm chiến dịch; admin xem xét, kết luận có lý do, có thể tạm dừng chiến dịch; toàn bộ ghi audit (human-in-the-loop). |
-| **Giao diện (Frontend)** | 🔶 Đang hoàn thiện | Nối API trang chủ, dashboard, quy trình tạo chiến dịch. (Đang hoàn thiện phần Admin). |
+| **Giao diện (Frontend)** | ✅ Đã hoàn thành | Thiết kế lại toàn bộ (25/09/2026): trang chủ, danh sách, chi tiết (sổ cái giao dịch công khai), đăng nhập/đăng ký, tạo chiến dịch 4 bước, dashboard chủ dự án, quản trị. Một file CSS `theme.css`; SEO: metadata/Open Graph, `sitemap.xml`, `robots.txt`, JSON-LD. |
 | **Hạ tầng & Triển khai** | ✅ Đã hoàn thành | **AWS Terraform (ECS Fargate, ALB, RDS)** hoàn tất. Docker Compose local đã chạy đủ 6 service (nginx, frontend, backend, AI, MySQL, Redis) và qua smoke test. |
 | **Kiểm thử** | 🔶 Đang tiến hành | Unit tests API backend đạt ~80%. Cần viết thêm E2E. |
 

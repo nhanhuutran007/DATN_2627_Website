@@ -24,6 +24,8 @@ services:
       NODE_ENV: production
       # SSR gọi thẳng backend trong mạng Docker (URL tương đối /api/v1 chỉ dùng được ở trình duyệt)
       API_INTERNAL_URL: http://backend:4000/api/v1
+      # URL công khai cho canonical/Open Graph/sitemap
+      SITE_URL: ${SITE_URL:-http://localhost:8080}
     ports:
       - "3000:3000"
     healthcheck:

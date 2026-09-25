@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 
+import { PageBanner } from "@/components/layout/PageBanner";
 import { CampaignExplorer } from "@/features/discovery/CampaignExplorer";
 
 export const metadata: Metadata = {
-  title: "Khám phá dự án",
-  description: "Tìm kiếm và lọc các chiến dịch xã hội, giáo dục, y tế, môi trường và khởi nghiệp.",
+  title: "Dự án đang gây quỹ",
+  description:
+    "Danh sách chiến dịch gây quỹ đã được kiểm duyệt: giáo dục, môi trường, y tế, nông nghiệp và khởi nghiệp. Lọc theo lĩnh vực, trạng thái và tiến độ.",
+  alternates: { canonical: "/du-an" },
 };
 
 type DiscoveryPageProps = {
@@ -15,21 +18,23 @@ export default async function DiscoveryPage({ searchParams }: DiscoveryPageProps
   const params = await searchParams;
 
   return (
-    <main className="page-surface">
-      <section className="page-hero page-hero-compact">
-        <div className="container">
-          <p className="eyebrow">Khám phá</p>
-          <h1>Tìm một dự án<br /><em>đáng để tin.</em></h1>
-          <p>Tìm kiếm toàn văn, lọc theo lĩnh vực và theo dõi các chiến dịch đã được kiểm duyệt.</p>
-        </div>
-      </section>
-      <section className="container explorer-section">
+    <main>
+      <PageBanner
+        title="Dự án đang gây quỹ"
+        crumbs={[{ href: "/", label: "Trang chủ" }, { label: "Dự án" }]}
+        image={{ src: "/images/cover-library.webp", alt: "" }}
+      >
+        <p className="page-banner-lead">
+          Chỉ gồm chiến dịch đã được quản trị viên duyệt. Hồ sơ nháp, chờ duyệt hoặc bị từ chối không xuất hiện ở đây.
+        </p>
+      </PageBanner>
+      <div className="container block-tight">
         <CampaignExplorer
           key={`${params.q ?? ""}:${params.category ?? ""}`}
           initialQuery={params.q}
           initialCategory={params.category}
         />
-      </section>
+      </div>
     </main>
   );
 }

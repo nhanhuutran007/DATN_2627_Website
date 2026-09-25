@@ -6,19 +6,29 @@ import { FormEvent, useMemo, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api";
-import { createCampaign, submitCampaign, type ApiCampaign } from "@/lib/api/campaigns";
-import type { CreateMilestonePayload } from "@/lib/api/progress";
-import { createMilestone } from "@/lib/api/progress";
+import {
+  createCampaign,
+  submitCampaign,
+  updateCampaign,
+  type CreateCampaignPayload,
+} from "@/lib/api/campaigns";
+import {
+  createMilestone,
+  deleteMilestone,
+  type CreateMilestonePayload,
+} from "@/lib/api/progress";
 import { useAuthUser } from "@/lib/auth";
 
-const steps = ["Thông tin cơ bản", "Câu chuyện & ngân sách", "Mốc thực hiện", "Kiểm tra & gửi duyệt"];
+const STEPS = [
+  { title: "Thông tin cơ bản", hint: "Tên, lĩnh vực, mục tiêu, thời hạn" },
+  { title: "Câu chuyện & ngân sách", hint: "Vấn đề, cách làm, dự toán, rủi ro" },
+  { title: "Kế hoạch theo mốc", hint: "Các đầu ra có hạn và ngân sách" },
+  { title: "Kiểm tra & gửi duyệt", hint: "Rà soát trước khi gửi" },
+];
 
-type DraftMilestone = {
-  title: string;
-  deadline: string;
-  budget: string;
-  output: string;
-};
+const CATEGORIES = ["Giáo dục", "Môi trường", "Nông nghiệp", "Y tế", "Khởi nghiệp", "Công nghệ"];
+
+type DraftMilestone = { title: string; deadline: string; budget: string; output: string };
 
 type Draft = {
   title: string;
@@ -26,37 +36,48 @@ type Draft = {
   location: string;
   target: string;
   deadline: string;
+  imageUrl: string;
   summary: string;
   story: string;
   budget: string;
   risks: string;
 };
 
-const initialMilestones: DraftMilestone[] = [
-  { title: "Chuẩn bị và khảo sát", deadline: "", budget: "", output: "" },
-  { title: "Triển khai hoạt động chính", deadline: "", budget: "", output: "" },
-  { title: "Đánh giá và công bố báo cáo", deadline: "", budget: "", output: "" },
-];
+const emptyMilestone: DraftMilestone = { title: "", deadline: "", budget: "", output: "" };
 
 const initialDraft: Draft = {
   title: "",
-  category: "Môi trường",
+  category: "Giáo dục",
   location: "",
   target: "",
   deadline: "",
+  imageUrl: "",
   summary: "",
   story: "",
   budget: "",
   risks: "",
 };
 
+const MIN_STORY = 80;
+const MIN_TARGET = 1_000_000;
+
 function messageFor(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 401) return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại và thử tiếp.";
+    if (error.status === 401) return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại rồi thử tiếp.";
+    if (error.status === 400) return `Dữ liệu chưa hợp lệ: ${error.message}`;
     return error.message;
   }
   if (error instanceof Error && error.message) return error.message;
-  return "Không kết nối được hệ thống. Vui lòng kiểm tra backend và thử lại.";
+  return "Không kết nối được máy chủ. Vui lòng thử lại.";
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 export function CampaignWizard() {
@@ -64,17 +85,40 @@ export function CampaignWizard() {
   const user = useAuthUser();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState(initialDraft);
-  const [milestones, setMilestones] = useState<DraftMilestone[]>(initialMilestones);
+  const [milestones, setMilestones] = useState<DraftMilestone[]>([
+    { ...emptyMilestone, title: "Chuẩn bị và khảo sát" },
+    { ...emptyMilestone, title: "Triển khai hoạt động chính" },
+    { ...emptyMilestone, title: "Tổng kết và công bố báo cáo" },
+  ]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [createdId, setCreatedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [declared, setDeclared] = useState(false);
+  // Sau lần lưu đầu, các lần lưu sau cập nhật đúng bản nháp đó thay vì tạo bản mới
+  const [campaignId, setCampaignId] = useState<string | null>(null);
+  const [savedMilestoneIds, setSavedMilestoneIds] = useState<string[]>([]);
+  const [submitted, setSubmitted] = useState(false);
 
-  const completion = useMemo(() => {
-    const filled = Object.values(draft).filter((value) => value.trim()).length;
-    return Math.round((filled / Object.keys(draft).length) * 100);
-  }, [draft]);
+  const plannedBudget = milestones.reduce((sum, m) => sum + (Number(m.budget) || 0), 0);
+  const target = Number(draft.target) || 0;
+
+  const checks = useMemo(
+    () => [
+      { ok: draft.title.trim().length >= 10, label: "Tên chiến dịch rõ ràng (từ 10 ký tự)" },
+      { ok: draft.summary.trim().length > 0, label: "Có mô tả ngắn hiển thị ở danh sách" },
+      { ok: draft.story.trim().length >= MIN_STORY, label: `Câu chuyện đủ chi tiết (từ ${MIN_STORY} ký tự)` },
+      { ok: draft.budget.trim().length > 0, label: "Có dự toán sử dụng vốn" },
+      { ok: draft.risks.trim().length > 0, label: "Có nêu rủi ro và phương án ứng phó" },
+      { ok: milestones.filter((m) => m.title.trim()).length >= 2, label: "Kế hoạch có ít nhất 2 mốc" },
+      {
+        ok: target > 0 && plannedBudget > 0 && Math.abs(plannedBudget - target) / target <= 0.1,
+        label: "Tổng ngân sách các mốc khớp mục tiêu (lệch không quá 10%)",
+      },
+      { ok: isHttpUrl(draft.imageUrl), label: "Có ảnh đại diện cho dự án" },
+    ],
+    [draft, milestones, plannedBudget, target],
+  );
+  const passed = checks.filter((check) => check.ok).length;
 
   const update = (key: keyof Draft, value: string) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -82,90 +126,93 @@ export function CampaignWizard() {
   };
 
   const updateMilestone = (index: number, key: keyof DraftMilestone, value: string) => {
-    setMilestones((current) =>
-      current.map((milestone, i) => (i === index ? { ...milestone, [key]: value } : milestone)),
-    );
+    setMilestones((current) => current.map((m, i) => (i === index ? { ...m, [key]: value } : m)));
     setNotice("");
   };
 
-  const addMilestone = () => {
-    setMilestones((current) => [...current, { title: "", deadline: "", budget: "", output: "" }]);
-  };
-
-  const removeMilestone = (index: number) => {
-    setMilestones((current) => current.filter((_, i) => i !== index));
-  };
-
-  const saveMilestones = async (campaignId: string): Promise<void> => {
-    const valid = milestones
-      .map((milestone, index) => {
-        if (!milestone.title.trim()) return null;
-        let targetDate: string | undefined;
-        if (milestone.deadline) {
-          targetDate = new Date(`${milestone.deadline}T23:59:59`).toISOString();
-        }
-        const budget = milestone.budget ? Number(milestone.budget) : undefined;
-        const payload: CreateMilestonePayload = {
-          title: milestone.title.trim(),
-          targetDate,
-          budget,
-          sortOrder: index,
-        };
-        if (milestone.output.trim()) payload.description = milestone.output.trim();
-        return payload;
-      })
-      .filter((item): item is CreateMilestonePayload => item !== null);
-
-    await Promise.all(valid.map((payload) => createMilestone(campaignId, payload)));
-  };
-
-  const validateCurrentStep = () => {
-    if (step === 0 && (!draft.title.trim() || !draft.location.trim() || Number(draft.target) < 1_000_000 || !draft.deadline)) {
-      setError("Vui lòng nhập tên, địa điểm, thời hạn và mục tiêu tối thiểu 1.000.000 ₫.");
-      return false;
+  const validateStep = (index: number): string => {
+    if (index === 0) {
+      if (!draft.title.trim() || !draft.location.trim() || !draft.deadline) return "Vui lòng nhập tên, địa điểm và ngày kết thúc.";
+      if (target < MIN_TARGET) return "Mục tiêu tối thiểu là 1.000.000 ₫.";
+      if (new Date(`${draft.deadline}T23:59:59`).getTime() <= Date.now()) return "Ngày kết thúc phải ở tương lai.";
+      if (draft.imageUrl.trim() && !isHttpUrl(draft.imageUrl.trim())) return "Link ảnh phải bắt đầu bằng http:// hoặc https://";
     }
-    if (step === 1 && (draft.story.trim().length < 80 || !draft.budget.trim() || !draft.risks.trim())) {
-      setError("Câu chuyện cần ít nhất 80 ký tự; kế hoạch ngân sách và rủi ro là bắt buộc.");
-      return false;
+    if (index === 1) {
+      if (draft.story.trim().length < MIN_STORY) return `Câu chuyện cần ít nhất ${MIN_STORY} ký tự.`;
+      if (!draft.budget.trim() || !draft.risks.trim()) return "Vui lòng nhập dự toán sử dụng vốn và rủi ro.";
     }
-    setError("");
-    return true;
+    return "";
   };
 
-  const nextStep = () => {
-    if (validateCurrentStep()) setStep((current) => Math.min(steps.length - 1, current + 1));
+  const goNext = () => {
+    const message = validateStep(step);
+    setError(message);
+    if (!message) setStep((current) => Math.min(STEPS.length - 1, current + 1));
   };
 
-  const toPayload = () => {
+  const toPayload = (): CreateCampaignPayload => {
     const deadline = new Date(`${draft.deadline}T23:59:59`);
-    if (Number.isNaN(deadline.getTime())) {
-      throw new Error("Vui lòng chọn ngày kết thúc trước khi lưu hồ sơ.");
-    }
+    if (Number.isNaN(deadline.getTime())) throw new Error("Vui lòng chọn ngày kết thúc trước khi lưu.");
     const parts = [draft.summary.trim(), draft.story.trim()];
     if (draft.budget.trim()) parts.push(`Kế hoạch sử dụng vốn:\n${draft.budget.trim()}`);
     if (draft.risks.trim()) parts.push(`Rủi ro và phương án ứng phó:\n${draft.risks.trim()}`);
     return {
       title: draft.title.trim(),
       category: draft.category,
-      goalAmount: Number(draft.target),
+      goalAmount: target,
       endDate: deadline.toISOString(),
       location: draft.location.trim(),
       description: parts.filter(Boolean).join("\n\n"),
+      ...(isHttpUrl(draft.imageUrl.trim()) ? { imageUrl: draft.imageUrl.trim() } : {}),
     };
   };
 
+  /** Tạo mới hoặc cập nhật bản nháp; mốc được thay thế toàn bộ để khớp với form. */
+  const persist = async (): Promise<string> => {
+    const payload = toPayload();
+    const id = campaignId ?? (await createCampaign(payload)).id;
+    if (campaignId) await updateCampaign(campaignId, payload);
+    setCampaignId(id);
+
+    await Promise.all(savedMilestoneIds.map((milestoneId) => deleteMilestone(milestoneId)));
+    const created = await Promise.all(
+      milestones
+        .map((m, index): CreateMilestonePayload | null => {
+          if (!m.title.trim()) return null;
+          return {
+            title: m.title.trim(),
+            sortOrder: index,
+            ...(m.deadline ? { targetDate: new Date(`${m.deadline}T23:59:59`).toISOString() } : {}),
+            ...(m.budget ? { budget: Number(m.budget) } : {}),
+            ...(m.output.trim() ? { description: m.output.trim() } : {}),
+          };
+        })
+        .filter((payloadItem): payloadItem is CreateMilestonePayload => payloadItem !== null)
+        .map((payloadItem) => createMilestone(id, payloadItem)),
+    );
+    setSavedMilestoneIds(created.map((milestone) => milestone.id));
+    return id;
+  };
+
+  const requireLogin = () => {
+    if (user) return false;
+    router.push("/dang-nhap?next=/tao-chien-dich");
+    return true;
+  };
+
   const saveDraft = async () => {
-    if (!user) {
-      router.push("/dang-nhap?next=/tao-chien-dich");
+    if (requireLogin()) return;
+    const message = validateStep(0);
+    if (message) {
+      setError(message);
+      setStep(0);
       return;
     }
     setError("");
-    setNotice("");
     setBusy(true);
     try {
-      const campaign = await createCampaign(toPayload());
-      await saveMilestones(campaign.id);
-      setNotice("Bản nháp đã được lưu trên hệ thống. Bạn có thể tiếp tục hoàn thiện hoặc gửi duyệt ở bước cuối.");
+      await persist();
+      setNotice("Đã lưu bản nháp. Bạn có thể tiếp tục chỉnh sửa và gửi duyệt ở bước cuối.");
     } catch (err) {
       setError(messageFor(err));
     } finally {
@@ -176,21 +223,25 @@ export function CampaignWizard() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setNotice("");
-    if (step < steps.length - 1) {
-      nextStep();
+    if (step < STEPS.length - 1) {
+      goNext();
+      return;
+    }
+    if (requireLogin()) return;
+    const firstInvalid = [0, 1].map(validateStep).find(Boolean);
+    if (firstInvalid) {
+      setError(firstInvalid);
+      return;
+    }
+    if (!declared) {
+      setError("Vui lòng xác nhận cam kết trước khi gửi duyệt.");
       return;
     }
     setError("");
-    if (!user) {
-      router.push("/dang-nhap?next=/tao-chien-dich");
-      return;
-    }
     setBusy(true);
     try {
-      const campaign: ApiCampaign = await createCampaign(toPayload());
-      await saveMilestones(campaign.id);
-      await submitCampaign(campaign.id);
-      setCreatedId(campaign.id);
+      const id = await persist();
+      await submitCampaign(id);
       setSubmitted(true);
     } catch (err) {
       setError(messageFor(err));
@@ -199,117 +250,186 @@ export function CampaignWizard() {
     }
   };
 
-  if (submitted) {
+  if (submitted && campaignId) {
     return (
-      <section className="wizard-success" aria-live="polite">
-        <span><Icon name="check" size={32} /></span>
-        <p className="eyebrow">Hồ sơ đã được gửi</p>
-        <h1>Chiến dịch đang chờ kiểm duyệt.</h1>
-        <p>Hồ sơ đã được tạo và gửi tới đội ngũ kiểm duyệt. Bạn sẽ nhận thông báo khi chiến dịch được phê duyệt hoặc cần bổ sung.</p>
-        <div>
-          {createdId ? (
-            <Link className="button button-primary" href={`/du-an/${createdId}`}>Xem hồ sơ dự án</Link>
-          ) : null}
-          <Link className="button button-outline" href="/dashboard">Về trang quản lý</Link>
-          <button className="button button-outline" type="button" onClick={() => { setSubmitted(false); setStep(0); }}>Tạo chiến dịch khác</button>
+      <section className="panel wizard-done" aria-live="polite">
+        <span className="done-icon"><Icon name="check" size={30} /></span>
+        <h2>Đã gửi hồ sơ, đang chờ kiểm duyệt</h2>
+        <p>Quản trị viên sẽ duyệt, yêu cầu bổ sung hoặc từ chối kèm lý do. Bạn theo dõi trạng thái trong trang quản lý.</p>
+        <div className="wizard-done-actions">
+          <Link className="button button-primary" href="/dashboard">Về trang quản lý</Link>
+          <Link className="button button-outline" href={`/du-an/${campaignId}`}>Xem hồ sơ</Link>
         </div>
       </section>
     );
   }
 
   return (
-    <div className="wizard-shell">
-      <aside className="wizard-sidebar">
-        <div>
-          <p className="eyebrow">Tạo chiến dịch</p>
-          <h1>Biến ý tưởng thành một kế hoạch đáng tin.</h1>
-          <p>{user ? "Hồ sơ sẽ được lưu trực tiếp vào hệ thống và gửi cho kiểm duyệt viên." : "Bạn cần đăng nhập ở bước cuối để lưu và gửi hồ sơ."}</p>
-        </div>
+    <div className="wizard">
+      <aside className="wizard-steps panel">
+        <h2 className="panel-title-sm">Các bước</h2>
         <ol>
-          {steps.map((label, index) => (
-            <li className={index === step ? "active" : index < step ? "done" : ""} key={label}>
-              <button type="button" disabled={index > step} onClick={() => setStep(index)}>
-                <span>{index < step ? <Icon name="check" size={14} /> : index + 1}</span>
-                <div><b>{label}</b><small>{index === 0 ? "Mục tiêu và phạm vi" : index === 1 ? "Tác động và sử dụng quỹ" : index === 2 ? "Đầu ra có thể kiểm chứng" : "Xác nhận trách nhiệm"}</small></div>
+          {STEPS.map((item, index) => (
+            <li className={index === step ? "is-current" : index < step ? "is-done" : ""} key={item.title}>
+              <button type="button" disabled={index > step} onClick={() => { setError(""); setStep(index); }}>
+                <span className="wizard-no">{index < step ? <Icon name="check" size={14} /> : index + 1}</span>
+                <span><b>{item.title}</b><small>{item.hint}</small></span>
               </button>
             </li>
           ))}
         </ol>
-        <div className="draft-completion"><span><b>Mức hoàn thiện hồ sơ</b><strong>{completion}%</strong></span><i><em style={{ width: `${completion}%` }} /></i><small>AI chỉ đánh giá hỗ trợ sau khi hồ sơ có đủ dữ liệu.</small></div>
+        <div className="wizard-progress">
+          <span>Hồ sơ đạt <b>{passed}/{checks.length}</b> tiêu chí</span>
+          <div className="meter"><span style={{ width: `${(passed / checks.length) * 100}%` }} /></div>
+        </div>
+        {!user && <p className="hint">Bạn cần đăng nhập để lưu nháp hoặc gửi hồ sơ.</p>}
+        {campaignId && <p className="hint">Bản nháp đã lưu. Các lần lưu sau sẽ cập nhật bản nháp này.</p>}
       </aside>
 
-      <form className="wizard-form" onSubmit={submit}>
-        <div className="wizard-topline"><span>Bước {step + 1} / {steps.length}</span><span><Icon name="shield" size={16} /> Hồ sơ được lưu vào hệ thống khi bạn gửi</span></div>
+      <form className="panel wizard-form" onSubmit={submit} noValidate>
+        <p className="wizard-count">Bước {step + 1}/{STEPS.length}</p>
+        <h2>{STEPS[step].title}</h2>
 
         {step === 0 && (
-          <fieldset className="wizard-fieldset">
-            <legend><span>01</span><div><h2>Thông tin cơ bản</h2><p>Giúp cộng đồng hiểu ngay dự án là gì và sẽ diễn ra ở đâu.</p></div></legend>
-            <label className="form-field form-field-full"><span>Tên chiến dịch <i>*</i></span><input value={draft.title} maxLength={100} placeholder="Ví dụ: Thư viện nhỏ trên non" onChange={(event) => update("title", event.target.value)} /><small>{draft.title.length}/100 ký tự</small></label>
-            <div className="form-grid">
-              <label className="form-field"><span>Lĩnh vực <i>*</i></span><select value={draft.category} onChange={(event) => update("category", event.target.value)}><option>Môi trường</option><option>Khởi nghiệp</option><option>Giáo dục</option><option>Y tế</option></select></label>
-              <label className="form-field"><span>Địa điểm thực hiện <i>*</i></span><input value={draft.location} placeholder="Quận/huyện, tỉnh/thành" onChange={(event) => update("location", event.target.value)} /></label>
-              <label className="form-field"><span>Mục tiêu tài chính (VNĐ) <i>*</i></span><input type="number" min="1000000" value={draft.target} placeholder="200000000" onChange={(event) => update("target", event.target.value)} /></label>
-              <label className="form-field"><span>Ngày kết thúc dự kiến <i>*</i></span><input type="date" value={draft.deadline} onChange={(event) => update("deadline", event.target.value)} /></label>
+          <div className="form">
+            <label className="field">
+              <span>Tên chiến dịch *</span>
+              <input value={draft.title} maxLength={200} placeholder="Ví dụ: Thư viện nhỏ cho điểm trường vùng cao" onChange={(e) => update("title", e.target.value)} />
+              <small>{draft.title.length}/200</small>
+            </label>
+            <div className="field-row">
+              <label className="field">
+                <span>Lĩnh vực *</span>
+                <select value={draft.category} onChange={(e) => update("category", e.target.value)}>
+                  {CATEGORIES.map((category) => <option key={category}>{category}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                <span>Địa điểm thực hiện *</span>
+                <input value={draft.location} placeholder="Huyện, tỉnh/thành" onChange={(e) => update("location", e.target.value)} />
+              </label>
+              <label className="field">
+                <span>Mục tiêu (VNĐ) *</span>
+                <input type="number" min={MIN_TARGET} step={100000} value={draft.target} placeholder="50000000" onChange={(e) => update("target", e.target.value)} />
+                {target > 0 && <small>{target.toLocaleString("vi-VN")} ₫</small>}
+              </label>
+              <label className="field">
+                <span>Ngày kết thúc *</span>
+                <input type="date" value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
+              </label>
             </div>
-            <label className="form-field form-field-full"><span>Mô tả ngắn</span><textarea rows={3} maxLength={220} value={draft.summary} placeholder="Nêu tác động chính trong 1–2 câu..." onChange={(event) => update("summary", event.target.value)} /><small>{draft.summary.length}/220 ký tự</small></label>
-          </fieldset>
+            <label className="field">
+              <span>Link ảnh đại diện</span>
+              <input type="url" value={draft.imageUrl} placeholder="https://…/anh-du-an.jpg" onChange={(e) => update("imageUrl", e.target.value)} />
+              <small>Ảnh thật của dự án giúp người ủng hộ tin tưởng hơn. Bỏ trống sẽ dùng ảnh minh họa theo lĩnh vực.</small>
+            </label>
+            <label className="field">
+              <span>Mô tả ngắn</span>
+              <textarea rows={3} maxLength={220} value={draft.summary} placeholder="Tác động chính của dự án trong 1–2 câu" onChange={(e) => update("summary", e.target.value)} />
+              <small>{draft.summary.length}/220</small>
+            </label>
+          </div>
         )}
 
         {step === 1 && (
-          <fieldset className="wizard-fieldset">
-            <legend><span>02</span><div><h2>Câu chuyện & sử dụng nguồn quỹ</h2><p>Nội dung cụ thể giúp người tài trợ đánh giá dự án công bằng hơn.</p></div></legend>
-            <label className="form-field form-field-full"><span>Câu chuyện dự án <i>*</i></span><textarea rows={8} value={draft.story} placeholder="Vấn đề là gì, ai được hưởng lợi, dự án giải quyết bằng cách nào..." onChange={(event) => update("story", event.target.value)} /><small>Tối thiểu 80 ký tự · hiện có {draft.story.length}</small></label>
-            <div className="form-grid">
-              <label className="form-field"><span>Dự toán sử dụng vốn <i>*</i></span><textarea rows={5} value={draft.budget} placeholder="Hạng mục, số tiền và căn cứ ước tính..." onChange={(event) => update("budget", event.target.value)} /></label>
-              <label className="form-field"><span>Rủi ro và phương án ứng phó <i>*</i></span><textarea rows={5} value={draft.risks} placeholder="Rủi ro tiến độ, chi phí, vận hành..." onChange={(event) => update("risks", event.target.value)} /></label>
+          <div className="form">
+            <label className="field">
+              <span>Câu chuyện dự án *</span>
+              <textarea rows={8} value={draft.story} placeholder="Vấn đề là gì, ai được hưởng lợi, dự án giải quyết bằng cách nào…" onChange={(e) => update("story", e.target.value)} />
+              <small>{draft.story.trim().length}/{MIN_STORY} ký tự tối thiểu</small>
+            </label>
+            <div className="field-row field-row-2">
+              <label className="field">
+                <span>Dự toán sử dụng vốn *</span>
+                <textarea rows={6} value={draft.budget} placeholder="Hạng mục, số tiền và căn cứ ước tính" onChange={(e) => update("budget", e.target.value)} />
+              </label>
+              <label className="field">
+                <span>Rủi ro và phương án ứng phó *</span>
+                <textarea rows={6} value={draft.risks} placeholder="Rủi ro về tiến độ, chi phí, vận hành…" onChange={(e) => update("risks", e.target.value)} />
+              </label>
             </div>
-            <div className="upload-zone"><Icon name="document" size={28} /><div><b>Thêm ảnh, video hoặc tài liệu minh chứng</b><span>JPG, PNG, PDF · tối đa 10 MB/tệp</span></div><button className="button button-outline" type="button">Chọn tệp</button></div>
-          </fieldset>
+          </div>
         )}
 
         {step === 2 && (
-          <fieldset className="wizard-fieldset">
-            <legend><span>03</span><div><h2>Mốc thực hiện</h2><p>Chia dự án thành các đầu ra có thời hạn và ngân sách rõ ràng.</p></div></legend>
+          <div className="form">
+            <p className="hint">Mỗi mốc là một đầu ra kiểm chứng được. Sau khi dự án được duyệt, bạn báo cáo tiến độ và chi tiêu theo từng mốc.</p>
             {milestones.map((milestone, index) => (
-              <div className="milestone-editor" key={index}>
-                <span>{index + 1}</span>
-                <div className="form-grid">
-                  <label className="form-field form-field-wide"><span>Tên mốc {index + 1}</span><input value={milestone.title} placeholder="Ví dụ: Chuẩn bị và khảo sát" onChange={(event) => updateMilestone(index, "title", event.target.value)} /></label>
-                  <label className="form-field"><span>Hạn hoàn thành</span><input type="date" value={milestone.deadline} onChange={(event) => updateMilestone(index, "deadline", event.target.value)} /></label>
-                  <label className="form-field"><span>Ngân sách dự kiến</span><input type="number" placeholder="0" value={milestone.budget} onChange={(event) => updateMilestone(index, "budget", event.target.value)} /></label>
-                  <label className="form-field form-field-wide"><span>Kết quả đầu ra</span><input value={milestone.output} placeholder="Sản phẩm hoặc chỉ số có thể kiểm chứng" onChange={(event) => updateMilestone(index, "output", event.target.value)} /></label>
+              <fieldset className="milestone" key={index}>
+                <legend>Mốc {index + 1}</legend>
+                <div className="field-row">
+                  <label className="field field-span-2">
+                    <span>Tên mốc</span>
+                    <input value={milestone.title} placeholder="Ví dụ: Mua sách và kệ" onChange={(e) => updateMilestone(index, "title", e.target.value)} />
+                  </label>
+                  <label className="field">
+                    <span>Hạn hoàn thành</span>
+                    <input type="date" value={milestone.deadline} onChange={(e) => updateMilestone(index, "deadline", e.target.value)} />
+                  </label>
+                  <label className="field">
+                    <span>Ngân sách (VNĐ)</span>
+                    <input type="number" min={0} value={milestone.budget} placeholder="0" onChange={(e) => updateMilestone(index, "budget", e.target.value)} />
+                  </label>
+                  <label className="field field-span-4">
+                    <span>Kết quả đầu ra</span>
+                    <input value={milestone.output} placeholder="Sản phẩm hoặc chỉ số có thể kiểm chứng" onChange={(e) => updateMilestone(index, "output", e.target.value)} />
+                  </label>
                 </div>
                 {milestones.length > 1 && (
-                  <button className="remove-milestone-button" type="button" onClick={() => removeMilestone(index)}>Xóa mốc</button>
+                  <button className="link-danger" type="button" onClick={() => setMilestones((c) => c.filter((_, i) => i !== index))}>
+                    Xóa mốc này
+                  </button>
                 )}
-              </div>
+              </fieldset>
             ))}
-            <button className="add-milestone-button" type="button" onClick={addMilestone}>+ Thêm mốc công việc</button>
-          </fieldset>
+            <div className="milestone-foot">
+              <button className="button button-outline" type="button" onClick={() => setMilestones((c) => [...c, { ...emptyMilestone }])}>
+                + Thêm mốc
+              </button>
+              <span>Tổng ngân sách các mốc: <b>{plannedBudget.toLocaleString("vi-VN")} ₫</b>{target > 0 && ` / mục tiêu ${target.toLocaleString("vi-VN")} ₫`}</span>
+            </div>
+          </div>
         )}
 
         {step === 3 && (
-          <fieldset className="wizard-fieldset review-fieldset">
-            <legend><span>04</span><div><h2>Kiểm tra trước khi gửi</h2><p>AI đưa ra gợi ý hỗ trợ; quản trị viên mới là người quyết định xét duyệt.</p></div></legend>
-            <div className="ai-review-card">
-              <div className="ai-review-score"><Icon name="sparkles" size={22} /><strong>{Math.max(42, completion)}<small>/100</small></strong><span>Mức hoàn thiện</span></div>
-              <div><p className="eyebrow">Gợi ý cải thiện</p><h3>{completion >= 80 ? "Hồ sơ đã có nền tảng tốt" : "Hồ sơ cần bổ sung trước khi gửi"}</h3><ul><li className={draft.story.length >= 80 ? "ok" : ""}><Icon name={draft.story.length >= 80 ? "check" : "clock"} size={15} /> Câu chuyện có bối cảnh và đối tượng hưởng lợi</li><li className={draft.budget ? "ok" : ""}><Icon name={draft.budget ? "check" : "clock"} size={15} /> Dự toán sử dụng vốn có giải thích</li><li><Icon name="clock" size={15} /> Nên bổ sung ít nhất 3 hình ảnh minh chứng</li></ul></div>
+          <div className="form">
+            <dl className="review-grid">
+              <div><dt>Tên chiến dịch</dt><dd>{draft.title || "—"}</dd></div>
+              <div><dt>Lĩnh vực</dt><dd>{draft.category}</dd></div>
+              <div><dt>Địa điểm</dt><dd>{draft.location || "—"}</dd></div>
+              <div><dt>Mục tiêu</dt><dd>{target ? `${target.toLocaleString("vi-VN")} ₫` : "—"}</dd></div>
+              <div><dt>Ngày kết thúc</dt><dd>{draft.deadline ? new Date(draft.deadline).toLocaleDateString("vi-VN") : "—"}</dd></div>
+              <div><dt>Số mốc</dt><dd>{milestones.filter((m) => m.title.trim()).length}</dd></div>
+            </dl>
+            <div className="checklist-box">
+              <h3>Tiêu chí hồ sơ ({passed}/{checks.length})</h3>
+              <ul>
+                {checks.map((check) => (
+                  <li className={check.ok ? "is-ok" : ""} key={check.label}>
+                    <Icon name={check.ok ? "check" : "clock"} size={15} /> {check.label}
+                  </li>
+                ))}
+              </ul>
+              <p className="hint">Đây là danh sách tự kiểm tra, không phải điểm chấm. Quản trị viên là người quyết định duyệt hồ sơ.</p>
             </div>
-            <div className="review-summary"><div><span>Tên chiến dịch</span><b>{draft.title || "Chưa nhập"}</b></div><div><span>Lĩnh vực</span><b>{draft.category}</b></div><div><span>Mục tiêu</span><b>{draft.target ? Number(draft.target).toLocaleString("vi-VN") + " ₫" : "Chưa nhập"}</b></div><div><span>Địa điểm</span><b>{draft.location || "Chưa nhập"}</b></div></div>
-            <label className="declaration"><input type="checkbox" required /><span>Tôi xác nhận thông tin là trung thực, đồng ý lưu lịch sử phiên bản và cam kết công bố tiến độ, chứng từ sử dụng quỹ theo kế hoạch.</span></label>
-            <p className="ai-disclaimer"><Icon name="shield" size={17} /> Điểm AI không phải cam kết thành công và không được dùng làm căn cứ duy nhất để từ chối chiến dịch.</p>
-          </fieldset>
+            <label className="check-row">
+              <input type="checkbox" checked={declared} onChange={(e) => setDeclared(e.target.checked)} />
+              <span>Tôi xác nhận thông tin là trung thực và cam kết báo cáo tiến độ, chi tiêu theo kế hoạch đã nêu.</span>
+            </label>
+          </div>
         )}
 
-        {error && <p className="form-error wizard-error" role="alert">{error}</p>}
-        {notice && <p className="wizard-notice" role="status">{notice}</p>}
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {notice && <p className="form-notice" role="status">{notice}</p>}
 
         <div className="wizard-actions">
-          <button className="button button-outline" type="button" disabled={step === 0} onClick={() => { setError(""); setStep((current) => Math.max(0, current - 1)); }}>Quay lại</button>
+          <button className="button button-outline" type="button" disabled={step === 0 || busy} onClick={() => { setError(""); setStep((c) => Math.max(0, c - 1)); }}>
+            Quay lại
+          </button>
           <div>
-            <button className="save-draft-button" type="button" disabled={busy} onClick={saveDraft}>Lưu nháp</button>
+            <button className="button button-ghost" type="button" disabled={busy} onClick={saveDraft}>Lưu nháp</button>
             <button className="button button-primary" type="submit" disabled={busy}>
-              {busy ? "Đang gửi hồ sơ…" : step === steps.length - 1 ? "Gửi duyệt" : "Tiếp tục"} <Icon name="arrow-right" size={18} />
+              {busy ? "Đang lưu…" : step === STEPS.length - 1 ? "Gửi duyệt" : "Tiếp tục"}
             </button>
           </div>
         </div>

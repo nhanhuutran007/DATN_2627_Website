@@ -529,42 +529,35 @@ export function AdminDashboard() {
 
   if (!user) {
     return (
-      <main className="dashboard-page">
-        <section className="container dashboard-login-gate">
-          <span className="confirmation-icon"><Icon name="shield" size={28} /></span>
-          <h1>Bạn cần đăng nhập để vào bảng quản trị.</h1>
-          <p>Chỉ quản trị viên được phép truy cập trang này.</p>
-          <div>
-            <Link className="button button-primary" href="/dang-nhap?next=/admin">Đăng nhập</Link>
-            <Link className="button button-outline" href="/du-an">Khám phá dự án</Link>
-          </div>
-        </section>
+      <main className="container gate">
+        <span className="gate-icon"><Icon name="shield" size={28} /></span>
+        <h1>Đăng nhập để vào trang quản trị</h1>
+        <p>Chỉ tài khoản quản trị viên được truy cập trang này.</p>
+        <div className="gate-actions">
+          <Link className="button button-primary" href="/dang-nhap?next=/admin">Đăng nhập</Link>
+          <Link className="button button-outline" href="/du-an">Xem dự án</Link>
+        </div>
       </main>
     );
   }
 
   if (!isAdmin) {
     return (
-      <main className="dashboard-page">
-        <section className="container dashboard-login-gate">
-          <span className="confirmation-icon"><Icon name="shield" size={28} /></span>
-          <h1>Không có quyền truy cập.</h1>
-          <p>Tài khoản này không phải quản trị viên. Nếu bạn gặp vấn đề, hãy liên hệ đội vận hành.</p>
-          <div>
-            <Link className="button button-outline" href="/">Về trang chủ</Link>
-          </div>
-        </section>
+      <main className="container gate">
+        <span className="gate-icon"><Icon name="shield" size={28} /></span>
+        <h1>Không có quyền truy cập</h1>
+        <p>Tài khoản này không phải quản trị viên.</p>
+        <div className="gate-actions">
+          <Link className="button button-outline" href="/">Về trang chủ</Link>
+        </div>
       </main>
     );
   }
 
   if (loading) {
     return (
-      <main className="dashboard-page">
-        <section className="container dashboard-loading" aria-live="polite">
-          <span className="ai-orb"><Icon name="sparkles" size={24} /></span>
-          <p>Đang tải dữ liệu quản trị…</p>
-        </section>
+      <main className="container gate" aria-live="polite">
+        <p className="hint">Đang tải dữ liệu quản trị…</p>
       </main>
     );
   }
@@ -694,7 +687,7 @@ export function AdminDashboard() {
                 <tbody>
                   {campaigns.map((campaign) => (
                     <tr key={campaign.id}>
-                      <td><span className="table-project-image atlas atlas-library" /><b>{campaign.title}</b></td>
+                      <td><b>{campaign.title}</b></td>
                       <td>{campaign.owner?.name ?? "Chưa có"}</td>
                       <td>{money(campaign.goalAmount)}</td>
                       <td>{money(campaign.currentAmount)}</td>
@@ -747,7 +740,7 @@ export function AdminDashboard() {
                 ))
               )}
             </div>
-            <p className="risk-footnote"><Icon name="shield" size={15} /> Cảnh báo AI chỉ giúp ưu tiên kiểm tra. Không tự động khóa tài khoản, tạm dừng chiến dịch hay công khai cáo buộc. Quyết định cuối cùng do quản trị viên đưa ra và được lưu lại làm dữ liệu huấn luyện.</p>
+            <p className="risk-footnote"><Icon name="shield" size={15} /> Cảnh báo AI chỉ giúp ưu tiên kiểm tra. Không tự động khóa tài khoản, tạm dừng chiến dịch hay công khai cáo buộc. Quyết định cuối cùng do quản trị viên đưa ra và được ghi vào nhật ký kiểm toán.</p>
           </section>
 
           <section className="admin-card risk-card" id="bao-cao-vi-pham">
@@ -801,7 +794,7 @@ export function AdminDashboard() {
                 <tbody>
                   {donations.map((donation) => (
                     <tr key={donation.id}>
-                      <td><span className="table-project-image avatar-tone" /><b>{donation.isAnonymous ? "Ẩn danh" : (donation.user?.name ?? "Người ủng hộ")}</b></td>
+                      <td><b>{donation.isAnonymous ? "Ẩn danh" : (donation.user?.name ?? "Người ủng hộ")}</b></td>
                       <td>{donation.campaign?.title ?? "—"}</td>
                       <td>{money(donation.amount)}</td>
                       <td>{donation.paymentMethod ?? "—"}</td>
@@ -830,7 +823,7 @@ export function AdminDashboard() {
                     const isSelf = user.id === adminUser.id;
                     return (
                       <tr key={adminUser.id}>
-                        <td><span className="table-project-image avatar-tone" /><b>{adminUser.name}{isSelf && " (bạn)"}</b></td>
+                        <td><b>{adminUser.name}{isSelf && " (bạn)"}</b></td>
                         <td>{adminUser.email}</td>
                         <td>{USER_ROLE_LABEL[adminUser.role]}</td>
                         <td>{formatDate(adminUser.createdAt)}</td>

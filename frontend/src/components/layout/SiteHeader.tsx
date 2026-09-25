@@ -10,10 +10,8 @@ import { useAuthUser } from "@/lib/auth";
 
 const navigation = [
   { href: "/", label: "Trang chủ" },
-  { href: "/du-an", label: "Khám phá dự án" },
-  { href: `/du-an?category=${encodeURIComponent("Môi trường")}`, label: "Dự án xã hội" },
-  { href: `/du-an?category=${encodeURIComponent("Khởi nghiệp")}`, label: "Khởi nghiệp" },
-  { href: "/#cach-hoat-dong", label: "Cách hoạt động" },
+  { href: "/du-an", label: "Dự án" },
+  { href: "/#quy-trinh", label: "Cách hoạt động" },
   { href: "/#minh-bach", label: "Minh bạch" },
 ];
 
@@ -23,101 +21,99 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const user = useAuthUser();
 
-  const handleLogout = () => {
+  const close = () => setOpen(false);
+  const logout = () => {
     clearSession();
+    close();
     if (pathname === "/dashboard" || pathname === "/admin") router.push("/");
     else router.refresh();
   };
 
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : !href.includes("#") && pathname.startsWith(href);
+
   return (
-    <header className="site-header">
-      <div className="announcement">
-        <div className="container announcement-inner">
-          <span><Icon name="shield" size={15} /> Mọi khoản đóng góp đều được truy vết minh bạch</span>
-          <span className="announcement-help">AI chỉ hỗ trợ · Quyết định luôn có con người kiểm duyệt</span>
-        </div>
-      </div>
-
-      <div className="header-main">
-        <div className="container header-main-inner">
-          <button
-            className="icon-button mobile-menu-button"
-            type="button"
-            aria-label={open ? "Đóng trình đơn" : "Mở trình đơn"}
-            aria-expanded={open}
-            onClick={() => setOpen((value) => !value)}
-          >
-            <Icon name={open ? "x" : "menu"} />
-          </button>
-
-          <Link className="brand" href="/" aria-label="Góp Mầm - Trang chủ">
-            <span className="brand-mark"><Icon name="leaf" size={23} /></span>
-            <span className="brand-copy"><b>GÓP MẦM</b><small>Góp niềm tin · Gieo thay đổi</small></span>
-          </Link>
-
-          <form className="header-search" action="/du-an" role="search">
-            <label className="sr-only" htmlFor="global-search">Tìm kiếm chiến dịch</label>
-            <input id="global-search" name="q" placeholder="Tìm dự án, lĩnh vực, địa điểm..." />
-            <button type="submit" aria-label="Tìm kiếm"><Icon name="search" size={20} /></button>
-          </form>
-
-          <div className="header-actions">
+    <header className="site-top">
+      <div className="topbar">
+        <div className="container topbar-inner">
+          <p><Icon name="shield" size={15} /> Mọi khoản ủng hộ chỉ được ghi nhận khi cổng thanh toán xác nhận</p>
+          <div className="topbar-account">
             {user ? (
               <>
-                <Link className="header-action header-notification" href="/dashboard" aria-label="Thông báo">
-                  <Icon name="bell" size={21} /><span>Thông báo</span>
-                </Link>
-                <div className="header-account">
-                  <Link className="header-action" href="/dashboard" aria-label="Trang quản lý">
-                    <Icon name="user" size={21} /><span>{user.name.split(" ").pop()}</span>
-                  </Link>
-                  <button className="header-action header-logout" type="button" onClick={handleLogout} aria-label="Đăng xuất">
-                    <Icon name="x" size={18} />
-                  </button>
-                </div>
+                <Link href="/dashboard">Xin chào, {user.name}</Link>
+                <button type="button" onClick={logout}>Đăng xuất</button>
               </>
             ) : (
-              <Link className="header-action" href="/dang-nhap">
-                <Icon name="user" size={21} /><span>Đăng nhập</span>
-              </Link>
+              <>
+                <Link href="/dang-nhap">Đăng nhập</Link>
+                <Link href="/dang-ky">Đăng ký</Link>
+              </>
             )}
-            <Link className="button button-primary header-cta" href="/tao-chien-dich">Tạo chiến dịch</Link>
           </div>
         </div>
       </div>
 
-      <nav className={`primary-nav ${open ? "is-open" : ""}`} aria-label="Điều hướng chính">
-        <div className="container primary-nav-inner">
-          <form className="mobile-nav-search" action="/du-an" role="search" onSubmit={() => setOpen(false)}>
-            <label className="sr-only" htmlFor="mobile-global-search">Tìm kiếm chiến dịch</label>
-            <Icon name="search" size={18} />
-            <input id="mobile-global-search" name="q" placeholder="Tìm dự án, lĩnh vực, địa điểm..." />
-            <button type="submit" aria-label="Tìm kiếm"><Icon name="arrow-right" size={18} /></button>
-          </form>
-          {navigation.map((item) => {
-            const active = item.href === "/"
-              ? pathname === "/"
-              : !item.href.includes("?") && !item.href.includes("#") && pathname.startsWith(item.href);
-            return (
+      <div className="navbar">
+        <div className="container navbar-inner">
+          <Link className="logo" href="/" aria-label="Góp Mầm – Trang chủ" onClick={close}>
+            <span className="logo-mark"><Icon name="leaf" size={22} /></span>
+            <span className="logo-text">GÓP <b>MẦM</b></span>
+          </Link>
+
+          <nav className={`main-nav ${open ? "is-open" : ""}`} id="main-nav" aria-label="Điều hướng chính">
+            {navigation.map((item) => (
               <Link
-                className={active ? "active" : ""}
+                aria-current={isActive(item.href) ? "page" : undefined}
                 href={item.href}
-                key={item.label}
-                onClick={() => setOpen(false)}
+                key={item.href}
+                onClick={close}
               >
                 {item.label}
               </Link>
-            );
-          })}
-          <Link className="nav-admin-link" href="/admin" onClick={() => setOpen(false)}>Quản trị demo</Link>
-          <div className="mobile-nav-actions">
-            <Link className="button button-outline" href={user ? "/dashboard" : "/dang-nhap"} onClick={() => setOpen(false)}>
-              <Icon name="user" size={18} /> {user ? "Trang quản lý" : "Đăng nhập"}
-            </Link>
-            <Link className="button button-primary" href="/tao-chien-dich" onClick={() => setOpen(false)}>Tạo chiến dịch</Link>
+            ))}
+            {user && (
+              <Link aria-current={pathname === "/dashboard" ? "page" : undefined} href="/dashboard" onClick={close}>
+                Quản lý
+              </Link>
+            )}
+            {user?.role === "admin" && (
+              <Link aria-current={pathname === "/admin" ? "page" : undefined} href="/admin" onClick={close}>
+                Quản trị
+              </Link>
+            )}
+            <div className="main-nav-mobile">
+              <Link href="/tao-chien-dich" onClick={close}>Tạo chiến dịch</Link>
+              {user ? (
+                <button type="button" onClick={logout}>Đăng xuất</button>
+              ) : (
+                <>
+                  <Link href="/dang-nhap" onClick={close}>Đăng nhập</Link>
+                  <Link href="/dang-ky" onClick={close}>Đăng ký</Link>
+                </>
+              )}
+            </div>
+          </nav>
+
+          <div className="navbar-actions">
+            <form className="navbar-search" action="/du-an" role="search">
+              <label className="sr-only" htmlFor="navbar-search">Tìm dự án</label>
+              <input id="navbar-search" name="q" placeholder="Tìm dự án…" />
+              <button type="submit" aria-label="Tìm"><Icon name="search" size={17} /></button>
+            </form>
+            <Link className="button button-primary" href="/tao-chien-dich">Tạo chiến dịch</Link>
+            <button
+              className="nav-toggle"
+              type="button"
+              aria-label={open ? "Đóng trình đơn" : "Mở trình đơn"}
+              aria-expanded={open}
+              aria-controls="main-nav"
+              onClick={() => setOpen((value) => !value)}
+            >
+              <Icon name={open ? "x" : "menu"} size={22} />
+            </button>
           </div>
         </div>
-      </nav>
+      </div>
     </header>
   );
 }
