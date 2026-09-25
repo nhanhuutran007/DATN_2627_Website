@@ -6,6 +6,7 @@ import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { Icon } from "@/components/ui/Icon";
 import { DonationPanel } from "@/features/donations/DonationPanel";
+import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
 import { apiCampaignToView, fetchCampaign, fetchCampaigns } from "@/lib/api/campaigns";
 import {
   campaignProgress,
@@ -85,6 +86,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           </div>
           <div className="detail-actions">
             <a className="button button-primary button-large" href="#tai-tro">Tài trợ dự án <Icon name="arrow-right" size={19} /></a>
+            <ReportCampaignButton campaignId={campaign.slug} campaignSlug={campaign.slug} />
           </div>
         </div>
       </section>

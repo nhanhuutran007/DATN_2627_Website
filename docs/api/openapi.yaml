@@ -996,6 +996,126 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /reports:
+    post:
+      operationId: createReport
+      summary: Báo cáo vi phạm một chiến dịch đã công khai
+      description: >-
+        Người dùng đã đăng nhập gửi báo cáo; không báo cáo được chiến dịch của chính mình
+        (403) hoặc chiến dịch chưa công khai (404). Mỗi người chỉ có một báo cáo mở
+        (pending/reviewing) cho mỗi chiến dịch (409). Rate limit 5 lần/10 phút/IP.
+        Hệ thống không tự ẩn/tạm dừng chiến dịch theo số báo cáo. Ghi audit `report.create`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportRequest"
+      responses:
+        "201":
+          description: Đã tạo báo cáo (status = pending)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+        "400":
+          description: Dữ liệu không hợp lệ (mô tả 10–2000 ký tự)
+        "401":
+          description: Chưa đăng nhập
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Đã có báo cáo đang mở cho chiến dịch này
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /reports/mine:
+    get:
+      operationId: listMyReports
+      summary: Các báo cáo tôi đã gửi (tối đa 50, mới nhất trước)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Danh sách báo cáo của người dùng hiện tại
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Report"
+        "401":
+          description: Chưa đăng nhập
+  /admin/reports:
+    get:
+      operationId: adminListReports
+      summary: Hàng đợi báo cáo vi phạm (kèm chiến dịch và người báo cáo)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ReportStatus"
+        - name: reason
+          in: query
+          schema:
+            $ref: "#/components/schemas/ReportReason"
+        - name: campaignId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Danh sách báo cáo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportList"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/reports/{id}:
+    patch:
+      operationId: adminReviewReport
+      summary: Xem xét / kết luận một báo cáo (human-in-the-loop)
+      description: >-
+        Chuyển trạng thái theo ma trận pending → reviewing | resolved | dismissed,
+        reviewing → resolved | dismissed; resolved/dismissed là kết luận cuối (409 nếu mở lại).
+        Kết luận bắt buộc `adminNotes` ≥ 5 ký tự. `pauseCampaign: true` (chỉ khi resolved)
+        tạm dừng chiến dịch qua luồng moderate (chiến dịch phải đang `active`, nếu không 409 và
+        báo cáo giữ nguyên). Ghi audit `report.review` (và `campaign.moderate` nếu tạm dừng).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewReportRequest"
+      responses:
+        "200":
+          description: Đã cập nhật báo cáo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+        "400":
+          description: Thiếu ghi chú khi kết luận, hoặc pauseCampaign khi không resolved
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Chuyển trạng thái không hợp lệ hoặc chiến dịch không tạm dừng được
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1128,6 +1248,10 @@ components:
           enum: [user, campaign_owner, admin]
     User:
       type: object
+      description: >-
+        Không bao giờ chứa passwordHash/failedLoginCount/lockedUntil. `email` và `phone`
+        chỉ có ở API của chính chủ (/users/*) và admin (/admin/*); bị ẩn khi user xuất hiện
+        lồng trong API công khai (vd. `owner` của chiến dịch).
       properties:
         id:
           type: string
@@ -1930,4 +2054,96 @@ components:
         scanned:
           type: integer
         flagged:
+          type: integer
+    ReportReason:
+      type: string
+      enum: [spam, fraud, inappropriate, misinformation, other]
+    ReportStatus:
+      type: string
+      enum: [pending, reviewing, resolved, dismissed]
+    CreateReportRequest:
+      type: object
+      required: [campaignId, reason, description]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        reason:
+          $ref: "#/components/schemas/ReportReason"
+        description:
+          type: string
+          minLength: 10
+          maxLength: 2000
+    ReviewReportRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [reviewing, resolved, dismissed]
+        adminNotes:
+          type: string
+          maxLength: 2000
+          description: Bắt buộc (≥ 5 ký tự) khi status là resolved hoặc dismissed
+        pauseCampaign:
+          type: boolean
+          description: Chỉ hợp lệ khi status = resolved; tạm dừng chiến dịch đang active
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reporterId:
+          type: string
+          format: uuid
+        reporter:
+          description: Chỉ có ở API admin; email chỉ hiển thị cho admin
+          allOf:
+            - $ref: "#/components/schemas/User"
+        campaignId:
+          type: string
+          format: uuid
+          nullable: true
+        campaign:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Campaign"
+        reason:
+          $ref: "#/components/schemas/ReportReason"
+        description:
+          type: string
+        status:
+          $ref: "#/components/schemas/ReportStatus"
+        adminNotes:
+          type: string
+          nullable: true
+        resolvedBy:
+          type: string
+          format: uuid
+          nullable: true
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
+        campaignPaused:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReportList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Report"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
           type: integer

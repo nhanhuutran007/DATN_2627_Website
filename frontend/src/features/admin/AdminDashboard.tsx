@@ -26,6 +26,15 @@ import {
   type RiskStatus,
 } from "@/lib/api/admin";
 import type { ApiCampaignStatus } from "@/lib/api/campaigns";
+import {
+  fetchAdminReports,
+  REPORT_REASON_LABEL,
+  REPORT_STATUS_LABEL,
+  reviewReport,
+  type CampaignReport,
+  type ReportStatus,
+  type ReviewStatus,
+} from "@/lib/api/reports";
 import { useAuthUser } from "@/lib/auth";
 import { formatCurrency } from "@/lib/data/campaigns";
 
@@ -103,7 +112,10 @@ const AUDIT_ENTITY_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "milestone", label: "Mốc tiến độ" },
   { value: "milestone_update", label: "Bài cập nhật" },
   { value: "risk_alert", label: "Cảnh báo rủi ro" },
+  { value: "report", label: "Báo cáo vi phạm" },
 ];
+
+const MIN_REPORT_NOTES = 5;
 
 function money(value: number | string): string {
   return formatCurrency(Number(value) || 0);
@@ -153,6 +165,8 @@ export function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [risks, setRisks] = useState<AdminRiskAlert[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [reports, setReports] = useState<CampaignReport[]>([]);
+  const [reportFilter, setReportFilter] = useState<ReportStatus | "">("pending");
 
   const [campaignFilter, setCampaignFilter] = useState<ApiCampaignStatus | "">("pending");
   const [donationFilter, setDonationFilter] = useState<AdminDonation["status"] | "">("completed");
@@ -169,13 +183,14 @@ export function AdminDashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const [ov, camps, dons, usrs, riskList, audit] = await Promise.all([
+        const [ov, camps, dons, usrs, riskList, audit, reportList] = await Promise.all([
           fetchAdminOverview(),
           fetchAdminCampaigns({ status: "pending", limit: 20 }),
           fetchAdminDonations({ status: "completed", limit: 20 }),
           fetchAdminUsers({ limit: 20 }),
           fetchAdminRisks({ status: "open", limit: 50 }),
           fetchAuditLogs({ limit: 50 }),
+          fetchAdminReports({ status: "pending", limit: 50 }),
         ]);
         if (cancelled) return;
         setOverview(ov);
@@ -184,6 +199,7 @@ export function AdminDashboard() {
         setUsers(usrs.items);
         setRisks(riskList.items);
         setAuditLogs(audit.items);
+        setReports(reportList.items);
         setError(null);
       } catch (err) {
         if (cancelled) return;
@@ -349,6 +365,95 @@ export function AdminDashboard() {
     }
   }
 
+  async function loadReports(status: ReportStatus | "") {
+    try {
+      const result = await fetchAdminReports({ status: status || undefined, limit: 50 });
+      setReports(result.items);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không tải được báo cáo vi phạm");
+    }
+  }
+
+  async function changeReportFilter(status: ReportStatus | "") {
+    setReportFilter(status);
+    await loadReports(status);
+  }
+
+  async function handleReportDecision(report: CampaignReport, status: ReviewStatus) {
+    const title = report.campaign?.title ?? "chiến dịch";
+    let adminNotes: string | undefined;
+    let pauseCampaign = false;
+
+    if (status !== "reviewing") {
+      const input = window.prompt(
+        status === "resolved"
+          ? `Kết luận vi phạm cho báo cáo về "${title}" (bắt buộc, lưu vào nhật ký)`
+          : `Lý do bỏ qua báo cáo về "${title}" (bắt buộc, lưu vào nhật ký)`,
+        "",
+      );
+      if (input === null) return;
+      if (input.trim().length < MIN_REPORT_NOTES) {
+        setNotice(`Vui lòng nhập ghi chú tối thiểu ${MIN_REPORT_NOTES} ký tự.`);
+        return;
+      }
+      adminNotes = input.trim();
+      if (status === "resolved" && report.campaign?.status === "active") {
+        pauseCampaign = window.confirm(
+          `Tạm dừng chiến dịch "${title}" để chủ dự án giải trình? Chiến dịch có thể được cho tiếp tục sau.`,
+        );
+      }
+    }
+
+    setBusy(report.id);
+    setNotice(null);
+    try {
+      await reviewReport(report.id, { status, adminNotes, pauseCampaign });
+      const reloads: Array<Promise<unknown>> = [loadReports(reportFilter)];
+      if (pauseCampaign) reloads.push(changeCampaignFilter(campaignFilter), reloadOverview());
+      await Promise.all(reloads);
+      setNotice(
+        status === "reviewing"
+          ? `Đã chuyển báo cáo về "${title}" sang đang xem xét.`
+          : status === "resolved"
+            ? `Đã xác nhận vi phạm "${title}"${pauseCampaign ? " và tạm dừng chiến dịch" : ""}.`
+            : `Đã bỏ qua báo cáo về "${title}".`,
+      );
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Không cập nhật được báo cáo");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const reportActions = (report: CampaignReport) => {
+    if (report.status === "resolved" || report.status === "dismissed") {
+      return (
+        <span>
+          {REPORT_STATUS_LABEL[report.status]}
+          {report.campaignPaused ? " · đã tạm dừng chiến dịch" : ""}
+          {report.resolvedAt ? ` · ${formatDate(report.resolvedAt)}` : ""}
+        </span>
+      );
+    }
+    const disabled = busy === report.id;
+    return (
+      <div className="risk-actions">
+        {report.status === "pending" && (
+          <button type="button" disabled={disabled} onClick={() => handleReportDecision(report, "reviewing")}>
+            Nhận xem xét
+          </button>
+        )}
+        <button className="resolve" type="button" disabled={disabled} onClick={() => handleReportDecision(report, "resolved")}>
+          Xác nhận vi phạm
+        </button>
+        <button type="button" disabled={disabled} onClick={() => handleReportDecision(report, "dismissed")}>
+          Không vi phạm
+        </button>
+      </div>
+    );
+  };
+
   const riskEntityLabel = (alert: AdminRiskAlert) =>
     alert.entityType === "campaign" ? "chiến dịch" : "tài khoản";
 
@@ -406,6 +511,15 @@ export function AdminDashboard() {
           </button>
           <button type="button" disabled={disabled} onClick={() => handleModerate(campaign, "rejected")}>
             Từ chối
+          </button>
+        </div>
+      );
+    }
+    if (campaign.status === "paused") {
+      return (
+        <div className="admin-actions">
+          <button className="approve" type="button" disabled={disabled} onClick={() => handleModerate(campaign, "active")}>
+            Cho tiếp tục
           </button>
         </div>
       );
@@ -471,6 +585,7 @@ export function AdminDashboard() {
             <a className="active" href="#tong-quan"><Icon name="chart" size={19} /> Tổng quan</a>
             <a href="#cho-duyet"><Icon name="document" size={19} /> Duyệt chiến dịch {pendingCount > 0 && <i>{pendingCount}</i>}</a>
             <a href="#rui-ro"><Icon name="shield" size={19} /> Cảnh báo rủi ro {(overview?.risks.open ?? 0) > 0 && <i>{overview?.risks.open}</i>}</a>
+            <a href="#bao-cao-vi-pham"><Icon name="bell" size={19} /> Báo cáo vi phạm</a>
             <a href="#giao-dich"><Icon name="receipt" size={19} /> Giao dịch</a>
             <a href="#nguoi-dung"><Icon name="users" size={19} /> Người dùng</a>
             <a href="#nhat-ky-kiem-toan"><Icon name="clock" size={19} /> Nhật ký kiểm toán</a>
@@ -569,6 +684,7 @@ export function AdminDashboard() {
                 <option value="rejected">Bị từ chối</option>
                 <option value="draft">Bản nháp</option>
                 <option value="active">Đang gây quỹ</option>
+                <option value="paused">Tạm dừng</option>
                 <option value="">Tất cả trạng thái</option>
               </select>
             </div>
@@ -632,6 +748,40 @@ export function AdminDashboard() {
               )}
             </div>
             <p className="risk-footnote"><Icon name="shield" size={15} /> Cảnh báo AI chỉ giúp ưu tiên kiểm tra. Không tự động khóa tài khoản, tạm dừng chiến dịch hay công khai cáo buộc. Quyết định cuối cùng do quản trị viên đưa ra và được lưu lại làm dữ liệu huấn luyện.</p>
+          </section>
+
+          <section className="admin-card risk-card" id="bao-cao-vi-pham">
+            <div className="card-heading">
+              <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>Báo cáo vi phạm</h2></div>
+              <select className="filter-button" aria-label="Lọc theo trạng thái báo cáo" value={reportFilter} onChange={(event) => changeReportFilter(event.target.value as ReportStatus | "")}>
+                <option value="pending">Chờ xem xét</option>
+                <option value="reviewing">Đang xem xét</option>
+                <option value="resolved">Đã xử lý vi phạm</option>
+                <option value="dismissed">Không vi phạm</option>
+                <option value="">Tất cả trạng thái</option>
+              </select>
+            </div>
+            <div className="risk-list">
+              {reports.length === 0 ? (
+                <article>
+                  <p className="table-muted">Không có báo cáo nào ở trạng thái này.</p>
+                </article>
+              ) : (
+                reports.map((report) => (
+                  <article key={report.id}>
+                    <span className={`report-status ${report.status}`}>{REPORT_STATUS_LABEL[report.status]}</span>
+                    <div>
+                      <h3>{report.campaign?.title ?? "Chiến dịch đã bị xoá"}</h3>
+                      <p>{REPORT_REASON_LABEL[report.reason]} · {formatDate(report.createdAt)} · bởi {report.reporter ? `${report.reporter.name}${report.reporter.email ? ` (${report.reporter.email})` : ""}` : "người dùng"}</p>
+                      <p className="report-quote">{report.description}</p>
+                      {report.adminNotes && <small><b>Ghi chú quản trị:</b> {report.adminNotes}</small>}
+                    </div>
+                    <div>{reportActions(report)}</div>
+                  </article>
+                ))
+              )}
+            </div>
+            <p className="risk-footnote"><Icon name="shield" size={15} /> Hệ thống không tự ẩn hay tạm dừng chiến dịch theo số lượng báo cáo. Quản trị viên xem xét, ghi lý do và mọi quyết định được lưu vào nhật ký kiểm toán.</p>
           </section>
 
           <section className="admin-card admin-table-card" id="giao-dich">

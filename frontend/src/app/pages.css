@@ -3750,3 +3750,90 @@
 :is(h1, h2, h3, h4) {
   font-family: var(--font-display), var(--font-body), "Segoe UI", Arial, sans-serif !important;
 }
+/* Báo cáo vi phạm: nút + form trên trang chi tiết dự án */
+.detail-actions .report-toggle {
+  gap: 8px;
+}
+
+.report-panel {
+  flex-basis: 100%;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.report-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.report-panel a {
+  color: var(--orange-dark);
+  font-weight: 800;
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.report-panel .report-note {
+  margin-top: 12px;
+  font-size: 0.68rem;
+}
+
+.report-panel .report-success {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: var(--green);
+  font-weight: 700;
+}
+
+/* Admin: hàng đợi báo cáo vi phạm (dùng chung bố cục .risk-list) */
+.report-status {
+  display: inline-grid;
+  place-items: center;
+  min-height: 34px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.report-status.pending {
+  color: #fff;
+  background: #c95f30;
+}
+
+.report-status.reviewing {
+  color: #8a6a12;
+  background: #f6eed4;
+}
+
+.report-status.resolved {
+  color: #12664f;
+  background: #dcefe5;
+}
+
+.report-status.dismissed {
+  color: #5b6b66;
+  background: #eceeec;
+}
+
+.risk-list .report-quote {
+  margin: 6px 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--line);
+  color: #5b6b66;
+  font-size: 0.72rem;
+  white-space: pre-line;
+}
