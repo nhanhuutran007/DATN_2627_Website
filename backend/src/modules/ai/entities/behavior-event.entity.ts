@@ -18,7 +18,7 @@ export class BehaviorEvent extends BaseEntity {
   @Column({ name: "campaign_id" })
   campaignId!: string;
 
-  @Column({ type: "enum", enum: BehaviorEventType })
+  @Column({ name: "event_type", type: "enum", enum: BehaviorEventType })
   eventType!: BehaviorEventType;
 
   @Column({ length: 100 })
