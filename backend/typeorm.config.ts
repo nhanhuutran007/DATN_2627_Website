@@ -1,6 +1,8 @@
 import { config } from "dotenv";
 import { DataSource } from "typeorm";
 
+import { readDatabaseSsl } from "./src/config/database.config";
+
 config({ path: ".env" });
 
 export default new DataSource({
@@ -10,6 +12,7 @@ export default new DataSource({
   username: process.env.DB_USERNAME ?? "root",
   password: process.env.DB_PASSWORD ?? "",
   database: process.env.DB_DATABASE ?? "crowdfunding",
+  ssl: readDatabaseSsl(),
   entities: ["src/modules/**/*.entity.ts"],
   migrations: ["database/migrations/*.ts"],
   synchronize: false,

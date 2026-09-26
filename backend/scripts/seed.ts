@@ -2,6 +2,7 @@ import { config } from "dotenv";
 import { DataSource } from "typeorm";
 import * as bcrypt from "bcryptjs";
 
+import { readDatabaseSsl } from "../src/config/database.config";
 import { User, UserRole } from "../src/modules/users/entities/user.entity";
 import { Campaign, CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import {
@@ -18,6 +19,7 @@ const dataSource = new DataSource({
   username: process.env.DB_USERNAME ?? "root",
   password: process.env.DB_PASSWORD ?? "",
   database: process.env.DB_DATABASE ?? "crowdfunding",
+  ssl: readDatabaseSsl(),
   entities: ["src/modules/**/*.entity.ts"],
   synchronize: false,
 });
