@@ -1,0 +1,7 @@
+# Sao chép thành terraform.tfvars (đã .gitignore) rồi thay bằng giá trị ngẫu nhiên, vd:
+#   python -c "import secrets; print(secrets.token_hex(32))"
+db_password            = "change-me-at-least-12-chars" # không chứa / @ " hoặc khoảng trắng
+jwt_access_secret      = "change-me-at-least-32-characters-long"
+jwt_refresh_secret     = "change-me-at-least-32-characters-long"
+payment_webhook_secret = "change-me-at-least-32-characters-long"
+ai_api_key             = "change-me-at-least-32-characters-long"

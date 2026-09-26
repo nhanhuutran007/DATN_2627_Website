@@ -57,57 +57,88 @@ Vậy là máy tính của bạn đã được kết nối với tài khoản AW
 
 ## Bước 4: Chạy Terraform để tự động tạo hệ thống
 
-Bây giờ bạn không cần phải lên web AWS để tạo gì cả, hãy để Terraform làm việc đó!
-Mở Terminal, trỏ vào thư mục chứa code Terraform của dự án:
+Mở PowerShell tại thư mục Terraform của dự án:
 
 ```powershell
 cd infra/terraform
 ```
 
-### Lệnh 1: Khởi tạo Terraform
+### Lệnh 1: Khởi tạo Terraform và khai báo secret
 ```powershell
 terraform init
+Copy-Item terraform.tfvars.example terraform.tfvars   # rồi thay bằng giá trị ngẫu nhiên
 ```
-*(Lệnh này sẽ tải các thư viện AWS về máy của bạn. Chạy thành công sẽ hiện chữ màu xanh lá cây).*
+`terraform.tfvars` chứa mật khẩu DB, JWT secret, webhook secret và `ai_api_key`; file này đã được `.gitignore`, **không commit**. Sinh giá trị ngẫu nhiên bằng `python -c "import secrets; print(secrets.token_hex(32))"`.
 
-### Lệnh 2: Chỉ tạo kho chứa Docker (ECR) trước
-Vì các dịch vụ (Frontend, Backend) cần phải tải Docker image từ AWS về để chạy, nên ta phải tạo cái Kho (ECR) trên AWS trước.
+### Lệnh 2: Tạo kho chứa Docker (ECR) trước
+Các ECS service kéo image từ ECR, nên phải có kho và image trước khi tạo service:
 ```powershell
 terraform apply -target="aws_ecr_repository.frontend" -target="aws_ecr_repository.backend" -target="aws_ecr_repository.ai_service"
 ```
-Gõ `yes` và bấm Enter khi được hỏi. Chạy xong nó sẽ in ra 3 cái URL kho chứa.
 
-### Lệnh 3: Build và đẩy code của bạn lên Kho AWS (ECR)
-Bật Docker Desktop lên. 
-(Thay `123456789012` bên dưới bằng mã tài khoản AWS của bạn, mã này nằm trong cái URL mà Lệnh 2 vừa in ra).
-
+### Lệnh 3: Build và đẩy image (cần Docker Desktop đang chạy)
 ```powershell
-# 1. Đăng nhập Docker vào AWS
-aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin 123456789012.dkr.ecr.ap-southeast-1.amazonaws.com
-
-# 2. Build Frontend và đẩy lên
-docker build -t gopmam-frontend ../../frontend
-docker tag gopmam-frontend:latest 123456789012.dkr.ecr.ap-southeast-1.amazonaws.com/gopmam-frontend:latest
-docker push 123456789012.dkr.ecr.ap-southeast-1.amazonaws.com/gopmam-frontend:latest
-
-# 3. Lặp lại tương tự cho Backend và AI Service
+.\deploy.ps1 push
 ```
+Script tự đăng nhập ECR, build 3 image `linux/amd64` (frontend, backend, ai-service) và đẩy tag `latest`.
+Lưu ý: image AI đóng gói các file mô hình `.pkl` trong `ai-service/models/` (không có trên Git), cần train/copy sẵn trên máy build.
 
-### Lệnh 4: Tạo toàn bộ phần còn lại (Load Balancer, RDS, Container)
+### Lệnh 4: Tạo toàn bộ phần còn lại
 ```powershell
 terraform apply
 ```
-Gõ `yes` và bấm Enter. Quá trình này sẽ mất khoảng 5 - 7 phút. Nó sẽ tự động đi tạo Load Balancer, tạo Database MySQL, tạo mạng, thiết lập bảo mật và chạy các container. 
+Mất khoảng 10 phút (RDS lâu nhất). Terraform tạo VPC, ALB, RDS MySQL 8.4, Cloud Map, CloudWatch Logs và 4 ECS service. Dòng cuối in ra **`alb_dns_name`**.
 
-Khi chạy xong, dòng cuối cùng sẽ in ra biến **`alb_dns_name`** (VD: `gopmam-alb-xxx.ap-southeast-1.elb.amazonaws.com`).
-=> **Copy link đó dán vào trình duyệt Chrome, website của bạn đã online trên AWS!**
+### Lệnh 5: Tạo bảng và dữ liệu mẫu trên RDS
+RDS không mở ra Internet nên migration/seed chạy bằng *one-off ECS task* trong VPC (dùng lại image backend):
+```powershell
+.\deploy.ps1 migrate
+.\deploy.ps1 seed       # tùy chọn: tài khoản + chiến dịch mẫu (bỏ qua nếu DB đã có user)
+.\deploy.ps1 status     # trạng thái service + URL website
+```
+Mở `http://<alb_dns_name>` trên trình duyệt.
+
+### Cập nhật code sau này
+```powershell
+.\deploy.ps1 push
+.\deploy.ps1 migrate    # nếu có migration mới
+.\deploy.ps1 redeploy   # buộc ECS kéo image mới
+```
+
+### Kiến trúc triển khai
+- **ALB (HTTP :80)**: `/api/v1/*` → backend, còn lại → frontend. AI service **không** mở ra ALB.
+- **Cloud Map (`gopmam.local`)**: backend gọi `ai.gopmam.local:8000` (kèm header `X-AI-Key`) và `redis.gopmam.local:6379`; SSR của frontend gọi `backend.gopmam.local:4000`.
+- **RDS MySQL 8.4** private, bắt buộc TLS; backend xác minh chứng chỉ bằng CA bundle của RDS đóng sẵn trong image (`DB_SSL=true`).
+- **Log**: CloudWatch `/ecs/gopmam/<service>`, giữ 7 ngày. Xem nhanh: `aws logs tail /ecs/gopmam/backend --follow`.
+- Giới hạn cho bản demo: chỉ HTTP (chưa có domain/HTTPS); secret truyền qua biến môi trường của task definition (chưa dùng Secrets Manager); Redis không có volume bền vững.
 
 ---
 
 > [!WARNING]
-> **DỌN DẸP KHI KHÔNG SỬ DỤNG ĐỂ KHÔNG MẤT TIỀN:**
-> Vì AWS sẽ tính phí Load Balancer và RDS theo giờ, khi bạn làm xong, báo cáo xong hoặc đi ngủ, hãy chạy lệnh sau:
-> ```powershell
-> terraform destroy
-> ```
-> Gõ `yes`. AWS sẽ tự động xóa sạch bong mọi thứ nó đã tạo ở lệnh 4, và bạn sẽ không bị trừ xu nào lúc đi ngủ cả. Hôm sau muốn bật lại chỉ cần gõ lại `terraform apply`.
+> **TẮT KHI KHÔNG SỬ DỤNG ĐỂ KHÔNG MẤT TIỀN:**
+> ALB, RDS, Fargate và IPv4 công khai tính phí theo giờ (ước tính khoảng 4 USD/ngày khi bật đủ 4 service).
+
+### Tắt hệ thống nhưng giữ image (khuyến nghị giữa các đợt phát triển)
+Xóa mọi thứ trừ 3 kho ECR (image ~0,3 GB, khoảng vài cent/tháng) để lần sau bật lại không phải build lại:
+```powershell
+terraform plan -destroy -out=destroy.tfplan -target="aws_vpc.main" -target="aws_ecs_cluster.main" `
+  -target="aws_iam_role.ecs_task_execution_role" -target="aws_cloudwatch_log_group.service" -target="aws_db_instance.mysql"
+terraform apply destroy.tfplan    # kiểm tra plan không có aws_ecr_repository rồi mới apply
+Remove-Item destroy.tfplan        # plan chứa secret
+```
+Dữ liệu RDS bị xóa (không giữ snapshot).
+
+### Bật lại để test
+```powershell
+.\deploy.ps1 push        # build lại image nếu code đã thay đổi
+terraform apply
+.\deploy.ps1 migrate
+.\deploy.ps1 seed
+.\deploy.ps1 status
+```
+
+### Xóa sạch hoàn toàn (kể cả ECR)
+```powershell
+terraform destroy
+```
+Kho ECR có `force_delete = true` nên bị xóa kèm image.

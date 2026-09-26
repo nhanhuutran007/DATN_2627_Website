@@ -47,23 +47,6 @@ resource "aws_lb_target_group" "backend" {
   }
 }
 
-resource "aws_lb_target_group" "ai_service" {
-  name        = "${var.project_name}-tg-ai"
-  port        = 8000
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
-
-  health_check {
-    path                = "/api/v1/health"
-    healthy_threshold   = 3
-    unhealthy_threshold = 3
-    timeout             = 5
-    interval            = 10
-    matcher             = "200"
-  }
-}
-
 # --- Listeners & Routing ---
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.main.arn
@@ -77,7 +60,7 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-# Route rules cho Backend (/api/v1/* ngoại trừ AI routes)
+# Route rules cho Backend (/api/v1/*). AI service không mở ra ALB: chỉ backend gọi nội bộ qua Cloud Map.
 resource "aws_lb_listener_rule" "backend_rule" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 100
@@ -90,23 +73,6 @@ resource "aws_lb_listener_rule" "backend_rule" {
   condition {
     path_pattern {
       values = ["/api/v1/*"]
-    }
-  }
-}
-
-# Route rules cho AI Service (nếu muốn gọi trực tiếp từ client, hoặc test)
-resource "aws_lb_listener_rule" "ai_rule" {
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 50 # Ưu tiên cao hơn rule backend
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.ai_service.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/api/v1/recommend", "/api/v1/predict", "/api/v1/fraud"]
     }
   }
 }

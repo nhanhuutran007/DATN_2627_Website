@@ -4,6 +4,7 @@ __pycache__
 .venv
 tests
 data
+!data/synthetic_campaigns.csv
 artifacts
 *.pyc
 .env*
