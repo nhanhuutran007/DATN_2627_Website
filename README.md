@@ -24,8 +24,8 @@
 | **Mã đề tài** | DATN_2627 |
 | **Loại đồ án** | Đồ án tốt nghiệp |
 | **Sinh viên thực hiện** | Trần Hữu Nhân |
-| **Giảng viên hướng dẫn** | *(cập nhật)* |
-| **Đơn vị** | *(cập nhật: Khoa / Trường)* |
+| **Giảng viên hướng dẫn** | *ThS. Dương Hữu Phước* |
+| **Đơn vị** | *Khoa Công nghệ thông tin , TDTU * |
 | **Năm thực hiện** | 2026 |
 
 ---
