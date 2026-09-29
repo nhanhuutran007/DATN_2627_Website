@@ -235,6 +235,11 @@ export function OwnerDashboard() {
                 </ul>
               )}
             </section>
+            <section className="panel" aria-labelledby="bao-mat-tai-khoan">
+              <h2 id="bao-mat-tai-khoan" className="panel-title-sm">Bảo mật tài khoản</h2>
+              <p className="hint">Nên đổi mật khẩu định kỳ và không dùng lại mật khẩu của trang khác.</p>
+              <Link className="button button-outline button-block" href="/doi-mat-khau">Đổi mật khẩu</Link>
+            </section>
             <section className="panel" aria-labelledby="minh-bach-note">
               <h2 id="minh-bach-note" className="panel-title-sm">Số liệu được tính thế nào?</h2>
               <ul className="check-list">

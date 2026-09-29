@@ -2107,6 +2107,18 @@ button {
   font-weight: 600;
 }
 
+/* Liên kết phụ ngay dưới ô nhập, vd. "Quên mật khẩu?" */
+.field-aside {
+  margin: -6px 0 0;
+  font-size: 0.88rem;
+  text-align: right;
+}
+
+.field-aside a {
+  color: var(--primary);
+  font-weight: 600;
+}
+
 .check-list {
   margin: 0;
   padding: 0;

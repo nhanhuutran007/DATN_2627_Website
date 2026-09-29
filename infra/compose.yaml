@@ -54,6 +54,15 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-refresh-secret-change-me}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-local-webhook-secret-change-me}
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      # Gốc URL frontend để tạo link trong email (vd. đặt lại mật khẩu)
+      FRONTEND_URL: ${SITE_URL:-http://localhost:8080}
+      # Gửi email thật qua SMTP (vd. Gmail + App Password). Để trống SMTP_HOST thì email chỉ ghi vào log.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     depends_on:

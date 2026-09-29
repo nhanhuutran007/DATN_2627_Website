@@ -63,6 +63,7 @@ export function LoginForm() {
         <span>Mật khẩu</span>
         <input type="password" required value={password} placeholder="••••••••" autoComplete="current-password" onChange={(event) => setPassword(event.target.value)} />
       </label>
+      <p className="field-aside"><Link href="/quen-mat-khau">Quên mật khẩu?</Link></p>
 
       {error && <p className="form-error" role="alert">{error}</p>}
 

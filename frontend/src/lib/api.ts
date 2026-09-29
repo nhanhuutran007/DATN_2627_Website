@@ -219,6 +219,42 @@ export async function registerRequest(payload: RegisterPayload): Promise<AuthSes
   return session;
 }
 
+type MessageResponse = { message: string };
+
+/** Gửi link đặt lại mật khẩu; phản hồi giống nhau dù email có tồn tại hay không. */
+export async function forgotPasswordRequest(email: string): Promise<string> {
+  const response = await apiFetch<MessageResponse>(
+    "/auth/forgot-password",
+    { method: "POST", body: JSON.stringify({ email }) },
+    false,
+  );
+  return response.message;
+}
+
+export async function resetPasswordRequest(token: string, newPassword: string): Promise<string> {
+  const response = await apiFetch<MessageResponse>(
+    "/auth/reset-password",
+    { method: "POST", body: JSON.stringify({ token, newPassword }) },
+    false,
+  );
+  // Mật khẩu đã đổi, mọi phiên cũ trên server không còn hợp lệ.
+  clearSession();
+  return response.message;
+}
+
+/**
+ * Đổi mật khẩu khi đã đăng nhập. Server vô hiệu mọi token cũ và trả cặp token
+ * mới, nên lưu lại ngay để phiên hiện tại tiếp tục.
+ */
+export async function changePasswordRequest(
+  currentPassword: string,
+  newPassword: string,
+): Promise<AuthSession> {
+  const session = await api.post<AuthSession>("/auth/change-password", { currentPassword, newPassword });
+  saveSession(session);
+  return session;
+}
+
 export function logoutRequest(): void {
   clearSession();
 }

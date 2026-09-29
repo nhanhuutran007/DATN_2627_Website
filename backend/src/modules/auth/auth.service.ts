@@ -11,6 +11,18 @@ import { User, UserRole, UserStatus } from "../users/entities/user.entity";
 import { isUserLocked, UsersService } from "../users/users.service";
 import { LoginDto, RegisterDto, TokenResponseDto } from "./dto/auth.dto";
 
+/**
+ * JWT phát hành trước lần đổi/đặt lại mật khẩu gần nhất không còn hợp lệ.
+ * `iat` tính bằng giây nên so với mốc đổi mật khẩu đã làm tròn xuống giây.
+ */
+export function issuedBeforePasswordChange(user: User, issuedAtSeconds?: number): boolean {
+  if (!user.passwordChangedAt) {
+    return false;
+  }
+  const changedAtSeconds = Math.floor(new Date(user.passwordChangedAt).getTime() / 1000);
+  return issuedAtSeconds === undefined || issuedAtSeconds < changedAtSeconds;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -107,7 +119,7 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string): Promise<TokenResponseDto> {
-    let payload: { sub: string };
+    let payload: { sub: string; iat?: number };
     try {
       payload = this.jwtService.verify(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET,
@@ -125,15 +137,27 @@ export class AuthService {
       throw new ForbiddenException("Account has been banned");
     }
 
+    if (issuedBeforePasswordChange(user, payload.iat)) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+
     return this.generateTokens(user);
   }
 
-  async validateUser(userId: string): Promise<User> {
+  async validateUser(userId: string, issuedAt?: number): Promise<User> {
     const user = await this.usersService.findById(userId);
     if (!user) {
       throw new UnauthorizedException("User not found");
     }
+    if (issuedBeforePasswordChange(user, issuedAt)) {
+      throw new UnauthorizedException("Session expired after password change");
+    }
     return user;
+  }
+
+  /** Cấp cặp token mới, vd. sau khi đổi mật khẩu để phiên hiện tại tiếp tục. */
+  issueTokens(user: User): TokenResponseDto {
+    return this.generateTokens(user);
   }
 
   private generateTokens(user: User): TokenResponseDto {

@@ -113,6 +113,15 @@ export class UsersService {
     return this.userRepo.save(user);
   }
 
+  /** Đặt mật khẩu mới, gỡ khóa đăng nhập và vô hiệu mọi JWT đã phát hành. */
+  async setPassword(user: User, passwordHash: string): Promise<User> {
+    user.passwordHash = passwordHash;
+    user.passwordChangedAt = new Date();
+    user.failedLoginCount = 0;
+    user.lockedUntil = null;
+    return this.userRepo.save(user);
+  }
+
   async recordLoginSuccess(user: User): Promise<User> {
     if (user.failedLoginCount || user.lockedUntil) {
       user.failedLoginCount = 0;

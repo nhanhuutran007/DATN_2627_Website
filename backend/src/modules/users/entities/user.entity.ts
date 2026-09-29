@@ -66,6 +66,11 @@ export class User extends BaseEntity {
   @Column({ name: "locked_until", type: "datetime", nullable: true })
   lockedUntil?: Date | null;
 
+  /** JWT phát hành trước thời điểm này không còn hợp lệ (đổi/đặt lại mật khẩu). */
+  @Exclude({ toPlainOnly: true })
+  @Column({ name: "password_changed_at", type: "datetime", nullable: true })
+  passwordChangedAt?: Date | null;
+
   @OneToMany("Campaign", "owner")
   campaigns!: any[];
 
