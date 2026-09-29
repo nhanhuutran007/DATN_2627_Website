@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { EmailVerificationNotice } from "@/features/auth/EmailVerificationNotice";
 import { ApiError } from "@/lib/api";
 import {
   deleteCampaign,
@@ -151,6 +152,7 @@ export function OwnerDashboard() {
       </section>
 
       <div className="container dash-body">
+        <EmailVerificationNotice user={user} />
         {state === "error" && (
           <div className="form-error" role="alert">
             Không tải được danh sách chiến dịch.{" "}

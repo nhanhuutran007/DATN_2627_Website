@@ -14,9 +14,17 @@ export type PasswordChangedEmail = {
   changedAt: Date;
 };
 
+export type EmailVerificationEmail = {
+  to: string;
+  name: string;
+  verifyUrl: string;
+  expiresInHours: number;
+};
+
 export interface EmailGateway {
   sendPasswordReset(message: PasswordResetEmail): Promise<void>;
   sendPasswordChanged(message: PasswordChangedEmail): Promise<void>;
+  sendEmailVerification(message: EmailVerificationEmail): Promise<void>;
 }
 
 export type RenderedEmail = {
@@ -32,6 +40,46 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+export function renderEmailVerificationEmail(message: EmailVerificationEmail): RenderedEmail {
+  const name = escapeHtml(message.name);
+  const url = escapeHtml(message.verifyUrl);
+
+  return {
+    subject: "Xác minh email tài khoản Góp Mầm",
+    text: [
+      `Xin chào ${message.name},`,
+      "",
+      "Cảm ơn bạn đã tạo tài khoản Góp Mầm. Mở liên kết sau để xác minh địa chỉ email",
+      `(hết hạn sau ${message.expiresInHours} giờ, chỉ dùng được một lần):`,
+      message.verifyUrl,
+      "",
+      "Nếu bạn không tạo tài khoản, hãy bỏ qua email này.",
+      "",
+      "Góp Mầm",
+    ].join("\n"),
+    html: `<!doctype html>
+<html lang="vi">
+  <body style="margin:0;padding:24px;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#141c33">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px">
+      <tr>
+        <td style="padding:32px">
+          <p style="margin:0 0 16px;font-size:20px;font-weight:bold">Xác minh email của bạn</p>
+          <p style="margin:0 0 12px;line-height:1.6">Xin chào ${name},</p>
+          <p style="margin:0 0 24px;line-height:1.6">Cảm ơn bạn đã tạo tài khoản Góp Mầm. Bấm nút dưới đây để xác nhận đây là địa chỉ email của bạn.</p>
+          <p style="margin:0 0 24px">
+            <a href="${url}" style="display:inline-block;padding:12px 24px;border-radius:8px;background:#16a34a;color:#ffffff;font-weight:bold;text-decoration:none">Xác minh email</a>
+          </p>
+          <p style="margin:0 0 12px;line-height:1.6;font-size:14px;color:#4b5563">Liên kết hết hạn sau ${message.expiresInHours} giờ và chỉ dùng được một lần. Nếu nút không bấm được, hãy dán đường dẫn này vào trình duyệt:</p>
+          <p style="margin:0 0 24px;font-size:13px;word-break:break-all"><a href="${url}" style="color:#16a34a">${url}</a></p>
+          <p style="margin:0;line-height:1.6;font-size:14px;color:#4b5563">Nếu bạn không tạo tài khoản, hãy bỏ qua email này.</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`,
+  };
 }
 
 export function renderPasswordResetEmail(message: PasswordResetEmail): RenderedEmail {
@@ -155,6 +203,18 @@ export class LogEmailGateway implements EmailGateway {
   async sendPasswordChanged(message: PasswordChangedEmail): Promise<void> {
     this.logger.log(`[demo email] Báo đổi mật khẩu cho ${message.to}`);
   }
+
+  async sendEmailVerification(message: EmailVerificationEmail): Promise<void> {
+    if (!this.revealLinks) {
+      this.logger.warn(`Chưa cấu hình SMTP: không gửi được email xác minh cho ${message.to}`);
+      return;
+    }
+
+    this.logger.log(
+      `[demo email] Xác minh email cho ${message.to}: ${message.verifyUrl} ` +
+        `(hết hạn sau ${message.expiresInHours} giờ)`,
+    );
+  }
 }
 
 /** Gửi email thật qua SMTP (vd. Gmail + App Password). */
@@ -177,6 +237,14 @@ export class SmtpEmailGateway implements EmailGateway {
       from: this.from,
       to: message.to,
       ...renderPasswordChangedEmail(message),
+    });
+  }
+
+  async sendEmailVerification(message: EmailVerificationEmail): Promise<void> {
+    await this.transporter.sendMail({
+      from: this.from,
+      to: message.to,
+      ...renderEmailVerificationEmail(message),
     });
   }
 }

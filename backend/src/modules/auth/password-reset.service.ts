@@ -126,6 +126,10 @@ export class PasswordResetService {
     }
 
     await this.usersService.setPassword(user, await bcrypt.hash(newPassword, 10));
+    // Mở được link trong email nghĩa là người dùng sở hữu địa chỉ email này.
+    if (!user.emailVerified) {
+      await this.usersService.markEmailVerified(user);
+    }
     await this.tokenRepo.update({ userId: user.id, usedAt: IsNull() }, { usedAt: new Date() });
     await this.auditService.record({
       userId: user.id,

@@ -122,6 +122,11 @@ export class UsersService {
     return this.userRepo.save(user);
   }
 
+  async markEmailVerified(user: User): Promise<User> {
+    user.emailVerified = true;
+    return this.userRepo.save(user);
+  }
+
   async recordLoginSuccess(user: User): Promise<User> {
     if (user.failedLoginCount || user.lockedUntil) {
       user.failedLoginCount = 0;

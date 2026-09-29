@@ -5,6 +5,7 @@ import {
   createEmailGateway,
   LogEmailGateway,
   readSmtpConfig,
+  renderEmailVerificationEmail,
   renderPasswordChangedEmail,
   renderPasswordResetEmail,
   SmtpEmailGateway,
@@ -111,5 +112,21 @@ describe("renderPasswordChangedEmail", () => {
     ok(email.text.includes("00:30"));
     ok(email.text.includes("/quen-mat-khau"));
     ok(email.html.includes("An &lt;b&gt;"));
+  });
+});
+
+describe("renderEmailVerificationEmail", () => {
+  it("includes the link and expiry and escapes the name", () => {
+    const email = renderEmailVerificationEmail({
+      to: "an@example.com",
+      name: "An <i>",
+      verifyUrl: "https://gopmam.example/xac-minh-email?token=abc&x=1",
+      expiresInHours: 24,
+    });
+
+    ok(email.text.includes("https://gopmam.example/xac-minh-email?token=abc&x=1"));
+    ok(email.text.includes("24 giờ"));
+    ok(email.html.includes("token=abc&amp;x=1"));
+    ok(email.html.includes("An &lt;i&gt;"));
   });
 });

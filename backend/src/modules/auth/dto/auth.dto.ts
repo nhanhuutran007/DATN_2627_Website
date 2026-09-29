@@ -62,6 +62,13 @@ export class ResetPasswordDto {
   newPassword!: string;
 }
 
+export class VerifyEmailDto {
+  /** Token base64url 32 byte gửi trong link email. */
+  @IsString()
+  @Length(43, 43, { message: "Liên kết xác minh không hợp lệ." })
+  token!: string;
+}
+
 export class ChangePasswordDto {
   @IsString()
   @MinLength(1, { message: "Vui lòng nhập mật khẩu hiện tại." })
@@ -86,5 +93,6 @@ export class TokenResponseDto {
     email: string;
     name: string;
     role: string;
+    emailVerified: boolean;
   };
 }

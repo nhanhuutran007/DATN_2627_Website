@@ -3,6 +3,8 @@ export type AuthUser = {
   email: string;
   name: string;
   role: "user" | "campaign_owner" | "admin";
+  /** Thiếu ở phiên đăng nhập cũ (trước khi có xác minh email). */
+  emailVerified?: boolean;
 };
 
 export type AuthSession = {
@@ -253,6 +255,25 @@ export async function changePasswordRequest(
   const session = await api.post<AuthSession>("/auth/change-password", { currentPassword, newPassword });
   saveSession(session);
   return session;
+}
+
+/** Xác minh email bằng token trong link; cập nhật phiên hiện tại nếu đúng tài khoản. */
+export async function verifyEmailRequest(token: string): Promise<{ message: string; email: string }> {
+  const result = await apiFetch<{ message: string; email: string }>(
+    "/auth/verify-email",
+    { method: "POST", body: JSON.stringify({ token }) },
+    false,
+  );
+  const user = getStoredUser();
+  if (user && user.email.toLowerCase() === result.email.toLowerCase()) {
+    updateStoredUser({ ...user, emailVerified: true });
+  }
+  return result;
+}
+
+export async function resendVerificationRequest(): Promise<string> {
+  const response = await api.post<MessageResponse>("/auth/resend-verification");
+  return response.message;
 }
 
 export function logoutRequest(): void {

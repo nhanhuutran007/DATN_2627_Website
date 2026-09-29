@@ -2107,6 +2107,23 @@ button {
   font-weight: 600;
 }
 
+/* Nhắc xác minh email trên trang quản lý */
+.verify-notice {
+  margin: 0 0 16px;
+}
+
+.verify-notice p {
+  margin: 0;
+}
+
+.verify-notice p + p {
+  margin-top: 6px;
+}
+
+.verify-notice .verify-notice-error {
+  color: #b42318;
+}
+
 /* Liên kết phụ ngay dưới ô nhập, vd. "Quên mật khẩu?" */
 .field-aside {
   margin: -6px 0 0;

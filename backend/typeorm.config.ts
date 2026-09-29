@@ -13,6 +13,8 @@ export default new DataSource({
   password: process.env.DB_PASSWORD ?? "",
   database: process.env.DB_DATABASE ?? "crowdfunding",
   ssl: readDatabaseSsl(),
+  // DATETIME lưu theo UTC (MySQL/RDS mặc định UTC); không phụ thuộc múi giờ máy chạy backend.
+  timezone: "Z",
   entities: ["src/modules/**/*.entity.ts"],
   migrations: ["database/migrations/*.ts"],
   synchronize: false,

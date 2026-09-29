@@ -20,6 +20,7 @@ paths:
                 $ref: "#/components/schemas/HealthResponse"
   /auth/register:
     post:
+      # Sau khi tạo tài khoản, backend gửi nền email xác minh (xem /auth/verify-email).
       operationId: register
       summary: Đăng ký tài khoản mới
       description: >-
@@ -166,6 +167,58 @@ paths:
           description: Mật khẩu hiện tại sai, mật khẩu mới trùng mật khẩu cũ hoặc không đạt yêu cầu
         "401":
           description: Chưa đăng nhập hoặc token hết hạn
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/verify-email:
+    post:
+      operationId: verifyEmail
+      summary: Xác minh email bằng token trong link
+      description: |
+        Sau khi đăng ký, hệ thống gửi email chứa link `/xac-minh-email?token=...`
+        (hạn 24 giờ, dùng một lần; gửi link mới sẽ hủy link cũ).
+        Rate limit 10 lần/15 phút theo IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailRequest"
+      responses:
+        "200":
+          description: Xác minh thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message, email]
+                properties:
+                  message:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+        "400":
+          description: Token không hợp lệ, đã dùng hoặc đã hết hạn
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/resend-verification:
+    post:
+      operationId: resendVerification
+      summary: Gửi lại email xác minh cho tài khoản đang đăng nhập
+      description: Rate limit 3 lần/15 phút theo IP; không gửi lại nếu vừa gửi trong 60 giây.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Đã gửi email xác minh
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Email đã được xác minh, vừa gửi gần đây, hoặc gửi thất bại
+        "401":
+          description: Chưa đăng nhập
         "429":
           $ref: "#/components/responses/TooManyRequests"
   /users:
@@ -1381,6 +1434,14 @@ components:
           type: string
           minLength: 8
           maxLength: 72
+    VerifyEmailRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 43
+          maxLength: 43
     MessageResponse:
       type: object
       required: [message]
@@ -1411,6 +1472,9 @@ components:
         role:
           type: string
           enum: [user, campaign_owner, admin]
+        emailVerified:
+          type: boolean
+          description: Có trong phản hồi đăng nhập/đăng ký/refresh/đổi mật khẩu
     User:
       type: object
       description: >-

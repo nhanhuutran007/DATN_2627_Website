@@ -3,7 +3,6 @@ import { beforeEach, describe, it } from "node:test";
 
 import { BadRequestException } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
-import { FindOperator } from "typeorm";
 
 import type {
   EmailGateway,
@@ -11,7 +10,6 @@ import type {
   PasswordResetEmail,
 } from "../src/integrations/email/email.gateway";
 import { issuedBeforePasswordChange } from "../src/modules/auth/auth.service";
-import { PasswordResetToken } from "../src/modules/auth/entities/password-reset-token.entity";
 import {
   FORGOT_PASSWORD_MESSAGE,
   hashResetToken,
@@ -20,50 +18,7 @@ import {
 import { User, UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
 import { UsersService } from "../src/modules/users/users.service";
 import { makeAuditRecorder } from "./helpers/audit";
-
-type Where = Record<string, unknown>;
-
-function matches(row: PasswordResetToken, where: Where): boolean {
-  return Object.entries(where).every(([key, expected]) => {
-    const actual = (row as unknown as Record<string, unknown>)[key];
-    if (expected instanceof FindOperator) {
-      if (expected.type === "isNull") return actual === null || actual === undefined;
-      if (expected.type === "moreThan") return (actual as Date) > (expected.value as Date);
-      throw new Error(`Unsupported operator ${expected.type}`);
-    }
-    return actual === expected;
-  });
-}
-
-/** Repository<PasswordResetToken> giả, đủ cho các truy vấn service dùng. */
-function makeTokenRepo() {
-  const rows: PasswordResetToken[] = [];
-  let sequence = 0;
-  const repo = {
-    rows,
-    create: (data: Partial<PasswordResetToken>) => ({ ...data }) as PasswordResetToken,
-    save: async (row: PasswordResetToken) => {
-      sequence += 1;
-      row.id ??= `token-${sequence}`;
-      row.createdAt ??= new Date();
-      rows.push(row);
-      return row;
-    },
-    findOne: async ({ where, order }: { where: Where; order?: Record<string, string> }) => {
-      const found = rows.filter((row) => matches(row, where));
-      if (order?.createdAt === "DESC") {
-        found.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      }
-      return found[0] ?? null;
-    },
-    update: async (where: Where, patch: Partial<PasswordResetToken>) => {
-      const found = rows.filter((row) => matches(row, where));
-      found.forEach((row) => Object.assign(row, patch));
-      return { affected: found.length };
-    },
-  };
-  return repo;
-}
+import { makeTokenRepo } from "./helpers/token-repo";
 
 function makeUser(overrides: Partial<User> = {}): User {
   return {
@@ -107,6 +62,10 @@ describe("PasswordResetService", () => {
         target.lockedUntil = null;
         return target;
       },
+      markEmailVerified: async (target: User) => {
+        target.emailVerified = true;
+        return target;
+      },
     } as unknown as UsersService;
     const emailGateway: EmailGateway = {
       sendPasswordReset: async (message) => {
@@ -117,6 +76,7 @@ describe("PasswordResetService", () => {
         if (failSend) throw new Error("SMTP down");
         changedNotices.push(message);
       },
+      sendEmailVerification: async () => {},
     };
 
     service = new PasswordResetService(
@@ -202,6 +162,7 @@ describe("PasswordResetService", () => {
       equal(user.failedLoginCount, 0);
       equal(user.lockedUntil, null);
       ok(user.passwordChangedAt instanceof Date);
+      equal(user.emailVerified, true);
       ok(audit.entries.some((entry) => entry.action === "auth.password_reset.completed"));
     });
 

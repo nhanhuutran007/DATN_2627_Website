@@ -7,6 +7,8 @@ import { createEmailGateway } from "../../integrations/email/email.gateway";
 import { UsersModule } from "../users/users.module";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
+import { EmailVerificationService } from "./email-verification.service";
+import { EmailVerificationToken } from "./entities/email-verification-token.entity";
 import { PasswordResetToken } from "./entities/password-reset-token.entity";
 import { PasswordResetService } from "./password-reset.service";
 import { JwtStrategy } from "./strategies/jwt.strategy";
@@ -15,7 +17,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
 @Module({
   imports: [
     UsersModule,
-    TypeOrmModule.forFeature([PasswordResetToken]),
+    TypeOrmModule.forFeature([PasswordResetToken, EmailVerificationToken]),
     PassportModule.register({ defaultStrategy: "jwt" }),
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,
@@ -26,6 +28,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
   providers: [
     AuthService,
     PasswordResetService,
+    EmailVerificationService,
     JwtStrategy,
     {
       provide: "EmailGateway",

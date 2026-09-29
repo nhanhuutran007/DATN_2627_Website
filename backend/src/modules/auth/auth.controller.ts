@@ -11,7 +11,9 @@ import {
   RefreshTokenDto,
   RegisterDto,
   ResetPasswordDto,
+  VerifyEmailDto,
 } from "./dto/auth.dto";
+import { EmailVerificationService } from "./email-verification.service";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { PasswordResetService } from "./password-reset.service";
 
@@ -20,13 +22,33 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly passwordResetService: PasswordResetService,
+    private readonly emailVerificationService: EmailVerificationService,
   ) {}
 
   @Post("register")
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 3, windowMs: 60_000, keyPrefix: "auth-register" })
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(@Body() dto: RegisterDto) {
+    const session = await this.authService.register(dto);
+    // Gửi nền để phản hồi đăng ký không phải chờ SMTP; lỗi chỉ được ghi log.
+    void this.emailVerificationService.sendVerificationForUserId(session.user.id);
+    return session;
+  }
+
+  @Post("verify-email")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 10, windowMs: 15 * 60_000, keyPrefix: "auth-verify-email" })
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.emailVerificationService.verify(dto.token);
+  }
+
+  @Post("resend-verification")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 3, windowMs: 15 * 60_000, keyPrefix: "auth-resend-verification" })
+  resendVerification(@GetCurrentUser() user: User) {
+    return this.emailVerificationService.resend(user);
   }
 
   @Post("login")
