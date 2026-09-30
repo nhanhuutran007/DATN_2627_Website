@@ -102,7 +102,7 @@ export default async function Home() {
         <Image
           className="hero-img"
           src="/images/cover-mangrove.webp"
-          alt="Tình nguyện viên cùng người dân trồng cây ngập mặn"
+          alt="Tình nguyện viên trồng cây ngập mặn trên bãi bồi"
           fill
           priority
           sizes="100vw"
@@ -129,10 +129,10 @@ export default async function Home() {
         <div className="container about">
           <div className="about-media">
             <div className="about-img about-img-a">
-              <Image src="/images/cover-library.webp" alt="Học sinh đọc sách trong thư viện cộng đồng" fill sizes="(max-width: 900px) 60vw, 300px" />
+              <Image src="/images/cover-library.webp" alt="Học sinh vùng cao trong lớp học ở Bát Xát, Lào Cai" fill sizes="(max-width: 900px) 60vw, 300px" />
             </div>
             <div className="about-img about-img-b">
-              <Image src="/images/cover-startup.webp" alt="Nhóm khởi nghiệp trẻ trao đổi ý tưởng" fill sizes="(max-width: 900px) 60vw, 300px" />
+              <Image src="/images/cover-startup.webp" alt="Nhóm bạn trẻ làm việc tại không gian làm việc chung ở Hà Nội" fill sizes="(max-width: 900px) 60vw, 300px" />
             </div>
             {stats && (
               <p className="about-stamp"><b>{stats.activeCampaigns}</b> chiến dịch đang gây quỹ</p>
@@ -208,7 +208,7 @@ export default async function Home() {
       <section className="block block-soft" id="quy-trinh" aria-labelledby="quy-trinh-title">
         <div className="container process">
           <div className="process-media">
-            <Image src="/images/cover-health.webp" alt="Nhân viên y tế thăm khám cho người dân vùng cao" fill sizes="(max-width: 900px) 100vw, 520px" />
+            <Image src="/images/cover-health.webp" alt="Khám mắt miễn phí cho người dân tại một điểm khám cộng đồng" fill sizes="(max-width: 900px) 100vw, 520px" />
           </div>
           <div>
             <span className="pill">Quy trình minh bạch</span>

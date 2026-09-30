@@ -1212,6 +1212,22 @@ h3 {
   padding-block: 18px;
 }
 
+.footer-bar-inner a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.credit-list {
+  display: grid;
+  gap: 16px;
+  padding-left: 1.2rem;
+  line-height: 1.6;
+}
+
+.credit-list a {
+  color: var(--primary);
+}
+
 /* ---------- Banner trang con ---------- */
 .page-banner {
   position: relative;

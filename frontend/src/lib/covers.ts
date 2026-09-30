@@ -5,10 +5,10 @@ type CoverKey = Campaign["image"];
 
 /** Ảnh minh họa theo lĩnh vực (không phải ảnh thật của từng dự án). */
 const COVERS: Record<CoverKey, { src: string; alt: string }> = {
-  mangrove: { src: "/images/cover-mangrove.webp", alt: "Tình nguyện viên trồng cây ngập mặn ven biển" },
-  startup: { src: "/images/cover-startup.webp", alt: "Nhóm khởi nghiệp làm việc cùng nhau" },
-  library: { src: "/images/cover-library.webp", alt: "Học sinh đọc sách trong thư viện" },
-  health: { src: "/images/cover-health.webp", alt: "Nhân viên y tế chăm sóc người dân" },
+  mangrove: { src: "/images/cover-mangrove.webp", alt: "Tình nguyện viên trồng cây ngập mặn trên bãi bồi" },
+  startup: { src: "/images/cover-startup.webp", alt: "Nhóm bạn trẻ làm việc tại không gian làm việc chung ở Hà Nội" },
+  library: { src: "/images/cover-library.webp", alt: "Học sinh vùng cao trong lớp học ở Bát Xát, Lào Cai" },
+  health: { src: "/images/cover-health.webp", alt: "Khám mắt miễn phí cho người dân tại một điểm khám cộng đồng" },
 };
 
 export function coverFor(campaign: Pick<Campaign, "image" | "imageUrl" | "title">): {

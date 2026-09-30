@@ -41,7 +41,9 @@ export function SiteFooter() {
       <div className="footer-bar">
         <div className="container footer-bar-inner">
           <span>© 2026 Góp Mầm · Đồ án tốt nghiệp DATN_2627</span>
-          <span>Bản demo sử dụng thanh toán sandbox, không phát sinh tiền thật.</span>
+          <span>
+            Bản demo sử dụng thanh toán sandbox, không phát sinh tiền thật. · <Link href="/nguon-anh">Nguồn ảnh</Link>
+          </span>
         </div>
       </div>
     </footer>

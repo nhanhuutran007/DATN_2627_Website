@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     siteName: "Góp Mầm",
     title: "Góp Mầm – Nền tảng gây quỹ cộng đồng minh bạch",
     description,
-    images: [{ url: "/images/cover-mangrove.webp", width: 768, height: 512, alt: "Tình nguyện viên trồng cây ngập mặn" }],
+    images: [{ url: "/images/cover-mangrove.webp", width: 1280, height: 853, alt: "Tình nguyện viên trồng cây ngập mặn trên bãi bồi" }],
   },
   robots: { index: true, follow: true },
 };
