@@ -1,8 +1,10 @@
 <div align="center">
 
 # GÓP MẦM
+
 ### Xây dựng nền tảng gây quỹ cộng đồng cho các dự án xã hội và khởi nghiệp
-*Tích hợp trí tuệ nhân tạo trong gợi ý dự án, dự đoán khả năng thành công và phát hiện gian lận*
+
+_Tích hợp trí tuệ nhân tạo trong gợi ý dự án, dự đoán khả năng thành công và phát hiện gian lận_
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs)
 ![NestJS](https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs)
@@ -18,15 +20,15 @@
 
 ## Thông tin đồ án
 
-| Mục | Nội dung |
-| --- | --- |
-| **Tên đề tài** | Xây dựng nền tảng gây quỹ cộng đồng cho các dự án xã hội và khởi nghiệp |
-| **Mã đề tài** | DATN_2627 |
-| **Loại đồ án** | Đồ án tốt nghiệp |
-| **Sinh viên thực hiện** | Trần Hữu Nhân |
-| **Giảng viên hướng dẫn** | *ThS. Dương Hữu Phước* |
-| **Đơn vị** | *Khoa Công nghệ thông tin , TDTU * |
-| **Năm thực hiện** | 2026 |
+| Mục                      | Nội dung                                                                |
+| ------------------------ | ----------------------------------------------------------------------- |
+| **Tên đề tài**           | Xây dựng nền tảng gây quỹ cộng đồng cho các dự án xã hội và khởi nghiệp |
+| **Mã đề tài**            | DATN_2627                                                               |
+| **Loại đồ án**           | Đồ án tốt nghiệp                                                        |
+| **Sinh viên thực hiện**  | Trần Hữu Nhân                                                           |
+| **Giảng viên hướng dẫn** | _ThS. Dương Hữu Phước_                                                  |
+| **Đơn vị**               | _Khoa Công nghệ thông tin , TDTU _                                      |
+| **Năm thực hiện**        | 2026                                                                    |
 
 ---
 
@@ -92,25 +94,25 @@ Các nền tảng gây quỹ thông thường còn tồn tại một số hạn 
 
 **Đối tượng nghiên cứu:** quy trình gây quỹ cộng đồng theo mô hình nhận tài trợ trực tuyến; dữ liệu chiến dịch và hành vi người dùng; các phương pháp học máy cho bài toán gợi ý, phân loại và phát hiện bất thường.
 
-| Trong phạm vi | Ngoài phạm vi |
-| --- | --- |
-| Website responsive dùng được trên máy tính và thiết bị di động | Ứng dụng di động native |
-| Toàn bộ vòng đời chiến dịch, từ bản nháp đến kết thúc | Xử lý tiền thật (chưa đáp ứng yêu cầu pháp lý với trung gian thanh toán) |
-| Cổng thanh toán **sandbox** (ví demo), webhook có chữ ký | Lưu trữ thông tin thẻ ngân hàng |
-| Ba mô-đun AI: gợi ý, dự đoán, phát hiện gian lận | eKYC / xác thực danh tính pháp lý chuyên sâu |
-| Kiểm duyệt có con người tham gia (human-in-the-loop) | AI tự động khóa, từ chối hoặc xóa |
+| Trong phạm vi                                                  | Ngoài phạm vi                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Website responsive dùng được trên máy tính và thiết bị di động | Ứng dụng di động native                                                  |
+| Toàn bộ vòng đời chiến dịch, từ bản nháp đến kết thúc          | Xử lý tiền thật (chưa đáp ứng yêu cầu pháp lý với trung gian thanh toán) |
+| Cổng thanh toán **sandbox** (ví demo), webhook có chữ ký       | Lưu trữ thông tin thẻ ngân hàng                                          |
+| Ba mô-đun AI: gợi ý, dự đoán, phát hiện gian lận               | eKYC / xác thực danh tính pháp lý chuyên sâu                             |
+| Kiểm duyệt có con người tham gia (human-in-the-loop)           | AI tự động khóa, từ chối hoặc xóa                                        |
 
 ---
 
 ## 4. Tác nhân và nhu cầu sử dụng
 
-| Tác nhân | Nhu cầu và quyền chính |
-| --- | --- |
-| **Khách truy cập** | Xem, tìm kiếm, lọc dự án; xem số liệu gây quỹ công khai; đăng ký tài khoản. |
-| **Người tài trợ** | Nhận gợi ý cá nhân hóa; tài trợ; xem lịch sử giao dịch và tiến độ sử dụng quỹ; báo cáo vi phạm. |
-| **Chủ dự án** | Tạo và chỉnh sửa chiến dịch; gửi xét duyệt; theo dõi số liệu; công bố cập nhật và mốc tiến độ. Một tài khoản có thể đồng thời là người tài trợ. |
-| **Quản trị viên** | Xét duyệt chiến dịch; quản lý và khóa/mở tài khoản; xử lý báo cáo vi phạm; xem cảnh báo rủi ro AI; tra cứu nhật ký kiểm toán. |
-| **Hệ thống ngoài** | Cổng thanh toán (sandbox), dịch vụ email, lưu trữ tệp. Được đóng gói qua interface để thay nhà cung cấp mà không ảnh hưởng nghiệp vụ lõi. |
+| Tác nhân           | Nhu cầu và quyền chính                                                                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Khách truy cập** | Xem, tìm kiếm, lọc dự án; xem số liệu gây quỹ công khai; đăng ký tài khoản.                                                                     |
+| **Người tài trợ**  | Nhận gợi ý cá nhân hóa; tài trợ; xem lịch sử giao dịch và tiến độ sử dụng quỹ; báo cáo vi phạm.                                                 |
+| **Chủ dự án**      | Tạo và chỉnh sửa chiến dịch; gửi xét duyệt; theo dõi số liệu; công bố cập nhật và mốc tiến độ. Một tài khoản có thể đồng thời là người tài trợ. |
+| **Quản trị viên**  | Xét duyệt chiến dịch; quản lý và khóa/mở tài khoản; xử lý báo cáo vi phạm; xem cảnh báo rủi ro AI; tra cứu nhật ký kiểm toán.                   |
+| **Hệ thống ngoài** | Cổng thanh toán (sandbox), dịch vụ email, lưu trữ tệp. Được đóng gói qua interface để thay nhà cung cấp mà không ảnh hưởng nghiệp vụ lõi.       |
 
 Vai trò trong hệ thống: `user` (người tài trợ), `campaign_owner` (chủ dự án), `admin` (quản trị viên). Người dùng **không thể tự đăng ký vai trò `admin`**.
 
@@ -118,18 +120,18 @@ Vai trò trong hệ thống: `user` (người tài trợ), `campaign_owner` (ch�
 
 ## 5. Chức năng hệ thống
 
-| Nhóm chức năng | Nội dung đã triển khai | Trạng thái |
-| --- | --- | :---: |
-| **Tài khoản & phân quyền** | Đăng ký, đăng nhập JWT (access + refresh token), phân quyền theo vai trò và quyền sở hữu, quản lý hồ sơ, khóa tạm thời sau 5 lần đăng nhập sai trong 15 phút. | ✅ |
-| **Quản lý chiến dịch** | Tạo chiến dịch theo 4 bước, gửi duyệt, kiểm duyệt theo ma trận chuyển trạng thái, tạm dừng/tiếp tục, tự động chốt chiến dịch hết hạn (thành công/không đạt), tìm kiếm, lọc, sắp xếp. | ✅ |
-| **Tài trợ & giao dịch** | Tạo giao dịch với idempotency key, thanh toán qua ví demo, webhook xác thực chữ ký HMAC và chống phát lại, chặn tài trợ vào chiến dịch đã hết hạn, sổ cái giao dịch công khai. | ✅ |
-| **Tiến độ & minh bạch** | Mốc tiến độ, bài cập nhật, tỷ lệ hoàn thành và số liệu quỹ **sinh từ giao dịch đã xác minh**. | ✅ |
-| **Kiểm duyệt nội dung** | Báo cáo vi phạm chiến dịch (chặn tự báo cáo và báo cáo trùng), hàng đợi xử lý của quản trị viên, bắt buộc ghi chú kết luận, tùy chọn tạm dừng chiến dịch. | ✅ |
-| **Quản trị** | Dashboard tổng quan, quản lý người dùng, xử lý cảnh báo rủi ro, xem nhật ký kiểm toán theo đối tượng. | ✅ |
-| **Trí tuệ nhân tạo** | Gợi ý dự án, dự đoán khả năng thành công, chấm điểm rủi ro gian lận; có giải thích, phiên bản mô hình và phương án dự phòng. | ✅ |
-| **Giao diện** | Trang chủ, danh sách và chi tiết dự án, đăng nhập/đăng ký, tạo chiến dịch, dashboard chủ dự án, trang quản trị; SEO (metadata, Open Graph, sitemap, JSON-LD). | ✅ |
-| **Thông báo** | Email và thông báo trong ứng dụng (mới có mô hình dữ liệu). | 🔶 |
-| **Tương tác cộng đồng** | Bình luận, theo dõi dự án. | ⏳ |
+| Nhóm chức năng             | Nội dung đã triển khai                                                                                                                                                               | Trạng thái |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------: |
+| **Tài khoản & phân quyền** | Đăng ký, đăng nhập JWT (access + refresh token), phân quyền theo vai trò và quyền sở hữu, quản lý hồ sơ, khóa tạm thời sau 5 lần đăng nhập sai trong 15 phút.                        |     ✅     |
+| **Quản lý chiến dịch**     | Tạo chiến dịch theo 4 bước, gửi duyệt, kiểm duyệt theo ma trận chuyển trạng thái, tạm dừng/tiếp tục, tự động chốt chiến dịch hết hạn (thành công/không đạt), tìm kiếm, lọc, sắp xếp. |     ✅     |
+| **Tài trợ & giao dịch**    | Tạo giao dịch với idempotency key, thanh toán qua ví demo, webhook xác thực chữ ký HMAC và chống phát lại, chặn tài trợ vào chiến dịch đã hết hạn, sổ cái giao dịch công khai.       |     ✅     |
+| **Tiến độ & minh bạch**    | Mốc tiến độ, bài cập nhật, tỷ lệ hoàn thành và số liệu quỹ **sinh từ giao dịch đã xác minh**.                                                                                        |     ✅     |
+| **Kiểm duyệt nội dung**    | Báo cáo vi phạm chiến dịch (chặn tự báo cáo và báo cáo trùng), hàng đợi xử lý của quản trị viên, bắt buộc ghi chú kết luận, tùy chọn tạm dừng chiến dịch.                            |     ✅     |
+| **Quản trị**               | Dashboard tổng quan, quản lý người dùng, xử lý cảnh báo rủi ro, xem nhật ký kiểm toán theo đối tượng.                                                                                |     ✅     |
+| **Trí tuệ nhân tạo**       | Gợi ý dự án, dự đoán khả năng thành công, chấm điểm rủi ro gian lận; có giải thích, phiên bản mô hình và phương án dự phòng.                                                         |     ✅     |
+| **Giao diện**              | Trang chủ, danh sách và chi tiết dự án, đăng nhập/đăng ký, tạo chiến dịch, dashboard chủ dự án, trang quản trị; SEO (metadata, Open Graph, sitemap, JSON-LD).                        |     ✅     |
+| **Thông báo**              | Email và thông báo trong ứng dụng (mới có mô hình dữ liệu).                                                                                                                          |     🔶     |
+| **Tương tác cộng đồng**    | Bình luận, theo dõi dự án.                                                                                                                                                           |     ⏳     |
 
 > ✅ Đã triển khai · 🔶 Triển khai một phần · ⏳ Kế hoạch
 
@@ -148,7 +150,7 @@ stateDiagram-v2
     BanNhap --> ChoDuyet: Gửi hồ sơ
     ChoDuyet: Chờ duyệt
     ChoDuyet --> CanBoSung: Yêu cầu bổ sung
-    CanBoSung: Cần bổ sung
+    CanBoSung: Cầbổ sung
     CanBoSung --> ChoDuyet: Gửi lại
     ChoDuyet --> DaDuyet: Phê duyệt
     ChoDuyet --> TuChoi: Từ chối kèm lý do
@@ -199,20 +201,20 @@ sequenceDiagram
 
 Ba mô-đun chạy trong dịch vụ `ai-service` riêng (FastAPI + scikit-learn). Backend gọi AI qua lớp proxy, chỉ gửi dữ liệu tối thiểu đã chuẩn hóa. Mọi kết quả đều kèm **giải thích** và **phiên bản mô hình**. Khi dịch vụ AI gián đoạn, hệ thống có **phương án dự phòng** không dùng AI, và việc thanh toán không phụ thuộc vào AI.
 
-| Mô-đun | Phương pháp | Người hưởng lợi | Dự phòng |
-| --- | --- | --- | --- |
-| **Gợi ý dự án** | Lọc theo nội dung (sở thích, danh mục) kết hợp tín hiệu cộng tác từ lịch sử tương tác, có suy giảm theo thời gian; trả về lý do gợi ý. | Người tài trợ | Danh sách dự án phổ biến |
-| **Dự đoán khả năng thành công** | Phân loại nhị phân; so sánh Logistic Regression với Random Forest, chọn theo ROC-AUC; hiển thị các yếu tố ảnh hưởng. | Chủ dự án, quản trị viên | Không hiển thị điểm, không chặn nghiệp vụ |
-| **Phát hiện gian lận** | Hai tầng: luật nghiệp vụ + Isolation Forest (chuẩn hóa StandardScaler). Tạo cảnh báo rủi ro kèm nhóm nguyên nhân. | Quản trị viên | Chỉ áp dụng tầng luật |
+| Mô-đun                          | Phương pháp                                                                                                                            | Người hưởng lợi          | Dự phòng                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ----------------------------------------- |
+| **Gợi ý dự án**                 | Lọc theo nội dung (sở thích, danh mục) kết hợp tín hiệu cộng tác từ lịch sử tương tác, có suy giảm theo thời gian; trả về lý do gợi ý. | Người tài trợ            | Danh sách dự án phổ biến                  |
+| **Dự đoán khả năng thành công** | Phân loại nhị phân; so sánh Logistic Regression với Random Forest, chọn theo ROC-AUC; hiển thị các yếu tố ảnh hưởng.                   | Chủ dự án, quản trị viên | Không hiển thị điểm, không chặn nghiệp vụ |
+| **Phát hiện gian lận**          | Hai tầng: luật nghiệp vụ + Isolation Forest (chuẩn hóa StandardScaler). Tạo cảnh báo rủi ro kèm nhóm nguyên nhân.                      | Quản trị viên            | Chỉ áp dụng tầng luật                     |
 
 **Kết quả đánh giá** (phiên bản mô hình `2026.09.1`, huấn luyện ngày 11/09/2026):
 
-| Mô-đun | Dữ liệu | Cách chia | Chỉ số |
-| --- | --- | --- | --- |
-| Dự đoán thành công (Random Forest) | 1.000 chiến dịch | Theo thời gian 80/20 | ROC-AUC 0,685 · F1 0,627 · Precision 0,697 · Recall 0,570 |
-| Dự đoán thành công (Logistic Regression, baseline) | 1.000 chiến dịch | Theo thời gian 80/20 | ROC-AUC 0,573 · F1 0,522 |
-| Phát hiện gian lận (Isolation Forest) | 2.040 giao dịch (2% bất thường) | — | Tỷ lệ phát hiện 97,5% · Tỷ lệ cảnh báo sai 0,1% |
-| Gợi ý dự án | 6.000 sự kiện, 300 người dùng | Theo thời gian 80/20 | Precision@10 0,012 · Recall@10 0,031 · NDCG@10 0,021 |
+| Mô-đun                                             | Dữ liệu                         | Cách chia            | Chỉ số                                                    |
+| -------------------------------------------------- | ------------------------------- | -------------------- | --------------------------------------------------------- |
+| Dự đoán thành công (Random Forest)                 | 1.000 chiến dịch                | Theo thời gian 80/20 | ROC-AUC 0,685 · F1 0,627 · Precision 0,697 · Recall 0,570 |
+| Dự đoán thành công (Logistic Regression, baseline) | 1.000 chiến dịch                | Theo thời gian 80/20 | ROC-AUC 0,573 · F1 0,522                                  |
+| Phát hiện gian lận (Isolation Forest)              | 2.040 giao dịch (2% bất thường) | —                    | Tỷ lệ phát hiện 97,5% · Tỷ lệ cảnh báo sai 0,1%           |
+| Gợi ý dự án                                        | 6.000 sự kiện, 300 người dùng   | Theo thời gian 80/20 | Precision@10 0,012 · Recall@10 0,031 · NDCG@10 0,021      |
 
 > **Giới hạn dữ liệu:** Các chỉ số trên đo trên **dữ liệu tổng hợp (synthetic) sinh có seed cố định**, do nền tảng mới chưa có dữ liệu thực. Chúng chứng minh pipeline huấn luyện – đánh giá – suy luận hoạt động đúng, **không** phản ánh hiệu năng trên dữ liệu thật. Chi tiết tái lập: [`ai-service/data/README.md`](ai-service/data/README.md), [`ai-service/training/`](ai-service/training).
 
@@ -243,15 +245,15 @@ Kiến trúc backend theo mô-đun nghiệp vụ, mỗi mô-đun tổ chức the
 
 ### 8.2. Công nghệ sử dụng
 
-| Thành phần | Công nghệ | Vai trò |
-| --- | --- | --- |
-| **Frontend** | Next.js 16, React 19, TypeScript | Giao diện responsive, render phía máy chủ, SEO |
-| **Backend** | NestJS 12, TypeScript, TypeORM, class-validator | Nghiệp vụ, xác thực/phân quyền, giao dịch, kiểm toán |
-| **AI Service** | Python 3.12, FastAPI, scikit-learn, pandas, NumPy | Huấn luyện ngoại tuyến và suy luận mô hình |
-| **Cơ sở dữ liệu** | MySQL 8 | Lưu trữ dữ liệu nghiệp vụ, migration có rollback |
-| **Bộ nhớ đệm** | Redis 7 | Giới hạn tần suất (tự chuyển về bộ nhớ trong nếu Redis lỗi) |
-| **Hạ tầng** | Docker Compose, Nginx, Terraform (AWS ECS Fargate, ALB, RDS) | Môi trường chạy thống nhất và triển khai đám mây |
-| **Tài liệu API** | OpenAPI 3 / Swagger | Mô tả hợp đồng dịch vụ |
+| Thành phần        | Công nghệ                                                    | Vai trò                                                     |
+| ----------------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
+| **Frontend**      | Next.js 16, React 19, TypeScript                             | Giao diện responsive, render phía máy chủ, SEO              |
+| **Backend**       | NestJS 12, TypeScript, TypeORM, class-validator              | Nghiệp vụ, xác thực/phân quyền, giao dịch, kiểm toán        |
+| **AI Service**    | Python 3.12, FastAPI, scikit-learn, pandas, NumPy            | Huấn luyện ngoại tuyến và suy luận mô hình                  |
+| **Cơ sở dữ liệu** | MySQL 8                                                      | Lưu trữ dữ liệu nghiệp vụ, migration có rollback            |
+| **Bộ nhớ đệm**    | Redis 7                                                      | Giới hạn tần suất (tự chuyển về bộ nhớ trong nếu Redis lỗi) |
+| **Hạ tầng**       | Docker Compose, Nginx, Terraform (AWS ECS Fargate, ALB, RDS) | Môi trường chạy thống nhất và triển khai đám mây            |
+| **Tài liệu API**  | OpenAPI 3 / Swagger                                          | Mô tả hợp đồng dịch vụ                                      |
 
 > **Ghi chú về quyết định kỹ thuật:** Đề cương ban đầu dự kiến backend Java Spring Boot. Trong quá trình thực hiện, backend được chuyển sang **NestJS** để frontend và backend dùng chung hệ sinh thái TypeScript, giảm số ngôn ngữ phải duy trì, trong khi vẫn giữ nguyên ranh giới nghiệp vụ và kiến trúc nhiều lớp. Lý do và hệ quả được ghi tại [ADR-001](docs/architecture/adr-001-backend-stack.md).
 
@@ -261,18 +263,18 @@ Kiến trúc backend theo mô-đun nghiệp vụ, mỗi mô-đun tổ chức the
 
 Các nhóm bảng chính:
 
-| Nhóm | Bảng |
-| --- | --- |
-| Tài khoản | `users` |
-| Chiến dịch & tiến độ | `campaigns`, `milestones`, `milestone_updates` |
-| Giao dịch | `donations` |
-| Kiểm duyệt & rủi ro | `reports`, `risk_alerts` |
-| AI | `behavior_events` (sự kiện hành vi phục vụ gợi ý) |
-| Hệ thống | `notifications`, `audit_logs` |
+| Nhóm                 | Bảng                                              |
+| -------------------- | ------------------------------------------------- |
+| Tài khoản            | `users`                                           |
+| Chiến dịch & tiến độ | `campaigns`, `milestones`, `milestone_updates`    |
+| Giao dịch            | `donations`                                       |
+| Kiểm duyệt & rủi ro  | `reports`, `risk_alerts`                          |
+| AI                   | `behavior_events` (sự kiện hành vi phục vụ gợi ý) |
+| Hệ thống             | `notifications`, `audit_logs`                     |
 
 Nguyên tắc thiết kế: khóa chính **UUID**; **xóa mềm** cho dữ liệu quan trọng; **nhật ký kiểm toán** cho mọi thay đổi quan trọng; schema chỉ thay đổi qua **migration có thứ tự và có rollback** (không dùng auto-sync), tương thích cả MySQL 8 và MariaDB.
 
-Tài liệu chi tiết: [ERD](docs/database/erd.md) · [Schema SQL](docs/database/schema.sql) · [Dữ liệu mẫu](docs/database/seed.sql).
+Tài liệu chi tiết: [ERD](docs/database/erd.md) · [Migration](backend/database/migrations/) · [Seed](backend/scripts/seed.ts).
 
 ---
 
@@ -290,10 +292,10 @@ Tài liệu chi tiết: [ERD](docs/database/erd.md) · [Schema SQL](docs/databas
 
 **Phi chức năng**
 
-- *Hiệu năng:* phân trang cho danh sách lớn; dịch vụ không lưu trạng thái, có thể mở rộng ngang.
-- *Tin cậy:* job định kỳ tự chốt chiến dịch hết hạn; AI có phương án dự phòng.
-- *Truy vết:* số liệu quỹ sinh từ giao dịch đã xác minh; nhật ký kiểm toán ghi thời điểm, người thực hiện và giá trị trước/sau.
-- *Khả dụng:* giao diện nhất quán, responsive, thông báo lỗi dễ hiểu.
+- _Hiệu năng:_ phân trang cho danh sách lớn; dịch vụ không lưu trạng thái, có thể mở rộng ngang.
+- _Tin cậy:_ job định kỳ tự chốt chiến dịch hết hạn; AI có phương án dự phòng.
+- _Truy vết:_ số liệu quỹ sinh từ giao dịch đã xác minh; nhật ký kiểm toán ghi thời điểm, người thực hiện và giá trị trước/sau.
+- _Khả dụng:_ giao diện nhất quán, responsive, thông báo lỗi dễ hiểu.
 
 ---
 
@@ -314,12 +316,12 @@ docker compose -f infra/compose.yaml up --build -d
 
 Compose khởi động 6 dịch vụ: `nginx`, `frontend`, `backend`, `ai-service`, `mysql`, `redis`.
 
-| Dịch vụ | Địa chỉ |
-| --- | --- |
-| Qua Nginx | `http://localhost:8080` |
-| Frontend | `http://localhost:3000` |
-| Backend API | `http://localhost:4000/api/v1` |
-| AI Service (Swagger) | `http://localhost:8000/docs` |
+| Dịch vụ              | Địa chỉ                        |
+| -------------------- | ------------------------------ |
+| Qua Nginx            | `http://localhost:8080`        |
+| Frontend             | `http://localhost:3000`        |
+| Backend API          | `http://localhost:4000/api/v1` |
+| AI Service (Swagger) | `http://localhost:8000/docs`   |
 
 ### 11.3. Chạy từng dịch vụ ở chế độ phát triển
 
@@ -357,12 +359,12 @@ cd backend
 
 ## 12. Kiểm thử
 
-| Loại | Công cụ | Phạm vi |
-| --- | --- | --- |
-| Unit test backend | `node --test` | Xác thực, người dùng, chiến dịch (chuyển trạng thái, tự chốt hết hạn), tài trợ, sổ cái, tiến độ, kiểm duyệt, quản trị, cảnh báo rủi ro, rate limit, kiểm toán, tuần tự hóa dữ liệu nhạy cảm |
-| Test AI service | `pytest` | Gợi ý, dự đoán, phát hiện gian lận, health, bảo mật |
-| Kiểm tra tĩnh | TypeScript, ESLint, Ruff | Kiểu dữ liệu, quy ước mã |
-| Smoke test | Docker Compose + Nginx | Toàn bộ 6 dịch vụ |
+| Loại              | Công cụ                  | Phạm vi                                                                                                                                                                                     |
+| ----------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit test backend | `node --test`            | Xác thực, người dùng, chiến dịch (chuyển trạng thái, tự chốt hết hạn), tài trợ, sổ cái, tiến độ, kiểm duyệt, quản trị, cảnh báo rủi ro, rate limit, kiểm toán, tuần tự hóa dữ liệu nhạy cảm |
+| Test AI service   | `pytest`                 | Gợi ý, dự đoán, phát hiện gian lận, health, bảo mật                                                                                                                                         |
+| Kiểm tra tĩnh     | TypeScript, ESLint, Ruff | Kiểu dữ liệu, quy ước mã                                                                                                                                                                    |
+| Smoke test        | Docker Compose + Nginx   | Toàn bộ 6 dịch vụ                                                                                                                                                                           |
 
 ```powershell
 .\scripts\npm-local.cmd run check          # typecheck + lint + unit test
@@ -371,7 +373,7 @@ cd backend
 .\scripts\python-ai.cmd -m ruff check ai-service
 ```
 
-Kịch bản kiểm thử đầu-cuối (E2E) theo luồng *đăng ký chủ dự án → nộp hồ sơ → xét duyệt → phát hành → nhận tài trợ → cập nhật tiến độ* đang được hoàn thiện. Xem thêm [`docs/testing/`](docs/testing/README.md).
+Kịch bản kiểm thử đầu-cuối (E2E) theo luồng _đăng ký chủ dự án → nộp hồ sơ → xét duyệt → phát hành → nhận tài trợ → cập nhật tiến độ_ đang được hoàn thiện. Xem thêm [`docs/testing/`](docs/testing/README.md).
 
 ---
 
@@ -385,7 +387,7 @@ Hạ tầng được mô tả dưới dạng mã (Infrastructure as Code) tại 
 - **Application Load Balancer** định tuyến theo đường dẫn.
 - **Amazon RDS** cho MySQL 8 (lớp `t4g.micro`).
 - **Amazon ECR** lưu Docker image.
-- *Tối ưu chi phí:* task Fargate đặt trong public subnet để không cần NAT Gateway, inbound bị khóa bằng Security Group (chỉ ALB được gọi vào).
+- _Tối ưu chi phí:_ task Fargate đặt trong public subnet để không cần NAT Gateway, inbound bị khóa bằng Security Group (chỉ ALB được gọi vào).
 
 ```bash
 cd infra/terraform
@@ -445,7 +447,7 @@ DATN_2627_Website/
 - Ba mô-đun AI độc lập, có giải thích, phiên bản mô hình và phương án dự phòng; quy trình kiểm duyệt có con người tham gia.
 - Hệ thống chạy thống nhất bằng Docker Compose; hạ tầng AWS mô tả bằng Terraform; API mô tả đầy đủ bằng OpenAPI.
 
-*Cập nhật lần cuối: 26/09/2026.*
+_Cập nhật lần cuối: 26/09/2026._
 
 ### 15.2. Hạn chế
 
@@ -465,16 +467,16 @@ DATN_2627_Website/
 
 ## 16. Tài liệu liên quan
 
-| Tài liệu | Đường dẫn |
-| --- | --- |
-| Đặc tả API (OpenAPI) | [`docs/api/openapi.yaml`](docs/api/openapi.yaml) |
-| Cấu trúc dự án | [`docs/architecture/project-structure.md`](docs/architecture/project-structure.md) |
-| Quyết định kiến trúc | [`docs/architecture/adr-001-backend-stack.md`](docs/architecture/adr-001-backend-stack.md) |
-| Thiết kế cơ sở dữ liệu | [`docs/database/`](docs/database/README.md) |
-| Kiểm thử | [`docs/testing/`](docs/testing/README.md) |
-| Vận hành | [`docs/operations/`](docs/operations/README.md) |
-| Hạ tầng | [`infra/README.md`](infra/README.md) |
-| Dữ liệu và mô hình AI | [`ai-service/data/README.md`](ai-service/data/README.md) |
+| Tài liệu               | Đường dẫn                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| Đặc tả API (OpenAPI)   | [`docs/api/openapi.yaml`](docs/api/openapi.yaml)                                           |
+| Cấu trúc dự án         | [`docs/architecture/project-structure.md`](docs/architecture/project-structure.md)         |
+| Quyết định kiến trúc   | [`docs/architecture/adr-001-backend-stack.md`](docs/architecture/adr-001-backend-stack.md) |
+| Thiết kế cơ sở dữ liệu | [`docs/database/`](docs/database/README.md)                                                |
+| Kiểm thử               | [`docs/testing/`](docs/testing/README.md)                                                  |
+| Vận hành               | [`docs/operations/`](docs/operations/README.md)                                            |
+| Hạ tầng                | [`infra/README.md`](infra/README.md)                                                       |
+| Dữ liệu và mô hình AI  | [`ai-service/data/README.md`](ai-service/data/README.md)                                   |
 
 ---
 

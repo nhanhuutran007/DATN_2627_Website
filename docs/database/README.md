@@ -1,10 +1,6 @@
 # Database
 
-MySQL là nguồn dữ liệu nghiệp vụ chính. Schema và migration được quản lý bằng TypeORM migration (`.ts`) tại `backend/database/migrations/`. Khi khởi tạo thủ công trên hosting (Vietnix), dùng các file SQL sinh sẵn:
-
-- **Schema:** [`docs/database/schema.sql`](./schema.sql)
-- **Seed:** [`docs/database/seed.sql`](./seed.sql)
-- **Hướng dẫn hosting:** [`docs/operations/vietnix-database.md`](../operations/vietnix-database.md)
+MySQL là nguồn dữ liệu nghiệp vụ chính. Schema và migration được quản lý bằng TypeORM migration (`.ts`) tại `backend/database/migrations/`; dữ liệu mẫu sinh bằng `backend/scripts/seed.ts` (`npm run migration:run` rồi `npm run seed` trong `backend/`). Sơ đồ quan hệ: [`erd.md`](./erd.md).
 
 Nguyên tắc bắt buộc:
 
