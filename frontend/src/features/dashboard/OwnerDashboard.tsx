@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { EmailVerificationNotice } from "@/features/auth/EmailVerificationNotice";
+import { MyDonations } from "@/features/finance/MyDonations";
 import { RewardManager } from "@/features/rewards/RewardManager";
 import { ApiError } from "@/lib/api";
 import {
@@ -171,6 +172,7 @@ export function OwnerDashboard() {
         </div>
 
         <div className="dash-grid">
+          <div className="dash-main">
           <section className="panel" id="chien-dich" aria-labelledby="ds-chien-dich">
             <h2 id="ds-chien-dich">Chiến dịch của bạn</h2>
             {state === "loading" && <p className="hint">Đang tải…</p>}
@@ -231,6 +233,13 @@ export function OwnerDashboard() {
               })}
             </ul>
           </section>
+
+          <section className="panel" id="ung-ho-cua-toi" aria-labelledby="ds-ung-ho">
+            <h2 id="ds-ung-ho">Khoản ủng hộ của tôi</h2>
+            <p className="hint">Mở biên nhận để in/lưu PDF hoặc gửi yêu cầu hoàn tiền.</p>
+            <MyDonations />
+          </section>
+          </div>
 
           <aside className="dash-side">
             <section className="panel" aria-labelledby="viec-can-lam">

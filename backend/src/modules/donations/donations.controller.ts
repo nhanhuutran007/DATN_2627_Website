@@ -56,9 +56,16 @@ export class DonationsController {
     return this.donationsService.findMine(user.id);
   }
 
+  @Get(":id/receipt")
+  @UseGuards(JwtAuthGuard)
+  receipt(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
+    return this.donationsService.getReceipt(id, user);
+  }
+
+  /** Chỉ người ủng hộ hoặc admin xem được (trước đây mọi người đăng nhập đều xem được). */
   @Get(":id")
   @UseGuards(JwtAuthGuard)
-  findOne(@Param("id", ParseUUIDPipe) id: string) {
-    return this.donationsService.findById(id);
+  findOne(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
+    return this.donationsService.findForUser(id, user);
   }
 }

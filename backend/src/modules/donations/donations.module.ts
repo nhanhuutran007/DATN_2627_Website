@@ -19,6 +19,6 @@ import { Donation } from "./entities/donation.entity";
       useFactory: () => new DemoWalletGateway(process.env.PAYMENT_WEBHOOK_SECRET),
     },
   ],
-  exports: [DonationsService],
+  exports: [DonationsService, "PaymentGateway"],
 })
 export class DonationsModule {}

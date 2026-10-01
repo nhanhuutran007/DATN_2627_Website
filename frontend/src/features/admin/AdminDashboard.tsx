@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
+import { AdminFinance } from "@/features/admin/AdminFinance";
 import {
   fetchAdminCampaigns,
   fetchAdminDonations,
@@ -26,6 +27,7 @@ import {
   type RiskStatus,
 } from "@/lib/api/admin";
 import type { ApiCampaignStatus } from "@/lib/api/campaigns";
+import { refundDonationDirectly } from "@/lib/api/finance";
 import {
   fetchAdminComments,
   hideComment,
@@ -441,6 +443,29 @@ export function AdminDashboard() {
     }
   }
 
+  async function handleDirectRefund(donation: AdminDonation) {
+    const input = window.prompt(
+      `Hoàn trực tiếp ${money(donation.amount)} cho "${donation.campaign?.title ?? "chiến dịch"}"? Lý do (bắt buộc, lưu nhật ký và gửi người ủng hộ):`,
+      "",
+    );
+    if (input === null) return;
+    if (input.trim().length < 5) {
+      setNotice("Vui lòng nhập lý do tối thiểu 5 ký tự.");
+      return;
+    }
+    setBusy(donation.id);
+    setNotice(null);
+    try {
+      await refundDonationDirectly(donation.id, input.trim());
+      await Promise.all([changeDonationFilter(donationFilter), reloadOverview()]);
+      setNotice(`Đã hoàn ${money(donation.amount)} qua cổng thanh toán sandbox.`);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Không hoàn được giao dịch");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function loadComments(status: CommentStatus | "") {
     try {
       const result = await fetchAdminComments({ status: status || undefined, limit: 30 });
@@ -636,6 +661,8 @@ export function AdminDashboard() {
             <a href="#rui-ro"><Icon name="shield" size={19} /> Cảnh báo rủi ro {(overview?.risks.open ?? 0) > 0 && <i>{overview?.risks.open}</i>}</a>
             <a href="#bao-cao-vi-pham"><Icon name="bell" size={19} /> Báo cáo vi phạm</a>
             <a href="#binh-luan"><Icon name="message" size={19} /> Bình luận</a>
+            <a href="#hoan-tien"><Icon name="wallet" size={19} /> Hoàn tiền</a>
+            <a href="#doi-soat"><Icon name="receipt" size={19} /> Đối soát</a>
             <a href="#giao-dich"><Icon name="receipt" size={19} /> Giao dịch</a>
             <a href="#nguoi-dung"><Icon name="users" size={19} /> Người dùng</a>
             <a href="#nhat-ky-kiem-toan"><Icon name="clock" size={19} /> Nhật ký kiểm toán</a>
@@ -888,7 +915,7 @@ export function AdminDashboard() {
             </div>
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Người ủng hộ</th><th>Chiến dịch</th><th>Số tiền</th><th>Phương thức</th><th>Mã giao dịch</th><th>Thời gian</th><th>Trạng thái</th></tr></thead>
+                <thead><tr><th>Người ủng hộ</th><th>Chiến dịch</th><th>Số tiền</th><th>Phương thức</th><th>Mã giao dịch</th><th>Thời gian</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
                 <tbody>
                   {donations.map((donation) => (
                     <tr key={donation.id}>
@@ -899,15 +926,24 @@ export function AdminDashboard() {
                       <td>{donation.transactionId ? donation.transactionId.slice(0, 10).toUpperCase() : "—"}</td>
                       <td>{formatDate(donation.completedAt ?? donation.createdAt)}</td>
                       <td><span className={`table-status ${DONATION_STATUS_TONE[donation.status]}`}>{DONATION_STATUS_LABEL[donation.status]}</span></td>
+                      <td>
+                        {donation.status === "completed" && (
+                          <button type="button" disabled={busy === donation.id} onClick={() => handleDirectRefund(donation)}>
+                            Hoàn tiền
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {donations.length === 0 && (
-                    <tr><td colSpan={7}><span className="table-muted">Không có giao dịch nào trong trạng thái này.</span></td></tr>
+                    <tr><td colSpan={8}><span className="table-muted">Không có giao dịch nào trong trạng thái này.</span></td></tr>
                   )}
                 </tbody>
               </table>
             </div>
           </section>
+
+          <AdminFinance onChanged={() => { void changeDonationFilter(donationFilter); void reloadOverview(); }} />
 
           <section className="admin-card admin-table-card" id="nguoi-dung">
             <div className="card-heading">

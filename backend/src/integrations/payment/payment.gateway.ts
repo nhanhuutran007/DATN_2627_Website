@@ -33,6 +33,15 @@ export interface PaymentGateway {
 
   /** Trả `true` chỉ khi chữ ký khớp với nội dung webhook. */
   verifyWebhookSignature(payload: WebhookSignedFields, signature: string): boolean;
+
+  /** Hoàn toàn bộ số tiền của một giao dịch đã thành công. */
+  refundTransaction(params: { transactionId: string; amount: number; reason: string }): Promise<RefundResult>;
+}
+
+export interface RefundResult {
+  success: boolean;
+  /** Mã hoàn tiền của cổng thanh toán (lưu vào donation để đối soát). */
+  refundId: string;
 }
 
 /** Chuỗi chuẩn hóa dùng để ký, tránh phụ thuộc thứ tự khóa/khoảng trắng của JSON. */
@@ -67,6 +76,12 @@ export class DemoWalletGateway implements PaymentGateway {
       transactionId,
       raw: { amount: params.amount, currency: params.currency, mode: "demo" },
     };
+  }
+
+  async refundTransaction(params: { transactionId: string; amount: number; reason: string }): Promise<RefundResult> {
+    // Sandbox: không có tiền thật, luôn hoàn thành công với mã tham chiếu giả lập.
+    void params;
+    return { success: true, refundId: `DEMO-RF-${randomUUID().slice(0, 8).toUpperCase()}` };
   }
 
   verifyWebhookSignature(payload: WebhookSignedFields, signature: string): boolean {

@@ -87,11 +87,17 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
           <div><dt>Mã giao dịch</dt><dd className="mono">{donation.transactionId ?? donation.id}</dd></div>
           <div><dt>Kênh</dt><dd>{donation.paymentMethod === "payos" ? "PayOS sandbox" : "Ví demo"}</dd></div>
           <div><dt>Hiển thị</dt><dd>{donation.isAnonymous ? "Ẩn danh" : "Tên của bạn"}</dd></div>
+          {selectedTier && <div><dt>Phần quà</dt><dd>{donation.rewardTierId ? selectedTier.title : "Hết suất — ghi nhận không kèm quà"}</dd></div>}
           <div><dt>Trạng thái</dt><dd>{donation.status === "completed" ? "Đã xác nhận" : "Đang xử lý"}</dd></div>
         </dl>
-        <button className="button button-outline" type="button" onClick={() => setDonation(null)}>
-          Ủng hộ thêm
-        </button>
+        <div className="give-done-actions">
+          {donation.status === "completed" && (
+            <Link className="button button-primary" href={`/bien-nhan/${donation.id}`}>Xem biên nhận</Link>
+          )}
+          <button className="button button-outline" type="button" onClick={() => { setDonation(null); setRewardTierId(""); }}>
+            Ủng hộ thêm
+          </button>
+        </div>
       </div>
     );
   }

@@ -257,6 +257,219 @@ h3 {
   text-decoration: underline;
 }
 
+.give-done-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------- Đối soát (admin) ---------- */
+.recon-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.recon-filter .field {
+  min-width: 160px;
+}
+
+.recon-totals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.recon-totals > div {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.recon-totals dt {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.recon-totals dd {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.recon-totals small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+#doi-soat td.num {
+  white-space: nowrap;
+}
+
+.recon-bad {
+  color: #b42318;
+}
+
+.recon-ok {
+  color: #157f3d;
+}
+
+@media (max-width: 960px) {
+  .recon-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- Biên nhận ---------- */
+.receipt-page {
+  max-width: 760px;
+  padding-block: 32px 72px;
+}
+
+.receipt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.receipt-card {
+  position: relative;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+}
+
+.receipt-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--primary);
+}
+
+.receipt-head h1 {
+  margin: 4px 0 0;
+  font-size: 1.6rem;
+}
+
+.receipt-brand {
+  margin: 0;
+  color: var(--primary);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.receipt-no {
+  display: grid;
+  gap: 2px;
+  text-align: right;
+}
+
+.receipt-no span {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.receipt-stamp {
+  display: inline-block;
+  margin: 18px 0 0;
+  padding: 4px 12px;
+  color: #b42318;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  border: 2px solid #b42318;
+  border-radius: 6px;
+  transform: rotate(-3deg);
+}
+
+.receipt-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin: 22px 0;
+}
+
+.receipt-grid dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.receipt-grid dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.receipt-amount {
+  color: var(--primary-dark);
+  font-size: 1.35rem;
+}
+
+.receipt-note {
+  margin: 0;
+  padding-top: 16px;
+  color: var(--text-2);
+  font-size: 0.85rem;
+  border-top: 1px dashed var(--line);
+}
+
+.receipt-refund {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.receipt-refund p {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .receipt-card {
+    padding: 20px;
+  }
+
+  .receipt-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .receipt-no {
+    text-align: left;
+  }
+}
+
+@media print {
+  .site-top,
+  .site-footer,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .receipt-page {
+    max-width: none;
+    padding: 0;
+  }
+
+  .receipt-card {
+    border: 0;
+    padding: 0;
+  }
+}
+
 /* ---------- Mức ủng hộ & phần quà ---------- */
 .reward-editor {
   display: grid;
@@ -2077,6 +2290,8 @@ h3 {
 }
 
 .table-wrap {
+  /* relative: phần tử .sr-only (absolute) trong bảng không thoát khỏi vùng cuộn */
+  position: relative;
   overflow-x: auto;
 }
 
@@ -3241,6 +3456,14 @@ button {
   font-family: var(--font-heading);
   font-size: 1.3rem;
   font-weight: 700;
+}
+
+.dash-main {
+  display: grid;
+  /* Cột co theo màn hình; bảng rộng tự cuộn trong .table-wrap thay vì kéo giãn trang */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  min-width: 0;
 }
 
 .dash-grid {

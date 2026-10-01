@@ -63,4 +63,14 @@ export class Donation extends BaseEntity {
 
   @Column({ name: "completed_at", type: "datetime", nullable: true })
   completedAt?: Date;
+
+  @Column({ name: "refunded_at", type: "datetime", nullable: true })
+  refundedAt?: Date | null;
+
+  /** Mã hoàn tiền do cổng thanh toán trả về. */
+  @Column({ name: "refund_reference", type: "varchar", length: 255, nullable: true })
+  refundReference?: string | null;
+
+  @Column({ name: "refund_reason", type: "varchar", length: 500, nullable: true })
+  refundReason?: string | null;
 }

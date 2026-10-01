@@ -23,6 +23,22 @@ import { User, UserRole } from "../users/entities/user.entity";
 import { CreateDonationDto, WebhookDonationDto } from "./dto/donation.dto";
 import { Donation, DonationStatus } from "./entities/donation.entity";
 
+export type DonationReceipt = {
+  receiptNumber: string;
+  donationId: string;
+  status: DonationStatus;
+  amount: number;
+  currency: string;
+  paymentMethod: string | null;
+  transactionId: string | null;
+  completedAt: Date | null;
+  donorName: string;
+  isAnonymous: boolean;
+  campaign: { id: string; title: string };
+  rewardTitle: string | null;
+  refund: { refundedAt: Date | null; reference: string | null; reason: string | null } | null;
+};
+
 @Injectable()
 export class DonationsService {
   constructor(
@@ -342,6 +358,48 @@ export class DonationsService {
       throw new NotFoundException("Donation not found");
     }
     return donation;
+  }
+
+  /**
+   * Chi tiết một khoản ủng hộ: chỉ người ủng hộ hoặc admin. Người khác nhận 404
+   * (không tiết lộ khoản ủng hộ có tồn tại).
+   */
+  async findForUser(id: string, user: User): Promise<Donation> {
+    const donation = await this.donationRepo.findOne({
+      where: { id },
+      relations: { user: true, campaign: true, rewardTier: true },
+    });
+    if (!donation || (donation.userId !== user.id && user.role !== UserRole.ADMIN)) {
+      throw new NotFoundException("Donation not found");
+    }
+    return donation;
+  }
+
+  /** Biên nhận (in/lưu PDF ở trình duyệt). Không phải hóa đơn thuế. */
+  async getReceipt(id: string, user: User): Promise<DonationReceipt> {
+    const d = await this.findForUser(id, user);
+    if (d.status !== DonationStatus.COMPLETED && d.status !== DonationStatus.REFUNDED) {
+      throw new ConflictException("Biên nhận chỉ có cho khoản ủng hộ đã xác nhận.");
+    }
+    const issued = d.completedAt ? new Date(d.completedAt) : new Date(d.createdAt);
+    const ymd = issued.toISOString().slice(0, 10).replace(/-/g, "");
+    return {
+      receiptNumber: `GM-${ymd}-${d.id.slice(0, 8).toUpperCase()}`,
+      donationId: d.id,
+      status: d.status,
+      amount: Number(d.amount),
+      currency: d.currency,
+      paymentMethod: d.paymentMethod ?? null,
+      transactionId: d.transactionId ?? null,
+      completedAt: d.completedAt ?? null,
+      donorName: d.user?.name ?? "Người ủng hộ",
+      isAnonymous: d.isAnonymous,
+      campaign: { id: d.campaignId, title: d.campaign?.title ?? "" },
+      rewardTitle: d.rewardTier?.title ?? null,
+      refund: d.status === DonationStatus.REFUNDED
+        ? { refundedAt: d.refundedAt ?? null, reference: d.refundReference ?? null, reason: d.refundReason ?? null }
+        : null,
+    };
   }
 
   async findMine(userId: string): Promise<Donation[]> {

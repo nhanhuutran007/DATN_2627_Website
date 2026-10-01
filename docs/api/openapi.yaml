@@ -623,6 +623,7 @@ paths:
     get:
       operationId: getDonationById
       summary: Chi tiết một đơn tài trợ
+      description: Chỉ người ủng hộ hoặc admin; người khác nhận 404 (không lộ đơn có tồn tại).
       security:
         - bearerAuth: []
       parameters:
@@ -1729,6 +1730,191 @@ paths:
         "409":
           description: Mức đã có người chọn
 
+  /donations/{id}/receipt:
+    get:
+      operationId: getDonationReceipt
+      summary: Biên nhận một khoản ủng hộ (người ủng hộ hoặc admin)
+      description: >-
+        Chỉ khoản đã xác nhận hoặc đã hoàn (409 nếu chưa xác nhận). Người khác nhận 404. Frontend
+        hiển thị ở `/bien-nhan/{id}` và in/lưu PDF bằng trình duyệt. Không phải hóa đơn thuế.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Biên nhận
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DonationReceipt"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Khoản ủng hộ chưa xác nhận
+  /donations/{id}/refund-request:
+    post:
+      operationId: requestRefund
+      summary: Người ủng hộ yêu cầu hoàn một khoản của mình
+      description: >-
+        Được yêu cầu khi chiến dịch thất bại/bị hủy, hoặc trong 7 ngày sau khi ủng hộ nếu chiến dịch
+        còn đang gây quỹ (409 nếu không đủ điều kiện hoặc đã có yêu cầu chờ xử lý). Admin duyệt.
+        Rate limit 5 lần/giờ/IP. Ghi audit `refund.request`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 10, maxLength: 1000 }
+      responses:
+        "201":
+          description: Đã tạo yêu cầu (pending)
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Không đủ điều kiện hoặc trùng yêu cầu
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /refund-requests/mine:
+    get:
+      operationId: listMyRefundRequests
+      summary: Yêu cầu hoàn tiền của tôi
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Danh sách yêu cầu
+  /admin/refunds:
+    get:
+      operationId: listAdminRefunds
+      summary: Hàng đợi yêu cầu hoàn tiền (chỉ admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, approved, rejected] }
+      responses:
+        "200":
+          description: Danh sách yêu cầu kèm giao dịch, chiến dịch, người yêu cầu
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/refunds/{id}/approve:
+    patch:
+      operationId: approveRefund
+      summary: Duyệt và hoàn tiền (chỉ admin)
+      description: >-
+        Trong 1 transaction: đổi completed → refunded có điều kiện (không hoàn 2 lần, 409), gọi cổng
+        thanh toán (lỗi → rollback, 502), trừ `currentAmount`/`backerCount` của chiến dịch và trả lại
+        suất quà. Ghi audit `donation.refund` + `refund.approve`; thông báo người ủng hộ (kèm email)
+        và chủ dự án.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminNotesRequest"
+      responses:
+        "200":
+          description: Yêu cầu đã duyệt
+        "409":
+          description: Yêu cầu đã xử lý hoặc khoản đã hoàn
+        "502":
+          description: Cổng thanh toán từ chối hoàn tiền
+  /admin/refunds/{id}/reject:
+    patch:
+      operationId: rejectRefund
+      summary: Từ chối yêu cầu hoàn tiền (chỉ admin)
+      description: Ghi audit `refund.reject`; thông báo người ủng hộ kèm lý do.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminNotesRequest"
+      responses:
+        "200":
+          description: Yêu cầu đã từ chối
+        "409":
+          description: Yêu cầu đã xử lý
+  /admin/donations/{id}/refund:
+    post:
+      operationId: refundDonationDirectly
+      summary: Admin hoàn trực tiếp một khoản đã xác nhận (vd. gian lận)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 5, maxLength: 500 }
+      responses:
+        "201":
+          description: Đã hoàn
+        "409":
+          description: Khoản chưa xác nhận hoặc đã hoàn
+        "502":
+          description: Cổng thanh toán từ chối hoàn tiền
+  /admin/reconciliation:
+    get:
+      operationId: getReconciliation
+      summary: Đối soát theo kỳ (chỉ admin)
+      description: >-
+        Tổng xác nhận/hoàn/ròng theo chiến dịch trong kỳ, và so số liệu đang lưu trên chiến dịch với
+        sổ giao dịch toàn thời gian (`mismatch` = lệch). Mặc định 30 ngày gần nhất.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReconFrom"
+        - $ref: "#/components/parameters/ReconTo"
+        - $ref: "#/components/parameters/ReconCampaign"
+      responses:
+        "200":
+          description: Báo cáo đối soát
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/reconciliation/export:
+    get:
+      operationId: exportReconciliationCsv
+      summary: Xuất CSV giao dịch trong kỳ (chỉ admin)
+      description: >-
+        CSV UTF-8 (BOM) có chống CSV/formula injection. Người ủng hộ được giả danh (`NUH-…`), không
+        có tên/email. Ghi audit `finance.export`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReconFrom"
+        - $ref: "#/components/parameters/ReconTo"
+        - $ref: "#/components/parameters/ReconCampaign"
+      responses:
+        "200":
+          description: File CSV
+          content:
+            text/csv: {}
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1736,6 +1922,20 @@ components:
       scheme: bearer
       bearerFormat: JWT
   parameters:
+    ReconFrom:
+      name: from
+      in: query
+      description: Ngày bắt đầu (ISO date, bao gồm)
+      schema: { type: string, format: date }
+    ReconTo:
+      name: to
+      in: query
+      description: Ngày kết thúc (ISO date, bao gồm cả ngày)
+      schema: { type: string, format: date }
+    ReconCampaign:
+      name: campaignId
+      in: query
+      schema: { type: string, format: uuid }
     IdPath:
       name: id
       in: path
@@ -2764,6 +2964,37 @@ components:
         hideComment:
           type: boolean
           description: Chỉ hợp lệ khi status = resolved và báo cáo nhắm vào bình luận; ẩn bình luận đó
+    AdminNotesRequest:
+      type: object
+      required: [adminNotes]
+      properties:
+        adminNotes: { type: string, minLength: 5, maxLength: 500 }
+    DonationReceipt:
+      type: object
+      required: [receiptNumber, donationId, status, amount, currency, donorName, campaign]
+      properties:
+        receiptNumber: { type: string, example: GM-20261001-55555555 }
+        donationId: { type: string, format: uuid }
+        status: { type: string, enum: [completed, refunded] }
+        amount: { type: number }
+        currency: { type: string }
+        paymentMethod: { type: [string, "null"] }
+        transactionId: { type: [string, "null"] }
+        completedAt: { type: [string, "null"], format: date-time }
+        donorName: { type: string }
+        isAnonymous: { type: boolean }
+        campaign:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            title: { type: string }
+        rewardTitle: { type: [string, "null"] }
+        refund:
+          type: [object, "null"]
+          properties:
+            refundedAt: { type: [string, "null"], format: date-time }
+            reference: { type: [string, "null"] }
+            reason: { type: [string, "null"] }
     RewardTierRequest:
       type: object
       required: [title, description, minAmount]

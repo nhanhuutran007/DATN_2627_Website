@@ -204,6 +204,24 @@ export async function apiFetch<T>(
   return (payload ?? undefined) as T;
 }
 
+/** Tải file (vd. CSV) có xác thực; trả nội dung + tên file từ Content-Disposition. */
+export async function apiDownload(path: string, retry = true): Promise<{ blob: Blob; filename: string | null }> {
+  const headers = new Headers();
+  const accessToken = readStorage(ACCESS_TOKEN_KEY);
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  const response = await fetch(`${apiBaseUrl()}${path}`, { headers });
+  if (response.status === 401 && retry && (await refreshAccessToken())) {
+    return apiDownload(path, false);
+  }
+  if (!response.ok) {
+    const payload = (await parseBody(response)) as ErrorPayload | null;
+    throw new ApiError(response.status, getErrorMessage(payload, `Tải file thất bại (HTTP ${response.status})`));
+  }
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = disposition.match(/filename="?([^";]+)"?/);
+  return { blob: await response.blob(), filename: match ? match[1] : null };
+}
+
 export const api = {
   get: <T>(path: string, options?: RequestInit) =>
     apiFetch<T>(path, { ...options, method: "GET" }),
