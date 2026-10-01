@@ -125,13 +125,16 @@ Vai trò trong hệ thống: `user` (người tài trợ), `campaign_owner` (ch�
 | **Tài khoản & phân quyền** | Đăng ký, đăng nhập JWT (access + refresh token), phân quyền theo vai trò và quyền sở hữu, quản lý hồ sơ, khóa tạm thời sau 5 lần đăng nhập sai trong 15 phút.                        |     ✅     |
 | **Quản lý chiến dịch**     | Tạo chiến dịch theo 4 bước, gửi duyệt, kiểm duyệt theo ma trận chuyển trạng thái, tạm dừng/tiếp tục, tự động chốt chiến dịch hết hạn (thành công/không đạt), tìm kiếm, lọc, sắp xếp. |     ✅     |
 | **Tài trợ & giao dịch**    | Tạo giao dịch với idempotency key, thanh toán qua ví demo, webhook xác thực chữ ký HMAC và chống phát lại, chặn tài trợ vào chiến dịch đã hết hạn, sổ cái giao dịch công khai.       |     ✅     |
+| **Mức quà tặng**           | Chủ dự án tạo mức ủng hộ kèm quà (số lượng giới hạn, ngày giao dự kiến); người ủng hộ chọn quà khi tài trợ; suất quà chỉ được tính khi giao dịch đã xác nhận.                        |     ✅     |
+| **Hoàn tiền & đối soát**   | Yêu cầu hoàn tiền do quản trị viên xét duyệt, biên nhận điện tử (`/bien-nhan/[id]`), lịch sử ủng hộ cá nhân, báo cáo đối soát và xuất CSV cho quản trị viên.                         |     ✅     |
+| **Tải ảnh lên**            | Tải ảnh bìa/ảnh chiến dịch (kiểm tra loại và dung lượng), lưu cục bộ hoặc Amazon S3 qua lớp lưu trữ trừu tượng.                                                                     |     ✅     |
 | **Tiến độ & minh bạch**    | Mốc tiến độ, bài cập nhật, tỷ lệ hoàn thành và số liệu quỹ **sinh từ giao dịch đã xác minh**.                                                                                        |     ✅     |
-| **Kiểm duyệt nội dung**    | Báo cáo vi phạm chiến dịch (chặn tự báo cáo và báo cáo trùng), hàng đợi xử lý của quản trị viên, bắt buộc ghi chú kết luận, tùy chọn tạm dừng chiến dịch.                            |     ✅     |
+| **Kiểm duyệt nội dung**    | Báo cáo vi phạm chiến dịch và bình luận (chặn tự báo cáo và báo cáo trùng), hàng đợi xử lý của quản trị viên, bắt buộc ghi chú kết luận, tùy chọn tạm dừng chiến dịch hoặc ẩn bình luận. |     ✅     |
 | **Quản trị**               | Dashboard tổng quan, quản lý người dùng, xử lý cảnh báo rủi ro, xem nhật ký kiểm toán theo đối tượng.                                                                                |     ✅     |
-| **Trí tuệ nhân tạo**       | Gợi ý dự án, dự đoán khả năng thành công, chấm điểm rủi ro gian lận; có giải thích, phiên bản mô hình và phương án dự phòng.                                                         |     ✅     |
+| **Trí tuệ nhân tạo**       | Gợi ý dự án, dự đoán khả năng thành công, chấm điểm rủi ro gian lận; có giải thích, phiên bản mô hình và phương án dự phòng. Chỉ ghi nhận hành vi khi người dùng **đồng ý** (opt-in, rút lại sẽ xóa lịch sử). |     ✅     |
 | **Giao diện**              | Trang chủ, danh sách và chi tiết dự án, đăng nhập/đăng ký, tạo chiến dịch, dashboard chủ dự án, trang quản trị; SEO (metadata, Open Graph, sitemap, JSON-LD).                        |     ✅     |
-| **Thông báo**              | Email và thông báo trong ứng dụng (mới có mô hình dữ liệu).                                                                                                                          |     🔶     |
-| **Tương tác cộng đồng**    | Bình luận, theo dõi dự án.                                                                                                                                                           |     ⏳     |
+| **Thông báo**              | Thông báo trong ứng dụng (chuông trên thanh điều hướng, trang `/thong-bao`) và email cho các quyết định xét duyệt; xác minh email, quên/đặt lại mật khẩu.                              |     ✅     |
+| **Tương tác cộng đồng**    | Bình luận/hỏi đáp trên trang dự án, trả lời theo luồng (đánh dấu phản hồi của chủ dự án), báo cáo bình luận vi phạm. Chưa có: theo dõi dự án.                                                                          |     🔶     |
 
 > ✅ Đã triển khai · 🔶 Triển khai một phần · ⏳ Kế hoạch
 
@@ -265,11 +268,12 @@ Các nhóm bảng chính:
 
 | Nhóm                 | Bảng                                              |
 | -------------------- | ------------------------------------------------- |
-| Tài khoản            | `users`                                           |
-| Chiến dịch & tiến độ | `campaigns`, `milestones`, `milestone_updates`    |
-| Giao dịch            | `donations`                                       |
+| Tài khoản            | `users` (kèm trạng thái đồng ý cá nhân hóa AI), token xác minh email/đặt lại mật khẩu |
+| Chiến dịch & tiến độ | `campaigns`, `milestones`, `milestone_updates`, `reward_tiers`, `media_files` |
+| Giao dịch            | `donations`, `refund_requests`                    |
+| Cộng đồng            | `campaign_comments`                               |
 | Kiểm duyệt & rủi ro  | `reports`, `risk_alerts`                          |
-| AI                   | `behavior_events` (sự kiện hành vi phục vụ gợi ý) |
+| AI                   | `behavior_events` (chỉ ghi khi người dùng đồng ý) |
 | Hệ thống             | `notifications`, `audit_logs`                     |
 
 Nguyên tắc thiết kế: khóa chính **UUID**; **xóa mềm** cho dữ liệu quan trọng; **nhật ký kiểm toán** cho mọi thay đổi quan trọng; schema chỉ thay đổi qua **migration có thứ tự và có rollback** (không dùng auto-sync), tương thích cả MySQL 8 và MariaDB.
@@ -413,14 +417,16 @@ DATN_2627_Website/
 ├── frontend/                 # Next.js 16 – giao diện người dùng
 │   └── src/
 │       ├── app/              # Định tuyến: /, /du-an, /du-an/[slug], /dang-nhap,
-│       │                     #   /dang-ky, /tao-chien-dich, /dashboard, /admin
+│       │                     #   /dang-ky, /tao-chien-dich, /dashboard, /admin,
+│       │                     #   /thong-bao, /bien-nhan/[id], /quen-mat-khau, ...
 │       ├── features/         # Mô-đun giao diện theo nghiệp vụ
 │       ├── components/       # Thành phần dùng chung
 │       └── lib/api/          # Lớp gọi API backend
 ├── backend/                  # NestJS 12 – API nghiệp vụ
 │   ├── src/
-│   │   ├── modules/          # auth, users, campaigns, donations, progress,
-│   │   │                     #   moderation, admin, ai, notifications, health
+│   │   ├── modules/          # auth, users, campaigns, donations, payments, progress,
+│   │   │                     #   rewards, finance, comments, media, moderation,
+│   │   │                     #   admin, ai, notifications, health
 │   │   ├── integrations/     # ai, payment, email, storage (interface + sandbox)
 │   │   └── common/           # Guard, interceptor, tiện ích dùng chung
 │   ├── database/migrations/  # Migration TypeORM có rollback
@@ -445,21 +451,22 @@ DATN_2627_Website/
 - Hoàn thiện quy trình gây quỹ khép kín: tạo chiến dịch → xét duyệt → phát hành → tài trợ → xác nhận thanh toán → cập nhật tiến độ → kết thúc.
 - Minh bạch nguồn quỹ nhờ sổ cái giao dịch công khai và số liệu tính từ giao dịch đã xác minh.
 - Ba mô-đun AI độc lập, có giải thích, phiên bản mô hình và phương án dự phòng; quy trình kiểm duyệt có con người tham gia.
+- Thông báo trong ứng dụng và email, bình luận/hỏi đáp có kiểm duyệt, mức quà tặng, hoàn tiền và đối soát, tải ảnh lên; dữ liệu hành vi cho AI chỉ thu thập khi người dùng đồng ý.
 - Hệ thống chạy thống nhất bằng Docker Compose; hạ tầng AWS mô tả bằng Terraform; API mô tả đầy đủ bằng OpenAPI.
 
-_Cập nhật lần cuối: 26/09/2026._
+_Cập nhật lần cuối: 01/10/2026._
 
 ### 15.2. Hạn chế
 
 - Mô hình AI được huấn luyện trên dữ liệu tổng hợp; hiệu năng thực tế cần đánh giá lại khi có dữ liệu thật.
-- Thanh toán chỉ ở mức sandbox; chưa có hoàn tiền và giải ngân thực tế.
-- Chưa hoàn thiện thông báo (email, trong ứng dụng), bình luận và theo dõi dự án.
+- Thanh toán và hoàn tiền chỉ ở mức sandbox; chưa có giải ngân thực tế.
+- Chưa có tính năng theo dõi dự án.
 - Kiểm thử đầu-cuối tự động chưa hoàn chỉnh.
 
 ### 15.3. Hướng phát triển
 
 - Tích hợp cổng thanh toán thật và eKYC qua nhà cung cấp chuyên nghiệp; ký quỹ và giải ngân theo mốc tiến độ.
-- Hoàn thiện thông báo, bình luận, theo dõi dự án và thu thập dữ liệu hành vi có sự đồng ý của người dùng.
+- Theo dõi dự án và thông báo khi dự án có cập nhật; thông báo đẩy (push).
 - Cập nhật mô hình AI định kỳ, giám sát trôi dữ liệu (drift), đánh giá công bằng giữa các nhóm dự án; phân tích mạng lưới để phát hiện nhóm tài khoản thông đồng.
 - Ứng dụng di động, đa ngôn ngữ và đa loại tiền tệ.
 
