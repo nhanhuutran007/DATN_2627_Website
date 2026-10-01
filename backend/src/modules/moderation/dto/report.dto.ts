@@ -22,6 +22,11 @@ export class CreateReportDto {
   @IsUUID()
   campaignId!: string;
 
+  /** Báo cáo một bình luận cụ thể của chiến dịch (bỏ trống = báo cáo chiến dịch). */
+  @IsOptional()
+  @IsUUID()
+  commentId?: string;
+
   @IsEnum(ReportReason)
   reason!: ReportReason;
 
@@ -83,4 +88,9 @@ export class ReviewReportDto {
   @IsOptional()
   @IsBoolean()
   pauseCampaign?: boolean;
+
+  /** Chỉ hợp lệ khi `status = resolved` và báo cáo nhắm vào một bình luận. */
+  @IsOptional()
+  @IsBoolean()
+  hideComment?: boolean;
 }

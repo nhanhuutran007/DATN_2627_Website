@@ -1457,6 +1457,151 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /campaigns/{id}/comments:
+    get:
+      operationId: listCampaignComments
+      summary: Hỏi đáp & bình luận công khai của chiến dịch
+      description: >-
+        Chỉ chiến dịch đã công khai (chưa công khai trả 404). Bình luận gốc mới nhất trước,
+        mỗi bình luận kèm các trả lời (1 cấp) theo thứ tự thời gian. Bình luận bị ẩn/xóa không
+        hiển thị. Người viết chỉ trả tên + avatar, `isOwner` = chủ dự án.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Trang luồng bình luận
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentThreadPage"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createCampaignComment
+      summary: Đặt câu hỏi, bình luận hoặc trả lời
+      description: >-
+        Nội dung 2–2000 ký tự (đã bỏ ký tự điều khiển). `parentId` để trả lời một bình luận gốc
+        đang hiển thị của cùng chiến dịch (chỉ 1 cấp; trả lời luôn là `comment`). Thông báo cho
+        chủ dự án (bình luận/câu hỏi mới) và người được trả lời. Rate limit 10 lần/10 phút/IP.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 2, maxLength: 2000 }
+                kind: { type: string, enum: [comment, question], default: comment }
+                parentId: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Đã đăng
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentView"
+        "400":
+          description: Nội dung không hợp lệ hoặc trả lời vào một câu trả lời
+        "401":
+          description: Chưa đăng nhập
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /comments/{id}:
+    delete:
+      operationId: deleteComment
+      summary: Xóa (mềm) bình luận của mình; admin xóa được mọi bình luận
+      description: Ghi audit `comment.delete`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Đã xóa
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/comments:
+    get:
+      operationId: listAdminComments
+      summary: Hàng đợi kiểm duyệt bình luận (chỉ admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [visible, hidden] }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Danh sách bình luận kèm chiến dịch và người viết
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/comments/{id}/hide:
+    patch:
+      operationId: hideComment
+      summary: Ẩn bình luận (chỉ admin, bắt buộc lý do)
+      description: Ghi audit `comment.hide`, thông báo cho tác giả kèm lý do. Đã ẩn trả 409.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 5, maxLength: 500 }
+      responses:
+        "200":
+          description: Bình luận sau khi ẩn
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Bình luận đã bị ẩn
+  /admin/comments/{id}/unhide:
+    patch:
+      operationId: unhideComment
+      summary: Hiện lại bình luận (chỉ admin)
+      description: Ghi audit `comment.unhide`. Đang hiển thị trả 409.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Bình luận sau khi hiện lại
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Bình luận đang hiển thị
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2458,6 +2603,10 @@ components:
         campaignId:
           type: string
           format: uuid
+        commentId:
+          type: string
+          format: uuid
+          description: Báo cáo một bình luận của chiến dịch (không báo cáo được bình luận của mình)
         reason:
           $ref: "#/components/schemas/ReportReason"
         description:
@@ -2478,6 +2627,42 @@ components:
         pauseCampaign:
           type: boolean
           description: Chỉ hợp lệ khi status = resolved; tạm dừng chiến dịch đang active
+        hideComment:
+          type: boolean
+          description: Chỉ hợp lệ khi status = resolved và báo cáo nhắm vào bình luận; ẩn bình luận đó
+    CommentView:
+      type: object
+      required: [id, kind, content, createdAt, author, isOwner, replies]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [comment, question] }
+        content: { type: string }
+        createdAt: { type: string, format: date-time }
+        author:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            avatar: { type: [string, "null"] }
+        isOwner:
+          type: boolean
+          description: Người viết là chủ dự án
+        replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentView"
+    CommentThreadPage:
+      type: object
+      required: [items, total, offset, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentView"
+        total: { type: integer }
+        offset: { type: integer }
+        limit: { type: integer }
     Notification:
       type: object
       required: [id, type, title, message, isRead, createdAt]
@@ -2563,6 +2748,12 @@ components:
           nullable: true
         campaignPaused:
           type: boolean
+        commentId:
+          type: [string, "null"]
+          description: Báo cáo nhắm vào một bình luận (nếu có)
+        commentHidden:
+          type: boolean
+          description: Bình luận đã bị ẩn khi xử lý báo cáo này
         createdAt:
           type: string
           format: date-time

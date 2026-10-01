@@ -27,6 +27,13 @@ import {
 } from "@/lib/api/admin";
 import type { ApiCampaignStatus } from "@/lib/api/campaigns";
 import {
+  fetchAdminComments,
+  hideComment,
+  unhideComment,
+  type AdminComment,
+  type CommentStatus,
+} from "@/lib/api/comments";
+import {
   fetchAdminReports,
   REPORT_REASON_LABEL,
   REPORT_STATUS_LABEL,
@@ -167,6 +174,8 @@ export function AdminDashboard() {
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [reports, setReports] = useState<CampaignReport[]>([]);
   const [reportFilter, setReportFilter] = useState<ReportStatus | "">("pending");
+  const [comments, setComments] = useState<AdminComment[]>([]);
+  const [commentFilter, setCommentFilter] = useState<CommentStatus | "">("visible");
 
   const [campaignFilter, setCampaignFilter] = useState<ApiCampaignStatus | "">("pending");
   const [donationFilter, setDonationFilter] = useState<AdminDonation["status"] | "">("completed");
@@ -183,7 +192,7 @@ export function AdminDashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const [ov, camps, dons, usrs, riskList, audit, reportList] = await Promise.all([
+        const [ov, camps, dons, usrs, riskList, audit, reportList, commentList] = await Promise.all([
           fetchAdminOverview(),
           fetchAdminCampaigns({ status: "pending", limit: 20 }),
           fetchAdminDonations({ status: "completed", limit: 20 }),
@@ -191,6 +200,7 @@ export function AdminDashboard() {
           fetchAdminRisks({ status: "open", limit: 50 }),
           fetchAuditLogs({ limit: 50 }),
           fetchAdminReports({ status: "pending", limit: 50 }),
+          fetchAdminComments({ status: "visible", limit: 30 }),
         ]);
         if (cancelled) return;
         setOverview(ov);
@@ -200,6 +210,7 @@ export function AdminDashboard() {
         setRisks(riskList.items);
         setAuditLogs(audit.items);
         setReports(reportList.items);
+        setComments(commentList.items);
         setError(null);
       } catch (err) {
         if (cancelled) return;
@@ -384,6 +395,7 @@ export function AdminDashboard() {
     const title = report.campaign?.title ?? "chiến dịch";
     let adminNotes: string | undefined;
     let pauseCampaign = false;
+    let hideReportedComment = false;
 
     if (status !== "reviewing") {
       const input = window.prompt(
@@ -398,7 +410,9 @@ export function AdminDashboard() {
         return;
       }
       adminNotes = input.trim();
-      if (status === "resolved" && report.campaign?.status === "active") {
+      if (status === "resolved" && report.commentId && report.comment?.status === "visible") {
+        hideReportedComment = window.confirm("Ẩn bình luận bị báo cáo khỏi trang dự án? Tác giả sẽ nhận thông báo kèm lý do.");
+      } else if (status === "resolved" && report.campaign?.status === "active") {
         pauseCampaign = window.confirm(
           `Tạm dừng chiến dịch "${title}" để chủ dự án giải trình? Chiến dịch có thể được cho tiếp tục sau.`,
         );
@@ -408,19 +422,60 @@ export function AdminDashboard() {
     setBusy(report.id);
     setNotice(null);
     try {
-      await reviewReport(report.id, { status, adminNotes, pauseCampaign });
+      await reviewReport(report.id, { status, adminNotes, pauseCampaign, hideComment: hideReportedComment });
       const reloads: Array<Promise<unknown>> = [loadReports(reportFilter)];
+      if (hideReportedComment) reloads.push(loadComments(commentFilter));
       if (pauseCampaign) reloads.push(changeCampaignFilter(campaignFilter), reloadOverview());
       await Promise.all(reloads);
       setNotice(
         status === "reviewing"
           ? `Đã chuyển báo cáo về "${title}" sang đang xem xét.`
           : status === "resolved"
-            ? `Đã xác nhận vi phạm "${title}"${pauseCampaign ? " và tạm dừng chiến dịch" : ""}.`
+            ? `Đã xác nhận vi phạm "${title}"${pauseCampaign ? " và tạm dừng chiến dịch" : ""}${hideReportedComment ? " và ẩn bình luận" : ""}.`
             : `Đã bỏ qua báo cáo về "${title}".`,
       );
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Không cập nhật được báo cáo");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function loadComments(status: CommentStatus | "") {
+    try {
+      const result = await fetchAdminComments({ status: status || undefined, limit: 30 });
+      setComments(result.items);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Không tải được bình luận");
+    }
+  }
+
+  async function changeCommentFilter(status: CommentStatus | "") {
+    setCommentFilter(status);
+    await loadComments(status);
+  }
+
+  async function handleCommentVisibility(comment: AdminComment) {
+    const hiding = comment.status === "visible";
+    let reason = "";
+    if (hiding) {
+      const input = window.prompt("Lý do ẩn bình luận (bắt buộc, gửi cho tác giả và lưu vào nhật ký)", "");
+      if (input === null) return;
+      if (input.trim().length < 5) {
+        setNotice("Vui lòng nhập lý do tối thiểu 5 ký tự.");
+        return;
+      }
+      reason = input.trim();
+    }
+    setBusy(comment.id);
+    setNotice(null);
+    try {
+      if (hiding) await hideComment(comment.id, reason);
+      else await unhideComment(comment.id);
+      await loadComments(commentFilter);
+      setNotice(hiding ? "Đã ẩn bình luận và thông báo cho tác giả." : "Đã hiện lại bình luận.");
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Không cập nhật được bình luận");
     } finally {
       setBusy(null);
     }
@@ -432,6 +487,7 @@ export function AdminDashboard() {
         <span>
           {REPORT_STATUS_LABEL[report.status]}
           {report.campaignPaused ? " · đã tạm dừng chiến dịch" : ""}
+          {report.commentHidden ? " · đã ẩn bình luận" : ""}
           {report.resolvedAt ? ` · ${formatDate(report.resolvedAt)}` : ""}
         </span>
       );
@@ -579,6 +635,7 @@ export function AdminDashboard() {
             <a href="#cho-duyet"><Icon name="document" size={19} /> Duyệt chiến dịch {pendingCount > 0 && <i>{pendingCount}</i>}</a>
             <a href="#rui-ro"><Icon name="shield" size={19} /> Cảnh báo rủi ro {(overview?.risks.open ?? 0) > 0 && <i>{overview?.risks.open}</i>}</a>
             <a href="#bao-cao-vi-pham"><Icon name="bell" size={19} /> Báo cáo vi phạm</a>
+            <a href="#binh-luan"><Icon name="message" size={19} /> Bình luận</a>
             <a href="#giao-dich"><Icon name="receipt" size={19} /> Giao dịch</a>
             <a href="#nguoi-dung"><Icon name="users" size={19} /> Người dùng</a>
             <a href="#nhat-ky-kiem-toan"><Icon name="clock" size={19} /> Nhật ký kiểm toán</a>
@@ -766,6 +823,9 @@ export function AdminDashboard() {
                     <div>
                       <h3>{report.campaign?.title ?? "Chiến dịch đã bị xoá"}</h3>
                       <p>{REPORT_REASON_LABEL[report.reason]} · {formatDate(report.createdAt)} · bởi {report.reporter ? `${report.reporter.name}${report.reporter.email ? ` (${report.reporter.email})` : ""}` : "người dùng"}</p>
+                      {report.comment && (
+                        <p className="report-quote report-comment"><b>Bình luận bị báo cáo{report.comment.status === "hidden" ? " (đã ẩn)" : ""}:</b> {report.comment.content}</p>
+                      )}
                       <p className="report-quote">{report.description}</p>
                       {report.adminNotes && <small><b>Ghi chú quản trị:</b> {report.adminNotes}</small>}
                     </div>
@@ -775,6 +835,44 @@ export function AdminDashboard() {
               )}
             </div>
             <p className="risk-footnote"><Icon name="shield" size={15} /> Hệ thống không tự ẩn hay tạm dừng chiến dịch theo số lượng báo cáo. Quản trị viên xem xét, ghi lý do và mọi quyết định được lưu vào nhật ký kiểm toán.</p>
+          </section>
+
+          <section className="admin-card risk-card" id="binh-luan">
+            <div className="card-heading">
+              <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>Bình luận &amp; hỏi đáp</h2></div>
+              <select className="filter-button" aria-label="Lọc bình luận theo trạng thái" value={commentFilter} onChange={(event) => changeCommentFilter(event.target.value as CommentStatus | "")}>
+                <option value="visible">Đang hiển thị</option>
+                <option value="hidden">Đã ẩn</option>
+                <option value="">Tất cả</option>
+              </select>
+            </div>
+            <div className="risk-list">
+              {comments.length === 0 ? (
+                <article>
+                  <p className="table-muted">Không có bình luận nào ở trạng thái này.</p>
+                </article>
+              ) : (
+                comments.map((comment) => (
+                  <article key={comment.id}>
+                    <span className={`report-status ${comment.status === "hidden" ? "dismissed" : "reviewing"}`}>
+                      {comment.kind === "question" ? "Câu hỏi" : comment.parentId ? "Trả lời" : "Bình luận"}
+                    </span>
+                    <div>
+                      <h3>{comment.campaign?.title ?? "Chiến dịch"}</h3>
+                      <p>{formatDate(comment.createdAt)} · bởi {comment.user ? `${comment.user.name}${comment.user.email ? ` (${comment.user.email})` : ""}` : "người dùng"}</p>
+                      <p className="report-quote">{comment.content}</p>
+                      {comment.status === "hidden" && comment.hiddenReason && <small><b>Lý do ẩn:</b> {comment.hiddenReason}</small>}
+                    </div>
+                    <div className="risk-actions">
+                      <button className={comment.status === "visible" ? "resolve" : undefined} type="button" disabled={busy === comment.id} onClick={() => handleCommentVisibility(comment)}>
+                        {comment.status === "visible" ? "Ẩn bình luận" : "Hiện lại"}
+                      </button>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+            <p className="risk-footnote"><Icon name="shield" size={15} /> Ẩn bình luận cần ghi lý do; tác giả được thông báo và thao tác được lưu vào nhật ký kiểm toán.</p>
           </section>
 
           <section className="admin-card admin-table-card" id="giao-dich">

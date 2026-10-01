@@ -10,6 +10,7 @@ import {
 import type { Repository } from "typeorm";
 
 import type { CampaignsService } from "../src/modules/campaigns/campaigns.service";
+import type { CommentsService } from "../src/modules/comments/comments.service";
 import type { ModerateCampaignDto } from "../src/modules/campaigns/dto/campaign.dto";
 import { Campaign, CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import {
@@ -20,6 +21,7 @@ import {
 import { ModerationService } from "../src/modules/moderation/moderation.service";
 import { User, UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
 import { makeAuditRecorder } from "./helpers/audit";
+import { makeNotifierRecorder } from "./helpers/notifications";
 
 const CAMPAIGN_ID = "123e4567-e89b-12d3-a456-426614174010";
 const OWNER_ID = "123e4567-e89b-12d3-a456-426614174002";
@@ -68,6 +70,7 @@ type Setup = {
   existingOpenReport?: Report | null;
   report?: Report | null;
   moderateError?: Error;
+  comment?: { id: string; userId: string; campaignId: string } | null;
 };
 
 function setup(opts: Setup = {}) {
@@ -101,9 +104,21 @@ function setup(opts: Setup = {}) {
     },
   } as unknown as CampaignsService;
 
+  const hideCalls: Array<{ id: string; reason: string }> = [];
+  const commentsService = {
+    findForReport: async (commentId: string) => {
+      if (!opts.comment || opts.comment.id !== commentId) throw new NotFoundException("Comment not found");
+      return opts.comment;
+    },
+    hide: async (id: string, reason: string) => {
+      hideCalls.push({ id, reason });
+      return opts.comment;
+    },
+  } as unknown as CommentsService;
+
   const audit = makeAuditRecorder();
-  const service = new ModerationService(reportRepo, campaignsService, audit.service);
-  return { service, saved, moderateCalls, lookups, audit };
+  const service = new ModerationService(reportRepo, campaignsService, audit.service, makeNotifierRecorder().service, commentsService);
+  return { service, saved, moderateCalls, lookups, audit, hideCalls };
 }
 
 const validReport = {
@@ -241,5 +256,51 @@ describe("ModerationService", () => {
         NotFoundException,
       );
     });
+  });
+});
+
+describe("ModerationService — báo cáo bình luận", () => {
+  const COMMENT_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const COMMENTER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const comment = { id: COMMENT_ID, userId: COMMENTER, campaignId: CAMPAIGN_ID };
+
+  it("lưu báo cáo kèm commentId, kiểm tra trùng theo bình luận", async () => {
+    const { service, saved, lookups } = setup({ comment });
+    const report = await service.createReport({ ...validReport, commentId: COMMENT_ID }, reporter);
+    equal(report.commentId, COMMENT_ID);
+    equal(saved[0].commentHidden, false);
+    equal(lookups[0].commentId, COMMENT_ID);
+  });
+
+  it("không báo cáo được bình luận của chính mình", async () => {
+    const { service } = setup({ comment });
+    await rejects(
+      service.createReport({ ...validReport, commentId: COMMENT_ID }, makeUser(COMMENTER, UserRole.USER)),
+      ForbiddenException,
+    );
+  });
+
+  it("chủ dự án báo cáo được bình luận trên chiến dịch của mình", async () => {
+    const { service } = setup({ comment, campaign: makeCampaign(CampaignStatus.ACTIVE) });
+    const report = await service.createReport({ ...validReport, commentId: COMMENT_ID }, owner);
+    equal(report.commentId, COMMENT_ID);
+  });
+
+  it("kết luận kèm hideComment → ẩn bình luận và ghi nhận", async () => {
+    const report = makeReport({ commentId: COMMENT_ID } as Partial<Report>);
+    const { service, hideCalls, audit } = setup({ comment, report });
+    const result = await service.review(REPORT_ID, { status: ReportStatus.RESOLVED, adminNotes: "Ngôn từ xúc phạm", hideComment: true }, admin);
+    equal(hideCalls.length, 1);
+    equal(hideCalls[0].id, COMMENT_ID);
+    equal(result.commentHidden, true);
+    equal((audit.entries.at(-1)?.newValues as Record<string, unknown>).commentHidden, true);
+  });
+
+  it("hideComment không hợp lệ khi báo cáo không nhắm vào bình luận", async () => {
+    const { service } = setup({ report: makeReport() });
+    await rejects(
+      service.review(REPORT_ID, { status: ReportStatus.RESOLVED, adminNotes: "Đã xem xét", hideComment: true }, admin),
+      BadRequestException,
+    );
   });
 });

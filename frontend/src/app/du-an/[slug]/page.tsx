@@ -7,6 +7,7 @@ import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { PageBanner } from "@/components/layout/PageBanner";
 import { Icon } from "@/components/ui/Icon";
+import { CampaignComments } from "@/features/comments/CampaignComments";
 import { CampaignLedger } from "@/features/donations/CampaignLedger";
 import { DonationPanel } from "@/features/donations/DonationPanel";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
@@ -165,6 +166,12 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             <h2 id="so-cai">Sổ cái giao dịch</h2>
             <p className="hint">Các khoản ủng hộ đã được cổng thanh toán xác nhận, mới nhất ở trên.</p>
             {live ? <CampaignLedger campaignId={campaign.slug} /> : <p className="hint">Dữ liệu mẫu không có sổ cái.</p>}
+          </section>
+
+          <section className="panel" id="hoi-dap" aria-labelledby="hoi-dap-title">
+            <h2 id="hoi-dap-title">Hỏi đáp &amp; bình luận</h2>
+            <p className="hint">Đặt câu hỏi cho chủ dự án hoặc chia sẻ ý kiến. Nội dung vi phạm có thể bị quản trị viên ẩn.</p>
+            {live ? <CampaignComments campaignId={campaign.slug} /> : <p className="hint">Dữ liệu mẫu không có bình luận.</p>}
           </section>
         </div>
 

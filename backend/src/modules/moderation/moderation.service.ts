@@ -6,11 +6,14 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindOptionsWhere, In, Repository } from "typeorm";
+import { FindOptionsWhere, In, IsNull, Repository } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { CampaignsService } from "../campaigns/campaigns.service";
 import { CampaignStatus } from "../campaigns/entities/campaign.entity";
+import { CommentsService } from "../comments/comments.service";
+import { NotificationType } from "../notifications/entities/notification.entity";
+import { NotificationsService } from "../notifications/notifications.service";
 import { User } from "../users/entities/user.entity";
 import {
   CreateReportDto,
@@ -64,6 +67,8 @@ export class ModerationService {
     private readonly reportRepo: Repository<Report>,
     private readonly campaignsService: CampaignsService,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
+    private readonly commentsService: CommentsService,
   ) {}
 
   async createReport(dto: CreateReportDto, reporter: User): Promise<Report> {
@@ -73,18 +78,27 @@ export class ModerationService {
       // Không tiết lộ sự tồn tại của chiến dịch chưa công khai.
       throw new NotFoundException("Campaign not found");
     }
-    if (campaign.ownerId === reporter.id) {
+    const comment = dto.commentId
+      ? await this.commentsService.findForReport(dto.commentId, campaign.id)
+      : null;
+    if (comment && comment.userId === reporter.id) {
+      throw new ForbiddenException("You cannot report your own comment");
+    }
+    if (!comment && campaign.ownerId === reporter.id) {
       throw new ForbiddenException("You cannot report your own campaign");
     }
 
     const openReport = await this.reportRepo.findOneBy({
       reporterId: reporter.id,
       campaignId: campaign.id,
+      commentId: comment ? comment.id : IsNull(),
       status: In(OPEN_STATUSES),
     });
     if (openReport) {
       throw new ConflictException(
-        "You already have an open report for this campaign",
+        comment
+          ? "You already have an open report for this comment"
+          : "You already have an open report for this campaign",
       );
     }
 
@@ -92,10 +106,12 @@ export class ModerationService {
       this.reportRepo.create({
         reporterId: reporter.id,
         campaignId: campaign.id,
+        commentId: comment?.id ?? null,
         reason: dto.reason,
         description: dto.description,
         status: ReportStatus.PENDING,
         campaignPaused: false,
+        commentHidden: false,
       }),
     );
     await this.auditService.record({
@@ -105,6 +121,7 @@ export class ModerationService {
       entityId: saved.id,
       newValues: {
         campaignId: campaign.id,
+        commentId: saved.commentId ?? null,
         reason: saved.reason,
         description: truncateForAudit(saved.description),
       },
@@ -115,7 +132,7 @@ export class ModerationService {
   async findMine(reporter: User): Promise<Report[]> {
     return this.reportRepo.find({
       where: { reporterId: reporter.id },
-      relations: { campaign: true },
+      relations: { campaign: true, comment: true },
       order: { createdAt: "DESC" },
       take: 50,
     });
@@ -131,7 +148,7 @@ export class ModerationService {
     };
     const [items, total] = await this.reportRepo.findAndCount({
       where,
-      relations: { campaign: true, reporter: true },
+      relations: { campaign: true, reporter: true, comment: true },
       order: { createdAt: "DESC" },
       skip: offset,
       take: limit,
@@ -170,6 +187,13 @@ export class ModerationService {
     if (pauseCampaign && !report.campaignId) {
       throw new BadRequestException("This report is not linked to a campaign");
     }
+    const hideComment = dto.hideComment === true;
+    if (hideComment && dto.status !== ReportStatus.RESOLVED) {
+      throw new BadRequestException("hideComment is only allowed when resolving a report");
+    }
+    if (hideComment && !report.commentId) {
+      throw new BadRequestException("This report is not linked to a comment");
+    }
 
     // Tạm dừng trước khi lưu báo cáo: nếu chiến dịch không ở trạng thái
     // tạm dừng được (vd. không còn `active`), moderate() ném 409 và báo cáo
@@ -185,6 +209,15 @@ export class ModerationService {
       );
     }
 
+    if (hideComment && report.commentId) {
+      await this.commentsService
+        .hide(report.commentId, `Vi phạm theo báo cáo: ${notes}`, admin)
+        .catch((error: unknown) => {
+          // Đã bị ẩn trước đó (admin ẩn trực tiếp): vẫn kết luận báo cáo bình thường.
+          if (!(error instanceof ConflictException)) throw error;
+        });
+    }
+
     const previous = {
       status: report.status,
       adminNotes: report.adminNotes ?? null,
@@ -196,6 +229,7 @@ export class ModerationService {
     report.resolvedBy = admin.id;
     report.resolvedAt = isConclusion ? new Date() : null;
     report.campaignPaused = report.campaignPaused || pauseCampaign;
+    report.commentHidden = report.commentHidden || hideComment;
 
     const saved = await this.reportRepo.save(report);
     await this.auditService.record({
@@ -208,9 +242,26 @@ export class ModerationService {
         status: saved.status,
         adminNotes: truncateForAudit(saved.adminNotes ?? null),
         campaignPaused: pauseCampaign,
+        commentHidden: hideComment,
         campaignId: saved.campaignId ?? null,
+        commentId: saved.commentId ?? null,
       },
     });
+    if (isConclusion && previous.status !== saved.status) {
+      // Chỉ báo kết quả, không gửi ghi chú nội bộ của admin cho người báo cáo.
+      const outcome =
+        saved.status === ReportStatus.RESOLVED
+          ? `Báo cáo vi phạm của bạn đã được xử lý${saved.campaignPaused ? "; chiến dịch liên quan đang tạm dừng để xem xét" : ""}.`
+          : "Sau khi xem xét, quản trị viên chưa ghi nhận vi phạm trong báo cáo của bạn.";
+      await this.notificationsService.notify({
+        userId: saved.reporterId,
+        type: NotificationType.REPORT_RESOLVED,
+        title: "Kết quả xử lý báo cáo vi phạm",
+        message: `${outcome} Cảm ơn bạn đã giúp cộng đồng minh bạch hơn.`,
+        link: saved.campaignId ? `/du-an/${saved.campaignId}` : undefined,
+        relatedId: saved.id,
+      });
+    }
     return saved;
   }
 }

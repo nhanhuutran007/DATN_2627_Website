@@ -2,6 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
 import type { Campaign } from "../../campaigns/entities/campaign.entity";
+import type { CampaignComment } from "../../comments/entities/campaign-comment.entity";
 import type { User } from "../../users/entities/user.entity";
 
 export enum ReportStatus {
@@ -35,6 +36,14 @@ export class Report extends BaseEntity {
   @JoinColumn({ name: "campaign_id" })
   campaign?: Campaign | null;
 
+  /** Báo cáo nhắm vào một bình luận cụ thể của chiến dịch (nếu có). */
+  @Column({ name: "comment_id", type: "varchar", nullable: true })
+  commentId?: string | null;
+
+  @ManyToOne("CampaignComment", { nullable: true })
+  @JoinColumn({ name: "comment_id" })
+  comment?: CampaignComment | null;
+
   @Column({ type: "enum", enum: ReportReason })
   reason!: ReportReason;
 
@@ -57,4 +66,8 @@ export class Report extends BaseEntity {
   /** Chiến dịch đã bị tạm dừng như một phần của việc xử lý báo cáo này. */
   @Column({ name: "campaign_paused", type: "boolean", default: false })
   campaignPaused!: boolean;
+
+  /** Bình luận bị báo cáo đã bị ẩn như một phần của việc xử lý báo cáo này. */
+  @Column({ name: "comment_hidden", type: "boolean", default: false })
+  commentHidden!: boolean;
 }

@@ -10,6 +10,7 @@ import { AdminModule } from "./modules/admin/admin.module";
 import { AiModule } from "./modules/ai/ai.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { CampaignsModule } from "./modules/campaigns/campaigns.module";
+import { CommentsModule } from "./modules/comments/comments.module";
 import { DonationsModule } from "./modules/donations/donations.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MediaModule } from "./modules/media/media.module";
@@ -35,6 +36,7 @@ import { UsersModule } from "./modules/users/users.module";
     DonationsModule,
     ProgressModule,
     ModerationModule,
+    CommentsModule,
     MediaModule,
     NotificationsModule,
     HealthModule,

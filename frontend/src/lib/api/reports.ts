@@ -33,6 +33,10 @@ export type CampaignReport = {
   resolvedBy?: string | null;
   resolvedAt?: string | null;
   campaignPaused: boolean;
+  /** Báo cáo nhắm vào một bình luận (nếu có). */
+  commentId?: string | null;
+  comment?: { id: string; content: string; status: "visible" | "hidden"; userId: string } | null;
+  commentHidden?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -46,6 +50,8 @@ export type ReportList = {
 
 export async function submitReport(payload: {
   campaignId: string;
+  /** Báo cáo một bình luận cụ thể của chiến dịch. */
+  commentId?: string;
   reason: ReportReason;
   description: string;
 }): Promise<CampaignReport> {
@@ -67,7 +73,7 @@ export async function fetchAdminReports(query: {
 
 export async function reviewReport(
   id: string,
-  payload: { status: ReviewStatus; adminNotes?: string; pauseCampaign?: boolean },
+  payload: { status: ReviewStatus; adminNotes?: string; pauseCampaign?: boolean; hideComment?: boolean },
 ): Promise<CampaignReport> {
   return api.patch<CampaignReport>(`/admin/reports/${encodeURIComponent(id)}`, payload);
 }
