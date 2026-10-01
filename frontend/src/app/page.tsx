@@ -190,7 +190,7 @@ export default async function Home() {
               </div>
             ))}
           </div>
-          <p className="container stats-note">Số liệu lấy trực tiếp từ cơ sở dữ liệu, chỉ tính giao dịch đã được xác nhận.</p>
+          <p className="container stats-note">Số liệu được cập nhật liên tục và chỉ ghi nhận những khoản ủng hộ đã được cổng thanh toán xác nhận.</p>
         </section>
       )}
 

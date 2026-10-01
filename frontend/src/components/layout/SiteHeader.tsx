@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
+import { LogoMark } from "@/components/ui/LogoMark";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { clearSession } from "@/lib/api";
 import { useAuthUser } from "@/lib/auth";
@@ -57,7 +58,7 @@ export function SiteHeader() {
       <div className="navbar">
         <div className="container navbar-inner">
           <Link className="logo" href="/" aria-label="Góp Mầm – Trang chủ" onClick={close}>
-            <span className="logo-mark"><Icon name="leaf" size={22} /></span>
+            <LogoMark className="logo-mark" />
             <span className="logo-text">GÓP <b>MẦM</b></span>
           </Link>
 

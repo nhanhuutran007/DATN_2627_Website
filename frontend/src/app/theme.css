@@ -1070,13 +1070,10 @@ h3 {
 }
 
 .logo-mark {
-  display: grid;
-  place-items: center;
+  display: block;
+  flex-shrink: 0;
   width: 40px;
   height: 40px;
-  color: var(--white);
-  border-radius: 50%;
-  background: var(--primary);
 }
 
 .logo-text {

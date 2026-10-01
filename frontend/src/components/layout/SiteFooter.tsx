@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Icon } from "@/components/ui/Icon";
+import { LogoMark } from "@/components/ui/LogoMark";
 
 export function SiteFooter() {
   return (
@@ -8,7 +9,7 @@ export function SiteFooter() {
       <div className="container footer-cols">
         <div className="footer-about">
           <Link className="logo logo-light" href="/" aria-label="Góp Mầm – Trang chủ">
-            <span className="logo-mark"><Icon name="leaf" size={22} /></span>
+            <LogoMark className="logo-mark" />
             <span className="logo-text">GÓP <b>MẦM</b></span>
           </Link>
           <p>
