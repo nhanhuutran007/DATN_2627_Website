@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { AiConsentSettings } from "@/features/ai-consent/AiConsentSettings";
 import { EmailVerificationNotice } from "@/features/auth/EmailVerificationNotice";
 import { MyDonations } from "@/features/finance/MyDonations";
 import { RewardManager } from "@/features/rewards/RewardManager";
@@ -264,6 +265,7 @@ export function OwnerDashboard() {
               <p className="hint">Nên đổi mật khẩu định kỳ và không dùng lại mật khẩu của trang khác.</p>
               <Link className="button button-outline button-block" href="/doi-mat-khau">Đổi mật khẩu</Link>
             </section>
+            <AiConsentSettings user={user} />
             <section className="panel" aria-labelledby="minh-bach-note">
               <h2 id="minh-bach-note" className="panel-title-sm">Số liệu được tính thế nào?</h2>
               <ul className="check-list">

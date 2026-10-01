@@ -251,6 +251,45 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+  /users/me/ai-consent:
+    patch:
+      operationId: updateAiConsent
+      summary: Đồng ý / rút lại đồng ý ghi nhận hành vi cho gợi ý AI (chính chủ)
+      description: >-
+        Opt-in, mặc định tắt. Rút lại đồng ý (`consent=false`) sẽ xóa toàn bộ
+        `behavior_events` của người dùng trong cùng transaction. Ghi audit `user.ai_consent`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [consent]
+              properties:
+                consent:
+                  type: boolean
+      responses:
+        "200":
+          description: Lựa chọn đã lưu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  aiTrackingConsent:
+                    type: boolean
+                  aiConsentUpdatedAt:
+                    type: string
+                    format: date-time
+                  deletedEventCount:
+                    type: integer
+                    description: Số sự kiện hành vi đã xóa (0 khi bật đồng ý)
+        "400":
+          description: Thiếu hoặc sai kiểu `consent`
+        "401":
+          description: Chưa đăng nhập
   /users/{id}:
     get:
       operationId: getUserById
@@ -891,7 +930,9 @@ paths:
     post:
       operationId: recordBehaviorEvent
       summary: Ghi sự kiện hành vi (xem/theo dõi/tài trợ) phục vụ cá nhân hóa
-      description: Chỉ ghi khi người dùng đã đồng ý cá nhân hóa (xử lý ở tầng FE).
+      description: >-
+        Chỉ ghi khi người dùng đã đồng ý cá nhân hóa (`aiTrackingConsent`). Chưa đồng ý thì
+        server bỏ qua và trả `{ recorded: false, reason: "NO_CONSENT" }`.
       security:
         - bearerAuth: []
       requestBody:
@@ -902,7 +943,20 @@ paths:
               $ref: "#/components/schemas/CreateBehaviorEventRequest"
       responses:
         "201":
-          description: Đã ghi sự kiện
+          description: Kết quả ghi nhận
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recorded:
+                    type: boolean
+                  eventId:
+                    type: string
+                    format: uuid
+                  reason:
+                    type: string
+                    enum: [NO_CONSENT]
         "404":
           description: Chiến dịch không tồn tại
 
@@ -2108,6 +2162,12 @@ components:
         emailVerified:
           type: boolean
           description: Có trong phản hồi đăng nhập/đăng ký/refresh/đổi mật khẩu
+        aiTrackingConsent:
+          type: boolean
+          description: Đã đồng ý ghi nhận hành vi cho gợi ý AI
+        aiConsentDecided:
+          type: boolean
+          description: false = chưa từng chọn → frontend hiển thị lời mời đồng ý
     User:
       type: object
       description: >-
@@ -2142,6 +2202,14 @@ components:
           nullable: true
         emailVerified:
           type: boolean
+        aiTrackingConsent:
+          type: boolean
+          description: Chỉ có ở API của chính chủ/admin
+        aiConsentUpdatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: NULL = chưa từng chọn; chỉ có ở API của chính chủ/admin
         createdAt:
           type: string
           format: date-time

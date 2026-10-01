@@ -1,8 +1,13 @@
-import { equal, ok } from "node:assert/strict";
+import { deepEqual, equal, ok } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
 import type { AiGateway } from "../src/integrations/ai/ai.gateway";
-import type { AiFraudResponse, AiPredictResponse, AiRecommendResponse } from "../src/integrations/ai/ai.types";
+import type {
+  AiFraudResponse,
+  AiPredictResponse,
+  AiRecommendRequest,
+  AiRecommendResponse,
+} from "../src/integrations/ai/ai.types";
 import { AiService } from "../src/modules/ai/ai.service";
 import { BehaviorEventType } from "../src/modules/ai/entities/behavior-event.entity";
 import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
@@ -36,7 +41,7 @@ function makeCampaign(overrides = {}) {
   };
 }
 
-function makeUser() {
+function makeUser(overrides: Record<string, unknown> = {}) {
   return {
     id: USER_ID,
     name: "Test User",
@@ -47,21 +52,26 @@ function makeUser() {
     emailVerified: true,
     failedLoginCount: 0,
     lockedUntil: null,
+    aiTrackingConsent: false,
+    aiConsentUpdatedAt: null,
     campaigns: [],
     donations: [],
     createdAt: new Date(),
     updatedAt: new Date(),
+    ...overrides,
   };
 }
 
 class FakeAiGateway implements AiGateway {
   unavailable = false;
+  lastRecommend: AiRecommendRequest | null = null;
 
   async health(): Promise<never> {
     throw new Error("not used");
   }
 
-  async recommend(): Promise<AiRecommendResponse> {
+  async recommend(request: AiRecommendRequest): Promise<AiRecommendResponse> {
+    this.lastRecommend = request;
     if (this.unavailable) throw new Error("down");
     return {
       source: "COLD_START",
@@ -115,8 +125,8 @@ function createRepos() {
       opts?.where?.id === "missing" ? null : makeUser(),
   };
   const eventRepo: any = {
-    create: async (dto: any) => dto,
-    save: async (event: any) => event,
+    create: (dto: any) => dto,
+    save: async (event: any) => ({ id: "event-1", ...event }),
     find: async () => [
       { campaignId: CAMPAIGN_ID, eventType: BehaviorEventType.VIEW, category: "Giáo dục" },
     ],
@@ -159,10 +169,22 @@ describe("AiService", () => {
       ok(result.detail);
     });
 
-    it("should build history from behavior events for a logged-in user", async () => {
-      const result = await service.recommend({ limit: 5 }, makeUser());
+    it("should build history from behavior events for a consenting user", async () => {
+      const result = await service.recommend({ limit: 5 }, makeUser({ aiTrackingConsent: true }));
       ok(result.available);
       equal(result.items.length, 1);
+      equal(gateway.lastRecommend?.userId, USER_ID);
+      ok((gateway.lastRecommend?.history.length ?? 0) > 0);
+    });
+
+    it("should not personalize or send userId without consent", async () => {
+      repos.eventRepo.find = async () => {
+        throw new Error("history must not be read without consent");
+      };
+      const result = await service.recommend({ limit: 5 }, makeUser());
+      ok(result.available);
+      equal(gateway.lastRecommend?.userId, null);
+      equal(gateway.lastRecommend?.history.length, 0);
     });
   });
 
@@ -224,14 +246,31 @@ describe("AiService", () => {
   });
 
   describe("recordEvent", () => {
-    it("should persist a behavior event with the campaign category", async () => {
-      const event = await service.recordEvent(
+    it("should persist a behavior event with the campaign category when consented", async () => {
+      let saved: any = null;
+      repos.eventRepo.save = async (event: any) => {
+        saved = event;
+        return { id: "event-1", ...event };
+      };
+      const result = await service.recordEvent(
+        { campaignId: CAMPAIGN_ID, eventType: BehaviorEventType.VIEW },
+        makeUser({ aiTrackingConsent: true }),
+      );
+      deepEqual(result, { recorded: true, eventId: "event-1" });
+      equal(saved.userId, USER_ID);
+      equal(saved.campaignId, CAMPAIGN_ID);
+      equal(saved.category, "Giáo dục");
+    });
+
+    it("should skip recording without consent", async () => {
+      repos.eventRepo.save = async () => {
+        throw new Error("must not save without consent");
+      };
+      const result = await service.recordEvent(
         { campaignId: CAMPAIGN_ID, eventType: BehaviorEventType.VIEW },
         makeUser(),
       );
-      equal(event.userId, USER_ID);
-      equal(event.campaignId, CAMPAIGN_ID);
-      equal(event.category, "Giáo dục");
+      deepEqual(result, { recorded: false, reason: "NO_CONSENT" });
     });
 
     it("should throw NotFoundException for a missing campaign", async () => {
@@ -239,7 +278,7 @@ describe("AiService", () => {
       await service
         .recordEvent(
           { campaignId: "missing", eventType: BehaviorEventType.FOLLOW },
-          makeUser(),
+          makeUser({ aiTrackingConsent: true }),
         )
         .then(() => Promise.reject(new Error("should have thrown")))
         .catch((err) => equal(err.status, 404));

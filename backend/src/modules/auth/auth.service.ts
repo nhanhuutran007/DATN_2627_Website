@@ -181,6 +181,8 @@ export class AuthService {
         name: user.name,
         role: user.role,
         emailVerified: Boolean(user.emailVerified),
+        aiTrackingConsent: Boolean(user.aiTrackingConsent),
+        aiConsentDecided: user.aiConsentUpdatedAt != null,
       },
     };
   }

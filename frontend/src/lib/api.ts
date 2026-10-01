@@ -5,6 +5,10 @@ export type AuthUser = {
   role: "user" | "campaign_owner" | "admin";
   /** Thiếu ở phiên đăng nhập cũ (trước khi có xác minh email). */
   emailVerified?: boolean;
+  /** Đồng ý ghi nhận hành vi để cá nhân hóa gợi ý AI (mặc định tắt). */
+  aiTrackingConsent?: boolean;
+  /** false/thiếu = chưa từng chọn → hiển thị lời mời đồng ý. */
+  aiConsentDecided?: boolean;
 };
 
 export type AuthSession = {

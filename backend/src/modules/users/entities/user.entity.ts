@@ -71,6 +71,16 @@ export class User extends BaseEntity {
   @Column({ name: "password_changed_at", type: "datetime", nullable: true })
   passwordChangedAt?: Date | null;
 
+  /** Đồng ý ghi nhận hành vi để cá nhân hóa gợi ý AI (opt-in, mặc định tắt). */
+  @Expose({ groups: [USER_PRIVATE_GROUP] })
+  @Column({ name: "ai_tracking_consent", default: false })
+  aiTrackingConsent!: boolean;
+
+  /** NULL = người dùng chưa từng quyết định (frontend hiển thị lời mời). */
+  @Expose({ groups: [USER_PRIVATE_GROUP] })
+  @Column({ name: "ai_consent_updated_at", type: "datetime", nullable: true })
+  aiConsentUpdatedAt?: Date | null;
+
   @OneToMany("Campaign", "owner")
   campaigns!: any[];
 

@@ -19,6 +19,7 @@ function createMockDependencies() {
     status: UserStatus.ACTIVE,
     failedLoginCount: 0,
     lockedUntil: null,
+    aiTrackingConsent: false,
   };
 
   const recordLoginFailure = async (user: Partial<User>): Promise<Partial<User>> => user;

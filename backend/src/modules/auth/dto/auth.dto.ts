@@ -94,5 +94,8 @@ export class TokenResponseDto {
     name: string;
     role: string;
     emailVerified: boolean;
+    aiTrackingConsent: boolean;
+    /** false = chưa từng chọn → frontend hiển thị lời mời đồng ý. */
+    aiConsentDecided: boolean;
   };
 }

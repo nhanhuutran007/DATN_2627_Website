@@ -3,11 +3,19 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
+import { BehaviorEvent } from "../ai/entities/behavior-event.entity";
 import { CreateUserDto, UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
 import { User } from "./entities/user.entity";
 
 export const MAX_LOGIN_ATTEMPTS = 5;
 export const LOGIN_LOCK_MINUTES = 15;
+
+export type AiConsentResult = {
+  aiTrackingConsent: boolean;
+  aiConsentUpdatedAt: Date;
+  /** Số sự kiện hành vi đã xóa khi rút lại đồng ý. */
+  deletedEventCount: number;
+};
 
 export function isUserLocked(user: User, now = new Date()): boolean {
   return Boolean(user.lockedUntil && new Date(user.lockedUntil).getTime() > now.getTime());
@@ -110,6 +118,37 @@ export class UsersService {
       entityId: id,
       oldValues: snapshot,
     });
+  }
+
+  /**
+   * Bật/tắt đồng ý ghi nhận hành vi cho gợi ý AI. Rút lại đồng ý thì xóa luôn
+   * lịch sử hành vi đã ghi (cùng transaction) để không còn dùng cho cá nhân hóa.
+   */
+  async updateAiConsent(user: User, consent: boolean): Promise<AiConsentResult> {
+    const previous = Boolean(user.aiTrackingConsent);
+    const now = new Date();
+
+    const deletedEventCount = await this.userRepo.manager.transaction(async (manager) => {
+      await manager.update(User, { id: user.id }, {
+        aiTrackingConsent: consent,
+        aiConsentUpdatedAt: now,
+      });
+      if (consent) return 0;
+      const result = await manager.delete(BehaviorEvent, { userId: user.id });
+      return result.affected ?? 0;
+    });
+
+    user.aiTrackingConsent = consent;
+    user.aiConsentUpdatedAt = now;
+    await this.auditService.record({
+      userId: user.id,
+      action: "user.ai_consent",
+      entity: "user",
+      entityId: user.id,
+      oldValues: { aiTrackingConsent: previous },
+      newValues: { aiTrackingConsent: consent, deletedEventCount },
+    });
+    return { aiTrackingConsent: consent, aiConsentUpdatedAt: now, deletedEventCount };
   }
 
   async recordLoginFailure(user: User): Promise<User> {

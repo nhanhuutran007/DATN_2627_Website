@@ -28,6 +28,7 @@ function makeUser(id = "11111111-1111-1111-1111-111111111111") {
     emailVerified: true,
     failedLoginCount: 0,
     lockedUntil: null,
+    aiTrackingConsent: false,
     campaigns: [],
     donations: [],
     createdAt: new Date(),

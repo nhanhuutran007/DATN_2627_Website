@@ -4351,3 +4351,68 @@ button {
     grid-template-columns: 40px minmax(0, 1fr) 96px;
   }
 }
+
+/* Lời mời đồng ý gợi ý cá nhân hóa (AI) */
+.ai-consent-banner {
+  border-bottom: 1px solid var(--line);
+  background: var(--soft);
+}
+
+.ai-consent-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 14px;
+}
+
+.ai-consent-title {
+  margin: 0;
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.ai-consent-text {
+  margin: 2px 0 0;
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+
+.ai-consent-error {
+  margin: 6px 0 0;
+  color: #b42318;
+  font-size: 0.88rem;
+}
+
+.ai-consent-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.ai-consent-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ai-consent-switch input {
+  width: 40px;
+  height: 22px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .ai-consent-inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-consent-actions .button {
+    flex: 1;
+  }
+}

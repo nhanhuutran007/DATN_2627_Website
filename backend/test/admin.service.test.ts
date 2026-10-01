@@ -22,6 +22,7 @@ function makeUser(overrides: Partial<User> = {}): User {
     emailVerified: true,
     failedLoginCount: 0,
     lockedUntil: null,
+    aiTrackingConsent: false,
     campaigns: [],
     donations: [],
     createdAt: new Date(),

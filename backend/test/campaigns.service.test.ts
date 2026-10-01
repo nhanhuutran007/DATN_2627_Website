@@ -48,6 +48,7 @@ function makeUser(role: UserRole = UserRole.USER, id = "123e4567-e89b-12d3-a456-
     emailVerified: true,
     failedLoginCount: 0,
     lockedUntil: null,
+    aiTrackingConsent: false,
     campaigns: [],
     donations: [],
     createdAt: new Date(),

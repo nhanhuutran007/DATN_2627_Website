@@ -1,4 +1,4 @@
-import { api, hasSession } from "../api";
+import { api, getStoredUser, hasSession, updateStoredUser } from "../api";
 import { apiCampaignToView, type ApiCampaign } from "./campaigns";
 import type { Campaign } from "@/lib/data/campaigns";
 
@@ -101,8 +101,9 @@ export async function trackBehaviorEvent(
   campaignId: string,
   eventType: BehaviorEventType,
 ): Promise<void> {
-  // POST /ai/events yêu cầu đăng nhập: khách vãng lai không gửi (tránh 401 thừa).
-  if (!hasSession()) return;
+  // POST /ai/events yêu cầu đăng nhập và chỉ ghi khi người dùng đã đồng ý
+  // (server cũng tự bỏ qua nếu chưa đồng ý).
+  if (!hasSession() || !getStoredUser()?.aiTrackingConsent) return;
   if (eventType === "view" && trackedCampaigns.has(campaignId)) return;
   trackedCampaigns.add(campaignId);
   try {
@@ -120,4 +121,20 @@ export async function fetchAiHealth(): Promise<AiHealth> {
   } catch {
     return { available: false };
   }
+}
+
+export type AiConsentResult = {
+  aiTrackingConsent: boolean;
+  aiConsentUpdatedAt: string;
+  deletedEventCount: number;
+};
+
+/** Đồng ý / rút lại đồng ý ghi nhận hành vi; rút lại thì server xóa lịch sử đã ghi. */
+export async function updateAiConsent(consent: boolean): Promise<AiConsentResult> {
+  const result = await api.patch<AiConsentResult>("/users/me/ai-consent", { consent });
+  const user = getStoredUser();
+  if (user) {
+    updateStoredUser({ ...user, aiTrackingConsent: result.aiTrackingConsent, aiConsentDecided: true });
+  }
+  return result;
 }

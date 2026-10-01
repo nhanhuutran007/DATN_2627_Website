@@ -23,6 +23,7 @@ function makeUser(): User {
     emailVerified: true,
     failedLoginCount: 2,
     lockedUntil: null,
+    aiTrackingConsent: false,
   });
 }
 

@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
+import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
 
 import { UserRole } from "../entities/user.entity";
 
@@ -44,4 +44,9 @@ export class UpdateUserDto {
 export class UpdateRoleDto {
   @IsEnum(UserRole)
   role!: UserRole;
+}
+
+export class UpdateAiConsentDto {
+  @IsBoolean()
+  consent!: boolean;
 }

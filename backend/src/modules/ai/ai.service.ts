@@ -57,6 +57,10 @@ export type RecommendResult = {
   detail?: string;
 };
 
+export type RecordEventResult =
+  | { recorded: true; eventId: string }
+  | { recorded: false; reason: "NO_CONSENT" };
+
 export type PredictResult =
   | { available: true; campaignId: string; data: AiPredictResponse }
   | { available: false; campaignId: string };
@@ -98,14 +102,16 @@ export class AiService {
       return { available: true, source: "COLD_START", items: [], detail: "Không có chiến dịch để gợi ý" };
     }
 
-    const history = user ? await this.buildHistory(user) : [];
+    // Chỉ dùng lịch sử cá nhân (và gửi userId sang AI) khi người dùng đã đồng ý.
+    const personalized = Boolean(user?.aiTrackingConsent);
+    const history = personalized && user ? await this.buildHistory(user) : [];
     const preferences = dto.preferences?.length
       ? dto.preferences
       : this.derivePreferences(history);
 
     try {
       const response = await this.aiGateway.recommend({
-        userId: user?.id ?? null,
+        userId: personalized && user ? user.id : null,
         preferences,
         excludeIds,
         candidates: candidates.map((campaign) => this.toCampaignFeature(campaign)),
@@ -188,7 +194,11 @@ export class AiService {
     }
   }
 
-  async recordEvent(dto: CreateBehaviorEventDto, user: User): Promise<BehaviorEvent> {
+  async recordEvent(dto: CreateBehaviorEventDto, user: User): Promise<RecordEventResult> {
+    if (!user.aiTrackingConsent) {
+      return { recorded: false, reason: "NO_CONSENT" };
+    }
+
     const campaign = await this.campaignRepo.findOne({ where: { id: dto.campaignId } });
     if (!campaign) {
       throw new NotFoundException("Campaign not found");
@@ -200,7 +210,8 @@ export class AiService {
       eventType: dto.eventType,
       category: campaign.category,
     });
-    return this.eventRepo.save(event);
+    const saved = await this.eventRepo.save(event);
+    return { recorded: true, eventId: saved.id };
   }
 
   private async loadCandidates(limit: number): Promise<Campaign[]> {

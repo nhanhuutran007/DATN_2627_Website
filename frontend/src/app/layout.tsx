@@ -3,6 +3,7 @@ import { Be_Vietnam_Pro, Montserrat } from "next/font/google";
 
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { AiConsentBanner } from "@/features/ai-consent/AiConsentBanner";
 import { siteUrl } from "@/lib/site";
 
 import "./theme.css";
@@ -59,6 +60,7 @@ export default function RootLayout({
       <body>
         <a className="skip-link" href="#noi-dung">Bỏ qua điều hướng</a>
         <SiteHeader />
+        <AiConsentBanner />
         <div id="noi-dung">{children}</div>
         <SiteFooter />
       </body>

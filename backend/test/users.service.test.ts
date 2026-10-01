@@ -224,4 +224,49 @@ describe("UsersService", () => {
       equal(user, base);
     });
   });
+
+  describe("updateAiConsent", () => {
+    function withManager() {
+      const calls: { updates: any[]; deletes: any[] } = { updates: [], deletes: [] };
+      const manager = {
+        update: async (_entity: unknown, where: any, values: any) => {
+          calls.updates.push({ where, values });
+        },
+        delete: async (_entity: unknown, where: any) => {
+          calls.deletes.push(where);
+          return { affected: 4 };
+        },
+      };
+      userRepo.manager = { transaction: async (fn: any) => fn(manager) };
+      return calls;
+    }
+
+    it("should opt in without deleting history and audit the change", async () => {
+      const calls = withManager();
+      const user = { id: "u1", aiTrackingConsent: false, aiConsentUpdatedAt: null } as any;
+
+      const result = await usersService.updateAiConsent(user, true);
+
+      equal(result.aiTrackingConsent, true);
+      equal(result.deletedEventCount, 0);
+      ok(result.aiConsentUpdatedAt instanceof Date);
+      equal(calls.updates[0].values.aiTrackingConsent, true);
+      equal(calls.deletes.length, 0);
+      equal(user.aiTrackingConsent, true);
+      equal(audit.entries[0].action, "user.ai_consent");
+      equal(audit.entries[0].entityId, "u1");
+    });
+
+    it("should delete behavior history when consent is withdrawn", async () => {
+      const calls = withManager();
+      const user = { id: "u1", aiTrackingConsent: true } as any;
+
+      const result = await usersService.updateAiConsent(user, false);
+
+      equal(result.aiTrackingConsent, false);
+      equal(result.deletedEventCount, 4);
+      equal(calls.deletes[0].userId, "u1");
+      equal((audit.entries[0].newValues as any).deletedEventCount, 4);
+    });
+  });
 });

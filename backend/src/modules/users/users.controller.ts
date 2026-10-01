@@ -16,7 +16,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { USER_PRIVATE_GROUP, User, UserRole } from "./entities/user.entity";
-import { UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
+import { UpdateAiConsentDto, UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
 import { UsersService } from "./users.service";
 
 @Controller("users")
@@ -35,6 +35,12 @@ export class UsersController {
   @Get("me")
   getMe(@GetCurrentUser() user: User) {
     return user;
+  }
+
+  /** Đồng ý / rút lại đồng ý ghi nhận hành vi cho gợi ý AI (chỉ chính chủ). */
+  @Patch("me/ai-consent")
+  updateAiConsent(@Body() dto: UpdateAiConsentDto, @GetCurrentUser() user: User) {
+    return this.usersService.updateAiConsent(user, dto.consent);
   }
 
   @Get(":id")

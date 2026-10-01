@@ -25,6 +25,7 @@ function makeUser(role: UserRole = UserRole.USER, id = OWNER_ID) {
     emailVerified: true,
     failedLoginCount: 0,
     lockedUntil: null,
+    aiTrackingConsent: false,
     campaigns: [],
     donations: [],
     createdAt: new Date(),
