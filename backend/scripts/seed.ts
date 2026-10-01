@@ -84,12 +84,12 @@ async function seed() {
       category: "Giáo dục",
       ownerId: owner1.id,
       goalAmount: 50000000,
-      currentAmount: 32500000,
+      currentAmount: 0,
       startDate: new Date(now.getTime() - 30 * 86400000),
       endDate: new Date(now.getTime() + 30 * 86400000),
       status: CampaignStatus.ACTIVE,
       location: "Lào Cai",
-      backerCount: 120,
+      backerCount: 0,
       viewCount: 2500,
     },
     {
@@ -99,12 +99,12 @@ async function seed() {
       category: "Nông nghiệp",
       ownerId: owner2.id,
       goalAmount: 80000000,
-      currentAmount: 12500000,
+      currentAmount: 0,
       startDate: new Date(now.getTime() - 10 * 86400000),
       endDate: new Date(now.getTime() + 50 * 86400000),
       status: CampaignStatus.ACTIVE,
       location: "Đà Lạt",
-      backerCount: 45,
+      backerCount: 0,
       viewCount: 890,
     },
     {
@@ -205,6 +205,17 @@ async function seed() {
   addDonation(eduTechCampaign, 300000, DonationStatus.FAILED, hoursAgo(0.6));
 
   await dataSource.getRepository(Donation).save(donationRows);
+
+  // Số liệu quỹ sinh từ giao dịch đã xác nhận (cùng quy tắc với donations.service:
+  // mỗi giao dịch completed cộng amount vào currentAmount và +1 backerCount), không gõ cứng.
+  for (const campaign of campaigns) {
+    const completed = donationRows.filter(
+      (row) => row.campaignId === campaign.id && row.status === DonationStatus.COMPLETED,
+    );
+    campaign.currentAmount = completed.reduce((sum, row) => sum + Number(row.amount), 0);
+    campaign.backerCount = completed.length;
+  }
+  await dataSource.getRepository(Campaign).save(campaigns);
 
   console.log(
     `Seeded: ${4} users, ${campaigns.length} campaigns, ${donationRows.length} donations.`,
