@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -15,7 +16,10 @@ import {
 } from "../../integrations/payment/payment.gateway";
 import { AuditService } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
-import { User } from "../users/entities/user.entity";
+import { NotificationType } from "../notifications/entities/notification.entity";
+import { NotificationsService } from "../notifications/notifications.service";
+import { RewardTier } from "../rewards/entities/reward-tier.entity";
+import { User, UserRole } from "../users/entities/user.entity";
 import { CreateDonationDto, WebhookDonationDto } from "./dto/donation.dto";
 import { Donation, DonationStatus } from "./entities/donation.entity";
 
@@ -29,6 +33,7 @@ export class DonationsService {
     private readonly dataSource: DataSource,
     @Inject("PaymentGateway") private readonly paymentGateway: PaymentGateway,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateDonationDto, user: User): Promise<Donation> {
@@ -54,6 +59,10 @@ export class DonationsService {
       throw new ConflictException("Campaign has ended");
     }
 
+    if (dto.rewardTierId) {
+      await this.assertRewardTierAvailable(dto.rewardTierId, campaign.id, dto.amount);
+    }
+
     const paymentResult = await this.paymentGateway.createTransaction({
       amount: dto.amount,
       currency: "VND",
@@ -71,9 +80,29 @@ export class DonationsService {
       idempotencyKey: dto.idempotencyKey,
       message: dto.message,
       isAnonymous: dto.isAnonymous ?? false,
+      rewardTierId: dto.rewardTierId ?? null,
     });
 
     return this.donationRepo.save(donation);
+  }
+
+  /**
+   * Kiểm tra lúc tạo giao dịch (suất chỉ bị trừ khi thanh toán được xác nhận,
+   * xem applyPaymentResult): mức thuộc chiến dịch, đang nhận, đủ tiền, còn suất.
+   */
+  private async assertRewardTierAvailable(tierId: string, campaignId: string, amount: number): Promise<void> {
+    const tier = await this.dataSource.getRepository(RewardTier).findOne({ where: { id: tierId } });
+    if (!tier || tier.campaignId !== campaignId || !tier.isActive) {
+      throw new NotFoundException("Reward tier not found");
+    }
+    if (Number(amount) < Number(tier.minAmount)) {
+      throw new BadRequestException(
+        `Mức quà "${tier.title}" cần ủng hộ tối thiểu ${Number(tier.minAmount).toLocaleString("vi-VN")} ₫.`,
+      );
+    }
+    if (tier.quantityLimit != null && tier.claimedCount >= tier.quantityLimit) {
+      throw new ConflictException(`Mức quà "${tier.title}" đã hết suất.`);
+    }
   }
 
   /**
@@ -196,6 +225,23 @@ export class DonationsService {
         return { applied: false as const, donation: current ?? donation };
       }
 
+      let rewardDropped = false;
+      if (nextStatus === DonationStatus.COMPLETED && donation.rewardTierId) {
+        // Trừ suất có điều kiện: hai giao dịch đua nhau không vượt giới hạn.
+        const claim = await manager
+          .createQueryBuilder()
+          .update(RewardTier)
+          .set({ claimedCount: () => "claimed_count + 1" })
+          .where("id = :id", { id: donation.rewardTierId })
+          .andWhere("(quantity_limit IS NULL OR claimed_count < quantity_limit)")
+          .execute();
+        if (!claim.affected) {
+          // Hết suất đúng lúc xác nhận: vẫn ghi nhận tiền, không kèm quà.
+          rewardDropped = true;
+          await manager.update(Donation, { id: donation.id }, { rewardTierId: null });
+        }
+      }
+
       if (nextStatus === DonationStatus.COMPLETED) {
         await manager.increment(
           Campaign,
@@ -213,11 +259,13 @@ export class DonationsService {
 
       return {
         applied: true as const,
+        rewardDropped,
         donation: {
           ...donation,
           status: nextStatus,
           transactionId: nextTransactionId,
           completedAt,
+          rewardTierId: rewardDropped ? null : donation.rewardTierId,
         } as Donation,
       };
     });
@@ -241,7 +289,48 @@ export class DonationsService {
         source,
       },
     });
+    if (result.status === DonationStatus.COMPLETED) {
+      // Giao dịch đã commit: lỗi khi gửi thông báo không được làm hỏng phản hồi thanh toán.
+      await this.notifyDonationCompleted(result, outcome.rewardDropped).catch(() => undefined);
+    }
     return result;
+  }
+
+  /** Báo người ủng hộ và chủ dự án; không nêu tên người ủng hộ (tôn trọng ẩn danh). */
+  private async notifyDonationCompleted(donation: Donation, rewardDropped: boolean): Promise<void> {
+    const campaign = await this.campaignRepo.findOne({ where: { id: donation.campaignId } });
+    if (!campaign) return;
+    const amount = `${Number(donation.amount).toLocaleString("vi-VN")} ₫`;
+    const tier = donation.rewardTierId
+      ? await this.dataSource.getRepository(RewardTier).findOne({ where: { id: donation.rewardTierId } })
+      : null;
+    const rewardNote = tier
+      ? ` Phần quà: ${tier.title}.`
+      : rewardDropped
+        ? " Mức quà bạn chọn vừa hết suất nên khoản ủng hộ được ghi nhận không kèm quà."
+        : "";
+    await this.notificationsService.notify([
+      {
+        userId: donation.userId,
+        type: NotificationType.DONATION_CONFIRMED,
+        title: "Ủng hộ thành công",
+        message: `Khoản ủng hộ ${amount} cho chiến dịch "${campaign.title}" đã được cổng thanh toán xác nhận.${rewardNote} Cảm ơn bạn!`,
+        link: `/du-an/${campaign.id}`,
+        relatedId: donation.id,
+      },
+      ...(campaign.ownerId !== donation.userId
+        ? [
+            {
+              userId: campaign.ownerId,
+              type: NotificationType.DONATION_RECEIVED,
+              title: "Có khoản ủng hộ mới",
+              message: `Chiến dịch "${campaign.title}" vừa nhận ${amount} (đã xác nhận).`,
+              link: "/dashboard",
+              relatedId: campaign.id,
+            },
+          ]
+        : []),
+    ]);
   }
 
   async findById(id: string): Promise<Donation> {
@@ -258,7 +347,7 @@ export class DonationsService {
   async findMine(userId: string): Promise<Donation[]> {
     return this.donationRepo.find({
       where: { userId },
-      relations: { campaign: true },
+      relations: { campaign: true, rewardTier: true },
       order: { createdAt: "DESC" },
     });
   }

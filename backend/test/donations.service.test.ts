@@ -13,6 +13,7 @@ import {
 import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import { UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
 import { makeAuditRecorder } from "./helpers/audit";
+import { makeNotifierRecorder } from "./helpers/notifications";
 
 const WEBHOOK_SECRET = "test-webhook-secret";
 
@@ -121,6 +122,7 @@ describe("DonationsService", () => {
       { transaction: repos.mockTransaction } as any,
       gateway,
       audit.service,
+      makeNotifierRecorder().service,
     );
   });
 
@@ -330,6 +332,7 @@ describe("DonationsService", () => {
         { transaction: repos.mockTransaction } as any,
         new DemoWalletGateway(),
         audit.service,
+        makeNotifierRecorder().service,
       );
       const { dto, signature } = signed("completed");
       await expectStatus(unsecured.handleWebhook(dto, signature), 401);
@@ -385,6 +388,7 @@ describe("DonationsService", () => {
         { transaction: repos.mockTransaction } as any,
         Object.assign(new DemoWalletGateway(WEBHOOK_SECRET), { mode: "live" as const }),
         audit.service,
+        makeNotifierRecorder().service,
       );
       await live
         .confirmDemoPayment(DONATION_ID, "completed", makeUser())

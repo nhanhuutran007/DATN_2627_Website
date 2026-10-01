@@ -1602,6 +1602,133 @@ paths:
         "409":
           description: Bình luận đang hiển thị
 
+  /campaigns/{id}/reward-tiers:
+    get:
+      operationId: listRewardTiers
+      summary: Mức ủng hộ & phần quà đang nhận (công khai)
+      description: Chỉ chiến dịch đã công khai; mức đang tắt không hiển thị. `remaining` = null nếu không giới hạn.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Danh sách mức quà
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RewardTier"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createRewardTier
+      summary: Thêm mức quà (chủ dự án/admin)
+      description: >-
+        Tối đa 10 mức mỗi chiến dịch; không thêm khi chiến dịch đã kết thúc (409). Ghi audit
+        `reward_tier.create`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RewardTierRequest"
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RewardTier"
+        "400":
+          description: Dữ liệu không hợp lệ hoặc vượt 10 mức
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Chiến dịch đã kết thúc
+  /campaigns/{id}/reward-tiers/manage:
+    get:
+      operationId: listManagedRewardTiers
+      summary: Mọi mức quà kể cả đang tắt (chủ dự án/admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Danh sách mức quà
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RewardTier"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /campaigns/{id}/reward-claims:
+    get:
+      operationId: listRewardClaims
+      summary: Người nhận quà để chủ dự án chuẩn bị gửi (chỉ khoản đã xác nhận)
+      description: Người ủng hộ chọn ẩn danh hiển thị "Ẩn danh"; không trả thông tin thanh toán.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Danh sách nhận quà
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /reward-tiers/{id}:
+    patch:
+      operationId: updateRewardTier
+      summary: Sửa / tắt-mở mức quà (chủ dự án/admin)
+      description: >-
+        Sau khi chiến dịch phát hành không đổi được `minAmount` (409); `quantityLimit` không thấp
+        hơn số suất đã nhận (409). Ghi audit `reward_tier.update`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/RewardTierRequest"
+              properties:
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Mức quà sau khi sửa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RewardTier"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Vi phạm quy tắc sửa sau phát hành
+    delete:
+      operationId: deleteRewardTier
+      summary: Xóa (mềm) mức quà chưa có ai chọn
+      description: Mức đã có người chọn trả 409 (hãy tắt thay vì xóa). Ghi audit `reward_tier.delete`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Đã xóa
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Mức đã có người chọn
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2074,6 +2201,13 @@ components:
         idempotencyKey:
           type: string
           maxLength: 255
+        rewardTierId:
+          type: string
+          format: uuid
+          description: >-
+            Mức quà chọn kèm. Số tiền phải ≥ `minAmount` (400), mức phải đang nhận và còn suất
+            (409). Suất chỉ bị trừ khi thanh toán được xác nhận; nếu hết suất đúng lúc đó khoản
+            ủng hộ vẫn được ghi nhận nhưng không kèm quà (`rewardTierId` = null).
     WebhookDonationRequest:
       type: object
       required: [donationId, status, timestamp]
@@ -2630,6 +2764,36 @@ components:
         hideComment:
           type: boolean
           description: Chỉ hợp lệ khi status = resolved và báo cáo nhắm vào bình luận; ẩn bình luận đó
+    RewardTierRequest:
+      type: object
+      required: [title, description, minAmount]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 120 }
+        description: { type: string, minLength: 10, maxLength: 1000 }
+        minAmount: { type: integer, minimum: 20000 }
+        quantityLimit:
+          type: [integer, "null"]
+          minimum: 1
+          description: Bỏ trống/null = không giới hạn
+        estimatedDelivery: { type: [string, "null"], format: date }
+        sortOrder: { type: integer, minimum: 0 }
+    RewardTier:
+      type: object
+      required: [id, campaignId, title, description, minAmount, claimedCount, isActive]
+      properties:
+        id: { type: string, format: uuid }
+        campaignId: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string }
+        minAmount: { type: number }
+        quantityLimit: { type: [integer, "null"] }
+        claimedCount:
+          type: integer
+          description: Chỉ tăng khi thanh toán được xác nhận (update có điều kiện, không vượt giới hạn)
+        remaining: { type: [integer, "null"] }
+        estimatedDelivery: { type: [string, "null"], format: date }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
     CommentView:
       type: object
       required: [id, kind, content, createdAt, author, isOwner, replies]

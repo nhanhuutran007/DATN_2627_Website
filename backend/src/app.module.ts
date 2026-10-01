@@ -17,6 +17,7 @@ import { MediaModule } from "./modules/media/media.module";
 import { ModerationModule } from "./modules/moderation/moderation.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { ProgressModule } from "./modules/progress/progress.module";
+import { RewardsModule } from "./modules/rewards/rewards.module";
 import { UsersModule } from "./modules/users/users.module";
 
 @Module({
@@ -37,6 +38,7 @@ import { UsersModule } from "./modules/users/users.module";
     ProgressModule,
     ModerationModule,
     CommentsModule,
+    RewardsModule,
     MediaModule,
     NotificationsModule,
     HealthModule,

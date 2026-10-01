@@ -9,6 +9,7 @@ import type { PaymentGateway } from "../src/integrations/payment/payment.gateway
 import { Campaign, CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import { DonationsService } from "../src/modules/donations/donations.service";
 import { Donation, DonationStatus } from "../src/modules/donations/entities/donation.entity";
+import { makeNotifierRecorder } from "./helpers/notifications";
 
 const CAMPAIGN_ID = "123e4567-e89b-12d3-a456-426614174010";
 
@@ -49,6 +50,7 @@ function setup(campaignStatus: CampaignStatus | null, donations: Donation[]) {
     {} as DataSource,
     {} as PaymentGateway,
     { record: async () => undefined } as unknown as AuditService,
+    makeNotifierRecorder().service,
   );
   return { service, findCalls };
 }

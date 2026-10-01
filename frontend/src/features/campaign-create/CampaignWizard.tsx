@@ -6,6 +6,13 @@ import { FormEvent, useMemo, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
 import { ImageUploader } from "@/features/media/ImageUploader";
+import {
+  emptyTier,
+  RewardTiersEditor,
+  tiersToPayloads,
+  validateTiers,
+  type DraftTier,
+} from "@/features/rewards/RewardTiersEditor";
 import { ApiError } from "@/lib/api";
 import {
   createCampaign,
@@ -18,6 +25,7 @@ import {
   deleteMilestone,
   type CreateMilestonePayload,
 } from "@/lib/api/progress";
+import { createRewardTier, deleteRewardTier } from "@/lib/api/rewards";
 import { useAuthUser } from "@/lib/auth";
 
 const STEPS = [
@@ -103,6 +111,8 @@ export function CampaignWizard() {
   // Sau lần lưu đầu, các lần lưu sau cập nhật đúng bản nháp đó thay vì tạo bản mới
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [savedMilestoneIds, setSavedMilestoneIds] = useState<string[]>([]);
+  const [tiers, setTiers] = useState<DraftTier[]>([{ ...emptyTier }]);
+  const [savedTierIds, setSavedTierIds] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
 
   const plannedBudget = milestones.reduce((sum, m) => sum + (Number(m.budget) || 0), 0);
@@ -146,6 +156,10 @@ export function CampaignWizard() {
     if (index === 1) {
       if (draft.story.trim().length < MIN_STORY) return `Câu chuyện cần ít nhất ${MIN_STORY} ký tự.`;
       if (!draft.budget.trim() || !draft.risks.trim()) return "Vui lòng nhập dự toán sử dụng vốn và rủi ro.";
+    }
+    if (index === 2) {
+      const tierError = validateTiers(tiers);
+      if (tierError) return tierError;
     }
     return "";
   };
@@ -197,6 +211,11 @@ export function CampaignWizard() {
         .map((payloadItem) => createMilestone(id, payloadItem)),
     );
     setSavedMilestoneIds(created.map((milestone) => milestone.id));
+
+    // Bản nháp chưa ai ủng hộ nên thay thế toàn bộ mức quà giống mốc.
+    await Promise.all(savedTierIds.map((tierId) => deleteRewardTier(tierId)));
+    const createdTiers = await Promise.all(tiersToPayloads(tiers).map((payloadItem) => createRewardTier(id, payloadItem)));
+    setSavedTierIds(createdTiers.map((tier) => tier.id));
     return id;
   };
 
@@ -212,6 +231,12 @@ export function CampaignWizard() {
     if (message) {
       setError(message);
       setStep(0);
+      return;
+    }
+    const tierError = validateTiers(tiers);
+    if (tierError) {
+      setError(tierError);
+      setStep(2);
       return;
     }
     setError("");
@@ -234,7 +259,7 @@ export function CampaignWizard() {
       return;
     }
     if (requireLogin()) return;
-    const firstInvalid = [0, 1].map(validateStep).find(Boolean);
+    const firstInvalid = [0, 1, 2].map(validateStep).find(Boolean);
     if (firstInvalid) {
       setError(firstInvalid);
       return;
@@ -396,6 +421,7 @@ export function CampaignWizard() {
               </button>
               <span>Tổng ngân sách các mốc: <b>{plannedBudget.toLocaleString("vi-VN")} ₫</b>{target > 0 && ` / mục tiêu ${target.toLocaleString("vi-VN")} ₫`}</span>
             </div>
+            <RewardTiersEditor tiers={tiers} onChange={(next) => { setTiers(next); setNotice(""); }} />
           </div>
         )}
 
@@ -408,6 +434,7 @@ export function CampaignWizard() {
               <div><dt>Mục tiêu</dt><dd>{target ? `${target.toLocaleString("vi-VN")} ₫` : "—"}</dd></div>
               <div><dt>Ngày kết thúc</dt><dd>{draft.deadline ? new Date(draft.deadline).toLocaleDateString("vi-VN") : "—"}</dd></div>
               <div><dt>Số mốc</dt><dd>{milestones.filter((m) => m.title.trim()).length}</dd></div>
+              <div><dt>Mức quà</dt><dd>{tiersToPayloads(tiers).length || "Không có"}</dd></div>
             </dl>
             <div className="checklist-box">
               <h3>Tiêu chí hồ sơ ({passed}/{checks.length})</h3>

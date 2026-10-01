@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { EmailVerificationNotice } from "@/features/auth/EmailVerificationNotice";
+import { RewardManager } from "@/features/rewards/RewardManager";
 import { ApiError } from "@/lib/api";
 import {
   deleteCampaign,
@@ -67,6 +68,7 @@ export function OwnerDashboard() {
   const [campaigns, setCampaigns] = useState<ApiCampaign[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [rewardsOpen, setRewardsOpen] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -212,7 +214,18 @@ export function OwnerDashboard() {
                           Xóa
                         </button>
                       )}
+                      <button
+                        className="button button-ghost button-sm"
+                        type="button"
+                        aria-expanded={rewardsOpen === c.id}
+                        onClick={() => setRewardsOpen((id) => (id === c.id ? null : c.id))}
+                      >
+                        Mức quà
+                      </button>
                     </div>
+                    {rewardsOpen === c.id && (
+                      <RewardManager campaignId={c.id} closed={["success", "failed", "cancelled", "ended"].includes(c.status)} />
+                    )}
                   </li>
                 );
               })}

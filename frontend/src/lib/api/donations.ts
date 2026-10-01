@@ -14,6 +14,7 @@ export type ApiDonation = {
   idempotencyKey: string;
   message?: string | null;
   isAnonymous: boolean;
+  rewardTierId?: string | null;
   completedAt?: string | null;
   createdAt?: string;
   campaign?: {
@@ -33,6 +34,8 @@ export type CreateDonationPayload = {
   message?: string;
   isAnonymous?: boolean;
   idempotencyKey: string;
+  /** Mức quà chọn kèm khoản ủng hộ (số tiền phải ≥ mức tối thiểu). */
+  rewardTierId?: string;
 };
 
 export type ConfirmDonationPayload = {

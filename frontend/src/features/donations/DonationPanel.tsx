@@ -11,18 +11,21 @@ import {
   type ApiDonation,
 } from "@/lib/api/donations";
 import { formatVnd } from "@/lib/format";
+import type { RewardTier } from "@/lib/api/rewards";
 
 type DonationPanelProps = {
   campaignId: string;
   campaignTitle: string;
   /** false khi đang xem dữ liệu mẫu — không cho gửi giao dịch. */
   enabled?: boolean;
+  /** Mức quà đang nhận của chiến dịch. */
+  rewardTiers?: RewardTier[];
 };
 
 const PRESETS = [100_000, 200_000, 500_000, 1_000_000];
 const MIN_AMOUNT = 20_000;
 
-export function DonationPanel({ campaignId, campaignTitle, enabled = true }: DonationPanelProps) {
+export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewardTiers = [] }: DonationPanelProps) {
   const [amount, setAmount] = useState(200_000);
   const [customAmount, setCustomAmount] = useState("");
   const [anonymous, setAnonymous] = useState(false);
@@ -30,6 +33,8 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true }: Don
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [donation, setDonation] = useState<ApiDonation | null>(null);
+  const [rewardTierId, setRewardTierId] = useState("");
+  const selectedTier = rewardTiers.find((tier) => tier.id === rewardTierId) ?? null;
 
   const effectiveAmount = useMemo(() => {
     if (!customAmount) return amount;
@@ -48,6 +53,10 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true }: Don
       setError(`Số tiền tối thiểu là ${formatVnd(MIN_AMOUNT)}.`);
       return;
     }
+    if (selectedTier && effectiveAmount < selectedTier.minAmount) {
+      setError(`Mức quà "${selectedTier.title}" cần ủng hộ tối thiểu ${formatVnd(selectedTier.minAmount)}.`);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -57,6 +66,7 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true }: Don
         paymentMethod: payment,
         isAnonymous: anonymous,
         idempotencyKey: generateIdempotencyKey(),
+        ...(selectedTier ? { rewardTierId: selectedTier.id } : {}),
       });
       const confirmed = await confirmDonation({ donationId: created.id, status: "completed" });
       setDonation(confirmed);
@@ -113,6 +123,47 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true }: Don
           onChange={(event) => setCustomAmount(event.target.value)}
         />
       </label>
+
+      {rewardTiers.length > 0 && (
+        <fieldset className="give-rewards">
+          <legend>Chọn phần quà</legend>
+          <label className="reward-option">
+            <input type="radio" name="reward" value="" checked={!rewardTierId} onChange={() => setRewardTierId("")} />
+            <span className="reward-option-body"><b>Ủng hộ không nhận quà</b></span>
+          </label>
+          {rewardTiers.map((tier) => {
+            const soldOut = tier.remaining === 0;
+            return (
+              <label className="reward-option" key={tier.id}>
+                <input
+                  type="radio"
+                  name="reward"
+                  value={tier.id}
+                  checked={rewardTierId === tier.id}
+                  disabled={soldOut}
+                  onChange={() => {
+                    setRewardTierId(tier.id);
+                    if (effectiveAmount < tier.minAmount) {
+                      setCustomAmount(String(tier.minAmount));
+                    }
+                  }}
+                />
+                <span className="reward-option-body">
+                  <span className="reward-option-head">
+                    <b>{tier.title}</b>
+                    <b className="num">từ {formatVnd(tier.minAmount)}</b>
+                  </span>
+                  <span>{tier.description}</span>
+                  <small>
+                    {soldOut ? "Đã hết suất" : tier.remaining === null ? "Không giới hạn suất" : `Còn ${tier.remaining}/${tier.quantityLimit} suất`}
+                    {tier.estimatedDelivery && ` · Dự kiến gửi ${new Date(tier.estimatedDelivery).toLocaleDateString("vi-VN")}`}
+                  </small>
+                </span>
+              </label>
+            );
+          })}
+        </fieldset>
+      )}
 
       <fieldset className="give-methods">
         <legend>Kênh thanh toán (thử nghiệm)</legend>

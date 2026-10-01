@@ -257,6 +257,156 @@ h3 {
   text-decoration: underline;
 }
 
+/* ---------- Mức ủng hộ & phần quà ---------- */
+.reward-editor {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.reward-editor h3 {
+  margin: 0;
+}
+
+.reward-editor h3 small {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.give-rewards {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.give-rewards legend {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.reward-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  cursor: pointer;
+}
+
+.reward-option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.reward-option:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.reward-option input {
+  margin-top: 3px;
+  accent-color: var(--primary);
+}
+
+.reward-option-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.reward-option-body b {
+  font-size: 0.95rem;
+}
+
+.reward-option-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.reward-option-body small,
+.reward-option-body span {
+  color: var(--text-2);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.reward-manager {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.reward-manager-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reward-manager-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--white);
+}
+
+.reward-manager-list li.is-off {
+  opacity: 0.65;
+}
+
+.reward-manager-list small {
+  display: block;
+  color: var(--muted);
+}
+
+.reward-add {
+  display: grid;
+  gap: 10px;
+}
+
+.reward-add > .button {
+  justify-self: start;
+}
+
+.reward-add .field-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.reward-add-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .reward-add .field-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reward-add .field-span-2,
+  .reward-add .field-span-4 {
+    grid-column: auto;
+  }
+}
+
 /* ---------- Hỏi đáp & bình luận ---------- */
 .comments {
   display: grid;
@@ -2875,6 +3025,10 @@ button {
   grid-column: 1 / -1;
 }
 
+.field-span-3 {
+  grid-column: span 3;
+}
+
 .milestone .link-danger {
   margin-top: 10px;
 }
@@ -3947,7 +4101,8 @@ button {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .field-span-2 {
+  .field-span-2,
+  .field-span-3 {
     grid-column: auto;
   }
 

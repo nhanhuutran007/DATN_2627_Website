@@ -34,6 +34,11 @@ export class CreateDonationDto {
   @IsString()
   @MaxLength(255)
   idempotencyKey!: string;
+
+  /** Chọn mức quà (số tiền phải ≥ mức tối thiểu, mức còn suất). */
+  @IsOptional()
+  @IsUUID()
+  rewardTierId?: string;
 }
 
 export class ConfirmDonationDto {

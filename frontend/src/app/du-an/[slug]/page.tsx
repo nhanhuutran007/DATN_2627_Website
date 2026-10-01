@@ -13,6 +13,7 @@ import { DonationPanel } from "@/features/donations/DonationPanel";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
 import { apiCampaignToView, fetchCampaign, fetchCampaigns } from "@/lib/api/campaigns";
 import { fetchCampaignProgress, type CampaignProgress } from "@/lib/api/progress";
+import { fetchRewardTiers, type RewardTier } from "@/lib/api/rewards";
 import { coverFor } from "@/lib/covers";
 import { campaignProgress, campaigns as mockCampaigns, findCampaign, type Campaign } from "@/lib/data/campaigns";
 import { formatVnd, isLiveId } from "@/lib/format";
@@ -42,6 +43,14 @@ async function loadProgress(id: string): Promise<CampaignProgress | null> {
     return await fetchCampaignProgress(id);
   } catch {
     return null;
+  }
+}
+
+async function loadRewardTiers(id: string): Promise<RewardTier[]> {
+  try {
+    return await fetchRewardTiers(id);
+  } catch {
+    return [];
   }
 }
 
@@ -83,9 +92,10 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   if (!loaded) notFound();
 
   const { campaign, live } = loaded;
-  const [progress, related] = await Promise.all([
+  const [progress, related, rewardTiers] = await Promise.all([
     live ? loadProgress(campaign.slug) : Promise.resolve(null),
     loadRelated(campaign, live),
+    live ? loadRewardTiers(campaign.slug) : Promise.resolve([]),
   ]);
   const percent = campaignProgress(campaign);
   const open = campaign.status === "Đang gây quỹ";
@@ -191,7 +201,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
 
           {open && (
             <div className="panel" id="ung-ho">
-              <DonationPanel campaignId={campaign.slug} campaignTitle={campaign.title} enabled={live} />
+              <DonationPanel campaignId={campaign.slug} campaignTitle={campaign.title} enabled={live} rewardTiers={rewardTiers} />
             </div>
           )}
 

@@ -25,6 +25,14 @@ export class Donation extends BaseEntity {
   @JoinColumn({ name: "campaign_id" })
   campaign!: any;
 
+  /** Mức quà người ủng hộ chọn (null nếu ủng hộ không nhận quà). */
+  @Column({ name: "reward_tier_id", type: "varchar", nullable: true })
+  rewardTierId?: string | null;
+
+  @ManyToOne("RewardTier")
+  @JoinColumn({ name: "reward_tier_id" })
+  rewardTier?: any;
+
   @Column({
     type: "decimal",
     precision: 15,
