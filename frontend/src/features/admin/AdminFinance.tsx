@@ -151,7 +151,7 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
         <p className="risk-footnote"><Icon name="shield" size={15} /> Hoàn tiền gọi cổng thanh toán sandbox, trừ số liệu chiến dịch, trả lại suất quà và ghi nhật ký kiểm toán.</p>
       </section>
 
-      <section className="admin-card" id="doi-soat">
+      <section className="admin-card admin-table-card" id="doi-soat">
         <div className="card-heading">
           <div><p className="eyebrow">Tài chính</p><h2>Đối soát giao dịch</h2></div>
         </div>
@@ -175,7 +175,15 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
             <div className="table-scroll">
               <table>
                 <thead>
-                  <tr><th>Chiến dịch</th><th>Xác nhận</th><th>Hoàn</th><th>Ròng</th><th>Ghi trên chiến dịch</th><th>Theo sổ giao dịch</th><th>Khớp</th></tr>
+                  <tr>
+                    <th>Chiến dịch</th>
+                    <th className="num">Xác nhận</th>
+                    <th className="num">Hoàn</th>
+                    <th className="num">Ròng</th>
+                    <th className="num" title="Số tiền và lượt ủng hộ đang ghi trên chiến dịch">Trên chiến dịch</th>
+                    <th className="num" title="Tính lại từ các giao dịch đã xác nhận">Theo sổ giao dịch</th>
+                    <th>Trạng thái</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {report.campaigns.length === 0 ? (
@@ -183,12 +191,12 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
                   ) : (
                     report.campaigns.map((c) => (
                       <tr key={c.campaignId}>
-                        <td>{c.title}</td>
+                        <td><b>{c.title}</b></td>
                         <td className="num">{formatVnd(c.completedAmount)}</td>
-                        <td className="num">{formatVnd(c.refundedAmount)}</td>
+                        <td className="num">{c.refundedAmount > 0 ? formatVnd(c.refundedAmount) : <span className="table-muted">—</span>}</td>
                         <td className="num">{formatVnd(c.netAmount)}</td>
-                        <td className="num">{formatVnd(c.recordedAmount)} · {c.recordedBackers} lượt</td>
-                        <td className="num">{formatVnd(c.ledgerAmount)} · {c.ledgerBackers} lượt</td>
+                        <td className="num">{formatVnd(c.recordedAmount)}<small>{c.recordedBackers} lượt</small></td>
+                        <td className="num">{formatVnd(c.ledgerAmount)}<small>{c.ledgerBackers} lượt</small></td>
                         <td>{c.mismatch ? <span className="tag tag-red">Lệch</span> : <span className="tag tag-green">Khớp</span>}</td>
                       </tr>
                     ))

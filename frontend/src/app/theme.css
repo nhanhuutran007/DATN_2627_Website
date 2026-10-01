@@ -306,8 +306,22 @@ h3 {
   font-weight: 500;
 }
 
+#doi-soat th.num,
 #doi-soat td.num {
+  text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dòng phụ "N lượt" nhỏ, nhạt dưới số tiền thay vì nối "· N lượt" cùng dòng */
+#doi-soat td.num small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+#doi-soat td:first-child {
+  min-width: 220px;
 }
 
 .recon-bad {
@@ -3700,25 +3714,25 @@ button {
   background: var(--soft);
 }
 
+/* Trải hết chiều ngang: sidebar sát mép trái, nội dung dùng toàn bộ phần còn lại */
 .admin-shell {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   align-items: start;
-  width: min(1320px, calc(100% - 32px));
-  margin-inline: auto;
-  gap: 24px;
-  padding-block: 28px 80px;
+  width: 100%;
 }
 
 .admin-sidebar {
   position: sticky;
-  top: 96px;
+  /* Ngay dưới thanh điều hướng (topbar cuộn mất, navbar 77px giữ lại) */
+  top: 77px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding: 18px;
+  height: calc(100vh - 77px);
+  overflow-y: auto;
+  padding: 20px 16px;
   color: #c9cfdf;
-  border-radius: var(--radius);
   background: var(--navy);
 }
 
@@ -3814,6 +3828,7 @@ button {
   flex-direction: column;
   gap: 20px;
   min-width: 0;
+  padding: 28px clamp(16px, 2.2vw, 40px) 80px;
 }
 
 .admin-content-header {
@@ -4125,6 +4140,8 @@ button {
 }
 
 .table-scroll {
+  /* relative: .sr-only (absolute) trong bảng không kéo giãn trang trên màn hẹp */
+  position: relative;
   overflow-x: auto;
 }
 
@@ -4154,6 +4171,27 @@ button {
 /* Cột tên/chiến dịch (1–2) được xuống dòng; các cột số, ngày, trạng thái giữ một dòng */
 .admin-table-card td:nth-child(n + 3) {
   white-space: nowrap;
+}
+
+.admin-table-card td:nth-child(-n + 2) {
+  min-width: 150px;
+}
+
+/* Tên chiến dịch tối đa ~2 dòng thay vì bị bóp thành 3–4 dòng */
+#giao-dich td:nth-child(2) {
+  min-width: 192px;
+}
+
+/* 8 cột: đệm ngang hẹp hơn để vừa màn 1366px mà không phải cuộn ngang */
+#giao-dich th,
+#giao-dich td {
+  padding-inline: 9px;
+}
+
+/* Nhật ký: "Tên (email)" được xuống dòng để cột Chi tiết không bị đẩy khuất */
+#nhat-ky-kiem-toan td:nth-child(4) {
+  min-width: 170px;
+  white-space: normal;
 }
 
 .admin-table-card td b {
@@ -4363,6 +4401,10 @@ button {
   .wizard-steps,
   .admin-sidebar {
     position: static;
+  }
+
+  .admin-sidebar {
+    height: auto;
   }
 
   .admin-sidebar nav {
