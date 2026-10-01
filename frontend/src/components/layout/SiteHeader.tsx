@@ -56,7 +56,7 @@ export function SiteHeader() {
       </div>
 
       <div className="navbar">
-        <div className="container navbar-inner">
+        <div className={`container navbar-inner${user ? " has-user" : ""}`}>
           <Link className="logo" href="/" aria-label="Góp Mầm – Trang chủ" onClick={close}>
             <LogoMark className="logo-mark" />
             <span className="logo-text">GÓP <b>MẦM</b></span>
