@@ -1298,6 +1298,91 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /notifications:
+    get:
+      operationId: listNotifications
+      summary: Danh sách thông báo của người dùng hiện tại (mới nhất trước)
+      description: >-
+        Thông báo trong ứng dụng phát khi: chiến dịch đổi trạng thái (duyệt/từ chối/cần bổ sung/
+        tạm dừng/tiếp tục/kết thúc — gửi chủ dự án, một số gửi cả người đã ủng hộ), khoản ủng hộ
+        được xác nhận (gửi người ủng hộ và chủ dự án, không nêu tên người ủng hộ), hoàn thành mốc
+        hoặc có bài cập nhật tiến độ (gửi người đã ủng hộ), báo cáo vi phạm được kết luận (gửi
+        người báo cáo, không kèm ghi chú nội bộ). Kết quả xét duyệt gửi kèm email cho chủ dự án.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - name: unread
+          in: query
+          description: "`true` để chỉ lấy thông báo chưa đọc"
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Trang thông báo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPage"
+        "401":
+          description: Chưa đăng nhập
+  /notifications/unread-count:
+    get:
+      operationId: getUnreadNotificationCount
+      summary: Số thông báo chưa đọc (cho chuông trên header)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Số chưa đọc
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [unread]
+                properties:
+                  unread: { type: integer }
+        "401":
+          description: Chưa đăng nhập
+  /notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      summary: Đánh dấu mọi thông báo của mình là đã đọc
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Số thông báo đã cập nhật
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [updated]
+                properties:
+                  updated: { type: integer }
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      summary: Đánh dấu một thông báo là đã đọc
+      description: Chỉ chủ thông báo; thông báo của người khác trả 404.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Thông báo sau khi cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2319,6 +2404,34 @@ components:
         pauseCampaign:
           type: boolean
           description: Chỉ hợp lệ khi status = resolved; tạm dừng chiến dịch đang active
+    Notification:
+      type: object
+      required: [id, type, title, message, isRead, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [campaign_approved, campaign_rejected, campaign_needs_info, campaign_paused, campaign_resumed, campaign_ended, donation_received, donation_confirmed, milestone_completed, progress_update, report_resolved, system]
+        title: { type: string, maxLength: 200 }
+        message: { type: string }
+        link:
+          type: [string, "null"]
+          description: Đường dẫn tương đối trong web để mở khi bấm thông báo
+        relatedId: { type: [string, "null"] }
+        isRead: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    NotificationPage:
+      type: object
+      required: [items, total, unread, page, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        total: { type: integer }
+        unread: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
     Report:
       type: object
       properties:

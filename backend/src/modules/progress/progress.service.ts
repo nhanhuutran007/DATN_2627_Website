@@ -10,6 +10,8 @@ import { Repository } from "typeorm";
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
+import { NotificationType } from "../notifications/entities/notification.entity";
+import { NotificationsService } from "../notifications/notifications.service";
 import { User, UserRole } from "../users/entities/user.entity";
 import {
   CreateMilestoneDto,
@@ -48,6 +50,7 @@ export class ProgressService {
     @InjectRepository(Donation)
     private readonly donationRepo: Repository<Donation>,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findCampaignMilestones(
@@ -163,6 +166,7 @@ export class ProgressService {
     this.assertCanManage(campaign, user);
     this.assertEditable(campaign);
 
+    const wasCompleted = milestone.isCompleted;
     milestone.isCompleted = true;
     milestone.completedAt = new Date();
     const saved = await this.milestoneRepo.save(milestone);
@@ -173,6 +177,19 @@ export class ProgressService {
       entityId: saved.id,
       newValues: { isCompleted: true, completedAt: saved.completedAt },
     });
+    if (!wasCompleted) {
+      await this.notificationsService.notifyCampaignBackers(
+        campaign.id,
+        {
+          type: NotificationType.MILESTONE_COMPLETED,
+          title: "Dự án bạn ủng hộ vừa hoàn thành một mốc",
+          message: `Chiến dịch "${campaign.title}" đã hoàn thành mốc "${saved.title}".`,
+          link: `/du-an/${campaign.id}`,
+          relatedId: saved.id,
+        },
+        [campaign.ownerId],
+      );
+    }
     return saved;
   }
 
@@ -204,6 +221,17 @@ export class ProgressService {
         content: truncateForAudit(saved.content),
       },
     });
+    await this.notificationsService.notifyCampaignBackers(
+      campaign.id,
+      {
+        type: NotificationType.PROGRESS_UPDATE,
+        title: "Có báo cáo tiến độ mới",
+        message: `Chiến dịch "${campaign.title}" vừa cập nhật tiến độ mốc "${milestone.title}".`,
+        link: `/du-an/${campaign.id}`,
+        relatedId: saved.id,
+      },
+      [campaign.ownerId],
+    );
     return saved;
   }
 

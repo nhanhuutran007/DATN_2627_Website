@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { clearSession } from "@/lib/api";
 import { useAuthUser } from "@/lib/auth";
 
@@ -100,6 +101,7 @@ export function SiteHeader() {
               <input id="navbar-search" name="q" placeholder="Tìm dự án…" />
               <button type="submit" aria-label="Tìm"><Icon name="search" size={17} /></button>
             </form>
+            {user && <NotificationBell onNavigate={close} />}
             <Link className="button button-primary" href="/tao-chien-dich">Tạo chiến dịch</Link>
             <button
               className="nav-toggle"

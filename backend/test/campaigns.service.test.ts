@@ -7,6 +7,7 @@ import { CampaignsService } from "../src/modules/campaigns/campaigns.service";
 import { Campaign, CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import { UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
 import { makeAuditRecorder } from "./helpers/audit";
+import { makeNotifierRecorder } from "./helpers/notifications";
 
 function createMockRepo() {
   const mockCampaign = {
@@ -63,7 +64,7 @@ describe("CampaignsService", () => {
     const created = createMockRepo();
     repo = created.repo;
     audit = makeAuditRecorder();
-    campaignsService = new CampaignsService(repo as any, audit.service);
+    campaignsService = new CampaignsService(repo as any, audit.service, makeNotifierRecorder().service);
   });
 
   describe("create", () => {

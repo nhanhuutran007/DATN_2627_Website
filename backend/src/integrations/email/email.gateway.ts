@@ -21,10 +21,23 @@ export type EmailVerificationEmail = {
   expiresInHours: number;
 };
 
+/** Email kèm thông báo trong ứng dụng (vd. kết quả xét duyệt chiến dịch). */
+export type NotificationEmail = {
+  to: string;
+  name: string;
+  subject: string;
+  /** Nội dung thuần văn bản; mỗi phần tử là một đoạn. */
+  paragraphs: string[];
+  /** Đường dẫn tương đối trong web (vd. `/dashboard`), ghép với FRONTEND_URL. */
+  link?: string;
+  linkLabel?: string;
+};
+
 export interface EmailGateway {
   sendPasswordReset(message: PasswordResetEmail): Promise<void>;
   sendPasswordChanged(message: PasswordChangedEmail): Promise<void>;
   sendEmailVerification(message: EmailVerificationEmail): Promise<void>;
+  sendNotification(message: NotificationEmail): Promise<void>;
 }
 
 export type RenderedEmail = {
@@ -170,6 +183,42 @@ export function renderPasswordChangedEmail(message: PasswordChangedEmail): Rende
   };
 }
 
+export function renderNotificationEmail(message: NotificationEmail): RenderedEmail {
+  const name = escapeHtml(message.name);
+  const url = message.link ? `${frontendBaseUrl()}${message.link}` : null;
+  const label = escapeHtml(message.linkLabel ?? "Xem chi tiết");
+  const paragraphs = message.paragraphs
+    .map((p) => `<p style="margin:0 0 12px;line-height:1.6">${escapeHtml(p)}</p>`)
+    .join("\n          ");
+
+  return {
+    subject: message.subject,
+    text: [
+      `Xin chào ${message.name},`,
+      "",
+      ...message.paragraphs,
+      ...(url ? ["", url] : []),
+      "",
+      "Góp Mầm",
+    ].join("\n"),
+    html: `<!doctype html>
+<html lang="vi">
+  <body style="margin:0;padding:24px;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#141c33">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px">
+      <tr>
+        <td style="padding:32px">
+          <p style="margin:0 0 16px;font-size:20px;font-weight:bold">${escapeHtml(message.subject)}</p>
+          <p style="margin:0 0 12px;line-height:1.6">Xin chào ${name},</p>
+          ${paragraphs}
+          ${url ? `<p style="margin:12px 0 0"><a href="${escapeHtml(url)}" style="display:inline-block;padding:12px 24px;border-radius:8px;background:#16a34a;color:#ffffff;font-weight:bold;text-decoration:none">${label}</a></p>` : ""}
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`,
+  };
+}
+
 /** Gốc URL frontend dùng trong link email (không kèm dấu "/" cuối). */
 export function frontendBaseUrl(env: Env = process.env): string {
   return (env.FRONTEND_URL ?? "http://localhost:3000").replace(/\/+$/, "");
@@ -215,6 +264,10 @@ export class LogEmailGateway implements EmailGateway {
         `(hết hạn sau ${message.expiresInHours} giờ)`,
     );
   }
+
+  async sendNotification(message: NotificationEmail): Promise<void> {
+    this.logger.log(`[demo email] Thông báo "${message.subject}" cho ${message.to}`);
+  }
 }
 
 /** Gửi email thật qua SMTP (vd. Gmail + App Password). */
@@ -245,6 +298,14 @@ export class SmtpEmailGateway implements EmailGateway {
       from: this.from,
       to: message.to,
       ...renderEmailVerificationEmail(message),
+    });
+  }
+
+  async sendNotification(message: NotificationEmail): Promise<void> {
+    await this.transporter.sendMail({
+      from: this.from,
+      to: message.to,
+      ...renderNotificationEmail(message),
     });
   }
 }

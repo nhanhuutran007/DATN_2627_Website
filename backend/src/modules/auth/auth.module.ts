@@ -35,6 +35,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
       useFactory: () => createEmailGateway(),
     },
   ],
-  exports: [AuthService, PassportModule],
+  // EmailGateway dùng chung (vd. NotificationsService gửi email thông báo)
+  exports: [AuthService, PassportModule, "EmailGateway"],
 })
 export class AuthModule {}

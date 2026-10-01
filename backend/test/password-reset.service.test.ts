@@ -76,6 +76,7 @@ describe("PasswordResetService", () => {
         if (failSend) throw new Error("SMTP down");
         changedNotices.push(message);
       },
+      sendNotification: async () => {},
       sendEmailVerification: async () => {},
     };
 

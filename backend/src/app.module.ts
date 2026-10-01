@@ -13,6 +13,7 @@ import { CampaignsModule } from "./modules/campaigns/campaigns.module";
 import { DonationsModule } from "./modules/donations/donations.module";
 import { HealthModule } from "./modules/health/health.module";
 import { ModerationModule } from "./modules/moderation/moderation.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { ProgressModule } from "./modules/progress/progress.module";
 import { UsersModule } from "./modules/users/users.module";
 
@@ -33,6 +34,7 @@ import { UsersModule } from "./modules/users/users.module";
     DonationsModule,
     ProgressModule,
     ModerationModule,
+    NotificationsModule,
     HealthModule,
   ],
 })

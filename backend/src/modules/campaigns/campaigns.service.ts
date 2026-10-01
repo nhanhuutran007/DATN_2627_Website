@@ -15,7 +15,9 @@ import {
 } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { User, UserRole } from "../users/entities/user.entity";
+import { campaignStatusNotifications } from "./campaign-notifications";
 import {
   CampaignQueryDto,
   CreateCampaignDto,
@@ -99,6 +101,7 @@ export class CampaignsService {
     @InjectRepository(Campaign)
     private readonly campaignRepo: Repository<Campaign>,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(
@@ -288,6 +291,12 @@ export class CampaignsService {
         rejectionReason: saved.rejectionReason ?? null,
       },
     });
+
+    const notices = campaignStatusNotifications(saved, previous.status, saved.status, dto.reason);
+    if (notices.owner) await this.notificationsService.notify(notices.owner);
+    if (notices.backers) {
+      await this.notificationsService.notifyCampaignBackers(saved.id, notices.backers, [saved.ownerId]);
+    }
     return saved;
   }
 

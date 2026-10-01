@@ -7,6 +7,7 @@ import { ProgressService } from "../src/modules/progress/progress.service";
 import { DonationStatus } from "../src/modules/donations/entities/donation.entity";
 import { UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
 import { makeAuditRecorder } from "./helpers/audit";
+import { makeNotifierRecorder } from "./helpers/notifications";
 
 const CAMPAIGN_ID = "123e4567-e89b-12d3-a456-426614174000";
 const OWNER_ID = "123e4567-e89b-12d3-a456-426614174001";
@@ -118,6 +119,7 @@ describe("ProgressService", () => {
       repos.campaignRepo,
       repos.donationRepo,
       audit.service,
+      makeNotifierRecorder().service,
     );
   });
 

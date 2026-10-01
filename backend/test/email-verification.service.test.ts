@@ -47,6 +47,7 @@ describe("EmailVerificationService", () => {
       },
     } as unknown as UsersService;
     const emailGateway = {
+      sendNotification: async () => {},
       sendEmailVerification: async (message: EmailVerificationEmail) => {
         if (failSend) throw new Error("SMTP down");
         sent.push(message);

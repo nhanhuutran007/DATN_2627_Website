@@ -4,6 +4,8 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { LessThanOrEqual, Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { campaignStatusNotifications } from "./campaign-notifications";
 import { Campaign, CampaignStatus } from "./entities/campaign.entity";
 
 export type ExpiryRunResult = {
@@ -25,6 +27,7 @@ export class CampaignExpiryService {
     @InjectRepository(Campaign)
     private readonly campaignRepo: Repository<Campaign>,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
@@ -74,6 +77,12 @@ export class CampaignExpiryService {
           goalAmount: campaign.goalAmount,
         },
       });
+
+      const notices = campaignStatusNotifications(campaign, CampaignStatus.ACTIVE, nextStatus);
+      if (notices.owner) await this.notificationsService.notify(notices.owner);
+      if (notices.backers) {
+        await this.notificationsService.notifyCampaignBackers(campaign.id, notices.backers, [campaign.ownerId]);
+      }
     }
 
     return { succeeded, failed };

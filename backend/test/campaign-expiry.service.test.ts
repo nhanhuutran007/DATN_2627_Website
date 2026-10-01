@@ -4,6 +4,7 @@ import { beforeEach, describe, it } from "node:test";
 import { CampaignExpiryService } from "../src/modules/campaigns/campaign-expiry.service";
 import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import { makeAuditRecorder } from "./helpers/audit";
+import { makeNotifierRecorder } from "./helpers/notifications";
 
 function makeCampaign(overrides: Record<string, unknown> = {}) {
   return {
@@ -33,7 +34,7 @@ describe("CampaignExpiryService", () => {
       },
     };
     audit = makeAuditRecorder();
-    service = new CampaignExpiryService(repo, audit.service);
+    service = new CampaignExpiryService(repo, audit.service, makeNotifierRecorder().service);
   });
 
   it("should mark an expired campaign that reached its goal as success", async () => {
