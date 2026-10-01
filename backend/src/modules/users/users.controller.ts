@@ -40,7 +40,7 @@ export class UsersController {
   @Get(":id")
   @Roles(UserRole.ADMIN)
   findOne(@Param("id", ParseUUIDPipe) id: string) {
-    return this.usersService.findById(id);
+    return this.usersService.getById(id);
   }
 
   @Patch(":id")

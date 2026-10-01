@@ -1,5 +1,7 @@
-import { equal, ok } from "node:assert/strict";
+import { equal, ok, rejects } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
+
+import { NotFoundException } from "@nestjs/common";
 
 import {
   LOGIN_LOCK_MINUTES,
@@ -65,6 +67,18 @@ describe("UsersService", () => {
       const user = await usersService.findById("123e4567-e89b-12d3-a456-426614174000");
       ok(user);
       equal(user!.id, "123e4567-e89b-12d3-a456-426614174000");
+    });
+  });
+
+  describe("getById", () => {
+    it("should return the user when it exists", async () => {
+      const user = await usersService.getById("123e4567-e89b-12d3-a456-426614174000");
+      equal(user.id, "123e4567-e89b-12d3-a456-426614174000");
+    });
+
+    it("should throw NotFoundException when the user does not exist", async () => {
+      userRepo.findOneBy = async () => null;
+      await rejects(usersService.getById("123e4567-e89b-12d3-a456-426614174001"), NotFoundException);
     });
   });
 
