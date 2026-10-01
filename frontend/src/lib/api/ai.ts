@@ -1,4 +1,4 @@
-import { api } from "../api";
+import { api, hasSession } from "../api";
 import { apiCampaignToView, type ApiCampaign } from "./campaigns";
 import type { Campaign } from "@/lib/data/campaigns";
 
@@ -101,6 +101,8 @@ export async function trackBehaviorEvent(
   campaignId: string,
   eventType: BehaviorEventType,
 ): Promise<void> {
+  // POST /ai/events yêu cầu đăng nhập: khách vãng lai không gửi (tránh 401 thừa).
+  if (!hasSession()) return;
   if (eventType === "view" && trackedCampaigns.has(campaignId)) return;
   trackedCampaigns.add(campaignId);
   try {
