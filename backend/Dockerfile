@@ -25,6 +25,8 @@ COPY --from=builder --chown=nestjs:nodejs /app/database ./database
 COPY --from=builder --chown=nestjs:nodejs /app/scripts ./scripts
 # CA bundle của Amazon RDS, dùng với DB_SSL=true + DB_SSL_CA_PATH
 ADD --chown=nestjs:nodejs https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem ./certs/rds-global-bundle.pem
+# Ảnh tải lên khi STORAGE_DRIVER=local (Docker mount volume vào đây; AWS dùng S3)
+RUN mkdir -p /app/uploads && chown nestjs:nodejs /app/uploads
 USER nestjs
 EXPOSE 4000
 CMD ["node", "dist/main.js"]

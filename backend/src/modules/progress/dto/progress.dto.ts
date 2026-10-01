@@ -5,11 +5,12 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUrl,
   Max,
   MaxLength,
   Min,
 } from "class-validator";
+
+import { IsImageUrl } from "../../../common/validators/is-image-url";
 
 export class CreateMilestoneDto {
   @IsString()
@@ -82,7 +83,7 @@ export class CreateMilestoneUpdateDto {
   content!: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsImageUrl()
   imageUrl?: string;
 
   @IsOptional()

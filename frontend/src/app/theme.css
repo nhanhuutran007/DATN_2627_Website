@@ -380,6 +380,83 @@ h3 {
   margin-top: 20px;
 }
 
+/* ---------- Tải ảnh lên ---------- */
+.image-uploader-drop {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 150px;
+  padding: 22px 16px;
+  color: var(--text-2);
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+  background: #fafbfc;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.image-uploader-drop:hover:not(:disabled),
+.image-uploader-drop:focus-visible {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.image-uploader-drop:disabled {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.image-uploader-drop svg {
+  color: var(--primary);
+}
+
+.image-uploader-drop small {
+  color: var(--muted);
+}
+
+.image-uploader-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.image-uploader-frame {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f2f4f7;
+}
+
+.image-uploader-frame img {
+  object-fit: cover;
+}
+
+.image-uploader-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.link-button {
+  justify-self: start;
+  align-self: flex-start;
+  width: fit-content;
+  min-height: 32px;
+  padding: 4px 0;
+  color: var(--primary-dark);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: underline;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
 /* ---------- Header ---------- */
 .site-top {
   position: sticky;

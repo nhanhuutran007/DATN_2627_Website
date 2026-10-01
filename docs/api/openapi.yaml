@@ -1298,6 +1298,80 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /media/images:
+    post:
+      operationId: uploadImage
+      summary: Tải ảnh lên (ảnh chiến dịch, ảnh bài cập nhật tiến độ)
+      description: >-
+        Người dùng đã đăng nhập gửi `multipart/form-data` với field `file` (một file).
+        Server nhận diện loại ảnh theo magic bytes của nội dung (JPEG/PNG/WebP), không tin
+        đuôi tên file hay Content-Type của client; tối đa 5 MB. Khóa lưu trữ do server sinh
+        (UUID). Lưu ra ổ đĩa (`STORAGE_DRIVER=local`) hoặc S3 (`STORAGE_DRIVER=s3`).
+        Rate limit 30 lần/15 phút/IP. Ghi audit `media.upload`. `url` trả về là đường dẫn
+        tương đối, dùng trực tiếp cho `imageUrl` của chiến dịch/bài cập nhật.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                purpose:
+                  type: string
+                  enum: [campaign_image, progress_image]
+                  default: campaign_image
+      responses:
+        "201":
+          description: Đã lưu ảnh
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedImage"
+        "400":
+          description: Thiếu file, file rỗng hoặc không phải ảnh JPEG/PNG/WebP
+        "401":
+          description: Chưa đăng nhập
+        "413":
+          description: Ảnh lớn hơn 5 MB
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /media/{folder}/{file}:
+    get:
+      operationId: getMediaFile
+      summary: Trả ảnh đã tải lên (công khai)
+      description: >-
+        Chỉ trả file có bản ghi trong `media_files` và chưa bị xóa. Header
+        `Cache-Control: public, max-age=31536000, immutable` (tên file là UUID, nội dung
+        không đổi) và `Cross-Origin-Resource-Policy: cross-origin`.
+      parameters:
+        - name: folder
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [campaigns, progress]
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f-]{36}\.(jpg|png|webp)$'
+      responses:
+        "200":
+          description: Nội dung ảnh
+          content:
+            image/jpeg: {}
+            image/png: {}
+            image/webp: {}
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /notifications:
     get:
       operationId: listNotifications
@@ -2432,6 +2506,23 @@ components:
         unread: { type: integer }
         page: { type: integer }
         limit: { type: integer }
+    UploadedImage:
+      type: object
+      required: [id, url, mimeType, sizeBytes]
+      properties:
+        id:
+          type: string
+          format: uuid
+        url:
+          type: string
+          description: Đường dẫn tương đối, dùng cho `imageUrl`
+          example: /api/v1/media/campaigns/3f2b8c1e-5d4a-4b7e-9c2d-1a2b3c4d5e6f.webp
+        mimeType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp]
+        sizeBytes:
+          type: integer
+          maximum: 5242880
     Report:
       type: object
       properties:

@@ -33,6 +33,10 @@ locals {
     { name = "SMTP_USER", value = var.smtp_user },
     { name = "SMTP_PASS", value = var.smtp_pass },
     { name = "MAIL_FROM", value = var.mail_from },
+    # Ảnh tải lên lưu ở S3 (s3.tf), quyền qua backend_task_role
+    { name = "STORAGE_DRIVER", value = "s3" },
+    { name = "S3_BUCKET", value = aws_s3_bucket.media.bucket },
+    { name = "S3_REGION", value = var.aws_region },
     # Backend đọc DB_* (backend/src/config/database.config.ts), không đọc DATABASE_URL
     { name = "DB_HOST", value = aws_db_instance.mysql.address },
     { name = "DB_PORT", value = tostring(aws_db_instance.mysql.port) },
@@ -213,6 +217,7 @@ resource "aws_ecs_task_definition" "backend" {
   cpu                      = 512
   memory                   = 1024
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  task_role_arn            = aws_iam_role.backend_task_role.arn
 
   container_definitions = jsonencode([{
     name        = "backend"

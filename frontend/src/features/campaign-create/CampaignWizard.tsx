@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
+import { ImageUploader } from "@/features/media/ImageUploader";
 import { ApiError } from "@/lib/api";
 import {
   createCampaign,
@@ -71,6 +72,11 @@ function messageFor(error: unknown): string {
   return "Không kết nối được máy chủ. Vui lòng thử lại.";
 }
 
+/** Ảnh đã tải lên hệ thống (đường dẫn `/api/v1/media/...`) hoặc link http(s). */
+function isImageValue(value: string): boolean {
+  return value.startsWith("/api/v1/media/") || isHttpUrl(value);
+}
+
 function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -114,7 +120,7 @@ export function CampaignWizard() {
         ok: target > 0 && plannedBudget > 0 && Math.abs(plannedBudget - target) / target <= 0.1,
         label: "Tổng ngân sách các mốc khớp mục tiêu (lệch không quá 10%)",
       },
-      { ok: isHttpUrl(draft.imageUrl), label: "Có ảnh đại diện cho dự án" },
+      { ok: isImageValue(draft.imageUrl), label: "Có ảnh đại diện cho dự án" },
     ],
     [draft, milestones, plannedBudget, target],
   );
@@ -135,7 +141,7 @@ export function CampaignWizard() {
       if (!draft.title.trim() || !draft.location.trim() || !draft.deadline) return "Vui lòng nhập tên, địa điểm và ngày kết thúc.";
       if (target < MIN_TARGET) return "Mục tiêu tối thiểu là 1.000.000 ₫.";
       if (new Date(`${draft.deadline}T23:59:59`).getTime() <= Date.now()) return "Ngày kết thúc phải ở tương lai.";
-      if (draft.imageUrl.trim() && !isHttpUrl(draft.imageUrl.trim())) return "Link ảnh phải bắt đầu bằng http:// hoặc https://";
+      if (draft.imageUrl.trim() && !isImageValue(draft.imageUrl.trim())) return "Link ảnh phải bắt đầu bằng http:// hoặc https://";
     }
     if (index === 1) {
       if (draft.story.trim().length < MIN_STORY) return `Câu chuyện cần ít nhất ${MIN_STORY} ký tự.`;
@@ -163,7 +169,7 @@ export function CampaignWizard() {
       endDate: deadline.toISOString(),
       location: draft.location.trim(),
       description: parts.filter(Boolean).join("\n\n"),
-      ...(isHttpUrl(draft.imageUrl.trim()) ? { imageUrl: draft.imageUrl.trim() } : {}),
+      ...(isImageValue(draft.imageUrl.trim()) ? { imageUrl: draft.imageUrl.trim() } : {}),
     };
   };
 
@@ -318,11 +324,13 @@ export function CampaignWizard() {
                 <input type="date" value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
               </label>
             </div>
-            <label className="field">
-              <span>Link ảnh đại diện</span>
-              <input type="url" value={draft.imageUrl} placeholder="https://…/anh-du-an.jpg" onChange={(e) => update("imageUrl", e.target.value)} />
-              <small>Ảnh thật của dự án giúp người ủng hộ tin tưởng hơn. Bỏ trống sẽ dùng ảnh minh họa theo lĩnh vực.</small>
-            </label>
+            <ImageUploader
+              label="Ảnh đại diện"
+              value={draft.imageUrl}
+              onChange={(url) => update("imageUrl", url)}
+              disabled={busy}
+              hint="Ảnh thật của dự án giúp người ủng hộ tin tưởng hơn. Bỏ trống sẽ dùng ảnh minh họa theo lĩnh vực."
+            />
             <label className="field">
               <span>Mô tả ngắn</span>
               <textarea rows={3} maxLength={220} value={draft.summary} placeholder="Tác động chính của dự án trong 1–2 câu" onChange={(e) => update("summary", e.target.value)} />

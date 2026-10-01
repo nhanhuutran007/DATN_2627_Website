@@ -66,3 +66,8 @@ output "acm_certificate_status" {
   description = "PENDING_VALIDATION -> ISSUED sau khi DNS có bản ghi xác minh"
   value       = var.domain_name == "" ? "" : aws_acm_certificate.site[0].status
 }
+
+output "media_bucket" {
+  description = "Bucket S3 chứa ảnh người dùng tải lên"
+  value       = aws_s3_bucket.media.bucket
+}

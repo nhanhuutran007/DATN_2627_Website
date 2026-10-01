@@ -43,6 +43,20 @@ function apiBaseUrl(): string {
   return PUBLIC_API_URL;
 }
 
+/**
+ * Ảnh tải lên được lưu dạng đường dẫn tương đối `/api/v1/media/...` (không phụ
+ * thuộc tên miền). Sau Nginx/ALB thì API cùng origin với web nên dùng nguyên;
+ * khi dev (API ở cổng khác) thì gắn origin của API vào.
+ */
+export function resolveMediaUrl(url: string): string {
+  if (!url.startsWith("/api/v1/")) return url;
+  try {
+    return new URL(url, new URL(PUBLIC_API_URL).origin).toString();
+  } catch {
+    return url;
+  }
+}
+
 const ACCESS_TOKEN_KEY = "gopmam.accessToken";
 const REFRESH_TOKEN_KEY = "gopmam.refreshToken";
 const USER_KEY = "gopmam.user";
@@ -157,7 +171,8 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
-  if (options.body !== undefined) {
+  // FormData (upload file): để trình duyệt tự đặt multipart/form-data kèm boundary.
+  if (options.body !== undefined && !(options.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 

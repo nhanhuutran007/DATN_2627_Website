@@ -8,12 +8,12 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUrl,
   Max,
   MaxLength,
   Min,
 } from "class-validator";
 
+import { IsImageUrl } from "../../../common/validators/is-image-url";
 import { CampaignStatus } from "../entities/campaign.entity";
 
 export class CreateCampaignDto {
@@ -40,7 +40,7 @@ export class CreateCampaignDto {
   endDate!: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsImageUrl()
   imageUrl?: string;
 
   @IsOptional()
@@ -78,7 +78,7 @@ export class UpdateCampaignDto {
   endDate?: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsImageUrl()
   imageUrl?: string;
 
   @IsOptional()

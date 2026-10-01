@@ -1,4 +1,5 @@
 import type { IconName } from "@/components/ui/Icon";
+import { resolveMediaUrl } from "@/lib/api";
 import type { Campaign } from "@/lib/data/campaigns";
 
 type CoverKey = Campaign["image"];
@@ -17,7 +18,7 @@ export function coverFor(campaign: Pick<Campaign, "image" | "imageUrl" | "title"
   illustrative: boolean;
 } {
   if (campaign.imageUrl) {
-    return { src: campaign.imageUrl, alt: `Ảnh dự án: ${campaign.title}`, illustrative: false };
+    return { src: resolveMediaUrl(campaign.imageUrl), alt: `Ảnh dự án: ${campaign.title}`, illustrative: false };
   }
   return { ...COVERS[campaign.image], illustrative: true };
 }

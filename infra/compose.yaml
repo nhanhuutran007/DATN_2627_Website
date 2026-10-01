@@ -63,6 +63,11 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      # Ảnh tải lên: lưu ra volume (AWS dùng STORAGE_DRIVER=s3)
+      STORAGE_DRIVER: local
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     depends_on:
@@ -134,3 +139,4 @@ services:
 volumes:
   mysql_data:
   redis_data:
+  uploads_data:
