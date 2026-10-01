@@ -43,3 +43,26 @@ output "ecs_tasks_security_group_id" {
   description = "Security group của ECS task"
   value       = aws_security_group.ecs_tasks_sg.id
 }
+
+output "public_url" {
+  description = "URL website người dùng truy cập"
+  value       = local.public_url
+}
+
+# Thêm các bản ghi này vào Cloudflare (Type CNAME, Proxy: DNS only) để ACM cấp chứng chỉ
+output "acm_validation_records" {
+  description = "Bản ghi DNS xác minh chứng chỉ ACM cho tên miền riêng"
+  value = var.domain_name == "" ? [] : [
+    for o in aws_acm_certificate.site[0].domain_validation_options : {
+      domain = o.domain_name
+      type   = o.resource_record_type
+      name   = o.resource_record_name
+      value  = o.resource_record_value
+    }
+  ]
+}
+
+output "acm_certificate_status" {
+  description = "PENDING_VALIDATION -> ISSUED sau khi DNS có bản ghi xác minh"
+  value       = var.domain_name == "" ? "" : aws_acm_certificate.site[0].status
+}

@@ -72,3 +72,60 @@ variable "ai_api_key" {
     error_message = "ai_api_key cần ít nhất 32 ký tự."
   }
 }
+
+# --- Tên miền riêng + HTTPS (xem README.md, mục "Dùng tên miền riêng") ---
+variable "domain_name" {
+  description = "Tên miền gốc trỏ về ALB (vd. gopmam.com). Để trống thì chỉ dùng DNS tự động của ALB."
+  type        = string
+  default     = ""
+}
+
+variable "enable_https" {
+  description = "Bật listener HTTPS 443 + chuyển HTTP sang HTTPS. Chỉ bật SAU KHI đã thêm bản ghi xác minh ACM vào DNS."
+  type        = bool
+  default     = false
+}
+
+variable "trust_proxy_hops" {
+  description = "Số proxy phía trước backend: 1 = chỉ ALB, 2 = Cloudflare (proxy bật) + ALB"
+  type        = number
+  default     = 1
+}
+
+# --- Gửi email qua SMTP (để trống smtp_host thì email chỉ ghi vào log) ---
+variable "smtp_host" {
+  description = "SMTP server, vd. smtp.resend.com"
+  type        = string
+  default     = ""
+}
+
+variable "smtp_port" {
+  description = "Cổng SMTP (465 = TLS ngay từ đầu, 587 = STARTTLS)"
+  type        = number
+  default     = 465
+}
+
+variable "smtp_secure" {
+  description = "\"true\" khi dùng cổng 465"
+  type        = string
+  default     = "true"
+}
+
+variable "smtp_user" {
+  description = "Tài khoản SMTP"
+  type        = string
+  default     = ""
+}
+
+variable "smtp_pass" {
+  description = "Mật khẩu/API key SMTP"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "mail_from" {
+  description = "Người gửi, vd. \"Góp Mầm <no-reply@gopmam.com>\""
+  type        = string
+  default     = ""
+}

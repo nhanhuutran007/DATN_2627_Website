@@ -110,7 +110,18 @@ Mở `http://<alb_dns_name>` trên trình duyệt.
 - **Cloud Map (`gopmam.local`)**: backend gọi `ai.gopmam.local:8000` (kèm header `X-AI-Key`) và `redis.gopmam.local:6379`; SSR của frontend gọi `backend.gopmam.local:4000`.
 - **RDS MySQL 8.4** private, bắt buộc TLS; backend xác minh chứng chỉ bằng CA bundle của RDS đóng sẵn trong image (`DB_SSL=true`).
 - **Log**: CloudWatch `/ecs/gopmam/<service>`, giữ 7 ngày. Xem nhanh: `aws logs tail /ecs/gopmam/backend --follow`.
-- Giới hạn cho bản demo: chỉ HTTP (chưa có domain/HTTPS); secret truyền qua biến môi trường của task definition (chưa dùng Secrets Manager); Redis không có volume bền vững.
+- **Email**: backend gửi qua SMTP khi khai báo `smtp_*` + `mail_from` trong `terraform.tfvars`; để trống thì email chỉ ghi log. Link trong email dùng `public_url` (tên miền riêng nếu đã bật HTTPS).
+- Giới hạn cho bản demo: secret truyền qua biến môi trường của task definition (chưa dùng Secrets Manager); Redis không có volume bền vững.
+
+### Dùng tên miền riêng (vd. gopmam.com, DNS quản lý trên Cloudflare)
+Chứng chỉ SSL lấy miễn phí từ AWS ACM; Cloudflare đứng trước ALB (proxy bật).
+
+1. Trong `terraform.tfvars`: `domain_name = "gopmam.com"`, `enable_https = false`, rồi `terraform apply`. Terraform tạo chứng chỉ ACM (trạng thái `PENDING_VALIDATION`).
+2. `terraform output acm_validation_records` → thêm từng bản ghi vào Cloudflare: **Type CNAME, Proxy status DNS only**, ô Name chỉ điền phần trước `.gopmam.com`. Chờ `terraform output acm_certificate_status` (hoặc `aws acm list-certificates`) báo `ISSUED` (thường 5–30 phút). Giữ các bản ghi này để ACM tự gia hạn.
+3. Đặt `enable_https = true` và `trust_proxy_hops = 2` (Cloudflare + ALB), `terraform apply`: ALB mở listener 443, cổng 80 chuyển sang HTTPS, backend/frontend dùng `https://gopmam.com` cho link email, CORS, canonical.
+4. Trên Cloudflare: thêm `CNAME @` và `CNAME www` trỏ về `alb_dns_name`, **Proxied**; SSL/TLS chọn **Full (strict)** (không dùng *Flexible*: gây vòng lặp chuyển hướng); nên bật *Always Use HTTPS*.
+
+`alb_dns_name` đổi mỗi lần tạo lại ALB (sau khi tắt/bật hệ thống) → cập nhật lại 2 bản ghi CNAME `@`/`www` trên Cloudflare. Chứng chỉ ACM không bị xóa bởi lệnh "tắt hệ thống" bên dưới nên không phải xác minh lại.
 
 ---
 

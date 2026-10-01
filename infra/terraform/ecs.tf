@@ -5,6 +5,13 @@ resource "aws_ecs_cluster" "main" {
 locals {
   service_domain = "${var.project_name}.local"
   alb_url        = "http://${aws_lb.main.dns_name}"
+  # URL người dùng thấy: link trong email, canonical/Open Graph/sitemap
+  public_url = var.domain_name != "" && var.enable_https ? "https://${var.domain_name}" : local.alb_url
+  cors_origins = join(",", compact([
+    local.alb_url,
+    var.domain_name != "" ? "https://${var.domain_name}" : "",
+    var.domain_name != "" ? "https://www.${var.domain_name}" : "",
+  ]))
 
   # Cloud Map: các task gọi nhau bằng DNS nội bộ, không vòng ra ALB/Internet
   redis_url       = "redis://redis.${local.service_domain}:6379"
@@ -14,9 +21,18 @@ locals {
   backend_environment = [
     { name = "NODE_ENV", value = "production" },
     { name = "PORT", value = "4000" },
-    { name = "CORS_ORIGINS", value = local.alb_url },
-    # ALB là 1 hop proxy phía trước backend (IP thật của client cho rate limit/audit)
-    { name = "TRUST_PROXY_HOPS", value = "1" },
+    { name = "CORS_ORIGINS", value = local.cors_origins },
+    # Số proxy phía trước backend (ALB, thêm Cloudflare nếu bật proxy) để lấy IP thật của client cho rate limit/audit
+    { name = "TRUST_PROXY_HOPS", value = tostring(var.trust_proxy_hops) },
+    # Gốc URL frontend để tạo link trong email (đặt lại mật khẩu, xác minh email)
+    { name = "FRONTEND_URL", value = local.public_url },
+    # Để trống SMTP_HOST thì email chỉ ghi vào log
+    { name = "SMTP_HOST", value = var.smtp_host },
+    { name = "SMTP_PORT", value = tostring(var.smtp_port) },
+    { name = "SMTP_SECURE", value = var.smtp_secure },
+    { name = "SMTP_USER", value = var.smtp_user },
+    { name = "SMTP_PASS", value = var.smtp_pass },
+    { name = "MAIL_FROM", value = var.mail_from },
     # Backend đọc DB_* (backend/src/config/database.config.ts), không đọc DATABASE_URL
     { name = "DB_HOST", value = aws_db_instance.mysql.address },
     { name = "DB_PORT", value = tostring(aws_db_instance.mysql.port) },
@@ -264,7 +280,7 @@ resource "aws_ecs_task_definition" "frontend" {
     environment = [
       { name = "NODE_ENV", value = "production" },
       { name = "API_INTERNAL_URL", value = local.backend_api_url },
-      { name = "SITE_URL", value = local.alb_url },
+      { name = "SITE_URL", value = local.public_url },
     ]
     portMappings = [{
       containerPort = 3000

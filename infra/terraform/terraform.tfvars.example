@@ -5,3 +5,15 @@ jwt_access_secret      = "change-me-at-least-32-characters-long"
 jwt_refresh_secret     = "change-me-at-least-32-characters-long"
 payment_webhook_secret = "change-me-at-least-32-characters-long"
 ai_api_key             = "change-me-at-least-32-characters-long"
+
+# --- Tên miền riêng (tùy chọn, xem README.md) ---
+# domain_name      = "example.com"
+# enable_https     = false # bật true SAU KHI thêm bản ghi acm_validation_records vào DNS
+# trust_proxy_hops = 2     # 2 nếu đặt Cloudflare (proxy bật) trước ALB, mặc định 1
+
+# --- Gửi email qua SMTP (tùy chọn; để trống thì email chỉ ghi log) ---
+# smtp_host = "smtp.example.com"
+# smtp_port = 465
+# smtp_user = "change-me"
+# smtp_pass = "change-me"
+# mail_from = "Góp Mầm <no-reply@example.com>"
