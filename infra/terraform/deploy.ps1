@@ -41,7 +41,19 @@ function Get-Region {
   return $region.Trim()
 }
 
+function Assert-Docker {
+  if (Get-Command docker -ErrorAction SilentlyContinue) { return }
+  # PATH có thể chưa có (hoặc sai) đường dẫn Docker Desktop: thử thư mục cài mặc định
+  $dockerBin = Join-Path $env:ProgramFiles "Docker\Docker\resources\bin"
+  if (Test-Path (Join-Path $dockerBin "docker.exe")) {
+    $env:PATH = "$dockerBin;$env:PATH"
+    return
+  }
+  throw "Không tìm thấy lệnh docker. Hãy bật Docker Desktop và kiểm tra PATH."
+}
+
 function Push-Images {
+  Assert-Docker
   $out = Get-TfOutputs
   $region = Get-Region
   $registry = ($out.ecr_backend_url.value -split "/")[0]
