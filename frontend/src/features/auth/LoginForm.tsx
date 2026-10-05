@@ -8,14 +8,6 @@ import { ApiError, loginRequest } from "@/lib/api";
 
 import { safeNext } from "./safeNext";
 
-// Tài khoản có sẵn trong dữ liệu seed, chỉ để demo
-const DEMO_ACCOUNTS = [
-  { label: "Chủ dự án", email: "owner1@gopmam.com" },
-  { label: "Người ủng hộ", email: "user1@gopmam.com" },
-  { label: "Quản trị viên", email: "admin@gopmam.com" },
-];
-const DEMO_PASSWORD = "Test@123";
-
 function messageFor(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 401) return "Email hoặc mật khẩu không đúng.";
@@ -71,21 +63,6 @@ export function LoginForm() {
         {busy ? "Đang đăng nhập…" : "Đăng nhập"}
       </button>
       <p className="form-switch">Chưa có tài khoản? <Link href="/dang-ky">Đăng ký</Link></p>
-
-      <div className="demo-box">
-        <p>Tài khoản demo (mật khẩu <code>{DEMO_PASSWORD}</code>)</p>
-        <div>
-          {DEMO_ACCOUNTS.map((account) => (
-            <button
-              key={account.email}
-              type="button"
-              onClick={() => { setEmail(account.email); setPassword(DEMO_PASSWORD); setError(""); }}
-            >
-              {account.label}
-            </button>
-          ))}
-        </div>
-      </div>
     </form>
   );
 }

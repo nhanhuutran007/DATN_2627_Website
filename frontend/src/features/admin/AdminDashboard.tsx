@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
 import { AdminFinance } from "@/features/admin/AdminFinance";
 import {
@@ -174,6 +175,7 @@ function evidenceSummary(evidences: Record<string, number>): string {
 export function AdminDashboard() {
   const user = useAuthUser();
   const isAdmin = user?.role === "admin";
+  const dialog = useDialog();
 
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [campaigns, setCampaigns] = useState<AdminCampaign[]>([]);
@@ -269,17 +271,25 @@ export function AdminDashboard() {
     const needsReason = status === "needs_info" || status === "rejected";
     let reason: string | undefined;
     if (needsReason) {
-      const promptLabel =
-        status === "needs_info"
-          ? `Ghi chú bổ sung cho chiến dịch "${campaign.title}"`
-          : `Lý do từ chối chiến dịch "${campaign.title}"`;
-      const input = window.prompt(promptLabel, "");
-      if (input === null) return;
-      if (!input.trim()) {
-        setNotice("Vui lòng nhập lý do để gửi yêu cầu.");
-        return;
-      }
-      reason = input.trim();
+      const asking = status === "needs_info";
+      const result = await dialog.prompt({
+        title: asking ? "Yêu cầu bổ sung hồ sơ" : "Từ chối chiến dịch",
+        message: (
+          <>
+            Chiến dịch <b>{campaign.title}</b>.{" "}
+            {asking
+              ? "Chủ dự án sẽ nhận thông báo kèm ghi chú này và có thể chỉnh sửa rồi gửi duyệt lại."
+              : "Chủ dự án sẽ nhận thông báo kèm lý do từ chối."}
+          </>
+        ),
+        label: asking ? "Ghi chú bổ sung (gửi cho chủ dự án)" : "Lý do từ chối (gửi cho chủ dự án)",
+        placeholder: asking ? "VD: Bổ sung báo giá thiết bị và xác nhận của địa phương…" : "VD: Hồ sơ chưa chứng minh được nguồn lực thực hiện…",
+        maxLength: 1000,
+        confirmLabel: asking ? "Gửi yêu cầu bổ sung" : "Từ chối chiến dịch",
+        tone: asking ? "default" : "danger",
+      });
+      if (!result) return;
+      reason = result.value;
     }
     setBusy(campaign.id);
     setNotice(null);
@@ -409,25 +419,32 @@ export function AdminDashboard() {
     let hideReportedComment = false;
 
     if (status !== "reviewing") {
-      const input = window.prompt(
-        status === "resolved"
-          ? `Kết luận vi phạm cho báo cáo về "${title}" (bắt buộc, lưu vào nhật ký)`
-          : `Lý do bỏ qua báo cáo về "${title}" (bắt buộc, lưu vào nhật ký)`,
-        "",
-      );
-      if (input === null) return;
-      if (input.trim().length < MIN_REPORT_NOTES) {
-        setNotice(`Vui lòng nhập ghi chú tối thiểu ${MIN_REPORT_NOTES} ký tự.`);
-        return;
-      }
-      adminNotes = input.trim();
-      if (status === "resolved" && report.commentId && report.comment?.status === "visible") {
-        hideReportedComment = window.confirm("Ẩn bình luận bị báo cáo khỏi trang dự án? Tác giả sẽ nhận thông báo kèm lý do.");
-      } else if (status === "resolved" && report.campaign?.status === "active") {
-        pauseCampaign = window.confirm(
-          `Tạm dừng chiến dịch "${title}" để chủ dự án giải trình? Chiến dịch có thể được cho tiếp tục sau.`,
-        );
-      }
+      const resolving = status === "resolved";
+      const canHideComment = resolving && Boolean(report.commentId) && report.comment?.status === "visible";
+      const canPause = resolving && !canHideComment && report.campaign?.status === "active";
+      const result = await dialog.prompt({
+        title: resolving ? "Xác nhận vi phạm" : "Bỏ qua báo cáo",
+        message: (
+          <>
+            Báo cáo về <b>{title}</b>. Ghi chú được lưu vào nhật ký kiểm toán
+            {resolving ? " và dùng làm căn cứ xử lý." : "."}
+          </>
+        ),
+        label: resolving ? "Kết luận vi phạm" : "Lý do bỏ qua",
+        minLength: MIN_REPORT_NOTES,
+        maxLength: 1000,
+        confirmLabel: resolving ? "Xác nhận vi phạm" : "Bỏ qua báo cáo",
+        tone: resolving ? "danger" : "default",
+        checkbox: canHideComment
+          ? { label: "Ẩn bình luận bị báo cáo khỏi trang dự án", hint: "Tác giả nhận thông báo kèm kết luận này.", defaultChecked: true }
+          : canPause
+            ? { label: "Tạm dừng chiến dịch để chủ dự án giải trình", hint: "Có thể cho chiến dịch tiếp tục sau khi đã giải trình." }
+            : undefined,
+      });
+      if (!result) return;
+      adminNotes = result.value;
+      hideReportedComment = canHideComment && result.checked;
+      pauseCampaign = canPause && result.checked;
     }
 
     setBusy(report.id);
@@ -453,19 +470,26 @@ export function AdminDashboard() {
   }
 
   async function handleDirectRefund(donation: AdminDonation) {
-    const input = window.prompt(
-      `Hoàn trực tiếp ${money(donation.amount)} cho "${donation.campaign?.title ?? "chiến dịch"}"? Lý do (bắt buộc, lưu nhật ký và gửi người ủng hộ):`,
-      "",
-    );
-    if (input === null) return;
-    if (input.trim().length < 5) {
-      setNotice("Vui lòng nhập lý do tối thiểu 5 ký tự.");
-      return;
-    }
+    const result = await dialog.prompt({
+      title: "Hoàn tiền trực tiếp",
+      message: (
+        <>
+          Hoàn <b>{money(donation.amount)}</b> cho khoản ủng hộ vào <b>{donation.campaign?.title ?? "chiến dịch"}</b> qua cổng
+          thanh toán. Số tiền của chiến dịch sẽ giảm tương ứng; thao tác không hoàn tác được.
+        </>
+      ),
+      label: "Lý do hoàn tiền (lưu nhật ký và gửi người ủng hộ)",
+      minLength: 5,
+      maxLength: 500,
+      confirmLabel: "Hoàn tiền",
+      tone: "danger",
+    });
+    if (!result) return;
+    const input = result.value;
     setBusy(donation.id);
     setNotice(null);
     try {
-      await refundDonationDirectly(donation.id, input.trim());
+      await refundDonationDirectly(donation.id, input);
       await Promise.all([changeDonationFilter(donationFilter), reloadOverview()]);
       setNotice(`Đã hoàn ${money(donation.amount)} qua cổng thanh toán sandbox.`);
     } catch (err) {
@@ -493,13 +517,17 @@ export function AdminDashboard() {
     const hiding = comment.status === "visible";
     let reason = "";
     if (hiding) {
-      const input = window.prompt("Lý do ẩn bình luận (bắt buộc, gửi cho tác giả và lưu vào nhật ký)", "");
-      if (input === null) return;
-      if (input.trim().length < 5) {
-        setNotice("Vui lòng nhập lý do tối thiểu 5 ký tự.");
-        return;
-      }
-      reason = input.trim();
+      const result = await dialog.prompt({
+        title: "Ẩn bình luận",
+        message: <>Bình luận của <b>{comment.user?.name ?? "người dùng"}</b> sẽ không còn hiển thị trên trang dự án.</>,
+        label: "Lý do ẩn (gửi cho tác giả và lưu vào nhật ký)",
+        minLength: 5,
+        maxLength: 500,
+        confirmLabel: "Ẩn bình luận",
+        tone: "danger",
+      });
+      if (!result) return;
+      reason = result.value;
     }
     setBusy(comment.id);
     setNotice(null);

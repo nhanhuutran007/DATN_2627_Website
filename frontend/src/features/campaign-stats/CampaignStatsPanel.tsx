@@ -90,7 +90,7 @@ function StatsBody({ stats }: { stats: CampaignStats }) {
         </div>
         <div><dt>Người theo dõi</dt><dd className="num">{compactNumber(stats.followerCount)}</dd></div>
       </dl>
-      <p className="hint stats-note">
+      <p className="hint stats-panel-note">
         Tỷ lệ chuyển đổi = lượt ủng hộ thành công / lượt xem. Lượt xem lặp lại của cùng một người trong 30 phút chỉ tính một lần; bạn tự xem chiến dịch của mình không được tính.
       </p>
       <div className="stats-charts">

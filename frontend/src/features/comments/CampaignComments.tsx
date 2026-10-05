@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useState, type FormEvent } from "react";
 
+import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api";
 import {
@@ -165,9 +166,16 @@ function CommentItem({ comment, campaignId, user, isReply, onReplyPosted, onDele
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const mine = user?.id === comment.author.id;
+  const dialog = useDialog();
 
   const remove = async () => {
-    if (!window.confirm("Xóa bình luận này?")) return;
+    const ok = await dialog.confirm({
+      title: "Xóa bình luận?",
+      message: "Bình luận và các trả lời bên dưới sẽ không còn hiển thị. Thao tác không hoàn tác được.",
+      confirmLabel: "Xóa bình luận",
+      tone: "danger",
+    });
+    if (!ok) return;
     setDeleting(true);
     try {
       await deleteComment(comment.id);

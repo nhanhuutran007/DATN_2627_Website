@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ProgressBar } from "@/components/campaign/ProgressBar";
+import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon, type IconName } from "@/components/ui/Icon";
-import { AiConsentSettings } from "@/features/ai-consent/AiConsentSettings";
 import { EmailVerificationNotice } from "@/features/auth/EmailVerificationNotice";
 import { CampaignStatsPanel } from "@/features/campaign-stats/CampaignStatsPanel";
 import { MyDonations } from "@/features/finance/MyDonations";
@@ -71,6 +71,7 @@ function buildTasks(campaigns: ApiCampaign[]): Task[] {
 
 export function OwnerDashboard() {
   const user = useAuthUser();
+  const dialog = useDialog();
   const [campaigns, setCampaigns] = useState<ApiCampaign[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -118,7 +119,15 @@ export function OwnerDashboard() {
   const tasks = useMemo(() => buildTasks(campaigns), [campaigns]);
 
   const act = async (campaign: ApiCampaign, action: "submit" | "delete") => {
-    if (action === "delete" && !window.confirm(`Xóa bản nháp “${campaign.title}”? Thao tác này không hoàn tác được.`)) return;
+    if (action === "delete") {
+      const ok = await dialog.confirm({
+        title: "Xóa bản nháp?",
+        message: <>Bản nháp <b>{campaign.title}</b> sẽ bị xóa vĩnh viễn. Thao tác này không hoàn tác được.</>,
+        confirmLabel: "Xóa bản nháp",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
     setBusyId(campaign.id);
     setMessage(null);
     try {
@@ -282,13 +291,11 @@ export function OwnerDashboard() {
                 </ul>
               )}
             </section>
-            <section className="panel" aria-labelledby="bao-mat-tai-khoan">
-              <h2 id="bao-mat-tai-khoan" className="panel-title-sm">Bảo mật tài khoản</h2>
-              <p className="hint">Nên đổi mật khẩu định kỳ và không dùng lại mật khẩu của trang khác.</p>
-              <Link className="button button-outline button-block" href="/ho-so">Hồ sơ &amp; phiên đăng nhập</Link>
-              <Link className="button button-outline button-block" href="/doi-mat-khau">Đổi mật khẩu</Link>
-            </section>
-            <AiConsentSettings user={user} />
+            <Link className="profile-side-link" href="/ho-so">
+              <Icon name="user" size={18} />
+              <span>Hồ sơ, bảo mật và quyền riêng tư</span>
+              <Icon name="arrow-right" size={16} />
+            </Link>
             <section className="panel" aria-labelledby="minh-bach-note">
               <h2 id="minh-bach-note" className="panel-title-sm">Số liệu được tính thế nào?</h2>
               <ul className="check-list">

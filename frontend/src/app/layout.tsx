@@ -3,6 +3,7 @@ import { Be_Vietnam_Pro, Montserrat } from "next/font/google";
 
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { DialogProvider } from "@/components/ui/DialogProvider";
 import { AiConsentBanner } from "@/features/ai-consent/AiConsentBanner";
 import { siteUrl } from "@/lib/site";
 
@@ -58,11 +59,13 @@ export default function RootLayout({
   return (
     <html lang="vi" className={`${bodyFont.variable} ${headingFont.variable}`}>
       <body>
-        <a className="skip-link" href="#noi-dung">Bỏ qua điều hướng</a>
-        <SiteHeader />
-        <AiConsentBanner />
-        <div id="noi-dung">{children}</div>
-        <SiteFooter />
+        <DialogProvider>
+          <a className="skip-link" href="#noi-dung">Bỏ qua điều hướng</a>
+          <SiteHeader />
+          <AiConsentBanner />
+          <div id="noi-dung">{children}</div>
+          <SiteFooter />
+        </DialogProvider>
       </body>
     </html>
   );

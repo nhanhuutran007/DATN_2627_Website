@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
+import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api";
 import {
@@ -20,6 +21,7 @@ const errorText = (err: unknown, fallback: string) => (err instanceof ApiError ?
 
 /** Hoàn tiền (duyệt yêu cầu) và đối soát cho trang quản trị. */
 export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
+  const dialog = useDialog();
   const [refunds, setRefunds] = useState<RefundRequest[]>([]);
   const [refundFilter, setRefundFilter] = useState<RefundRequestStatus | "">("pending");
   const [busy, setBusy] = useState<string | null>(null);
@@ -53,22 +55,26 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
 
   const decide = async (request: RefundRequest, approve: boolean) => {
     const amount = formatVnd(Number(request.donation?.amount ?? 0));
-    const input = window.prompt(
-      approve
-        ? `Duyệt hoàn ${amount}? Ghi chú (bắt buộc, gửi cho người ủng hộ và lưu nhật ký):`
-        : "Lý do không chấp nhận (bắt buộc, gửi cho người ủng hộ):",
-      "",
-    );
-    if (input === null) return;
-    if (input.trim().length < 5) {
-      setNotice("Vui lòng nhập ghi chú tối thiểu 5 ký tự.");
-      return;
-    }
+    const result = await dialog.prompt({
+      title: approve ? "Duyệt yêu cầu hoàn tiền" : "Từ chối yêu cầu hoàn tiền",
+      message: approve ? (
+        <>Hoàn <b>{amount}</b> qua cổng thanh toán. Số tiền của chiến dịch sẽ giảm tương ứng; thao tác không hoàn tác được.</>
+      ) : (
+        <>Người ủng hộ sẽ nhận thông báo kèm lý do không chấp nhận hoàn <b>{amount}</b>.</>
+      ),
+      label: approve ? "Ghi chú (gửi cho người ủng hộ và lưu nhật ký)" : "Lý do không chấp nhận (gửi cho người ủng hộ)",
+      minLength: 5,
+      maxLength: 500,
+      confirmLabel: approve ? "Duyệt hoàn tiền" : "Từ chối yêu cầu",
+      tone: approve ? "danger" : "default",
+    });
+    if (!result) return;
+    const input = result.value;
     setBusy(request.id);
     setNotice(null);
     try {
-      if (approve) await approveRefund(request.id, input.trim());
-      else await rejectRefund(request.id, input.trim());
+      if (approve) await approveRefund(request.id, input);
+      else await rejectRefund(request.id, input);
       await loadRefunds(refundFilter);
       setNotice(approve ? `Đã hoàn ${amount} qua cổng thanh toán sandbox.` : "Đã từ chối yêu cầu hoàn tiền.");
       if (approve) onChanged?.();
