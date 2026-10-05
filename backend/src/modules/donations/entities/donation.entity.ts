@@ -7,6 +7,10 @@ export enum DonationStatus {
   COMPLETED = "completed",
   FAILED = "failed",
   REFUNDED = "refunded",
+  /** Đơn `pending` quá hạn thanh toán (job `DonationExpiryService`). */
+  EXPIRED = "expired",
+  /** Người ủng hộ hủy hoặc cổng thanh toán báo hủy. */
+  CANCELLED = "cancelled",
 }
 
 @Entity("donations")

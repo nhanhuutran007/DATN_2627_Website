@@ -8,6 +8,7 @@
 import { config } from "dotenv";
 
 import { signWebhookPayload } from "../src/integrations/payment/payment.gateway";
+import { WEBHOOK_STATUSES } from "../src/modules/donations/dto/donation.dto";
 
 config({ path: ".env" });
 
@@ -16,13 +17,13 @@ function main(): void {
 
   if (!donationId || !status) {
     console.error(
-      "Dùng: sign-webhook.ts <donationId> <completed|failed> [transactionId]",
+      "Dùng: sign-webhook.ts <donationId> <completed|failed|cancelled|expired> [transactionId]",
     );
     process.exitCode = 1;
     return;
   }
-  if (status !== "completed" && status !== "failed") {
-    console.error('status phải là "completed" hoặc "failed"');
+  if (!(WEBHOOK_STATUSES as readonly string[]).includes(status)) {
+    console.error(`status phải là một trong: ${WEBHOOK_STATUSES.join(", ")}`);
     process.exitCode = 1;
     return;
   }

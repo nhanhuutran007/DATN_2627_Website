@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -48,6 +50,14 @@ export class DonationsController {
     @GetCurrentUser() user: User,
   ) {
     return this.donationsService.confirmDemoPayment(id, dto.status, user);
+  }
+
+  /** Người ủng hộ hủy đơn đang chờ thanh toán. */
+  @Post(":id/cancel")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  cancel(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
+    return this.donationsService.cancel(id, user);
   }
 
   @Get("mine")

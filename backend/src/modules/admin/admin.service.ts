@@ -191,6 +191,12 @@ export class AdminService {
         refunded: donations.filter(
           (donation) => donation.status === DonationStatus.REFUNDED,
         ).length,
+        expired: donations.filter(
+          (donation) => donation.status === DonationStatus.EXPIRED,
+        ).length,
+        cancelled: donations.filter(
+          (donation) => donation.status === DonationStatus.CANCELLED,
+        ).length,
         completedAmount: Math.round(completedAmount),
         failedAmount: Math.round(failedAmount),
       },

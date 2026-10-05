@@ -80,6 +80,8 @@ const DONATION_STATUS_LABEL: Record<AdminDonation["status"], string> = {
   completed: "Thành công",
   failed: "Thất bại",
   refunded: "Hoàn tiền",
+  expired: "Hết hạn",
+  cancelled: "Đã hủy",
 };
 
 const DONATION_STATUS_TONE: Record<AdminDonation["status"], string> = {
@@ -87,6 +89,8 @@ const DONATION_STATUS_TONE: Record<AdminDonation["status"], string> = {
   completed: "success",
   failed: "failed",
   refunded: "changes",
+  expired: "draft",
+  cancelled: "draft",
 };
 
 const USER_STATUS_LABEL: Record<AdminUserStatus, string> = {
@@ -910,6 +914,8 @@ export function AdminDashboard() {
                 <option value="pending">Chờ xử lý</option>
                 <option value="failed">Thất bại</option>
                 <option value="refunded">Hoàn tiền</option>
+                <option value="expired">Hết hạn</option>
+                <option value="cancelled">Đã hủy</option>
                 <option value="">Tất cả trạng thái</option>
               </select>
             </div>

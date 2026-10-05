@@ -1,6 +1,6 @@
 import { api } from "../api";
 
-export type ApiDonationStatus = "pending" | "completed" | "failed" | "refunded";
+export type ApiDonationStatus = "pending" | "completed" | "failed" | "refunded" | "expired" | "cancelled";
 
 export type ApiDonation = {
   id: string;
@@ -56,6 +56,11 @@ export async function confirmDonation(payload: ConfirmDonationPayload): Promise<
     `/donations/${encodeURIComponent(payload.donationId)}/confirm`,
     { status: payload.status },
   );
+}
+
+/** Hủy giao dịch đang chờ thanh toán (chỉ chủ giao dịch). */
+export async function cancelDonation(donationId: string): Promise<ApiDonation> {
+  return api.post<ApiDonation>(`/donations/${encodeURIComponent(donationId)}/cancel`);
 }
 
 export async function fetchMyDonations(): Promise<ApiDonation[]> {

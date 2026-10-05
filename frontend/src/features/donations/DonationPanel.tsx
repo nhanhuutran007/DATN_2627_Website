@@ -5,6 +5,7 @@ import { FormEvent, useMemo, useState } from "react";
 
 import { ApiError, hasSession } from "@/lib/api";
 import {
+  cancelDonation,
   confirmDonation,
   createDonation,
   generateIdempotencyKey,
@@ -59,8 +60,9 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
     }
 
     setLoading(true);
+    let created: ApiDonation | null = null;
     try {
-      const created = await createDonation({
+      created = await createDonation({
         campaignId,
         amount: effectiveAmount,
         paymentMethod: payment,
@@ -68,14 +70,85 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
         idempotencyKey: generateIdempotencyKey(),
         ...(selectedTier ? { rewardTierId: selectedTier.id } : {}),
       });
-      const confirmed = await confirmDonation({ donationId: created.id, status: "completed" });
-      setDonation(confirmed);
+      // Đơn đã tạo: dù xác nhận lỗi vẫn hiển thị để người dùng thanh toán lại hoặc hủy.
+      setDonation(created);
+      setDonation(await confirmDonation({ donationId: created.id, status: "completed" }));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Có lỗi xảy ra. Vui lòng thử lại.");
+      if (err instanceof ApiError) setError(err.message);
+      else if (created) setError("Chưa xác nhận được thanh toán do lỗi kết nối. Bạn có thể thanh toán lại hoặc hủy giao dịch.");
+      else setError("Không kết nối được máy chủ. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
   };
+
+  const retryPayment = async () => {
+    if (!donation) return;
+    setLoading(true);
+    setError("");
+    try {
+      setDonation(await confirmDonation({ donationId: donation.id, status: "completed" }));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Chưa xác nhận được thanh toán. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelPending = async () => {
+    if (!donation) return;
+    setLoading(true);
+    setError("");
+    try {
+      setDonation(await cancelDonation(donation.id));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Không hủy được giao dịch. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startOver = () => {
+    setDonation(null);
+    setRewardTierId("");
+    setError("");
+  };
+
+  if (donation && donation.status !== "completed") {
+    const pending = donation.status === "pending";
+    const outcome = {
+      pending: { title: "Giao dịch đang chờ thanh toán", text: "Bạn có thể thanh toán lại hoặc hủy giao dịch. Giao dịch chưa thanh toán sẽ tự hết hạn sau 30 phút." },
+      cancelled: { title: "Đã hủy giao dịch", text: "Không có khoản tiền nào được ghi nhận." },
+      expired: { title: "Giao dịch đã hết hạn", text: "Giao dịch quá thời gian chờ thanh toán. Không có khoản tiền nào được ghi nhận." },
+      failed: { title: "Thanh toán không thành công", text: "Không có khoản tiền nào được ghi nhận. Bạn có thể thử lại." },
+      refunded: { title: "Khoản ủng hộ đã được hoàn tiền", text: "" },
+    }[donation.status];
+    return (
+      <div className="give give-done" aria-live="polite">
+        <h2 className="give-title">{outcome.title}</h2>
+        <p>{outcome.text}</p>
+        <dl className="receipt">
+          <div><dt>Số tiền</dt><dd className="num">{formatVnd(Number(donation.amount) || effectiveAmount)}</dd></div>
+          <div><dt>Mã giao dịch</dt><dd className="mono">{donation.transactionId ?? donation.id}</dd></div>
+        </dl>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="give-done-actions">
+          {pending ? (
+            <>
+              <button className="button button-primary" type="button" disabled={loading} onClick={retryPayment}>
+                {loading ? "Đang xử lý…" : "Thanh toán lại"}
+              </button>
+              <button className="button button-outline" type="button" disabled={loading} onClick={cancelPending}>
+                Hủy giao dịch
+              </button>
+            </>
+          ) : (
+            <button className="button button-primary" type="button" onClick={startOver}>Tạo giao dịch mới</button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (donation) {
     return (
@@ -88,13 +161,11 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
           <div><dt>Kênh</dt><dd>{donation.paymentMethod === "payos" ? "PayOS sandbox" : "Ví demo"}</dd></div>
           <div><dt>Hiển thị</dt><dd>{donation.isAnonymous ? "Ẩn danh" : "Tên của bạn"}</dd></div>
           {selectedTier && <div><dt>Phần quà</dt><dd>{donation.rewardTierId ? selectedTier.title : "Hết suất — ghi nhận không kèm quà"}</dd></div>}
-          <div><dt>Trạng thái</dt><dd>{donation.status === "completed" ? "Đã xác nhận" : "Đang xử lý"}</dd></div>
+          <div><dt>Trạng thái</dt><dd>Đã xác nhận</dd></div>
         </dl>
         <div className="give-done-actions">
-          {donation.status === "completed" && (
-            <Link className="button button-primary" href={`/bien-nhan/${donation.id}`}>Xem biên nhận</Link>
-          )}
-          <button className="button button-outline" type="button" onClick={() => { setDonation(null); setRewardTierId(""); }}>
+          <Link className="button button-primary" href={`/bien-nhan/${donation.id}`}>Xem biên nhận</Link>
+          <button className="button button-outline" type="button" onClick={startOver}>
             Ủng hộ thêm
           </button>
         </div>

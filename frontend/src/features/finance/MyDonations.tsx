@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { api } from "@/lib/api";
-import type { ApiDonation } from "@/lib/api/donations";
+import { ApiError, api } from "@/lib/api";
+import { cancelDonation, type ApiDonation } from "@/lib/api/donations";
 import { formatVnd } from "@/lib/format";
 
 const STATUS_LABEL: Record<ApiDonation["status"], { label: string; tone: string }> = {
@@ -10,6 +10,8 @@ const STATUS_LABEL: Record<ApiDonation["status"], { label: string; tone: string 
   pending: { label: "Đang xử lý", tone: "tag-amber" },
   failed: { label: "Thất bại", tone: "tag-red" },
   refunded: { label: "Đã hoàn tiền", tone: "tag-blue" },
+  expired: { label: "Hết hạn thanh toán", tone: "" },
+  cancelled: { label: "Đã hủy", tone: "" },
 };
 
 type Donation = ApiDonation & { rewardTier?: { title: string } | null };
@@ -18,6 +20,21 @@ type Donation = ApiDonation & { rewardTier?: { title: string } | null };
 export function MyDonations() {
   const [items, setItems] = useState<Donation[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
+
+  const cancel = async (id: string) => {
+    setBusyId(id);
+    setActionError("");
+    try {
+      const updated = await cancelDonation(id);
+      setItems((current) => current.map((item) => (item.id === id ? { ...item, status: updated.status } : item)));
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Không hủy được giao dịch, vui lòng thử lại.");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +65,8 @@ export function MyDonations() {
   }
 
   return (
+    <>
+    {actionError && <p className="form-error" role="alert">{actionError}</p>}
     <div className="table-wrap">
       <table className="data-table">
         <thead>
@@ -66,12 +85,20 @@ export function MyDonations() {
                 <td className="num">{formatVnd(Number(d.amount))}</td>
                 <td className="nowrap">{(d.completedAt ?? d.createdAt) ? new Date((d.completedAt ?? d.createdAt) as string).toLocaleDateString("vi-VN") : "—"}</td>
                 <td><span className={`tag ${status.tone}`}>{status.label}</span></td>
-                <td>{hasReceipt && <Link href={`/bien-nhan/${d.id}`}>Biên nhận</Link>}</td>
+                <td>
+                  {hasReceipt && <Link href={`/bien-nhan/${d.id}`}>Biên nhận</Link>}
+                  {d.status === "pending" && (
+                    <button className="link-button" type="button" disabled={busyId === d.id} onClick={() => cancel(d.id)}>
+                      Hủy<span className="sr-only"> giao dịch {formatVnd(Number(d.amount))}</span>
+                    </button>
+                  )}
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
     </div>
+    </>
   );
 }

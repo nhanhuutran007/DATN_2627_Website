@@ -46,12 +46,16 @@ export class ConfirmDonationDto {
   status!: "completed" | "failed";
 }
 
+/** Kết quả cổng thanh toán có thể báo về qua webhook. */
+export const WEBHOOK_STATUSES = ["completed", "failed", "cancelled", "expired"] as const;
+export type WebhookStatus = (typeof WEBHOOK_STATUSES)[number];
+
 export class WebhookDonationDto {
   @IsUUID()
   donationId!: string;
 
-  @IsIn(["completed", "failed"])
-  status!: "completed" | "failed";
+  @IsIn(WEBHOOK_STATUSES)
+  status!: WebhookStatus;
 
   @IsOptional()
   @IsString()

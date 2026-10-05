@@ -727,6 +727,32 @@ paths:
           description: Cổng thanh toán hiện không ở chế độ demo
         "404":
           description: Không tìm thấy đơn tài trợ thuộc về người dùng hiện tại
+        "409":
+          description: Đơn đã hết hạn hoặc đã bị hủy — phải tạo giao dịch mới
+  /donations/{id}/cancel:
+    post:
+      operationId: cancelDonation
+      summary: Người ủng hộ hủy giao dịch đang chờ thanh toán
+      description: >-
+        Chỉ chủ đơn; chỉ đơn `pending` (đơn đã `cancelled` trả lại nguyên trạng). Update có điều
+        kiện nên không đè lên kết quả thanh toán về cùng lúc. Ghi audit `donation.cancel`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Đã hủy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+        "401":
+          description: Chưa đăng nhập
+        "404":
+          description: Không tìm thấy đơn tài trợ thuộc về người dùng hiện tại
+        "409":
+          description: Đơn không còn ở trạng thái chờ thanh toán
   /donations/mine:
     get:
       operationId: listMyDonations
@@ -2628,7 +2654,10 @@ components:
 
     DonationStatus:
       type: string
-      enum: [pending, completed, failed, refunded]
+      description: >-
+        `expired` = đơn `pending` quá `DONATION_PENDING_TTL_MINUTES` phút (mặc định 30) do job
+        10 phút/lần chuyển; `cancelled` = người ủng hộ hủy hoặc cổng báo hủy.
+      enum: [pending, completed, failed, refunded, expired, cancelled]
     Donation:
       type: object
       properties:
@@ -2706,7 +2735,10 @@ components:
           format: uuid
         status:
           type: string
-          enum: [completed, failed]
+          description: >-
+            `failed`/`cancelled`/`expired` chỉ áp dụng cho đơn `pending`. `completed` áp dụng cả cho
+            đơn đã `expired`/`cancelled` (tiền đã thực sự chuyển) và được audit kèm `lateCompletion: true`.
+          enum: [completed, failed, cancelled, expired]
         transactionId:
           type: string
           maxLength: 255
@@ -3057,6 +3089,8 @@ components:
             refunded: { type: integer }
             completedAmount: { type: number }
             failedAmount: { type: number }
+            expired: { type: integer }
+            cancelled: { type: integer }
         successRate:
           type: number
           description: Tỷ lệ `success / (success + failed)` trong các chiến dịch đã kết thúc

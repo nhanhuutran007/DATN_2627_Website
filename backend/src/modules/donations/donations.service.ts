@@ -20,7 +20,7 @@ import { NotificationType } from "../notifications/entities/notification.entity"
 import { NotificationsService } from "../notifications/notifications.service";
 import { RewardTier } from "../rewards/entities/reward-tier.entity";
 import { User, UserRole } from "../users/entities/user.entity";
-import { CreateDonationDto, WebhookDonationDto } from "./dto/donation.dto";
+import { CreateDonationDto, WebhookDonationDto, type WebhookStatus } from "./dto/donation.dto";
 import { Donation, DonationStatus } from "./entities/donation.entity";
 
 export type DonationReceipt = {
@@ -38,6 +38,25 @@ export type DonationReceipt = {
   rewardTitle: string | null;
   refund: { refundedAt: Date | null; reference: string | null; reason: string | null } | null;
 };
+
+const STATUS_FROM_GATEWAY: Record<WebhookStatus, DonationStatus> = {
+  completed: DonationStatus.COMPLETED,
+  failed: DonationStatus.FAILED,
+  cancelled: DonationStatus.CANCELLED,
+  expired: DonationStatus.EXPIRED,
+};
+
+/**
+ * Trạng thái được phép chuyển sang khi nhận kết quả thanh toán. Thanh toán
+ * thành công đến muộn (sau khi đơn đã hết hạn/bị hủy phía hệ thống) vẫn được
+ * ghi nhận vì tiền đã thực sự chuyển — bỏ qua sẽ làm lệch đối soát; admin có
+ * thể hoàn tiền nếu cần. Các kết quả không thu tiền chỉ áp dụng cho đơn `pending`.
+ */
+function transitionSources(next: DonationStatus): DonationStatus[] {
+  return next === DonationStatus.COMPLETED
+    ? [DonationStatus.PENDING, DonationStatus.EXPIRED, DonationStatus.CANCELLED]
+    : [DonationStatus.PENDING];
+}
 
 @Injectable()
 export class DonationsService {
@@ -183,6 +202,14 @@ export class DonationsService {
     if (!donation || donation.userId !== user.id) {
       throw new NotFoundException("Donation not found");
     }
+    if (donation.status === DonationStatus.EXPIRED || donation.status === DonationStatus.CANCELLED) {
+      // Ví demo mô phỏng người dùng bấm thanh toán: cổng không cho trả đơn đã hết hạn/hủy.
+      throw new ConflictException(
+        donation.status === DonationStatus.EXPIRED
+          ? "Giao dịch đã hết hạn thanh toán. Vui lòng tạo giao dịch mới."
+          : "Giao dịch đã bị hủy. Vui lòng tạo giao dịch mới.",
+      );
+    }
     return this.applyPaymentResult(
       {
         donationId,
@@ -206,14 +233,13 @@ export class DonationsService {
     if (!donation) {
       throw new NotFoundException("Donation not found");
     }
-    if (donation.status !== DonationStatus.PENDING) {
+    const nextStatus = STATUS_FROM_GATEWAY[dto.status];
+    const sources = transitionSources(nextStatus);
+    const previousStatus = donation.status;
+    if (!sources.includes(previousStatus)) {
+      // Đã xử lý rồi (hoặc chuyển không hợp lệ, vd. hủy một đơn đã thành công): idempotent.
       return donation;
     }
-
-    const nextStatus =
-      dto.status === "completed"
-        ? DonationStatus.COMPLETED
-        : DonationStatus.FAILED;
     const nextTransactionId = dto.transactionId ?? donation.transactionId;
     const completedAt =
       nextStatus === DonationStatus.COMPLETED
@@ -222,13 +248,13 @@ export class DonationsService {
 
     const outcome = await this.dataSource.transaction(async (manager) => {
       // Update có điều kiện trên chính cột `status`: chỉ ghi khi donation vẫn
-      // còn PENDING tại thời điểm này. Guard `status !== PENDING` ở trên đọc
-      // ngoài transaction nên không đủ để chống race — nếu update vô điều kiện
-      // như trước, hai webhook (hoặc webhook đua với xác nhận ví demo) cùng đọc
-      // PENDING rồi cùng ghi sẽ cùng cộng tiền/backer trùng lặp cho một donation.
+      // còn ở đúng trạng thái đã đọc. Guard ở trên đọc ngoài transaction nên
+      // không đủ để chống race — nếu update vô điều kiện, hai webhook (hoặc
+      // webhook đua với xác nhận ví demo/job hết hạn) cùng đọc rồi cùng ghi sẽ
+      // cùng cộng tiền/backer trùng lặp cho một donation.
       const updateResult = await manager.update(
         Donation,
-        { id: donation.id, status: DonationStatus.PENDING },
+        { id: donation.id, status: previousStatus },
         { status: nextStatus, transactionId: nextTransactionId, completedAt },
       );
 
@@ -296,13 +322,15 @@ export class DonationsService {
       action: `donation.payment.${result.status}`,
       entity: "donation",
       entityId: result.id,
-      oldValues: { status: DonationStatus.PENDING },
+      oldValues: { status: previousStatus },
       newValues: {
         status: result.status,
         amount: result.amount,
         campaignId: result.campaignId,
         transactionId: result.transactionId ?? null,
         source,
+        // Thanh toán thành công sau khi đơn đã hết hạn/bị hủy: cần admin xem xét.
+        ...(previousStatus !== DonationStatus.PENDING ? { lateCompletion: true } : {}),
       },
     });
     if (result.status === DonationStatus.COMPLETED) {
@@ -400,6 +428,37 @@ export class DonationsService {
         ? { refundedAt: d.refundedAt ?? null, reference: d.refundReference ?? null, reason: d.refundReason ?? null }
         : null,
     };
+  }
+
+  /**
+   * Người ủng hộ tự hủy đơn chưa thanh toán. Idempotent với đơn đã hủy; đơn đã
+   * có kết quả khác (thành công, thất bại, hết hạn, hoàn tiền) không hủy được.
+   */
+  async cancel(donationId: string, user: User): Promise<Donation> {
+    const donation = await this.donationRepo.findOne({ where: { id: donationId } });
+    if (!donation || donation.userId !== user.id) {
+      throw new NotFoundException("Donation not found");
+    }
+    if (donation.status === DonationStatus.CANCELLED) {
+      return donation;
+    }
+    // Có điều kiện: không đè lên kết quả thanh toán vừa về cùng lúc.
+    const result = await this.donationRepo.update(
+      { id: donation.id, status: DonationStatus.PENDING },
+      { status: DonationStatus.CANCELLED },
+    );
+    if (!result.affected) {
+      throw new ConflictException("Chỉ hủy được giao dịch đang chờ thanh toán.");
+    }
+    await this.auditService.record({
+      userId: user.id,
+      action: "donation.cancel",
+      entity: "donation",
+      entityId: donation.id,
+      oldValues: { status: DonationStatus.PENDING },
+      newValues: { status: DonationStatus.CANCELLED, amount: donation.amount, campaignId: donation.campaignId },
+    });
+    return { ...donation, status: DonationStatus.CANCELLED } as Donation;
   }
 
   async findMine(userId: string): Promise<Donation[]> {

@@ -6,6 +6,7 @@ import { Campaign } from "../campaigns/entities/campaign.entity";
 import { RewardTier } from "../rewards/entities/reward-tier.entity";
 import { CampaignLedgerController } from "./campaign-ledger.controller";
 import { DonationsController } from "./donations.controller";
+import { DonationExpiryService } from "./donation-expiry.service";
 import { DonationsService } from "./donations.service";
 import { Donation } from "./entities/donation.entity";
 
@@ -14,6 +15,7 @@ import { Donation } from "./entities/donation.entity";
   controllers: [DonationsController, CampaignLedgerController],
   providers: [
     DonationsService,
+    DonationExpiryService,
     {
       provide: "PaymentGateway",
       useFactory: () => new DemoWalletGateway(process.env.PAYMENT_WEBHOOK_SECRET),
