@@ -93,6 +93,9 @@ const DONATION_STATUS_TONE: Record<AdminDonation["status"], string> = {
   cancelled: "draft",
 };
 
+/** Lọc theo trạng thái, hoặc "flagged" = giao dịch có cảnh báo rủi ro đang mở. */
+type DonationFilter = AdminDonation["status"] | "" | "flagged";
+
 const USER_STATUS_LABEL: Record<AdminUserStatus, string> = {
   active: "Hoạt động",
   inactive: "Không hoạt động",
@@ -184,7 +187,7 @@ export function AdminDashboard() {
   const [commentFilter, setCommentFilter] = useState<CommentStatus | "">("visible");
 
   const [campaignFilter, setCampaignFilter] = useState<ApiCampaignStatus | "">("pending");
-  const [donationFilter, setDonationFilter] = useState<AdminDonation["status"] | "">("completed");
+  const [donationFilter, setDonationFilter] = useState<DonationFilter>("completed");
   const [riskFilter, setRiskFilter] = useState<RiskStatus | "">("open");
   const [auditEntityFilter, setAuditEntityFilter] = useState<string>("");
 
@@ -249,10 +252,12 @@ export function AdminDashboard() {
     }
   }
 
-  async function changeDonationFilter(status: AdminDonation["status"] | "") {
-    setDonationFilter(status);
+  async function changeDonationFilter(filter: DonationFilter) {
+    setDonationFilter(filter);
     try {
-      const result = await fetchAdminDonations({ status: status || undefined, limit: 20 });
+      const result = await fetchAdminDonations(
+        filter === "flagged" ? { flagged: true, limit: 20 } : { status: filter || undefined, limit: 20 },
+      );
       setDonations(result.items);
       setError(null);
     } catch (err) {
@@ -909,19 +914,20 @@ export function AdminDashboard() {
           <section className="admin-card admin-table-card" id="giao-dich">
             <div className="card-heading">
               <div><p className="eyebrow">Minh bạch quỹ</p><h2>Giao dịch tài trợ</h2></div>
-              <select className="filter-button" aria-label="Lọc theo trạng thái giao dịch" value={donationFilter} onChange={(event) => changeDonationFilter(event.target.value as AdminDonation["status"] | "")}>
+              <select className="filter-button" aria-label="Lọc theo trạng thái giao dịch" value={donationFilter} onChange={(event) => changeDonationFilter(event.target.value as DonationFilter)}>
                 <option value="completed">Thành công</option>
                 <option value="pending">Chờ xử lý</option>
                 <option value="failed">Thất bại</option>
                 <option value="refunded">Hoàn tiền</option>
                 <option value="expired">Hết hạn</option>
                 <option value="cancelled">Đã hủy</option>
+                <option value="flagged">Có cảnh báo rủi ro</option>
                 <option value="">Tất cả trạng thái</option>
               </select>
             </div>
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Người ủng hộ</th><th>Chiến dịch</th><th>Số tiền</th><th>Phương thức</th><th>Mã giao dịch</th><th>Thời gian</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
+                <thead><tr><th>Người ủng hộ</th><th>Chiến dịch</th><th>Số tiền</th><th>Phương thức</th><th>Mã giao dịch</th><th>Thời gian</th><th>Trạng thái</th><th>Rủi ro</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
                 <tbody>
                   {donations.map((donation) => (
                     <tr key={donation.id}>
@@ -933,6 +939,15 @@ export function AdminDashboard() {
                       <td>{formatDate(donation.completedAt ?? donation.createdAt)}</td>
                       <td><span className={`table-status ${DONATION_STATUS_TONE[donation.status]}`}>{DONATION_STATUS_LABEL[donation.status]}</span></td>
                       <td>
+                        {donation.riskLevel ? (
+                          <a className={`risk-level ${donation.riskLevel}`} href="#rui-ro" title="Chiến dịch hoặc người ủng hộ có cảnh báo đang mở">
+                            {RISK_LEVEL_LABEL[donation.riskLevel]}
+                          </a>
+                        ) : (
+                          <span className="table-muted">—</span>
+                        )}
+                      </td>
+                      <td>
                         {donation.status === "completed" && (
                           <button type="button" disabled={busy === donation.id} onClick={() => handleDirectRefund(donation)}>
                             Hoàn tiền
@@ -942,7 +957,7 @@ export function AdminDashboard() {
                     </tr>
                   ))}
                   {donations.length === 0 && (
-                    <tr><td colSpan={8}><span className="table-muted">Không có giao dịch nào trong trạng thái này.</span></td></tr>
+                    <tr><td colSpan={9}><span className="table-muted">{donationFilter === "flagged" ? "Không có giao dịch nào liên quan tới cảnh báo rủi ro đang mở." : "Không có giao dịch nào trong trạng thái này."}</span></td></tr>
                   )}
                 </tbody>
               </table>

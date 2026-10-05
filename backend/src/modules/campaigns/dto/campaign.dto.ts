@@ -192,3 +192,12 @@ export class ModerateCampaignDto {
   @IsString()
   reason?: string;
 }
+export class CampaignStatsQueryDto {
+  /** Số ngày gần nhất cho chuỗi theo ngày. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(7)
+  @Max(90)
+  days?: number = 30;
+}

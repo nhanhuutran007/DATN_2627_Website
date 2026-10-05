@@ -12,6 +12,7 @@ import { CampaignLedger } from "@/features/donations/CampaignLedger";
 import { DonationPanel } from "@/features/donations/DonationPanel";
 import { FollowCampaignButton } from "@/features/follows/FollowCampaignButton";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
+import { CampaignViewTracker } from "@/features/campaign-stats/CampaignViewTracker";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
 import { apiCampaignToView, fetchCampaign, fetchCampaigns } from "@/lib/api/campaigns";
 import { fetchCampaignProgress, type CampaignProgress } from "@/lib/api/progress";
@@ -122,6 +123,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
       </PageBanner>
 
       <div className="container detail-layout">
+        {live && <CampaignViewTracker campaignId={campaign.slug} />}
         {!live && <p className="notice-sample">Dữ liệu mẫu — không phải chiến dịch thật trên hệ thống.</p>}
 
         <div className="detail-main">

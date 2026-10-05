@@ -4719,3 +4719,211 @@ button {
 .dash-side .panel .button-block + .button-block {
   margin-top: 10px;
 }
+
+/* Số liệu chiến dịch ở dashboard (lượt xem, chuyển đổi, diễn biến theo ngày) */
+.stats-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+}
+
+.stats-range {
+  display: inline-flex;
+  justify-self: start;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.stats-range button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.stats-range button[aria-pressed="true"] {
+  background: var(--white);
+  color: var(--navy);
+  box-shadow: 0 1px 2px rgba(21, 29, 54, 0.12);
+}
+
+.stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.stats-tiles div {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.stats-tiles dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.stats-tiles dd {
+  margin: 2px 0 0;
+  color: var(--navy);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.stats-note {
+  margin: 0;
+}
+
+.stats-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.daily-chart {
+  min-width: 0;
+  margin: 0;
+}
+
+.daily-chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 10px;
+  margin-bottom: 8px;
+}
+
+.daily-chart-title {
+  color: var(--navy);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.daily-chart-total {
+  color: var(--text-2);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-chart-plot {
+  position: relative;
+  height: 140px;
+  padding-top: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.daily-chart-max {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.daily-chart-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 100%;
+}
+
+.daily-chart-col {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  cursor: default;
+}
+
+.daily-chart-col:hover,
+.daily-chart-col.is-active,
+.daily-chart-col:focus-visible {
+  background: var(--soft);
+}
+
+.daily-chart-col:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: -2px;
+}
+
+.daily-chart-bar {
+  display: block;
+  width: 100%;
+  max-width: 24px;
+  border-radius: 4px 4px 0 0;
+}
+
+.daily-chart-tip {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+  min-width: 110px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  box-shadow: var(--shadow-card);
+  color: var(--text);
+  font-size: 0.78rem;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  white-space: nowrap;
+}
+
+.daily-chart-tip small {
+  color: var(--muted);
+}
+
+.daily-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.daily-chart-table {
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.daily-chart-table summary {
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.daily-chart-table .table-wrap {
+  max-height: 220px;
+  margin-top: 6px;
+  overflow-y: auto;
+}
+
+@media (max-width: 760px) {
+  .stats-tiles,
+  .stats-charts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

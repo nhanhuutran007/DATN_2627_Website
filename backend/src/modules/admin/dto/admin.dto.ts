@@ -1,5 +1,6 @@
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
+  IsBoolean,
   IsEnum,
   IsIn,
   IsInt,
@@ -50,6 +51,12 @@ export class AdminDonationQueryDto {
   @IsOptional()
   @IsEnum(DonationStatus)
   status?: DonationStatus;
+
+  /** Chỉ giao dịch của chiến dịch hoặc người ủng hộ đang có cảnh báo rủi ro `open`. */
+  @IsOptional()
+  @Transform(({ value }) => (value === "true" || value === true ? true : value === "false" || value === false ? false : value))
+  @IsBoolean()
+  flagged?: boolean;
 
   @IsOptional()
   @Type(() => Number)

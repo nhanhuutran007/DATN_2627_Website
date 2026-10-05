@@ -1115,6 +1115,10 @@ paths:
     get:
       operationId: adminListDonations
       summary: Danh sách giao dịch cho admin (kèm người tài trợ và chiến dịch)
+      description: >-
+        Mỗi giao dịch kèm `riskLevel` = mức cao nhất trong các cảnh báo rủi ro đang `open`
+        của chiến dịch hoặc người ủng hộ liên quan (null nếu không có). Cảnh báo gắn với
+        chiến dịch/người dùng, không gắn từng giao dịch.
       security:
         - bearerAuth: []
       parameters:
@@ -1122,6 +1126,11 @@ paths:
           in: query
           schema:
             $ref: "#/components/schemas/DonationStatus"
+        - name: flagged
+          in: query
+          description: "`true` = chỉ giao dịch của chiến dịch/người ủng hộ đang có cảnh báo `open`"
+          schema:
+            type: boolean
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
       responses:
@@ -1622,6 +1631,80 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /campaigns/{id}/views:
+    post:
+      operationId: recordCampaignView
+      summary: Ghi một lượt xem trang chiến dịch
+      description: >-
+        Không bắt buộc đăng nhập. Chống đếm trùng 30 phút theo người xem (tài khoản nếu đã
+        đăng nhập, ngược lại băm IP + user-agent; không lưu IP thô) qua Redis, rơi về bộ nhớ.
+        Chủ dự án tự xem không được tính. Tăng `campaigns.view_count` và `campaign_view_daily`
+        (ngày UTC). Rate limit 60 lần/phút theo IP.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Kết quả
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  counted: { type: boolean }
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /campaigns/{id}/stats:
+    get:
+      operationId: getCampaignStats
+      summary: Số liệu chiến dịch cho chủ dự án/admin
+      description: >-
+        Lượt xem, lượt ủng hộ, người theo dõi, tỷ lệ chuyển đổi (lượt ủng hộ thành công /
+        lượt xem) và chuỗi N ngày UTC gần nhất (lượt xem, số giao dịch đã xác nhận, số tiền
+        còn giữ — giao dịch đã hoàn tiền không cộng tiền).
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 7
+            maximum: 90
+            default: 30
+      responses:
+        "200":
+          description: Số liệu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  campaignId: { type: string, format: uuid }
+                  viewCount: { type: integer }
+                  backerCount: { type: integer }
+                  followerCount: { type: integer }
+                  currentAmount: { type: number }
+                  goalAmount: { type: number }
+                  conversionRate: { type: number, nullable: true, description: "0–1; null khi chưa có lượt xem" }
+                  days: { type: integer }
+                  daily:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date: { type: string, format: date }
+                        views: { type: integer }
+                        donations: { type: integer }
+                        amount: { type: number }
+        "401":
+          description: Chưa đăng nhập
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /campaigns/{id}/follow:
     get:
       operationId: getCampaignFollowStatus

@@ -1,4 +1,4 @@
-import { equal, ok } from "node:assert/strict";
+import { deepEqual, equal, ok } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
 import { AdminService } from "../src/modules/admin/admin.service";
@@ -262,6 +262,50 @@ describe("AdminService", () => {
       await service.listDonations({ status: DonationStatus.COMPLETED });
       const call = repos.donationRepo.calls.find((c) => c.method === "findAndCount");
       equal(call.args[0].where.status, DonationStatus.COMPLETED);
+    });
+
+    it("flagged chỉ lấy giao dịch của chiến dịch/người ủng hộ có cảnh báo đang mở", async () => {
+      repos.riskAlertRepo.seed = [
+        { entityType: "campaign", entityId: "camp-risky", level: "medium", status: "open" },
+        { entityType: "campaign", entityId: "camp-risky", level: "high", status: "open" },
+        { entityType: "user", entityId: "user-risky", level: "low", status: "open" },
+        { entityType: "campaign", entityId: "camp-closed", level: "high", status: "resolved" },
+      ];
+      repos.donationRepo.findAndCount = async () => [
+        [
+          makeDonation({ campaignId: "camp-risky", userId: "someone" }),
+          makeDonation({ campaignId: "camp-ok", userId: "user-risky" }),
+        ],
+        2,
+      ];
+      repos.donationRepo.calls = [];
+      const original = repos.donationRepo.findAndCount;
+      repos.donationRepo.findAndCount = async (...args: unknown[]) => {
+        repos.donationRepo.calls.push({ method: "findAndCount", args });
+        return original(...args);
+      };
+
+      const result = await service.listDonations({ flagged: true, status: DonationStatus.COMPLETED });
+      const where = repos.donationRepo.calls[0].args[0].where as Array<Record<string, any>>;
+      equal(where.length, 2);
+      deepEqual(where[0].campaignId.value, ["camp-risky"]);
+      deepEqual(where[1].userId.value, ["user-risky"]);
+      ok(where.every((clause) => clause.status === DonationStatus.COMPLETED));
+      // Mức cao nhất của chiến dịch là "high"; người ủng hộ là "low".
+      deepEqual(result.items.map((item) => item.riskLevel), ["high", "low"]);
+    });
+
+    it("flagged khi không có cảnh báo nào đang mở trả danh sách rỗng, không truy vấn", async () => {
+      repos.riskAlertRepo.seed = [{ entityType: "campaign", entityId: "c", level: "high", status: "dismissed" }];
+      repos.donationRepo.calls = [];
+      const result = await service.listDonations({ flagged: true });
+      equal(result.total, 0);
+      equal(repos.donationRepo.calls.filter((c) => c.method === "findAndCount").length, 0);
+    });
+
+    it("danh sách thường vẫn gắn mức rủi ro (null nếu không có cảnh báo)", async () => {
+      const result = await service.listDonations({});
+      equal(result.items[0].riskLevel, null);
     });
   });
 

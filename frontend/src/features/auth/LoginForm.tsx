@@ -14,7 +14,7 @@ const DEMO_ACCOUNTS = [
   { label: "Người ủng hộ", email: "user1@gopmam.com" },
   { label: "Quản trị viên", email: "admin@gopmam.com" },
 ];
-const DEMO_PASSWORD = "password123";
+const DEMO_PASSWORD = "Test@123";
 
 function messageFor(error: unknown): string {
   if (error instanceof ApiError) {

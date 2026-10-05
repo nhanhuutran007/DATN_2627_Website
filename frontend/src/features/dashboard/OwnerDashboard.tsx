@@ -7,6 +7,7 @@ import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { AiConsentSettings } from "@/features/ai-consent/AiConsentSettings";
 import { EmailVerificationNotice } from "@/features/auth/EmailVerificationNotice";
+import { CampaignStatsPanel } from "@/features/campaign-stats/CampaignStatsPanel";
 import { MyDonations } from "@/features/finance/MyDonations";
 import { MyFollows } from "@/features/follows/MyFollows";
 import { RewardManager } from "@/features/rewards/RewardManager";
@@ -36,6 +37,8 @@ const STATUS: Record<ApiCampaignStatus, { label: string; tone: string }> = {
 };
 
 const EDITABLE: ApiCampaignStatus[] = ["draft", "rejected", "needs_info"];
+/** Đã phát hành → có lượt xem/giao dịch để thống kê. */
+const PUBLISHED: ApiCampaignStatus[] = ["approved", "active", "paused", "success", "failed", "ended"];
 const DAY_MS = 86_400_000;
 
 type Task = { key: string; icon: IconName; text: string; href: string };
@@ -72,6 +75,7 @@ export function OwnerDashboard() {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rewardsOpen, setRewardsOpen] = useState<string | null>(null);
+  const [statsOpen, setStatsOpen] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -218,6 +222,16 @@ export function OwnerDashboard() {
                           Xóa
                         </button>
                       )}
+                      {PUBLISHED.includes(c.status) && (
+                        <button
+                          className="button button-ghost button-sm"
+                          type="button"
+                          aria-expanded={statsOpen === c.id}
+                          onClick={() => setStatsOpen((id) => (id === c.id ? null : c.id))}
+                        >
+                          Số liệu
+                        </button>
+                      )}
                       <button
                         className="button button-ghost button-sm"
                         type="button"
@@ -227,6 +241,7 @@ export function OwnerDashboard() {
                         Mức quà
                       </button>
                     </div>
+                    {statsOpen === c.id && <CampaignStatsPanel campaignId={c.id} />}
                     {rewardsOpen === c.id && (
                       <RewardManager campaignId={c.id} closed={["success", "failed", "cancelled", "ended"].includes(c.status)} />
                     )}

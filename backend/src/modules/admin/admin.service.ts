@@ -7,6 +7,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import {
   FindOptionsOrder,
   FindOptionsWhere,
+  In,
   Like,
   Repository,
 } from "typeorm";
@@ -25,6 +26,7 @@ import {
   RiskAlert,
   RiskAlertLevel,
   RiskAlertStatus,
+  RiskEntityType,
 } from "./entities/risk-alert.entity";
 
 export type AdminListResult<T> = {
@@ -35,6 +37,19 @@ export type AdminListResult<T> = {
 };
 
 type StatusTotals = Record<string, number>;
+
+/** Giao dịch kèm mức cảnh báo cao nhất đang mở của chiến dịch/người ủng hộ liên quan. */
+export type FlaggedDonation = Donation & { riskLevel: RiskAlertLevel | null };
+
+const RISK_RANK: Record<RiskAlertLevel, number> = {
+  [RiskAlertLevel.LOW]: 1,
+  [RiskAlertLevel.MEDIUM]: 2,
+  [RiskAlertLevel.HIGH]: 3,
+};
+
+function higherRisk(a: RiskAlertLevel | undefined, b: RiskAlertLevel): RiskAlertLevel {
+  return a && RISK_RANK[a] >= RISK_RANK[b] ? a : b;
+}
 
 function toMoney(value: unknown): number {
   const number = Number(value);
@@ -241,16 +256,50 @@ export class AdminService {
 
   async listDonations(
     query: AdminDonationQueryDto,
-  ): Promise<AdminListResult<Donation>> {
+  ): Promise<AdminListResult<FlaggedDonation>> {
     const limit = query.limit ?? 20;
     const offset = query.offset ?? 0;
 
-    const [items, total] = await this.donationRepo.findAndCount({
-      where: query.status ? { status: query.status } : {},
+    // Cảnh báo rủi ro gắn với chiến dịch hoặc người dùng, không gắn từng giao dịch:
+    // giao dịch "bị cảnh báo" là giao dịch thuộc một trong hai đối tượng đó.
+    const openAlerts = await this.riskAlertRepo.find({
+      select: { entityType: true, entityId: true, level: true },
+      where: { status: RiskAlertStatus.OPEN },
+    });
+    const campaignRisk = new Map<string, RiskAlertLevel>();
+    const userRisk = new Map<string, RiskAlertLevel>();
+    for (const alert of openAlerts) {
+      const target = alert.entityType === RiskEntityType.CAMPAIGN ? campaignRisk : userRisk;
+      target.set(alert.entityId, higherRisk(target.get(alert.entityId), alert.level));
+    }
+
+    const base: FindOptionsWhere<Donation> = query.status ? { status: query.status } : {};
+    let where: FindOptionsWhere<Donation> | FindOptionsWhere<Donation>[] = base;
+    if (query.flagged) {
+      where = [
+        ...(campaignRisk.size ? [{ ...base, campaignId: In([...campaignRisk.keys()]) }] : []),
+        ...(userRisk.size ? [{ ...base, userId: In([...userRisk.keys()]) }] : []),
+      ];
+      if (where.length === 0) {
+        return { items: [], total: 0, limit, offset };
+      }
+    }
+
+    const [donations, total] = await this.donationRepo.findAndCount({
+      where,
       relations: { user: true, campaign: true },
       order: { createdAt: "DESC" },
       skip: offset,
       take: limit,
+    });
+    // Gắn thêm thuộc tính vào chính entity (giữ class để serializer vẫn ẩn trường nhạy cảm).
+    const items = donations.map((donation) => {
+      const fromCampaign = campaignRisk.get(donation.campaignId);
+      const fromUser = userRisk.get(donation.userId);
+      const riskLevel = fromCampaign && fromUser
+        ? higherRisk(fromCampaign, fromUser)
+        : fromCampaign ?? fromUser ?? null;
+      return Object.assign(donation, { riskLevel });
     });
     return { items, total, limit, offset };
   }

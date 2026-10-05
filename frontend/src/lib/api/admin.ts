@@ -72,6 +72,8 @@ export type AdminDonation = {
   isAnonymous: boolean;
   completedAt?: string | null;
   createdAt: string;
+  /** Mức cảnh báo cao nhất đang mở của chiến dịch/người ủng hộ liên quan. */
+  riskLevel?: RiskLevel | null;
 };
 
 export type AdminDonationList = {
@@ -207,10 +209,13 @@ export async function fetchAdminCampaigns(query: {
 
 export async function fetchAdminDonations(query: {
   status?: AdminDonationStatus;
+  /** Chỉ giao dịch của chiến dịch/người ủng hộ đang có cảnh báo rủi ro. */
+  flagged?: boolean;
   limit?: number;
   offset?: number;
 } = {}): Promise<AdminDonationList> {
-  const params = toParams(query);
+  const { flagged, ...rest } = query;
+  const params = toParams({ ...rest, flagged: flagged ? "true" : undefined });
   return api.get<AdminDonationList>(`/admin/donations${params ? `?${params}` : ""}`);
 }
 
