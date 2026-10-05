@@ -1,15 +1,23 @@
+import { randomUUID } from "node:crypto";
+
 import {
   ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
+import { InjectRepository } from "@nestjs/typeorm";
 import * as bcrypt from "bcryptjs";
+import { LessThan, Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import { User, UserRole, UserStatus } from "../users/entities/user.entity";
 import { isUserLocked, UsersService } from "../users/users.service";
 import { LoginDto, RegisterDto, TokenResponseDto } from "./dto/auth.dto";
+import { RevokedToken } from "./entities/revoked-token.entity";
+
+/** Phần payload JWT dùng để thu hồi token (`jti`) và biết lúc nó tự hết hạn (`exp`). */
+type TokenClaims = { sub?: string; jti?: string; iat?: number; exp?: number };
 
 /**
  * JWT phát hành trước lần đổi/đặt lại mật khẩu gần nhất không còn hợp lệ.
@@ -23,12 +31,26 @@ export function issuedBeforePasswordChange(user: User, issuedAtSeconds?: number)
   return issuedAtSeconds === undefined || issuedAtSeconds < changedAtSeconds;
 }
 
+/** JWT bị vô hiệu do đổi/đặt lại mật khẩu hoặc "đăng xuất khỏi mọi thiết bị". */
+export function issuedBeforeSessionCutoff(user: User, issuedAtSeconds?: number): boolean {
+  if (issuedBeforePasswordChange(user, issuedAtSeconds)) {
+    return true;
+  }
+  if (!user.sessionsRevokedAt) {
+    return false;
+  }
+  const revokedAtSeconds = Math.floor(new Date(user.sessionsRevokedAt).getTime() / 1000);
+  return issuedAtSeconds === undefined || issuedAtSeconds < revokedAtSeconds;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
+    @InjectRepository(RevokedToken)
+    private readonly revokedTokenRepo: Repository<RevokedToken>,
   ) {}
 
   async register(dto: RegisterDto): Promise<TokenResponseDto> {
@@ -119,7 +141,7 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string): Promise<TokenResponseDto> {
-    let payload: { sub: string; iat?: number };
+    let payload: { sub: string; iat?: number; jti?: string };
     try {
       payload = this.jwtService.verify(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET,
@@ -137,22 +159,89 @@ export class AuthService {
       throw new ForbiddenException("Account has been banned");
     }
 
-    if (issuedBeforePasswordChange(user, payload.iat)) {
+    if (issuedBeforeSessionCutoff(user, payload.iat) || (await this.isRevoked(payload.jti))) {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
     return this.generateTokens(user);
   }
 
-  async validateUser(userId: string, issuedAt?: number): Promise<User> {
+  async validateUser(userId: string, issuedAt?: number, jti?: string): Promise<User> {
     const user = await this.usersService.findById(userId);
     if (!user) {
       throw new UnauthorizedException("User not found");
     }
-    if (issuedBeforePasswordChange(user, issuedAt)) {
-      throw new UnauthorizedException("Session expired after password change");
+    if (issuedBeforeSessionCutoff(user, issuedAt)) {
+      throw new UnauthorizedException("Session has been revoked");
+    }
+    if (await this.isRevoked(jti)) {
+      throw new UnauthorizedException("Session has been logged out");
     }
     return user;
+  }
+
+  /**
+   * Đăng xuất phiên hiện tại: thu hồi access token đang dùng và refresh token
+   * đi kèm (nếu gửi lên và đúng của người này) tới khi chúng tự hết hạn.
+   */
+  async logout(user: User, accessToken: string | undefined, refreshToken?: string): Promise<void> {
+    const revoked: RevokedToken[] = [];
+    const access = accessToken ? this.jwtService.decode<TokenClaims | null>(accessToken) : null;
+    const accessEntry = this.toRevokedEntry(user, access);
+    if (accessEntry) revoked.push(accessEntry);
+
+    if (refreshToken) {
+      try {
+        const refresh = this.jwtService.verify<TokenClaims>(refreshToken, {
+          secret: process.env.JWT_REFRESH_SECRET,
+        });
+        const refreshEntry = this.toRevokedEntry(user, refresh);
+        if (refreshEntry) revoked.push(refreshEntry);
+      } catch {
+        // Refresh token sai/hết hạn thì vốn đã không dùng được, không cần thu hồi.
+      }
+    }
+
+    // Dọn các dòng đã quá hạn (token tương ứng đã tự hết hiệu lực).
+    await this.revokedTokenRepo.delete({ expiresAt: LessThan(new Date()) });
+    if (revoked.length > 0) {
+      await this.revokedTokenRepo.save(revoked);
+    }
+    await this.auditService.record({
+      userId: user.id,
+      action: "auth.logout",
+      entity: "user",
+      entityId: user.id,
+      newValues: { revokedTokens: revoked.length },
+    });
+  }
+
+  /** Vô hiệu mọi phiên của tài khoản, kể cả phiên đang gọi. */
+  async logoutAll(user: User): Promise<void> {
+    const revokedAt = await this.usersService.revokeAllSessions(user);
+    await this.auditService.record({
+      userId: user.id,
+      action: "auth.logout_all",
+      entity: "user",
+      entityId: user.id,
+      newValues: { sessionsRevokedAt: revokedAt.toISOString() },
+    });
+  }
+
+  private toRevokedEntry(user: User, claims: TokenClaims | null): RevokedToken | null {
+    // Token phát hành trước khi có `jti` không thu hồi riêng lẻ được; chúng tự hết hạn.
+    if (!claims || claims.sub !== user.id || !claims.jti || !claims.exp) {
+      return null;
+    }
+    return Object.assign(new RevokedToken(), {
+      jti: claims.jti,
+      userId: user.id,
+      expiresAt: new Date(claims.exp * 1000),
+    });
+  }
+
+  private async isRevoked(jti: string | undefined): Promise<boolean> {
+    return jti ? this.revokedTokenRepo.existsBy({ jti }) : false;
   }
 
   /** Cấp cặp token mới, vd. sau khi đổi mật khẩu để phiên hiện tại tiếp tục. */
@@ -163,11 +252,12 @@ export class AuthService {
   private generateTokens(user: User): TokenResponseDto {
     const payload = { sub: user.id, email: user.email, role: user.role };
 
-    const accessToken = this.jwtService.sign(payload, {
+    // Mỗi token có `jti` riêng để đăng xuất thu hồi được đúng phiên đó.
+    const accessToken = this.jwtService.sign({ ...payload, jti: randomUUID() }, {
       secret: process.env.JWT_ACCESS_SECRET,
     });
 
-    const refreshToken = this.jwtService.sign(payload, {
+    const refreshToken = this.jwtService.sign({ ...payload, jti: randomUUID() }, {
       secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: "7d",
     });

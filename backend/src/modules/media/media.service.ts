@@ -23,6 +23,7 @@ export const MEDIA_URL_PREFIX = "/api/v1/media/";
 const FOLDER_BY_PURPOSE: Record<MediaPurpose, string> = {
   [MediaPurpose.CAMPAIGN_IMAGE]: "campaigns",
   [MediaPurpose.PROGRESS_IMAGE]: "progress",
+  [MediaPurpose.AVATAR]: "avatars",
 };
 
 export type IncomingFile = {

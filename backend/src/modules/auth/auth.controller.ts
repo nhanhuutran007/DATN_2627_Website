@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Ip, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Headers, HttpCode, HttpStatus, Ip, Post, UseGuards } from "@nestjs/common";
 
 import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.module";
 import { User } from "../users/entities/user.entity";
@@ -8,6 +8,7 @@ import {
   ChangePasswordDto,
   ForgotPasswordDto,
   LoginDto,
+  LogoutDto,
   RefreshTokenDto,
   RegisterDto,
   ResetPasswordDto,
@@ -63,6 +64,28 @@ export class AuthController {
   @RateLimit({ limit: 10, windowMs: 60_000, keyPrefix: "auth-refresh" })
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshTokens(dto.refreshToken);
+  }
+
+  /** Đăng xuất phiên hiện tại: access token đang dùng + refresh token gửi kèm bị thu hồi. */
+  @Post("logout")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard)
+  async logout(
+    @GetCurrentUser() user: User,
+    @Headers("authorization") authorization: string | undefined,
+    @Body() dto: LogoutDto,
+  ): Promise<void> {
+    const accessToken = authorization?.replace(/^Bearer\s+/i, "");
+    await this.authService.logout(user, accessToken, dto.refreshToken);
+  }
+
+  /** Đăng xuất khỏi mọi thiết bị (mọi token đã phát hành, kể cả phiên này). */
+  @Post("logout-all")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 5, windowMs: 15 * 60_000, keyPrefix: "auth-logout-all" })
+  async logoutAll(@GetCurrentUser() user: User): Promise<void> {
+    await this.authService.logoutAll(user);
   }
 
   @Post("forgot-password")

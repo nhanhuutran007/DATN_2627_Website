@@ -8,6 +8,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { AiConsentSettings } from "@/features/ai-consent/AiConsentSettings";
 import { EmailVerificationNotice } from "@/features/auth/EmailVerificationNotice";
 import { MyDonations } from "@/features/finance/MyDonations";
+import { MyFollows } from "@/features/follows/MyFollows";
 import { RewardManager } from "@/features/rewards/RewardManager";
 import { ApiError } from "@/lib/api";
 import {
@@ -240,6 +241,12 @@ export function OwnerDashboard() {
             <p className="hint">Mở biên nhận để in/lưu PDF hoặc gửi yêu cầu hoàn tiền.</p>
             <MyDonations />
           </section>
+
+          <section className="panel" id="dang-theo-doi" aria-labelledby="ds-theo-doi">
+            <h2 id="ds-theo-doi">Dự án đang theo dõi</h2>
+            <p className="hint">Bạn nhận thông báo khi các dự án này có cập nhật, đạt mốc hoặc đổi trạng thái.</p>
+            <MyFollows />
+          </section>
           </div>
 
           <aside className="dash-side">
@@ -263,6 +270,7 @@ export function OwnerDashboard() {
             <section className="panel" aria-labelledby="bao-mat-tai-khoan">
               <h2 id="bao-mat-tai-khoan" className="panel-title-sm">Bảo mật tài khoản</h2>
               <p className="hint">Nên đổi mật khẩu định kỳ và không dùng lại mật khẩu của trang khác.</p>
+              <Link className="button button-outline button-block" href="/ho-so">Hồ sơ &amp; phiên đăng nhập</Link>
               <Link className="button button-outline button-block" href="/doi-mat-khau">Đổi mật khẩu</Link>
             </section>
             <AiConsentSettings user={user} />

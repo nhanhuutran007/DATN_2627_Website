@@ -2920,6 +2920,16 @@ button {
   font-size: 0.95rem;
 }
 
+/* Ô ẩn trong field (vd. input file của ImageUploader): giữ kích thước .sr-only,
+   nếu không `width: 100%` ở trên làm nó giãn và tràn ngang trang. */
+.field input.sr-only,
+.form-field input.sr-only {
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+}
+
 .field textarea,
 .form-field textarea {
   line-height: 1.6;
@@ -4523,4 +4533,189 @@ button {
   .ai-consent-actions .button {
     flex: 1;
   }
+}
+
+/* Trang hồ sơ cá nhân (/ho-so) */
+.field > span small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.profile-meta {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.profile-meta div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.profile-meta dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.profile-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.profile-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.profile-sessions h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.profile-sessions .hint {
+  margin: 0;
+}
+
+.profile-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.profile-confirm .button {
+  flex: 1 1 180px;
+}
+
+/* Theo dõi / chia sẻ ở thẻ gây quỹ (/du-an/[id]) */
+.fund-social {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.follow-box .is-following {
+  color: var(--success);
+  border-color: #b7e0c4;
+  background: var(--success-soft);
+}
+
+.follow-count {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--text-2);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.share-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.share-message:empty {
+  display: none;
+}
+
+.share-message {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* Bộ lọc nâng cao trang /du-an */
+.filter-more {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  grid-column: 1 / -1;
+}
+
+.card-grid.is-loading {
+  opacity: 0.55;
+  transition: opacity 160ms ease;
+}
+
+.load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+@media (max-width: 960px) {
+  .filter-more {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.filter-toggle {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .filter-more {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filter-toggle {
+    display: inline-flex;
+    grid-column: 1 / -1;
+  }
+
+  .filter-more:not(.is-open) {
+    display: none;
+  }
+}
+
+/* Dự án đang theo dõi (dashboard) */
+.follow-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.follow-list li {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.follow-list-head,
+.follow-list-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.follow-list-head a {
+  min-width: 0;
+  color: var(--navy);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* Nhiều nút xếp chồng trong cùng panel sidebar (vd. Bảo mật tài khoản) */
+.dash-side .panel .button-block + .button-block {
+  margin-top: 10px;
 }

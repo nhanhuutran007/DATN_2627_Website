@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
-import { clearSession } from "@/lib/api";
+import { logoutRequest } from "@/lib/api";
 import { useAuthUser } from "@/lib/auth";
 
 const navigation = [
@@ -24,10 +24,10 @@ export function SiteHeader() {
   const user = useAuthUser();
 
   const close = () => setOpen(false);
-  const logout = () => {
-    clearSession();
+  const logout = async () => {
     close();
-    if (pathname === "/dashboard" || pathname === "/admin") router.push("/");
+    await logoutRequest();
+    if (pathname === "/dashboard" || pathname === "/admin" || pathname === "/ho-so") router.push("/");
     else router.refresh();
   };
 
@@ -43,6 +43,7 @@ export function SiteHeader() {
             {user ? (
               <>
                 <Link href="/dashboard">Xin chào, {user.name}</Link>
+                <Link href="/ho-so">Hồ sơ</Link>
                 <button type="button" onClick={logout}>Đăng xuất</button>
               </>
             ) : (
@@ -86,7 +87,10 @@ export function SiteHeader() {
             <div className="main-nav-mobile">
               <Link href="/tao-chien-dich" onClick={close}>Tạo chiến dịch</Link>
               {user ? (
-                <button type="button" onClick={logout}>Đăng xuất</button>
+                <>
+                  <Link href="/ho-so" onClick={close}>Hồ sơ cá nhân</Link>
+                  <button type="button" onClick={logout}>Đăng xuất</button>
+                </>
               ) : (
                 <>
                   <Link href="/dang-nhap" onClick={close}>Đăng nhập</Link>

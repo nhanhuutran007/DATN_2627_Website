@@ -313,6 +313,29 @@ export async function resendVerificationRequest(): Promise<string> {
   return response.message;
 }
 
-export function logoutRequest(): void {
+/**
+ * Đăng xuất: báo server thu hồi access + refresh token của phiên này rồi xóa
+ * phiên ở trình duyệt. Server lỗi/mất mạng vẫn xóa phiên cục bộ (token cũ tự
+ * hết hạn), không giữ người dùng ở trạng thái đăng nhập.
+ */
+export async function logoutRequest(): Promise<void> {
+  const refreshToken = readStorage(REFRESH_TOKEN_KEY);
+  try {
+    if (hasSession()) {
+      await apiFetch<void>("/auth/logout", {
+        method: "POST",
+        body: JSON.stringify(refreshToken ? { refreshToken } : {}),
+      }, true, false);
+    }
+  } catch {
+    // Bỏ qua: phiên cục bộ vẫn bị xóa ở dưới.
+  } finally {
+    clearSession();
+  }
+}
+
+/** Đăng xuất khỏi mọi thiết bị (kể cả thiết bị này). */
+export async function logoutAllRequest(): Promise<void> {
+  await api.post<void>("/auth/logout-all");
   clearSession();
 }

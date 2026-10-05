@@ -174,6 +174,14 @@ export class UsersService {
     return this.userRepo.save(user);
   }
 
+  /** Vô hiệu mọi JWT đã phát hành cho tài khoản ("đăng xuất khỏi mọi thiết bị"). */
+  async revokeAllSessions(user: User): Promise<Date> {
+    const now = new Date();
+    await this.userRepo.update({ id: user.id }, { sessionsRevokedAt: now });
+    user.sessionsRevokedAt = now;
+    return now;
+  }
+
   async recordLoginSuccess(user: User): Promise<User> {
     if (user.failedLoginCount || user.lockedUntil) {
       user.failedLoginCount = 0;

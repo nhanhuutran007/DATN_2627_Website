@@ -13,6 +13,7 @@ import { CampaignsModule } from "./modules/campaigns/campaigns.module";
 import { CommentsModule } from "./modules/comments/comments.module";
 import { DonationsModule } from "./modules/donations/donations.module";
 import { FinanceModule } from "./modules/finance/finance.module";
+import { FollowsModule } from "./modules/follows/follows.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MediaModule } from "./modules/media/media.module";
 import { ModerationModule } from "./modules/moderation/moderation.module";
@@ -39,6 +40,7 @@ import { UsersModule } from "./modules/users/users.module";
     ProgressModule,
     ModerationModule,
     CommentsModule,
+    FollowsModule,
     RewardsModule,
     FinanceModule,
     MediaModule,

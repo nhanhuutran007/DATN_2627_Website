@@ -1,4 +1,4 @@
-import { equal, ok, rejects } from "node:assert/strict";
+import { deepEqual, equal, ok, rejects } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
 import { NotFoundException } from "@nestjs/common";
@@ -65,13 +65,22 @@ describe("NotificationsService", () => {
   let repo: ReturnType<typeof makeNotificationRepo>;
   let emails: any[];
   let service: NotificationsService;
+  let followers: string[];
 
   beforeEach(() => {
     repo = makeNotificationRepo();
     emails = [];
     const userRepo = { find: async () => [{ id: OWNER, email: "owner@example.com", name: "Chủ dự án" }] };
     const emailGateway = { sendNotification: async (m: any) => { emails.push(m); } };
-    service = new NotificationsService(repo as any, makeDonationRepo([DONOR_A, DONOR_B, OWNER]) as any, userRepo as any, emailGateway as any);
+    followers = [];
+    const followRepo = { find: async () => followers.map((userId) => ({ userId })) };
+    service = new NotificationsService(
+      repo as any,
+      makeDonationRepo([DONOR_A, DONOR_B, OWNER]) as any,
+      userRepo as any,
+      emailGateway as any,
+      followRepo as any,
+    );
   });
 
   it("lưu thông báo chưa đọc, chỉ gửi email khi được yêu cầu", async () => {
@@ -102,6 +111,17 @@ describe("NotificationsService", () => {
     );
     equal(count, 2);
     ok(repo.rows.every((r) => r.userId !== OWNER));
+  });
+
+  it("gửi cả người theo dõi, không trùng với người vừa ủng hộ vừa theo dõi", async () => {
+    followers = [DONOR_A, "follower-only", OWNER];
+    const count = await service.notifyCampaignBackers(
+      "c1",
+      { type: NotificationType.PROGRESS_UPDATE, title: "Cập nhật", message: "m" },
+      [OWNER],
+    );
+    equal(count, 3);
+    deepEqual(repo.rows.map((r) => r.userId).sort(), [DONOR_A, DONOR_B, "follower-only"].sort());
   });
 
   it("đánh dấu đã đọc chỉ với thông báo của chính mình", async () => {

@@ -169,6 +169,45 @@ paths:
           description: Chưa đăng nhập hoặc token hết hạn
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Đăng xuất phiên hiện tại
+      description: |
+        Thu hồi access token đang dùng (header `Authorization`) và refresh token gửi
+        kèm (nếu đúng của người dùng này) bằng `jti`, giữ trong `revoked_tokens` tới
+        khi token tự hết hạn. Token đã thu hồi bị từ chối 401 ở mọi endpoint và ở
+        `/auth/refresh`. Refresh token sai/hết hạn được bỏ qua. Ghi audit `auth.logout`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+      responses:
+        "204":
+          description: Đã đăng xuất
+        "401":
+          description: Chưa đăng nhập hoặc token hết hạn/đã thu hồi
+  /auth/logout-all:
+    post:
+      operationId: logoutAll
+      summary: Đăng xuất khỏi mọi thiết bị
+      description: |
+        Đặt `users.sessions_revoked_at` = thời điểm hiện tại: mọi access/refresh token
+        phát hành trước đó (kể cả phiên đang gọi) bị từ chối. Ghi audit
+        `auth.logout_all`. Rate limit 5 lần/15 phút theo IP.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Đã thu hồi mọi phiên
+        "401":
+          description: Chưa đăng nhập hoặc token hết hạn/đã thu hồi
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /auth/verify-email:
     post:
       operationId: verifyEmail
@@ -384,10 +423,53 @@ paths:
         Không cần đăng nhập. Mặc định chỉ trả chiến dịch ở trạng thái công
         khai (`approved`, `active`, `success`, `ended`) trừ khi lọc `status`.
         Lọc `status` chỉ nhận trạng thái đã công khai; draft/pending/needs_info/rejected/cancelled trả 400.
+        Mọi bộ lọc chạy ở server (truy vấn lấy id rồi mới nạp quan hệ nên phân trang đúng).
+        `q`/`location` thoát ký tự `%`/`_` của LIKE. `sort=progress` theo tỷ lệ
+        `currentAmount/goalAmount`; `sort=ending` bỏ chiến dịch đã quá hạn. Khoảng ngược
+        (`minGoal > maxGoal`, `minProgress > maxProgress`) trả 400.
       parameters:
         - $ref: "#/components/parameters/CampaignQ"
         - $ref: "#/components/parameters/CampaignCategory"
         - $ref: "#/components/parameters/CampaignStatusFilter"
+        - name: location
+          in: query
+          description: Địa điểm chứa chuỗi này
+          schema:
+            type: string
+            maxLength: 100
+        - name: minGoal
+          in: query
+          description: Mục tiêu vốn tối thiểu (VNĐ)
+          schema:
+            type: number
+            minimum: 0
+        - name: maxGoal
+          in: query
+          description: Mục tiêu vốn tối đa (VNĐ)
+          schema:
+            type: number
+            minimum: 0
+        - name: minProgress
+          in: query
+          description: Tỷ lệ hoàn thành tối thiểu (%)
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1000
+        - name: maxProgress
+          in: query
+          description: Tỷ lệ hoàn thành tối đa (%)
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1000
+        - name: endingWithinDays
+          in: query
+          description: Chỉ chiến dịch `active` kết thúc trong N ngày tới
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
         - $ref: "#/components/parameters/CampaignSort"
         - $ref: "#/components/parameters/Offset"
         - $ref: "#/components/parameters/Limit"
@@ -398,6 +480,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CampaignList"
+        "400":
+          description: Trạng thái chưa công khai, tham số sai kiểu/ngoài phạm vi hoặc khoảng lọc ngược
     post:
       operationId: createCampaign
       summary: Tạo chiến dịch mới (trạng thái `draft`)
@@ -1379,7 +1463,7 @@ paths:
                   format: binary
                 purpose:
                   type: string
-                  enum: [campaign_image, progress_image]
+                  enum: [campaign_image, progress_image, avatar]
                   default: campaign_image
       responses:
         "201":
@@ -1512,6 +1596,116 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /campaigns/{id}/follow:
+    get:
+      operationId: getCampaignFollowStatus
+      summary: Số người theo dõi chiến dịch và người đang đăng nhập đã theo dõi chưa
+      description: >-
+        Không bắt buộc đăng nhập (khách nhận `following: false`). Chiến dịch chưa
+        công khai trả 404.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Trạng thái theo dõi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowStatus"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: followCampaign
+      summary: Theo dõi chiến dịch (idempotent)
+      description: >-
+        Người theo dõi nhận thông báo khi chiến dịch có bài cập nhật, đạt mốc hoặc
+        đổi trạng thái (như người ủng hộ). Chỉ khi chiến dịch `approved`/`active`/`paused`;
+        chủ dự án không tự theo dõi. Rate limit 30 lần/phút.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Đang theo dõi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowStatus"
+        "400":
+          description: Chủ dự án tự theo dõi hoặc chiến dịch đã kết thúc
+        "401":
+          description: Chưa đăng nhập
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+    delete:
+      operationId: unfollowCampaign
+      summary: Bỏ theo dõi chiến dịch (idempotent, được cả khi chiến dịch đã kết thúc)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Đã bỏ theo dõi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowStatus"
+        "401":
+          description: Chưa đăng nhập
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /users/me/follows:
+    get:
+      operationId: listMyFollows
+      summary: Các chiến dịch đang theo dõi của người dùng hiện tại
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Danh sách theo dõi (mới nhất trước)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        followedAt:
+                          type: string
+                          format: date-time
+                        campaign:
+                          type: object
+                          properties:
+                            id: { type: string, format: uuid }
+                            title: { type: string }
+                            category: { type: string }
+                            status: { $ref: "#/components/schemas/CampaignStatus" }
+                            goalAmount: { type: number }
+                            currentAmount: { type: number }
+                            endDate: { type: string, format: date-time }
+                            imageUrl: { type: string, nullable: true }
+                            location: { type: string, nullable: true }
+                  total: { type: integer }
+                  limit: { type: integer }
+                  offset: { type: integer }
+        "401":
+          description: Chưa đăng nhập
   /campaigns/{id}/comments:
     get:
       operationId: listCampaignComments
@@ -2028,8 +2222,13 @@ components:
     CampaignStatusFilter:
       name: status
       in: query
+      description: Một hoặc nhiều trạng thái, cách nhau bởi dấu phẩy (vd. `active,success`)
+      style: form
+      explode: false
       schema:
-        $ref: "#/components/schemas/CampaignStatus"
+        type: array
+        items:
+          $ref: "#/components/schemas/CampaignStatus"
     CampaignSort:
       name: sort
       in: query
@@ -2215,18 +2414,40 @@ components:
           format: date-time
     UpdateUserRequest:
       type: object
+      description: Các trường chuỗi được cắt khoảng trắng; trường lạ (email, role, status…) bị từ chối 400.
       properties:
         name:
           type: string
           minLength: 2
+          maxLength: 100
         bio:
           type: string
+          maxLength: 500
         phone:
           type: string
+          description: Rỗng để xóa; ngược lại 8–20 ký tự gồm số, khoảng trắng, `.`, `-`, có thể bắt đầu bằng `+`
+          pattern: "^$|^\\+?[0-9 .-]{8,20}$"
         organization:
           type: string
+          maxLength: 255
         avatar:
           type: string
+          maxLength: 255
+          description: Rỗng để gỡ ảnh; ảnh tải lên (`/api/v1/media/avatars/...`) hoặc link `http(s)://`
+    FollowStatus:
+      type: object
+      properties:
+        following:
+          type: boolean
+          description: Người đang đăng nhập đã theo dõi chưa (khách luôn false)
+        followerCount:
+          type: integer
+    LogoutRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: Refresh token của phiên này để thu hồi cùng access token
     UpdateRoleRequest:
       type: object
       required: [role]

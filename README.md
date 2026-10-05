@@ -122,8 +122,8 @@ Vai trò trong hệ thống: `user` (người tài trợ), `campaign_owner` (ch�
 
 | Nhóm chức năng             | Nội dung đã triển khai                                                                                                                                                               | Trạng thái |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------: |
-| **Tài khoản & phân quyền** | Đăng ký, đăng nhập JWT (access + refresh token), phân quyền theo vai trò và quyền sở hữu, quản lý hồ sơ, khóa tạm thời sau 5 lần đăng nhập sai trong 15 phút.                        |     ✅     |
-| **Quản lý chiến dịch**     | Tạo chiến dịch theo 4 bước, gửi duyệt, kiểm duyệt theo ma trận chuyển trạng thái, tạm dừng/tiếp tục, tự động chốt chiến dịch hết hạn (thành công/không đạt), tìm kiếm, lọc, sắp xếp. |     ✅     |
+| **Tài khoản & phân quyền** | Đăng ký, đăng nhập JWT (access + refresh token), phân quyền theo vai trò và quyền sở hữu, trang hồ sơ cá nhân `/ho-so` (ảnh đại diện, liên hệ), đăng xuất phía server (thu hồi token theo `jti`) và đăng xuất khỏi mọi thiết bị, khóa tạm thời sau 5 lần đăng nhập sai trong 15 phút.                        |     ✅     |
+| **Quản lý chiến dịch**     | Tạo chiến dịch theo 4 bước, gửi duyệt, kiểm duyệt theo ma trận chuyển trạng thái, tạm dừng/tiếp tục, tự động chốt chiến dịch hết hạn (thành công/không đạt); tìm kiếm và lọc **phía server** theo lĩnh vực, trạng thái, địa điểm, khoảng mục tiêu vốn, tỷ lệ hoàn thành, thời gian còn lại, sắp xếp theo mức phổ biến/thời gian/tỷ lệ hoàn thành, phân trang "Xem thêm"; theo dõi chiến dịch (nhận thông báo cập nhật như người ủng hộ) và chia sẻ (Web Share/sao chép liên kết/Facebook). |     ✅     |
 | **Tài trợ & giao dịch**    | Tạo giao dịch với idempotency key, thanh toán qua ví demo, webhook xác thực chữ ký HMAC và chống phát lại, chặn tài trợ vào chiến dịch đã hết hạn, sổ cái giao dịch công khai.       |     ✅     |
 | **Mức quà tặng**           | Chủ dự án tạo mức ủng hộ kèm quà (số lượng giới hạn, ngày giao dự kiến); người ủng hộ chọn quà khi tài trợ; suất quà chỉ được tính khi giao dịch đã xác nhận.                        |     ✅     |
 | **Hoàn tiền & đối soát**   | Yêu cầu hoàn tiền do quản trị viên xét duyệt, biên nhận điện tử (`/bien-nhan/[id]`), lịch sử ủng hộ cá nhân, báo cáo đối soát và xuất CSV cho quản trị viên.                         |     ✅     |
@@ -268,10 +268,10 @@ Các nhóm bảng chính:
 
 | Nhóm                 | Bảng                                              |
 | -------------------- | ------------------------------------------------- |
-| Tài khoản            | `users` (kèm trạng thái đồng ý cá nhân hóa AI), token xác minh email/đặt lại mật khẩu |
+| Tài khoản            | `users` (kèm trạng thái đồng ý cá nhân hóa AI), token xác minh email/đặt lại mật khẩu, `revoked_tokens` (token đã đăng xuất) |
 | Chiến dịch & tiến độ | `campaigns`, `milestones`, `milestone_updates`, `reward_tiers`, `media_files` |
 | Giao dịch            | `donations`, `refund_requests`                    |
-| Cộng đồng            | `campaign_comments`                               |
+| Cộng đồng            | `campaign_comments`, `campaign_follows`           |
 | Kiểm duyệt & rủi ro  | `reports`, `risk_alerts`                          |
 | AI                   | `behavior_events` (chỉ ghi khi người dùng đồng ý) |
 | Hệ thống             | `notifications`, `audit_logs`                     |

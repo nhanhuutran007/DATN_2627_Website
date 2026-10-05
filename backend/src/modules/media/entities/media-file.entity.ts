@@ -5,6 +5,7 @@ import { BaseEntity } from "../../../common/base.entity";
 export enum MediaPurpose {
   CAMPAIGN_IMAGE = "campaign_image",
   PROGRESS_IMAGE = "progress_image",
+  AVATAR = "avatar",
 }
 
 @Entity("media_files")

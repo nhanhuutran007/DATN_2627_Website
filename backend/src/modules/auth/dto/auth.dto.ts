@@ -42,6 +42,13 @@ export class RefreshTokenDto {
   refreshToken!: string;
 }
 
+export class LogoutDto {
+  /** Refresh token của phiên này, để thu hồi cùng access token đang dùng. */
+  @IsOptional()
+  @IsString()
+  refreshToken?: string;
+}
+
 export class ForgotPasswordDto {
   @Transform(({ value }) => (typeof value === "string" ? value.trim().toLowerCase() : value))
   @IsEmail({}, { message: "Email không hợp lệ." })

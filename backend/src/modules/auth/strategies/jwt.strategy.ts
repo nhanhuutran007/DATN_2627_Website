@@ -9,6 +9,7 @@ export interface JwtPayload {
   email: string;
   role: string;
   iat?: number;
+  jti?: string;
 }
 
 @Injectable()
@@ -22,6 +23,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    return this.authService.validateUser(payload.sub, payload.iat);
+    return this.authService.validateUser(payload.sub, payload.iat, payload.jti);
   }
 }

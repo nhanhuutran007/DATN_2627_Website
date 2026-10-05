@@ -10,6 +10,7 @@ import { AuthService } from "./auth.service";
 import { EmailVerificationService } from "./email-verification.service";
 import { EmailVerificationToken } from "./entities/email-verification-token.entity";
 import { PasswordResetToken } from "./entities/password-reset-token.entity";
+import { RevokedToken } from "./entities/revoked-token.entity";
 import { PasswordResetService } from "./password-reset.service";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 
@@ -17,7 +18,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
 @Module({
   imports: [
     UsersModule,
-    TypeOrmModule.forFeature([PasswordResetToken, EmailVerificationToken]),
+    TypeOrmModule.forFeature([PasswordResetToken, EmailVerificationToken, RevokedToken]),
     PassportModule.register({ defaultStrategy: "jwt" }),
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,

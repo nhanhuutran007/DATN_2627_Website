@@ -67,7 +67,17 @@ export type CampaignSort = "popular" | "ending" | "newest" | "progress" | "lates
 export type CampaignQuery = {
   q?: string;
   category?: string;
-  status?: ApiCampaignStatus;
+  /** Một hoặc nhiều trạng thái (gửi dạng `active,success`). */
+  status?: ApiCampaignStatus | ApiCampaignStatus[];
+  location?: string;
+  /** Khoảng mục tiêu vốn (VNĐ). */
+  minGoal?: number;
+  maxGoal?: number;
+  /** Khoảng tỷ lệ hoàn thành (%). */
+  minProgress?: number;
+  maxProgress?: number;
+  /** Chỉ chiến dịch đang gây quỹ, kết thúc trong N ngày tới. */
+  endingWithinDays?: number;
   sort?: CampaignSort;
   limit?: number;
   offset?: number;
@@ -121,7 +131,13 @@ function toParams(query: CampaignQuery): string {
   const params = new URLSearchParams();
   if (query.q) params.set("q", query.q);
   if (query.category) params.set("category", query.category);
-  if (query.status) params.set("status", query.status);
+  const statuses = Array.isArray(query.status) ? query.status : query.status ? [query.status] : [];
+  if (statuses.length > 0) params.set("status", statuses.join(","));
+  if (query.location) params.set("location", query.location);
+  for (const key of ["minGoal", "maxGoal", "minProgress", "maxProgress", "endingWithinDays"] as const) {
+    const value = query[key];
+    if (value !== undefined) params.set(key, String(value));
+  }
   if (query.sort) params.set("sort", query.sort);
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   if (query.offset !== undefined) params.set("offset", String(query.offset));

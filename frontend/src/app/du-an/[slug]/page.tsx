@@ -10,6 +10,8 @@ import { Icon } from "@/components/ui/Icon";
 import { CampaignComments } from "@/features/comments/CampaignComments";
 import { CampaignLedger } from "@/features/donations/CampaignLedger";
 import { DonationPanel } from "@/features/donations/DonationPanel";
+import { FollowCampaignButton } from "@/features/follows/FollowCampaignButton";
+import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
 import { apiCampaignToView, fetchCampaign, fetchCampaigns } from "@/lib/api/campaigns";
 import { fetchCampaignProgress, type CampaignProgress } from "@/lib/api/progress";
@@ -196,6 +198,12 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               <li><strong>{open ? campaign.daysLeft : "—"}</strong><span>{open ? "ngày còn lại" : campaign.status}</span></li>
             </ul>
             {open && <a className="button button-primary button-block" href="#ung-ho">Ủng hộ ngay</a>}
+            {live && (
+              <div className="fund-social">
+                <FollowCampaignButton campaignId={campaign.slug} />
+                <ShareCampaignButton campaignId={campaign.slug} title={campaign.title} />
+              </div>
+            )}
             {live && <div className="fund-report"><ReportCampaignButton campaignId={campaign.slug} campaignSlug={campaign.slug} /></div>}
           </section>
 

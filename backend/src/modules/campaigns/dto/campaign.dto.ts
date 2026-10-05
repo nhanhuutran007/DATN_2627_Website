@@ -1,5 +1,7 @@
-import { Type } from "class-transformer";
+import { Transform, Type, type TransformFnParams } from "class-transformer";
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
@@ -87,6 +89,15 @@ export class UpdateCampaignDto {
   location?: string;
 }
 
+/** `?status=active,success` hoặc `?status=active&status=success` → mảng trạng thái. */
+function toStatusList({ value }: TransformFnParams): unknown {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parts = (Array.isArray(value) ? value : [value]).flatMap((item: unknown) =>
+    typeof item === "string" ? item.split(",") : [item],
+  );
+  return parts.map((item) => (typeof item === "string" ? item.trim() : item)).filter((item) => item !== "");
+}
+
 export class CampaignQueryDto {
   @IsOptional()
   @IsString()
@@ -98,9 +109,55 @@ export class CampaignQueryDto {
   @MaxLength(100)
   category?: string;
 
+  /** Một hoặc nhiều trạng thái (cách nhau bởi dấu phẩy). */
   @IsOptional()
-  @IsEnum(CampaignStatus)
-  status?: CampaignStatus;
+  @Transform(toStatusList)
+  @IsArray()
+  @ArrayMaxSize(11)
+  @IsEnum(CampaignStatus, { each: true })
+  status?: CampaignStatus[];
+
+  /** Địa điểm chứa chuỗi này (không phân biệt hoa thường). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  location?: string;
+
+  /** Khoảng mục tiêu vốn (VNĐ). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minGoal?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxGoal?: number;
+
+  /** Khoảng tỷ lệ hoàn thành (%), tính từ số tiền đã xác nhận / mục tiêu. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(1000)
+  minProgress?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(1000)
+  maxProgress?: number;
+
+  /** Chỉ chiến dịch đang gây quỹ và kết thúc trong N ngày tới. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  endingWithinDays?: number;
 
   @IsOptional()
   @IsIn(["popular", "ending", "newest", "progress", "latest"])

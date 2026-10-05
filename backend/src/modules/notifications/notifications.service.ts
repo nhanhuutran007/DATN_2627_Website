@@ -4,6 +4,7 @@ import { In, Repository } from "typeorm";
 
 import type { EmailGateway } from "../../integrations/email/email.gateway";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
+import { CampaignFollow } from "../follows/entities/campaign-follow.entity";
 import { User } from "../users/entities/user.entity";
 import { NotificationQueryDto } from "./dto/notification.dto";
 import { Notification, NotificationType } from "./entities/notification.entity";
@@ -43,6 +44,8 @@ export class NotificationsService {
     private readonly userRepo: Repository<User>,
     @Inject("EmailGateway")
     private readonly emailGateway: EmailGateway,
+    @InjectRepository(CampaignFollow)
+    private readonly followRepo: Repository<CampaignFollow>,
   ) {}
 
   /**
@@ -96,21 +99,29 @@ export class NotificationsService {
     }
   }
 
-  /** Gửi cho mọi người đã ủng hộ thành công chiến dịch (mỗi người một thông báo). */
+  /**
+   * Gửi cho mọi người đã ủng hộ thành công và mọi người đang theo dõi chiến
+   * dịch (mỗi người một thông báo, không trùng).
+   */
   async notifyCampaignBackers(
     campaignId: string,
     base: Omit<NotifyInput, "userId">,
     excludeUserIds: string[] = [],
   ): Promise<number> {
     try {
-      const rows: Array<{ userId: string }> = await this.donationRepo
-        .createQueryBuilder("d")
-        .select("DISTINCT d.user_id", "userId")
-        .where("d.campaign_id = :campaignId", { campaignId })
-        .andWhere("d.status = :status", { status: DonationStatus.COMPLETED })
-        .getRawMany();
+      const [backers, follows] = await Promise.all([
+        this.donationRepo
+          .createQueryBuilder("d")
+          .select("DISTINCT d.user_id", "userId")
+          .where("d.campaign_id = :campaignId", { campaignId })
+          .andWhere("d.status = :status", { status: DonationStatus.COMPLETED })
+          .getRawMany<{ userId: string }>(),
+        this.followRepo.find({ select: { userId: true }, where: { campaignId } }),
+      ]);
       const exclude = new Set(excludeUserIds);
-      const userIds = rows.map((r) => r.userId).filter((id) => id && !exclude.has(id));
+      const userIds = [...new Set([...backers, ...follows].map((r) => r.userId))].filter(
+        (id) => id && !exclude.has(id),
+      );
       await this.notify(userIds.map((userId) => ({ ...base, userId })));
       return userIds.length;
     } catch (error) {

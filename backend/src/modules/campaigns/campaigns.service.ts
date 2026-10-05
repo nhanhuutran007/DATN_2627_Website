@@ -6,13 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import {
-  FindOptionsOrder,
-  FindOptionsWhere,
-  In,
-  Like,
-  Repository,
-} from "typeorm";
+import { Brackets, In, Repository, SelectQueryBuilder } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -79,6 +73,16 @@ const STATS_STATUSES = [
   CampaignStatus.ENDED,
 ];
 
+const DAY_MS = 86_400_000;
+
+/** Tỷ lệ hoàn thành (%) theo số tiền đã xác nhận; NULLIF tránh chia cho 0. */
+const PROGRESS_PERCENT_SQL = "(c.currentAmount * 100 / NULLIF(c.goalAmount, 0))";
+
+/** Thoát ký tự đại diện của LIKE để từ khóa như "100%" được tìm đúng nghĩa đen. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
 export type PlatformStats = {
   /** Tổng tiền đã ghi nhận — chỉ tăng khi giao dịch được cổng thanh toán xác nhận. */
   totalRaised: number;
@@ -110,48 +114,126 @@ export class CampaignsService {
   ): Promise<CampaignListResult> {
     const limit = query.limit ?? 9;
     const offset = query.offset ?? 0;
+    const statuses = query.status?.length ? query.status : undefined;
 
     // Danh sách công khai chỉ được lọc trong các trạng thái đã công khai; nếu
     // không, `?status=draft` sẽ lộ hồ sơ nháp/chờ duyệt của người khác.
-    if (!ownerId && query.status && !STATS_STATUSES.includes(query.status)) {
+    if (!ownerId && statuses?.some((status) => !STATS_STATUSES.includes(status))) {
       throw new BadRequestException(
         `status must be one of: ${STATS_STATUSES.join(", ")}`,
       );
     }
-
-    const base: FindOptionsWhere<Campaign> = ownerId
-      ? { ownerId, ...(query.status ? { status: query.status } : {}) }
-      : {
-          status: In(query.status ? [query.status] : PUBLIC_STATUSES),
-          ...(query.category ? { category: query.category } : {}),
-        };
-
-    const q = query.q?.trim();
-    let where: FindOptionsWhere<Campaign> | FindOptionsWhere<Campaign>[];
-    if (q) {
-      const like = `%${q}%`;
-      where = [
-        { ...base, title: Like(like) },
-        { ...base, description: Like(like) },
-        { ...base, location: Like(like) },
-      ];
-    } else {
-      where = base;
+    if (query.minGoal !== undefined && query.maxGoal !== undefined && query.minGoal > query.maxGoal) {
+      throw new BadRequestException("minGoal must not exceed maxGoal");
+    }
+    if (
+      query.minProgress !== undefined &&
+      query.maxProgress !== undefined &&
+      query.minProgress > query.maxProgress
+    ) {
+      throw new BadRequestException("minProgress must not exceed maxProgress");
     }
 
-    const order = this.getOrder(query.sort);
-    const [items, total] = await Promise.all([
-      this.campaignRepo.find({
-        where,
-        relations: { owner: true, milestones: true },
-        order,
-        skip: offset,
-        take: limit,
-      }),
-      this.campaignRepo.count({ where }),
+    // Bước 1: lọc + sắp xếp + phân trang trên riêng bảng campaigns (lấy id).
+    // Không join milestones ở bước này vì quan hệ 1-n làm lệch LIMIT/OFFSET và
+    // TypeORM không phân trang được khi ORDER BY theo biểu thức (tỷ lệ %).
+    const qb = this.campaignRepo.createQueryBuilder("c").select("c.id", "id");
+    this.applyListFilters(qb, query, statuses, ownerId);
+    this.applyListOrder(qb, query.sort);
+
+    const [rows, total] = await Promise.all([
+      qb.clone().offset(offset).limit(limit).getRawMany<{ id: string }>(),
+      qb.clone().getCount(),
     ]);
+    const ids = rows.map((row) => row.id);
+    if (ids.length === 0) {
+      return { items: [], total, limit, offset };
+    }
+
+    // Bước 2: nạp đủ quan hệ cho đúng trang đó rồi giữ thứ tự của bước 1.
+    const loaded = await this.campaignRepo.find({
+      where: { id: In(ids) },
+      relations: { owner: true, milestones: true },
+    });
+    const byId = new Map(loaded.map((campaign) => [campaign.id, campaign]));
+    const items = ids
+      .map((id) => byId.get(id))
+      .filter((campaign): campaign is Campaign => campaign !== undefined);
 
     return { items, total, limit, offset };
+  }
+
+  private applyListFilters(
+    qb: SelectQueryBuilder<Campaign>,
+    query: CampaignQueryDto,
+    statuses: CampaignStatus[] | undefined,
+    ownerId?: string,
+  ): void {
+    if (ownerId) {
+      qb.where("c.ownerId = :ownerId", { ownerId });
+      if (statuses) qb.andWhere("c.status IN (:...statuses)", { statuses });
+    } else {
+      qb.where("c.status IN (:...statuses)", { statuses: statuses ?? PUBLIC_STATUSES });
+      if (query.category) qb.andWhere("c.category = :category", { category: query.category });
+    }
+
+    const q = query.q?.trim();
+    if (q) {
+      qb.andWhere(
+        new Brackets((sub) => {
+          const like = { q: `%${escapeLike(q)}%` };
+          sub
+            .where("c.title LIKE :q", like)
+            .orWhere("c.description LIKE :q", like)
+            .orWhere("c.location LIKE :q", like);
+        }),
+      );
+    }
+
+    const location = query.location?.trim();
+    if (location) {
+      qb.andWhere("c.location LIKE :location", { location: `%${escapeLike(location)}%` });
+    }
+    if (query.minGoal !== undefined) qb.andWhere("c.goalAmount >= :minGoal", { minGoal: query.minGoal });
+    if (query.maxGoal !== undefined) qb.andWhere("c.goalAmount <= :maxGoal", { maxGoal: query.maxGoal });
+    if (query.minProgress !== undefined) {
+      qb.andWhere(`${PROGRESS_PERCENT_SQL} >= :minProgress`, { minProgress: query.minProgress });
+    }
+    if (query.maxProgress !== undefined) {
+      qb.andWhere(`${PROGRESS_PERCENT_SQL} <= :maxProgress`, { maxProgress: query.maxProgress });
+    }
+
+    const now = new Date();
+    if (query.endingWithinDays !== undefined) {
+      qb.andWhere("c.status = :activeStatus", { activeStatus: CampaignStatus.ACTIVE })
+        .andWhere("c.endDate >= :now", { now })
+        .andWhere("c.endDate <= :endingBefore", {
+          endingBefore: new Date(now.getTime() + query.endingWithinDays * DAY_MS),
+        });
+    } else if (query.sort === "ending") {
+      // "Sắp hết hạn" chỉ có nghĩa với chiến dịch chưa quá hạn.
+      qb.andWhere("c.endDate >= :now", { now });
+    }
+  }
+
+  private applyListOrder(qb: SelectQueryBuilder<Campaign>, sort?: string): void {
+    switch (sort) {
+      case "ending":
+        qb.orderBy("c.endDate", "ASC");
+        break;
+      case "progress":
+        qb.orderBy(PROGRESS_PERCENT_SQL, "DESC");
+        break;
+      case "newest":
+      case "latest":
+        qb.orderBy("c.createdAt", "DESC");
+        break;
+      case "popular":
+      default:
+        qb.orderBy("c.backerCount", "DESC");
+    }
+    // Thứ tự ổn định giữa các trang khi giá trị sắp xếp bằng nhau.
+    qb.addOrderBy("c.createdAt", "DESC").addOrderBy("c.id", "ASC");
   }
 
   async findById(id: string): Promise<Campaign> {
@@ -352,21 +434,6 @@ export class CampaignsService {
   private assertCanManage(campaign: Campaign, user: User): void {
     if (campaign.ownerId !== user.id && user.role !== UserRole.ADMIN) {
       throw new ForbiddenException("You can only manage your own campaigns");
-    }
-  }
-
-  private getOrder(sort?: string): FindOptionsOrder<Campaign> {
-    switch (sort) {
-      case "ending":
-        return { endDate: "ASC" };
-      case "progress":
-        return { currentAmount: "DESC" };
-      case "newest":
-      case "latest":
-        return { createdAt: "DESC" };
-      case "popular":
-      default:
-        return { backerCount: "DESC" };
     }
   }
 }

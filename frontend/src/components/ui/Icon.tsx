@@ -15,6 +15,7 @@ export type IconName =
   | "receipt"
   | "rocket"
   | "search"
+  | "share"
   | "shield"
   | "sparkles"
   | "user"
@@ -45,6 +46,7 @@ const paths: Record<IconName, React.ReactNode> = {
   receipt: <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Zm3 5h6m-6 4h6" />,
   rocket: <><path d="M14 5c3-3 6-2 6-2s1 3-2 6l-6 6-4-4 6-6Z" /><path d="m9 14-4 1-2 4 6-2m2-8-1-4-4 2 2 3m5 5 1 5 4-4-3-1" /><circle cx="15" cy="8" r="1" /></>,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
+  share: <><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 13.5 6.8 4m0-11-6.8 4" /></>,
   shield: <><path d="M12 3 4 6v5c0 5 3 8 8 10 5-2 8-5 8-10V6l-8-3Z" /><path d="m9 12 2 2 4-4" /></>,
   sparkles: <path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3Zm-6 9 .9 2.1L9 15l-2.1.9L6 18l-.9-2.1L3 15l2.1-.9L6 12Zm11 2 1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2Z" />,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
