@@ -1,0 +1,357 @@
+// Góp Mầm — schema MySQL 8 (khớp migration tới 1790000000002).
+// Dán vào https://dbdiagram.io để vẽ ERD vật lý, hoặc xuất PNG/PDF cho báo cáo.
+
+Project gop_mam {
+  database_type: 'MySQL'
+  Note: 'Nền tảng gây quỹ cộng đồng Góp Mầm (DATN_2627)'
+}
+
+// ───────────── Tài khoản ─────────────
+
+Table users {
+  id char(36) [pk]
+  name varchar(100) [not null]
+  email varchar(255) [not null, unique]
+  password_hash varchar(255) [not null]
+  role enum('user','campaign_owner','admin') [not null, default: 'user']
+  status enum('active','inactive','banned') [not null, default: 'active']
+  avatar varchar(255)
+  bio varchar(500)
+  phone varchar(100)
+  organization varchar(255)
+  email_verified tinyint(1) [not null, default: 0]
+  failed_login_count int [not null, default: 0]
+  locked_until datetime
+  password_changed_at datetime
+  sessions_revoked_at datetime
+  ai_tracking_consent tinyint(1) [not null, default: 0]
+  ai_consent_updated_at datetime
+  created_at datetime(6) [not null, default: `CURRENT_TIMESTAMP(6)`]
+  updated_at datetime(6) [not null, default: `CURRENT_TIMESTAMP(6)`]
+}
+
+Table email_verification_tokens {
+  id char(36) [pk]
+  user_id char(36) [not null, ref: > users.id]
+  token_hash char(64) [not null, unique, note: 'SHA-256 của token gửi qua email']
+  expires_at datetime [not null]
+  used_at datetime
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    (user_id, created_at)
+  }
+}
+
+Table password_reset_tokens {
+  id char(36) [pk]
+  user_id char(36) [not null, ref: > users.id]
+  token_hash char(64) [not null, unique]
+  expires_at datetime [not null]
+  used_at datetime
+  requested_ip varchar(45)
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    (user_id, created_at)
+  }
+}
+
+Table revoked_tokens {
+  jti char(36) [pk, note: 'jti của JWT đã đăng xuất']
+  user_id char(36) [not null, ref: > users.id]
+  expires_at datetime [not null]
+  created_at datetime(6) [not null]
+  indexes {
+    expires_at
+  }
+}
+
+// ───────────── Chiến dịch & tiến độ ─────────────
+
+Table campaigns {
+  id char(36) [pk]
+  title varchar(200) [not null]
+  description text [not null]
+  category varchar(100) [not null]
+  owner_id char(36) [not null, ref: > users.id]
+  goal_amount decimal(15,2) [not null]
+  current_amount decimal(15,2) [not null, default: 0]
+  start_date datetime [not null]
+  end_date datetime [not null]
+  status enum('draft','pending','approved','rejected','needs_info','active','paused','success','failed','cancelled','ended') [not null, default: 'draft']
+  image_url varchar(500)
+  video_url varchar(500)
+  location varchar(255)
+  backer_count int [not null, default: 0]
+  view_count int [not null, default: 0]
+  rejection_reason text
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    status
+    category
+  }
+}
+
+Table milestones {
+  id char(36) [pk]
+  campaign_id char(36) [not null, ref: > campaigns.id]
+  title varchar(200) [not null]
+  description text
+  target_date datetime
+  budget decimal(15,2)
+  sort_order int [not null, default: 0]
+  is_completed tinyint(1) [not null, default: 0]
+  completed_at datetime
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+}
+
+Table milestone_updates {
+  id char(36) [pk]
+  milestone_id char(36) [not null, ref: > milestones.id]
+  content text [not null]
+  image_url varchar(500)
+  expense_amount decimal(15,2)
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+}
+
+Table reward_tiers {
+  id char(36) [pk]
+  campaign_id char(36) [not null, ref: > campaigns.id]
+  title varchar(120) [not null]
+  description text [not null]
+  min_amount decimal(15,2) [not null, note: 'CHECK > 0']
+  quantity_limit int [note: 'NULL = không giới hạn']
+  claimed_count int [not null, default: 0, note: 'CHECK claimed_count <= quantity_limit']
+  estimated_delivery date
+  sort_order int [not null, default: 0]
+  is_active tinyint(1) [not null, default: 1]
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  deleted_at datetime(6) [note: 'xóa mềm']
+  indexes {
+    (campaign_id, sort_order)
+  }
+}
+
+Table media_files {
+  id char(36) [pk]
+  owner_id char(36) [not null, ref: > users.id]
+  storage_key varchar(120) [not null, unique]
+  mime_type varchar(50) [not null]
+  size_bytes int [not null]
+  purpose enum('campaign_image','progress_image','avatar') [not null]
+  original_name varchar(255)
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  deleted_at datetime(6) [note: 'xóa mềm']
+  indexes {
+    (owner_id, created_at)
+  }
+}
+
+// ───────────── Giao dịch ─────────────
+
+Table donations {
+  id char(36) [pk]
+  user_id char(36) [not null, ref: > users.id]
+  campaign_id char(36) [not null, ref: > campaigns.id]
+  reward_tier_id char(36) [ref: > reward_tiers.id]
+  amount decimal(15,2) [not null]
+  currency varchar(3) [not null, default: 'VND']
+  status enum('pending','completed','failed','refunded','expired','cancelled') [not null, default: 'pending']
+  payment_method varchar(50)
+  transaction_id varchar(255) [unique]
+  idempotency_key varchar(255) [not null, unique]
+  message text
+  is_anonymous tinyint(1) [not null, default: 0]
+  completed_at datetime
+  refunded_at datetime
+  refund_reference varchar(255)
+  refund_reason varchar(500)
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    user_id
+    campaign_id
+    (status, created_at)
+  }
+}
+
+Table refund_requests {
+  id char(36) [pk]
+  donation_id char(36) [not null, ref: > donations.id]
+  user_id char(36) [not null, ref: > users.id]
+  reason text [not null]
+  status enum('pending','approved','rejected') [not null, default: 'pending']
+  admin_notes text
+  reviewed_by char(36) [ref: > users.id]
+  reviewed_at datetime
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    (status, created_at)
+    (donation_id, status)
+  }
+}
+
+// ───────────── Cộng đồng ─────────────
+
+Table campaign_comments {
+  id char(36) [pk]
+  campaign_id char(36) [not null, ref: > campaigns.id]
+  user_id char(36) [not null, ref: > users.id]
+  parent_id char(36) [ref: > campaign_comments.id, note: 'trả lời 1 cấp']
+  kind enum('comment','question') [not null, default: 'comment']
+  content text [not null]
+  status enum('visible','hidden') [not null, default: 'visible']
+  hidden_reason varchar(500)
+  hidden_by char(36) [ref: > users.id]
+  hidden_at datetime
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  deleted_at datetime(6) [note: 'xóa mềm']
+  indexes {
+    (campaign_id, parent_id, created_at)
+    (status, created_at)
+  }
+}
+
+Table campaign_follows {
+  id char(36) [pk]
+  user_id char(36) [not null, ref: > users.id]
+  campaign_id char(36) [not null, ref: > campaigns.id]
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    (user_id, campaign_id) [unique]
+    campaign_id
+  }
+}
+
+// ───────────── Kiểm duyệt & rủi ro ─────────────
+
+Table reports {
+  id char(36) [pk]
+  reporter_id char(36) [not null, ref: > users.id]
+  campaign_id char(36) [ref: > campaigns.id]
+  comment_id char(36) [ref: > campaign_comments.id]
+  reason enum('spam','fraud','inappropriate','misinformation','other') [not null]
+  description text [not null]
+  status enum('pending','reviewing','resolved','dismissed') [not null, default: 'pending']
+  admin_notes text
+  resolved_by char(36) [ref: > users.id]
+  resolved_at datetime
+  campaign_paused tinyint(1) [not null, default: 0]
+  comment_hidden tinyint(1) [not null, default: 0]
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    (status, created_at)
+    (campaign_id, reporter_id)
+  }
+}
+
+Table risk_alerts {
+  id char(36) [pk]
+  entity_type enum('campaign','user') [not null]
+  entity_id char(36) [not null, note: 'đa hình: campaigns.id hoặc users.id, không có FK']
+  entity_name varchar(255) [not null]
+  risk_level enum('low','medium','high') [not null, default: 'medium']
+  risk_score float [not null, default: 0]
+  method enum('ai','rule') [not null, default: 'ai']
+  reasons json [not null]
+  evidences json [not null]
+  status enum('open','resolved','dismissed') [not null, default: 'open']
+  resolved_by char(36) [ref: > users.id]
+  resolved_at datetime(6)
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    status
+    (entity_type, entity_id)
+  }
+}
+
+// ───────────── AI ─────────────
+
+Table behavior_events {
+  id char(36) [pk]
+  user_id char(36) [not null, ref: > users.id]
+  campaign_id char(36) [not null, ref: > campaigns.id]
+  event_type enum('view','follow','contribute') [not null]
+  category varchar(100) [not null]
+  event_data json
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    (user_id, event_type)
+    campaign_id
+  }
+}
+
+// ───────────── Hệ thống ─────────────
+
+Table notifications {
+  id char(36) [pk]
+  user_id char(36) [not null, ref: > users.id]
+  type enum('campaign_approved','campaign_rejected','campaign_needs_info','campaign_paused','campaign_resumed','campaign_ended','donation_received','donation_confirmed','milestone_completed','progress_update','report_resolved','comment_new','comment_reply','comment_hidden','refund_approved','refund_rejected','donation_refunded','system') [not null]
+  title varchar(200) [not null]
+  message text [not null]
+  link varchar(300)
+  is_read tinyint(1) [not null, default: 0]
+  related_id char(36) [note: 'id đối tượng liên quan, không có FK']
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    (user_id, is_read, created_at)
+  }
+}
+
+Table audit_logs {
+  id char(36) [pk]
+  user_id varchar(36) [note: 'không có FK — giữ log khi user bị xóa']
+  action varchar(100) [not null]
+  entity varchar(100) [not null]
+  entity_id varchar(36)
+  old_values json
+  new_values json
+  ip_address varchar(45)
+  user_agent varchar(500)
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+}
+
+TableGroup tai_khoan {
+  users
+  email_verification_tokens
+  password_reset_tokens
+  revoked_tokens
+}
+TableGroup chien_dich {
+  campaigns
+  milestones
+  milestone_updates
+  reward_tiers
+  media_files
+}
+TableGroup giao_dich {
+  donations
+  refund_requests
+}
+TableGroup cong_dong {
+  campaign_comments
+  campaign_follows
+}
+TableGroup kiem_duyet {
+  reports
+  risk_alerts
+}
+TableGroup he_thong {
+  behavior_events
+  notifications
+  audit_logs
+}
