@@ -120,21 +120,21 @@ Vai trò trong hệ thống: `user` (người tài trợ), `campaign_owner` (ch�
 
 ## 5. Chức năng hệ thống
 
-| Nhóm chức năng             | Nội dung đã triển khai                                                                                                                                                               | Trạng thái |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------: |
-| **Tài khoản & phân quyền** | Đăng ký, đăng nhập JWT (access + refresh token), phân quyền theo vai trò và quyền sở hữu, trang hồ sơ cá nhân `/ho-so` (ảnh đại diện, liên hệ), đăng xuất phía server (thu hồi token theo `jti`) và đăng xuất khỏi mọi thiết bị, khóa tạm thời sau 5 lần đăng nhập sai trong 15 phút.                        |     ✅     |
-| **Quản lý chiến dịch**     | Tạo chiến dịch theo 4 bước, gửi duyệt, kiểm duyệt theo ma trận chuyển trạng thái, tạm dừng/tiếp tục, tự động chốt chiến dịch hết hạn (thành công/không đạt); tìm kiếm và lọc **phía server** theo lĩnh vực, trạng thái, địa điểm, khoảng mục tiêu vốn, tỷ lệ hoàn thành, thời gian còn lại, sắp xếp theo mức phổ biến/thời gian/tỷ lệ hoàn thành, phân trang "Xem thêm"; theo dõi chiến dịch (nhận thông báo cập nhật như người ủng hộ) và chia sẻ (Web Share/sao chép liên kết/Facebook). |     ✅     |
-| **Tài trợ & giao dịch**    | Tạo giao dịch với idempotency key, thanh toán qua ví demo, webhook xác thực chữ ký HMAC và chống phát lại, chặn tài trợ vào chiến dịch đã hết hạn, sổ cái giao dịch công khai; đủ trạng thái thành công/thất bại/**hết hạn** (đơn chờ quá 30 phút tự chuyển)/**đã hủy** (người ủng hộ hủy hoặc cổng báo hủy)/hoàn tiền, thanh toán thành công đến muộn vẫn được ghi nhận và đánh dấu để quản trị viên xem xét.       |     ✅     |
-| **Mức quà tặng**           | Chủ dự án tạo mức ủng hộ kèm quà (số lượng giới hạn, ngày giao dự kiến); người ủng hộ chọn quà khi tài trợ; suất quà chỉ được tính khi giao dịch đã xác nhận.                        |     ✅     |
-| **Hoàn tiền & đối soát**   | Yêu cầu hoàn tiền do quản trị viên xét duyệt, biên nhận điện tử (`/bien-nhan/[id]`), lịch sử ủng hộ cá nhân, báo cáo đối soát và xuất CSV cho quản trị viên.                         |     ✅     |
-| **Tải ảnh lên**            | Tải ảnh bìa/ảnh chiến dịch (kiểm tra loại và dung lượng), lưu cục bộ hoặc Amazon S3 qua lớp lưu trữ trừu tượng.                                                                     |     ✅     |
-| **Tiến độ & minh bạch**    | Mốc tiến độ, bài cập nhật, tỷ lệ hoàn thành và số liệu quỹ **sinh từ giao dịch đã xác minh**.                                                                                        |     ✅     |
-| **Kiểm duyệt nội dung**    | Báo cáo vi phạm chiến dịch và bình luận (chặn tự báo cáo và báo cáo trùng), hàng đợi xử lý của quản trị viên, bắt buộc ghi chú kết luận, tùy chọn tạm dừng chiến dịch hoặc ẩn bình luận. |     ✅     |
-| **Quản trị**               | Dashboard tổng quan, quản lý người dùng, xử lý cảnh báo rủi ro, xem nhật ký kiểm toán theo đối tượng.                                                                                |     ✅     |
-| **Trí tuệ nhân tạo**       | Gợi ý dự án, dự đoán khả năng thành công, chấm điểm rủi ro gian lận; có giải thích, phiên bản mô hình và phương án dự phòng. Chỉ ghi nhận hành vi khi người dùng **đồng ý** (opt-in, rút lại sẽ xóa lịch sử). |     ✅     |
-| **Giao diện**              | Trang chủ, danh sách và chi tiết dự án, đăng nhập/đăng ký, tạo chiến dịch, dashboard chủ dự án, trang quản trị; SEO (metadata, Open Graph, sitemap, JSON-LD).                        |     ✅     |
-| **Thông báo**              | Thông báo trong ứng dụng (chuông trên thanh điều hướng, trang `/thong-bao`) và email cho các quyết định xét duyệt; xác minh email, quên/đặt lại mật khẩu.                              |     ✅     |
-| **Tương tác cộng đồng**    | Bình luận/hỏi đáp trên trang dự án, trả lời theo luồng (đánh dấu phản hồi của chủ dự án), báo cáo bình luận vi phạm. Chưa có: theo dõi dự án.                                                                          |     🔶     |
+| Nhóm chức năng             | Nội dung đã triển khai                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Trạng thái |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------: |
+| **Tài khoản & phân quyền** | Đăng ký, đăng nhập JWT (access + refresh token), phân quyền theo vai trò và quyền sở hữu, trang hồ sơ cá nhân `/ho-so` (ảnh đại diện, liên hệ), đăng xuất phía server (thu hồi token theo `jti`) và đăng xuất khỏi mọi thiết bị, khóa tạm thời sau 5 lần đăng nhập sai trong 15 phút.                                                                                                                                                                                                      |     ✅     |
+| **Quản lý chiến dịch**     | Tạo chiến dịch theo 4 bước, gửi duyệt, kiểm duyệt theo ma trận chuyển trạng thái, tạm dừng/tiếp tục, tự động chốt chiến dịch hết hạn (thành công/không đạt); lĩnh vực chiến dịch do quản trị viên quản lý; tìm kiếm và lọc **phía server** theo lĩnh vực, trạng thái, địa điểm, khoảng mục tiêu vốn, tỷ lệ hoàn thành, thời gian còn lại, sắp xếp theo mức phổ biến/thời gian/tỷ lệ hoàn thành, phân trang "Xem thêm"; bảng điều khiển chủ dự án có lượt xem thật (chống đếm trùng), tỷ lệ chuyển đổi, người theo dõi và biểu đồ số tiền/lượt xem theo ngày. |     ✅      |
+| **Tài trợ & giao dịch**    | Tạo giao dịch với idempotency key, thanh toán qua ví demo, webhook xác thực chữ ký HMAC và chống phát lại, chặn tài trợ vào chiến dịch đã hết hạn, sổ cái giao dịch công khai; đủ trạng thái thành công/thất bại/**hết hạn** (đơn chờ quá 30 phút tự chuyển)/**đã hủy** (người ủng hộ hủy hoặc cổng báo hủy)/hoàn tiền, thanh toán thành công đến muộn vẫn được ghi nhận và đánh dấu để quản trị viên xem xét.                                                                             |     ✅     |
+| **Mức quà tặng**           | Chủ dự án tạo mức ủng hộ kèm quà (số lượng giới hạn, ngày giao dự kiến); người ủng hộ chọn quà khi tài trợ; suất quà chỉ được tính khi giao dịch đã xác nhận.                                                                                                                                                                                                                                                                                                                              |     ✅     |
+| **Hoàn tiền & đối soát**   | Yêu cầu hoàn tiền do quản trị viên xét duyệt, biên nhận điện tử (`/bien-nhan/[id]`), lịch sử ủng hộ cá nhân, báo cáo đối soát và xuất CSV cho quản trị viên.                                                                                                                                                                                                                                                                                                                               |     ✅     |
+| **Tải ảnh lên**            | Tải ảnh bìa/ảnh chiến dịch (kiểm tra loại và dung lượng), lưu cục bộ hoặc Amazon S3 qua lớp lưu trữ trừu tượng.                                                                                                                                                                                                                                                                                                                                                                            |     ✅     |
+| **Tiến độ & minh bạch**    | Mốc tiến độ, bài cập nhật và số liệu quỹ **sinh từ giao dịch đã xác minh**; mỗi khoản chi phải kèm **ảnh chứng từ** (hóa đơn, biên lai) và tổng chi không vượt số tiền đã huy động; nhật ký tiến độ & chi tiêu công khai; trạng thái từng mốc (đúng hạn / **chậm tiến độ** / chậm nhưng đã giải trình) kèm nhắc chủ dự án tự động; sau khi phát hành, mọi thay đổi hạn/ngân sách phải nêu lý do, được lưu thành **lịch sử thay đổi kế hoạch** công khai và thông báo cho người ủng hộ. |     ✅      |
+| **Kiểm duyệt nội dung**    | Báo cáo vi phạm chiến dịch và bình luận (chặn tự báo cáo và báo cáo trùng), hàng đợi xử lý của quản trị viên, bắt buộc ghi chú kết luận, tùy chọn tạm dừng chiến dịch hoặc ẩn bình luận.                                                                                                                                                                                                                                                                                                   |     ✅     |
+| **Quản trị**               | Dashboard tổng quan, quản lý người dùng, xử lý cảnh báo rủi ro, lọc giao dịch liên quan tới cảnh báo đang mở (kèm mức rủi ro), xem nhật ký kiểm toán theo đối tượng; chọn **dự án nổi bật** cho trang chủ, quản lý lĩnh vực (thêm, đổi tên, sắp xếp, ngừng nhận), **xuất thống kê CSV** theo chiến dịch và theo ngày đã ẩn dữ liệu cá nhân. |     ✅      |
+| **Trí tuệ nhân tạo**       | Gợi ý dự án, dự đoán khả năng thành công, chấm điểm rủi ro gian lận; có giải thích, phiên bản mô hình và phương án dự phòng. Ước lượng thành công chỉ hiển thị cho chủ dự án (kèm gợi ý cải thiện) và quản trị viên (tham khảo khi xét duyệt), không công khai để tránh ảnh hưởng người ủng hộ. Chỉ ghi nhận hành vi khi người dùng **đồng ý** (opt-in, rút lại sẽ xóa lịch sử). |     ✅      |
+| **Giao diện**              | Trang chủ, danh sách và chi tiết dự án, đăng nhập/đăng ký, tạo chiến dịch, dashboard chủ dự án, trang quản trị; SEO (metadata, Open Graph, sitemap, JSON-LD).                                                                                                                                                                                                                                                                                                                              |     ✅     |
+| **Thông báo**              | Thông báo trong ứng dụng (chuông trên thanh điều hướng, trang `/thong-bao`) và email cho các quyết định xét duyệt; thông báo khi dự án cập nhật tiến độ, hoàn thành hoặc đổi lịch mốc, nhắc chủ dự án khi mốc quá hạn; xác minh email, quên/đặt lại mật khẩu. |     ✅      |
+| **Tương tác cộng đồng**    | Bình luận/hỏi đáp trên trang dự án, trả lời theo luồng (đánh dấu phản hồi của chủ dự án), báo cáo bình luận vi phạm; theo dõi dự án (nhận thông báo cập nhật như người ủng hộ) và chia sẻ (Web Share/sao chép liên kết/Facebook). |     ✅      |
 
 > ✅ Đã triển khai · 🔶 Triển khai một phần · ⏳ Kế hoạch
 
@@ -266,15 +266,15 @@ Kiến trúc backend theo mô-đun nghiệp vụ, mỗi mô-đun tổ chức the
 
 Các nhóm bảng chính:
 
-| Nhóm                 | Bảng                                              |
-| -------------------- | ------------------------------------------------- |
+| Nhóm                 | Bảng                                                                                                                         |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | Tài khoản            | `users` (kèm trạng thái đồng ý cá nhân hóa AI), token xác minh email/đặt lại mật khẩu, `revoked_tokens` (token đã đăng xuất) |
-| Chiến dịch & tiến độ | `campaigns`, `milestones`, `milestone_updates`, `reward_tiers`, `media_files` |
-| Giao dịch            | `donations`, `refund_requests`                    |
-| Cộng đồng            | `campaign_comments`, `campaign_follows`           |
-| Kiểm duyệt & rủi ro  | `reports`, `risk_alerts`                          |
-| AI                   | `behavior_events` (chỉ ghi khi người dùng đồng ý) |
-| Hệ thống             | `notifications`, `audit_logs`                     |
+| Chiến dịch & tiến độ | `campaigns`, `categories`, `milestones`, `milestone_updates`, `milestone_update_attachments` (chứng từ chi tiêu), `milestone_revisions` (lịch sử thay đổi kế hoạch), `reward_tiers`, `media_files` |
+| Giao dịch            | `donations`, `refund_requests`                                                                                               |
+| Cộng đồng            | `campaign_comments`, `campaign_follows`, `campaign_view_daily`                                                                                      |
+| Kiểm duyệt & rủi ro  | `reports`, `risk_alerts`                                                                                                     |
+| AI                   | `behavior_events` (chỉ ghi khi người dùng đồng ý)                                                                            |
+| Hệ thống             | `notifications`, `audit_logs`                                                                                                |
 
 Nguyên tắc thiết kế: khóa chính **UUID**; **xóa mềm** cho dữ liệu quan trọng; **nhật ký kiểm toán** cho mọi thay đổi quan trọng; schema chỉ thay đổi qua **migration có thứ tự và có rollback** (không dùng auto-sync), tương thích cả MySQL 8 và MariaDB.
 
@@ -343,6 +343,9 @@ cd backend
 ..\scripts\npm-local.cmd run migration:run
 ..\scripts\npm-local.cmd run seed
 cd ..
+# Seed (chỉ chạy khi DB chưa có người dùng): 12 tài khoản mẫu, mật khẩu chung Test@123
+#   admin@gopmam.com · owner1..3@gopmam.com (chủ dự án) · user1..8@gopmam.com (người ủng hộ)
+#   25 chiến dịch (6 lĩnh vực, đủ trạng thái), ~650 giao dịch trải 6–7 tháng, lượt xem theo ngày, mốc, theo dõi
 
 # 4. Chạy ba dịch vụ (mỗi lệnh một terminal)
 .\scripts\npm-local.cmd run dev:frontend
@@ -365,7 +368,7 @@ cd backend
 
 | Loại              | Công cụ                  | Phạm vi                                                                                                                                                                                     |
 | ----------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit test backend | `node --test`            | Xác thực, người dùng, chiến dịch (chuyển trạng thái, tự chốt hết hạn), tài trợ, sổ cái, tiến độ, kiểm duyệt, quản trị, cảnh báo rủi ro, rate limit, kiểm toán, tuần tự hóa dữ liệu nhạy cảm |
+| Unit test backend | `node --test`            | Xác thực, người dùng, chiến dịch (chuyển trạng thái, tự chốt hết hạn), tài trợ, sổ cái, tiến độ (chứng từ chi tiêu, chậm tiến độ, lịch sử kế hoạch), kiểm duyệt, quản trị (dự án nổi bật, lĩnh vực, xuất thống kê), cảnh báo rủi ro, rate limit, kiểm toán, tuần tự hóa dữ liệu nhạy cảm |
 | Test AI service   | `pytest`                 | Gợi ý, dự đoán, phát hiện gian lận, health, bảo mật                                                                                                                                         |
 | Kiểm tra tĩnh     | TypeScript, ESLint, Ruff | Kiểu dữ liệu, quy ước mã                                                                                                                                                                    |
 | Smoke test        | Docker Compose + Nginx   | Toàn bộ 6 dịch vụ                                                                                                                                                                           |
@@ -451,22 +454,23 @@ DATN_2627_Website/
 - Hoàn thiện quy trình gây quỹ khép kín: tạo chiến dịch → xét duyệt → phát hành → tài trợ → xác nhận thanh toán → cập nhật tiến độ → kết thúc.
 - Minh bạch nguồn quỹ nhờ sổ cái giao dịch công khai và số liệu tính từ giao dịch đã xác minh.
 - Ba mô-đun AI độc lập, có giải thích, phiên bản mô hình và phương án dự phòng; quy trình kiểm duyệt có con người tham gia.
-- Thông báo trong ứng dụng và email, bình luận/hỏi đáp có kiểm duyệt, mức quà tặng, hoàn tiền và đối soát, tải ảnh lên; dữ liệu hành vi cho AI chỉ thu thập khi người dùng đồng ý.
+- Thông báo trong ứng dụng và email, bình luận/hỏi đáp có kiểm duyệt, theo dõi dự án, mức quà tặng, hoàn tiền và đối soát, tải ảnh lên; dữ liệu hành vi cho AI chỉ thu thập khi người dùng đồng ý.
+- Giải trình sử dụng quỹ bằng chứng từ chi tiêu, theo dõi chậm tiến độ và lịch sử thay đổi kế hoạch công khai.
+- Công cụ quản trị nội dung: dự án nổi bật, lĩnh vực, xuất thống kê ẩn danh.
 - Hệ thống chạy thống nhất bằng Docker Compose; hạ tầng AWS mô tả bằng Terraform; API mô tả đầy đủ bằng OpenAPI.
 
-_Cập nhật lần cuối: 01/10/2026._
+_Cập nhật lần cuối: 07/10/2026._
 
 ### 15.2. Hạn chế
 
 - Mô hình AI được huấn luyện trên dữ liệu tổng hợp; hiệu năng thực tế cần đánh giá lại khi có dữ liệu thật.
 - Thanh toán và hoàn tiền chỉ ở mức sandbox; chưa có giải ngân thực tế.
-- Chưa có tính năng theo dõi dự án.
 - Kiểm thử đầu-cuối tự động chưa hoàn chỉnh.
 
 ### 15.3. Hướng phát triển
 
 - Tích hợp cổng thanh toán thật và eKYC qua nhà cung cấp chuyên nghiệp; ký quỹ và giải ngân theo mốc tiến độ.
-- Theo dõi dự án và thông báo khi dự án có cập nhật; thông báo đẩy (push).
+- Thông báo đẩy (push) và email tóm tắt cập nhật cho người theo dõi.
 - Cập nhật mô hình AI định kỳ, giám sát trôi dữ liệu (drift), đánh giá công bằng giữa các nhóm dự án; phân tích mạng lưới để phát hiện nhóm tài khoản thông đồng.
 - Ứng dụng di động, đa ngôn ngữ và đa loại tiền tệ.
 
