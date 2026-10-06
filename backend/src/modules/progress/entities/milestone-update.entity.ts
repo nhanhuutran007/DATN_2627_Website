@@ -1,6 +1,7 @@
-import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
+import { MilestoneUpdateAttachment } from "./milestone-update-attachment.entity";
 
 @Entity("milestone_updates")
 export class MilestoneUpdate extends BaseEntity {
@@ -19,4 +20,8 @@ export class MilestoneUpdate extends BaseEntity {
 
   @Column({ name: "expense_amount", type: "decimal", precision: 15, scale: 2, nullable: true })
   expenseAmount?: number;
+
+  /** Chứng từ chi tiêu; tạo cùng bài cập nhật (cascade insert). */
+  @OneToMany(() => MilestoneUpdateAttachment, (attachment) => attachment.milestoneUpdate, { cascade: ["insert"] })
+  attachments?: MilestoneUpdateAttachment[];
 }

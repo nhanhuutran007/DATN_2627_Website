@@ -160,7 +160,7 @@ export class CampaignQueryDto {
   endingWithinDays?: number;
 
   @IsOptional()
-  @IsIn(["popular", "ending", "newest", "progress", "latest"])
+  @IsIn(["featured", "popular", "ending", "newest", "progress", "latest"])
   sort?: string = "popular";
 
   @IsOptional()

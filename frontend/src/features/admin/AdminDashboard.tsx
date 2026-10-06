@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
+import { AdminContent } from "@/features/admin/AdminContent";
 import { AdminFinance } from "@/features/admin/AdminFinance";
+import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredictionCard";
 import {
   fetchAdminCampaigns,
   fetchAdminDonations,
@@ -14,7 +16,9 @@ import {
   fetchAdminUsers,
   fetchAuditLogs,
   generateRiskWarnings,
+  MAX_FEATURED,
   moderateCampaign,
+  setCampaignFeatured,
   setRiskStatus,
   setUserStatus,
   type AdminCampaign,
@@ -189,6 +193,7 @@ export function AdminDashboard() {
   const [commentFilter, setCommentFilter] = useState<CommentStatus | "">("visible");
 
   const [campaignFilter, setCampaignFilter] = useState<ApiCampaignStatus | "">("pending");
+  const [predictionOpen, setPredictionOpen] = useState<string | null>(null);
   const [donationFilter, setDonationFilter] = useState<DonationFilter>("completed");
   const [riskFilter, setRiskFilter] = useState<RiskStatus | "">("open");
   const [auditEntityFilter, setAuditEntityFilter] = useState<string>("");
@@ -264,6 +269,23 @@ export function AdminDashboard() {
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được danh sách giao dịch");
+    }
+  }
+
+  async function handleFeatured(campaign: AdminCampaign) {
+    const next = !campaign.isFeatured;
+    setBusy(campaign.id);
+    setNotice(null);
+    try {
+      await setCampaignFeatured(campaign.id, next);
+      await changeCampaignFilter(campaignFilter);
+      setNotice(next
+        ? `Đã đưa "${campaign.title}" vào mục Dự án nổi bật ở trang chủ.`
+        : `Đã bỏ "${campaign.title}" khỏi mục Dự án nổi bật.`);
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Không cập nhật được mục nổi bật");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -702,6 +724,8 @@ export function AdminDashboard() {
             <a href="#doi-soat"><Icon name="receipt" size={19} /> Đối soát</a>
             <a href="#giao-dich"><Icon name="receipt" size={19} /> Giao dịch</a>
             <a href="#nguoi-dung"><Icon name="users" size={19} /> Người dùng</a>
+            <a href="#danh-muc"><Icon name="document" size={19} /> Lĩnh vực</a>
+            <a href="#xuat-thong-ke"><Icon name="chart" size={19} /> Xuất thống kê</a>
             <a href="#nhat-ky-kiem-toan"><Icon name="clock" size={19} /> Nhật ký kiểm toán</a>
           </nav>
           <div className="admin-policy"><Icon name="shield" size={22} /><p><b>AI không tự động xử phạt</b><span>Mọi cảnh báo phải có quản trị viên xem xét và lưu lý do quyết định.</span></p></div>
@@ -807,8 +831,31 @@ export function AdminDashboard() {
                 <thead><tr><th>Chiến dịch</th><th>Chủ dự án</th><th>Mục tiêu</th><th>Đã huy động</th><th>Hạng mục</th><th>Kết thúc</th><th>Trạng thái</th><th /></tr></thead>
                 <tbody>
                   {campaigns.map((campaign) => (
-                    <tr key={campaign.id}>
-                      <td><b>{campaign.title}</b></td>
+                    <Fragment key={campaign.id}>
+                    <tr>
+                      <td>
+                        <b>{campaign.title}</b>
+                        {campaign.isFeatured && <span className="tag tag-amber featured-tag">Nổi bật</span>}
+                        {(campaign.isFeatured || ["approved", "active", "success"].includes(campaign.status)) && (
+                          <button
+                            className="link-inline table-sub-action"
+                            type="button"
+                            disabled={busy === campaign.id}
+                            title={`Trang chủ hiển thị 3 dự án nổi bật mới chọn nhất; tối đa ${MAX_FEATURED} dự án`}
+                            onClick={() => handleFeatured(campaign)}
+                          >
+                            {campaign.isFeatured ? "Bỏ nổi bật" : "Đặt nổi bật"}
+                          </button>
+                        )}
+                        <button
+                          className="link-inline table-sub-action"
+                          type="button"
+                          aria-expanded={predictionOpen === campaign.id}
+                          onClick={() => setPredictionOpen((id) => (id === campaign.id ? null : campaign.id))}
+                        >
+                          {predictionOpen === campaign.id ? "Ẩn ước lượng" : "Ước lượng AI"}
+                        </button>
+                      </td>
                       <td>{campaign.owner?.name ?? "Chưa có"}</td>
                       <td>{money(campaign.goalAmount)}</td>
                       <td>{money(campaign.currentAmount)}</td>
@@ -817,6 +864,12 @@ export function AdminDashboard() {
                       <td><span className={`table-status ${CAMPAIGN_STATUS_TONE[campaign.status]}`}>{CAMPAIGN_STATUS_LABEL[campaign.status]}</span></td>
                       <td>{tableActions(campaign)}</td>
                     </tr>
+                    {predictionOpen === campaign.id && (
+                      <tr className="table-detail-row">
+                        <td colSpan={8}><CampaignPredictionCard campaignId={campaign.id} variant="admin" /></td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                   {campaigns.length === 0 && (
                     <tr><td colSpan={8}><span className="table-muted">Không có chiến dịch nào trong trạng thái này.</span></td></tr>
@@ -1027,6 +1080,8 @@ export function AdminDashboard() {
               </table>
             </div>
           </section>
+
+          <AdminContent />
 
           <section className="admin-card admin-table-card" id="nhat-ky-kiem-toan">
             <div className="card-heading">

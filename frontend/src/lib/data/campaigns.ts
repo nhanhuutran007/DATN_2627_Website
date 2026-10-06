@@ -33,10 +33,12 @@ export type Campaign = {
   story: string[];
   transparencyScore: number;
   milestones: Array<{
+    /** Có với chiến dịch thật (API); dữ liệu mẫu không có. */
+    id?: string;
     title: string;
     date: string;
     budget: number;
-    status: "Hoàn thành" | "Đang thực hiện" | "Sắp tới";
+    status: "Hoàn thành" | "Đang thực hiện" | "Sắp tới" | "Quá hạn";
   }>;
   latestUpdate: {
     date: string;

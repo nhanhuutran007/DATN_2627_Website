@@ -213,6 +213,34 @@ describe("AiService", () => {
     });
   });
 
+  describe("predictForViewer", () => {
+    it("should let the campaign owner view the prediction", async () => {
+      const result = await service.predictForViewer(CAMPAIGN_ID, makeUser());
+      equal(result.available, true);
+    });
+
+    it("should let an admin view any campaign's prediction", async () => {
+      const admin = makeUser({ id: "22222222-2222-2222-2222-222222222222", role: UserRole.ADMIN });
+      const result = await service.predictForViewer(CAMPAIGN_ID, admin);
+      equal(result.available, true);
+    });
+
+    it("should forbid other users", async () => {
+      const stranger = makeUser({ id: "44444444-4444-4444-4444-444444444444" });
+      await service
+        .predictForViewer(CAMPAIGN_ID, stranger)
+        .then(() => Promise.reject(new Error("should have thrown")))
+        .catch((err) => equal(err.status, 403));
+    });
+
+    it("should throw NotFoundException for a missing campaign", async () => {
+      await service
+        .predictForViewer("missing", makeUser())
+        .then(() => Promise.reject(new Error("should have thrown")))
+        .catch((err) => equal(err.status, 404));
+    });
+  });
+
   describe("getFraudScore", () => {
     it("should reject requests without campaignId or userId", async () => {
       await service

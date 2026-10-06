@@ -2218,8 +2218,7 @@ h3 {
   gap: 24px;
 }
 
-.panel,
-.side-block {
+.panel {
   padding: 28px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -2228,8 +2227,7 @@ h3 {
 }
 
 .panel > h2,
-.give-title,
-.side-title {
+.give-title {
   position: relative;
   margin: 0 0 16px;
   padding-bottom: 12px;
@@ -2238,8 +2236,7 @@ h3 {
 }
 
 .panel > h2::after,
-.give-title::after,
-.side-title::after {
+.give-title::after {
   position: absolute;
   bottom: -2px;
   left: 0;
@@ -2249,8 +2246,7 @@ h3 {
   content: "";
 }
 
-.panel > .panel-title-sm,
-.side-title {
+.panel > .panel-title-sm {
   font-size: 1.05rem;
 }
 
@@ -2382,6 +2378,10 @@ h3 {
 .tag-green {
   color: var(--success);
   background: var(--success-soft);
+}
+
+.facts li > span.fact-warn:last-child {
+  color: #b42318;
 }
 
 .facts,
@@ -2751,8 +2751,7 @@ h3 {
     left: 36px;
   }
 
-  .panel,
-  .side-block {
+  .panel {
     padding: 20px;
   }
 
@@ -4231,6 +4230,98 @@ button {
   opacity: 0.5;
 }
 
+/* Nút phụ "Ước lượng AI" dưới tên chiến dịch: dạng liên kết, không phải nút viền */
+.admin-table-card td > button.table-sub-action {
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  color: var(--text-2);
+  border: 0;
+  background: none;
+  font-size: 0.78rem;
+}
+
+.admin-table-card td > button.table-sub-action:hover {
+  color: var(--primary);
+}
+
+.admin-table-card .featured-tag {
+  margin-left: 6px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  vertical-align: 1px;
+}
+
+.category-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-create input {
+  min-width: 0;
+  width: 220px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+
+.category-create input:focus {
+  border-color: var(--primary);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.export-grid article {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.export-grid h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 0.98rem;
+}
+
+.export-grid p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.export-grid article > .button {
+  justify-self: start;
+}
+
+@media (max-width: 760px) {
+  .export-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .category-create,
+  .category-create input {
+    width: 100%;
+  }
+}
+
+.admin-table-card .table-detail-row td {
+  padding-block: 4px 14px;
+  white-space: normal;
+  background: var(--soft);
+}
+
 .risk-list {
   display: flex;
   flex-direction: column;
@@ -4688,6 +4779,477 @@ button {
 
 .stats-panel-note {
   margin: 0;
+}
+
+/* Ước lượng của mô hình (chỉ chủ dự án/admin) */
+.prediction-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+}
+
+.prediction-admin {
+  max-width: 560px;
+}
+
+.prediction-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.prediction-head h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 0.95rem;
+}
+
+.prediction-card .model-figure,
+.prediction-card .fineprint,
+.prediction-card .hint,
+.prediction-card .form-error {
+  margin: 0;
+}
+
+.prediction-tips h4 {
+  margin: 4px 0 6px;
+  color: var(--navy);
+  font-size: 0.88rem;
+}
+
+.prediction-tips ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: 0.88rem;
+}
+
+/* Nhật ký tiến độ & chi tiêu (trang dự án + dashboard chủ dự án) */
+.timeline {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline-item {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 0 0 22px 22px;
+  border-left: 2px solid var(--line);
+}
+
+.timeline-item::before {
+  position: absolute;
+  top: 4px;
+  left: -7px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--white);
+  border-radius: 50%;
+  background: var(--primary);
+  content: "";
+}
+
+.timeline-item:last-child {
+  padding-bottom: 4px;
+  border-left-color: transparent;
+}
+
+.timeline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.timeline-content {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.65;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.timeline-photo {
+  position: relative;
+  max-width: 560px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.timeline-photo img {
+  object-fit: cover;
+}
+
+.timeline-expense {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.timeline-expense > p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--navy);
+  font-size: 0.9rem;
+}
+
+.timeline-expense .hint {
+  margin: 0;
+}
+
+.expense-receipts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.expense-receipts a {
+  display: grid;
+  gap: 4px;
+  width: 112px;
+  color: var(--text-2);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.expense-receipts a:hover .expense-thumb,
+.expense-receipts a:focus-visible .expense-thumb {
+  border-color: var(--primary);
+}
+
+.expense-thumb {
+  position: relative;
+  display: block;
+  width: 112px;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+}
+
+.expense-thumb img {
+  object-fit: cover;
+}
+
+.expense-caption {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+}
+
+.timeline-more {
+  margin-top: 6px;
+}
+
+.progress-manager {
+  display: grid;
+  gap: 16px;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+}
+
+.progress-manager .form-notice,
+.progress-manager .form-error {
+  margin: 0;
+}
+
+.milestone-checklist {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.milestone-checklist li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.milestone-checklist li:last-child {
+  border-bottom: 0;
+}
+
+.milestone-dot {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: var(--white);
+  border: 2px solid var(--line);
+  border-radius: 50%;
+}
+
+.milestone-dot.done {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+.milestone-name {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.milestone-name b {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.milestone-name small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.milestone-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.progress-alert {
+  margin: 0;
+  padding: 10px 12px;
+  color: #8a5300;
+  border: 1px solid #f3d9a4;
+  border-radius: 8px;
+  background: #fff8ea;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.progress-alert svg {
+  margin-right: 4px;
+  vertical-align: -3px;
+}
+
+.reschedule-form {
+  display: grid;
+  flex-basis: 100%;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.reschedule-form .form-error {
+  margin: 0;
+}
+
+.revision-log {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.revision-log summary {
+  padding: 10px 14px;
+  color: var(--navy);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.revision-log ol {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 4px 14px 14px;
+  list-style: none;
+}
+
+.revision-log ol > li {
+  display: grid;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+  font-size: 0.88rem;
+}
+
+.revision-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.revision-head b {
+  color: var(--navy);
+}
+
+.revision-head time {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.revision-changes {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+}
+
+.revision-changes s {
+  color: var(--muted);
+}
+
+.revision-reason {
+  margin: 0;
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.progress-form {
+  display: grid;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.progress-form h3,
+.progress-manager-timeline h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1rem;
+}
+
+.progress-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.expense-receipt-field {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.expense-receipt-field legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--navy);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.expense-receipt-field > button {
+  justify-self: start;
+}
+
+.expense-receipt-field > small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.required-mark {
+  color: var(--primary);
+}
+
+.expense-receipt-edit {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.expense-receipt-edit li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.expense-receipt-edit .expense-thumb {
+  flex: none;
+  width: 56px;
+}
+
+.expense-receipt-edit input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.expense-receipt-edit input:focus {
+  border-color: var(--primary);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.progress-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.progress-manager-timeline {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 760px) {
+  .progress-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-manager .stats-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .milestone-checklist li {
+    flex-wrap: wrap;
+  }
+
+  .expense-receipts a,
+  .expense-thumb {
+    width: 96px;
+  }
+
+  .progress-form-actions .button {
+    width: 100%;
+  }
 }
 
 .stats-charts {

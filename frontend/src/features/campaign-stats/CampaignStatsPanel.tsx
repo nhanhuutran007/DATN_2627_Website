@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/api";
 import { fetchCampaignStats, type CampaignStats } from "@/lib/api/campaign-stats";
 import { formatVnd } from "@/lib/format";
 
+import { CampaignPredictionCard } from "./CampaignPredictionCard";
 import { DailyColumnChart } from "./DailyColumnChart";
 
 const AMOUNT_COLOR = "#e0402b";
@@ -19,7 +20,7 @@ type State =
 
 const compactNumber = (value: number) => value.toLocaleString("vi-VN");
 
-/** Số liệu một chiến dịch cho chủ dự án: lượt xem, chuyển đổi, diễn biến theo ngày. */
+/** Số liệu một chiến dịch cho chủ dự án: lượt xem, chuyển đổi, diễn biến theo ngày, ước lượng của mô hình. */
 export function CampaignStatsPanel({ campaignId }: { campaignId: string }) {
   const [days, setDays] = useState<(typeof RANGES)[number]>(30);
   const [state, setState] = useState<State>({ status: "loading" });
@@ -73,6 +74,7 @@ export function CampaignStatsPanel({ campaignId }: { campaignId: string }) {
         </p>
       )}
       {state.status === "ready" && <StatsBody stats={state.stats} />}
+      <CampaignPredictionCard campaignId={campaignId} variant="owner" />
     </div>
   );
 }

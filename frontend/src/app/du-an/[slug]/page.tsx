@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { AiPredictCard } from "@/components/ai/AiPredictCard";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { PageBanner } from "@/components/layout/PageBanner";
@@ -11,15 +10,24 @@ import { CampaignComments } from "@/features/comments/CampaignComments";
 import { CampaignLedger } from "@/features/donations/CampaignLedger";
 import { DonationPanel } from "@/features/donations/DonationPanel";
 import { FollowCampaignButton } from "@/features/follows/FollowCampaignButton";
+import { MilestoneRevisions } from "@/features/progress/MilestoneRevisions";
+import { ProgressTimeline } from "@/features/progress/ProgressTimeline";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { CampaignViewTracker } from "@/features/campaign-stats/CampaignViewTracker";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
 import { apiCampaignToView, fetchCampaign, fetchCampaigns } from "@/lib/api/campaigns";
-import { fetchCampaignProgress, type CampaignProgress } from "@/lib/api/progress";
+import {
+  fetchCampaignProgress,
+  MILESTONE_STATE_LABEL,
+  MILESTONE_STATE_TONE,
+  TRANSPARENCY_LABEL,
+  type CampaignProgress,
+} from "@/lib/api/progress";
 import { fetchRewardTiers, type RewardTier } from "@/lib/api/rewards";
 import { coverFor } from "@/lib/covers";
 import { campaignProgress, campaigns as mockCampaigns, findCampaign, type Campaign } from "@/lib/data/campaigns";
 import { formatVnd, isLiveId } from "@/lib/format";
+import { timeAgo } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +114,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   const totalMilestones = progress?.totalMilestones ?? campaign.milestones.length;
   const budget = progress?.totalBudget ?? plannedBudget;
   const cover = coverFor(campaign);
+  const stateById = new Map((progress?.milestoneStates ?? []).map((item) => [item.id, item.state]));
 
   return (
     <main>
@@ -158,7 +167,16 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                         <td>{milestone.title}</td>
                         <td className="nowrap">{milestone.date}</td>
                         <td className="num">{formatVnd(milestone.budget)}</td>
-                        <td><span className={`tag ${milestone.status === "Hoàn thành" ? "tag-green" : ""}`}>{milestone.status}</span></td>
+                        <td>
+                          {(() => {
+                            const state = milestone.id ? stateById.get(milestone.id) : undefined;
+                            return state ? (
+                              <span className={`tag ${MILESTONE_STATE_TONE[state]}`}>{MILESTONE_STATE_LABEL[state]}</span>
+                            ) : (
+                              <span className={`tag ${milestone.status === "Hoàn thành" ? "tag-green" : milestone.status === "Quá hạn" ? "tag-red" : ""}`}>{milestone.status}</span>
+                            );
+                          })()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -174,6 +192,18 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             ) : (
               <p className="hint">Chủ dự án chưa công bố kế hoạch theo mốc.</p>
             )}
+            {progress && progress.overdueMilestones > 0 && (
+              <p className="hint">
+                &quot;Chậm tiến độ&quot;: mốc đã quá hạn mà chưa hoàn thành. &quot;Đã giải trình&quot;: chủ dự án đã đăng cập nhật sau hạn — xem Nhật ký tiến độ bên dưới.
+              </p>
+            )}
+            {live && progress && progress.revisionCount > 0 && <MilestoneRevisions campaignId={campaign.slug} />}
+          </section>
+
+          <section className="panel" id="nhat-ky" aria-labelledby="nhat-ky-title">
+            <h2 id="nhat-ky-title">Nhật ký tiến độ &amp; chi tiêu</h2>
+            <p className="hint">Cập nhật của chủ dự án theo từng mốc. Mỗi khoản chi kèm ảnh chứng từ; tổng chi không vượt số tiền đã được xác nhận.</p>
+            {live ? <ProgressTimeline campaignId={campaign.slug} /> : <p className="hint">Dữ liệu mẫu không có nhật ký tiến độ.</p>}
           </section>
 
           <section className="panel" aria-labelledby="so-cai">
@@ -229,13 +259,24 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                       : `${totalMilestones} mốc`}
                 </span>
               </li>
+              {progress && (
+                <li>
+                  <span>Tình trạng tiến độ</span>
+                  <span className={progress.transparency === "late" ? "fact-warn" : undefined}>{TRANSPARENCY_LABEL[progress.transparency]}</span>
+                </li>
+              )}
+              {progress && progress.totalMilestones > 0 && (
+                <li>
+                  <span>Cập nhật gần nhất</span>
+                  <span>{progress.lastUpdateAt ? timeAgo(progress.lastUpdateAt) : "Chưa có"}</span>
+                </li>
+              )}
               <li><span>Chi tiêu đã báo cáo</span><span>{progress && progress.totalExpense > 0 ? formatVnd(progress.totalExpense) : "Chưa có"}</span></li>
               <li><span>Ngân sách kế hoạch</span><span>{budget > 0 ? formatVnd(budget) : "—"}</span></li>
               {campaign.endDate && <li><span>Hạn gây quỹ</span><span>{campaign.endDate}</span></li>}
             </ul>
           </section>
 
-          {live && <AiPredictCard campaignId={campaign.slug} />}
         </aside>
       </div>
 

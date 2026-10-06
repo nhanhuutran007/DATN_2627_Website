@@ -6,6 +6,7 @@ export enum MediaPurpose {
   CAMPAIGN_IMAGE = "campaign_image",
   PROGRESS_IMAGE = "progress_image",
   AVATAR = "avatar",
+  EXPENSE_RECEIPT = "expense_receipt",
 }
 
 @Entity("media_files")

@@ -12,6 +12,14 @@ export function formatVndShort(value: number): string {
   return formatVnd(value);
 }
 
+/** "25/09/2026" */
+export function formatDay(value: Date | string): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "—";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+}
+
 /** "25/09/2026 15:04" */
 export function formatDateTime(value: Date | string): string {
   const date = typeof value === "string" ? new Date(value) : value;

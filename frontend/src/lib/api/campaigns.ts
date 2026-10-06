@@ -44,6 +44,7 @@ export type ApiCampaign = {
   startDate: string;
   endDate: string;
   status: ApiCampaignStatus;
+  isFeatured?: boolean;
   imageUrl?: string | null;
   videoUrl?: string | null;
   location?: string | null;
@@ -62,7 +63,7 @@ export type CampaignListResponse = {
   offset: number;
 };
 
-export type CampaignSort = "popular" | "ending" | "newest" | "progress" | "latest";
+export type CampaignSort = "featured" | "popular" | "ending" | "newest" | "progress" | "latest";
 
 export type CampaignQuery = {
   q?: string;
@@ -224,11 +225,14 @@ function toMilestones(api: ApiCampaign, now: Date): Campaign["milestones"] {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     .map<MilestoneView>((milestone) => {
       const target = milestone.targetDate ? new Date(milestone.targetDate) : null;
-      const status =
-        milestone.isCompleted || (target === null ? false : target.getTime() <= now.getTime())
-          ? "Hoàn thành"
+      // Qua hạn mà chưa đánh dấu hoàn thành là "Quá hạn", không phải "Hoàn thành".
+      const status: MilestoneView["status"] = milestone.isCompleted
+        ? "Hoàn thành"
+        : target !== null && target.getTime() <= now.getTime()
+          ? "Quá hạn"
           : "Sắp tới";
       return {
+        id: milestone.id,
         title: milestone.title,
         date: formatDate(milestone.targetDate),
         budget: toNumber(milestone.budget),

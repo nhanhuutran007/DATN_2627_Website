@@ -20,6 +20,8 @@ export enum NotificationType {
   REFUND_APPROVED = "refund_approved",
   REFUND_REJECTED = "refund_rejected",
   DONATION_REFUNDED = "donation_refunded",
+  MILESTONE_OVERDUE = "milestone_overdue",
+  MILESTONE_RESCHEDULED = "milestone_rescheduled",
   SYSTEM = "system",
 }
 

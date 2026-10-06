@@ -1,7 +1,7 @@
 import { isURL, ValidateBy, type ValidationOptions } from "class-validator";
 
 /** Đường dẫn ảnh do `POST /media/images` cấp (tương đối, không phụ thuộc tên miền). */
-export const MEDIA_IMAGE_PATH = /^\/api\/v1\/media\/(campaigns|progress|avatars)\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+export const MEDIA_IMAGE_PATH = /^\/api\/v1\/media\/(campaigns|progress|avatars|receipts)\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
 
 export function isImageUrl(value: unknown): boolean {
   if (typeof value !== "string") return false;

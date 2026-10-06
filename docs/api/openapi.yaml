@@ -831,6 +831,63 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: Chiến dịch đã kết thúc, không thể sửa mốc
+  /campaigns/{id}/milestone-revisions:
+    get:
+      operationId: listMilestoneRevisions
+      summary: Lịch sử thay đổi kế hoạch sau khi phát hành (công khai, 50 bản mới nhất)
+      description: Không trả người sửa; chỉ giá trị cũ/mới của trường thay đổi và lý do.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Danh sách thay đổi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    milestoneId: { type: string, format: uuid }
+                    milestoneTitle: { type: string }
+                    reason: { type: string }
+                    oldValues: { $ref: "#/components/schemas/MilestoneRevisionValues" }
+                    newValues: { $ref: "#/components/schemas/MilestoneRevisionValues" }
+                    createdAt: { type: string, format: date-time }
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /campaigns/{id}/updates:
+    get:
+      operationId: listCampaignUpdates
+      summary: Nhật ký tiến độ công khai của chiến dịch (mới nhất trước), kèm chứng từ chi tiêu
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Danh sách bài cập nhật
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: "#/components/schemas/MilestoneUpdate"
+                        - type: object
+                          properties:
+                            milestoneTitle: { type: string }
+                  total: { type: integer }
+        "404":
+          $ref: "#/components/responses/NotFound"
   /campaigns/{id}/progress:
     get:
       operationId: getCampaignProgress
@@ -850,7 +907,12 @@ paths:
     patch:
       operationId: updateMilestone
       summary: Cập nhật một mốc tiến độ
-      description: Ghi audit `milestone.update`.
+      description: >-
+        Ghi audit `milestone.update`. Khi chiến dịch đã phát hành
+        (`approved/active/paused/success/ended`), đổi tên/mô tả/hạn/ngân sách bắt buộc
+        có `changeReason` (≥ 10 ký tự); thay đổi được lưu vào `milestone_revisions`
+        (công khai qua `GET /campaigns/{id}/milestone-revisions`). Đổi hạn/ngân sách thì
+        thông báo `milestone_rescheduled` cho người ủng hộ/theo dõi và đặt lại bộ nhắc quá hạn.
       security:
         - bearerAuth: []
       parameters:
@@ -868,16 +930,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Milestone"
+        "400":
+          description: Chiến dịch đã phát hành mà thiếu `changeReason`
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          description: Chiến dịch đã kết thúc, không thể sửa mốc
+          description: Chiến dịch đã kết thúc, hoặc đổi hạn/ngân sách của mốc đã hoàn thành
     delete:
       operationId: removeMilestone
-      summary: Xóa một mốc tiến độ
-      description: Ghi audit `milestone.delete`.
+      summary: Xóa một mốc tiến độ (chỉ trước khi phát hành)
+      description: Ghi audit `milestone.delete`. Sau khi phát hành không xóa được — đổi hạn/ngân sách kèm lý do.
       security:
         - bearerAuth: []
       parameters:
@@ -890,7 +954,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          description: Chiến dịch đã kết thúc, không thể sửa mốc
+          description: Chiến dịch đã phát hành hoặc đã kết thúc
   /milestones/{id}/complete:
     post:
       operationId: completeMilestone
@@ -929,7 +993,12 @@ paths:
     post:
       operationId: addMilestoneUpdate
       summary: Thêm bài cập nhật/chứng từ chi tiêu cho một mốc
-      description: Ghi audit `milestone_update.create`.
+      description: >-
+        Chỉ chủ dự án/admin, khi chiến dịch ở `approved/active/paused/success/ended`.
+        Có `expenseAmount > 0` thì bắt buộc kèm `receipts` (ảnh `expense_receipt` do
+        chính người đăng tải lên, mỗi ảnh chỉ dùng một lần) và tổng chi đã báo cáo
+        không vượt số tiền đã huy động được xác nhận. Ghi audit `milestone_update.create`,
+        thông báo cho người ủng hộ/theo dõi.
       security:
         - bearerAuth: []
       parameters:
@@ -951,8 +1020,12 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "400":
+          description: Thiếu chứng từ khi khai chi tiêu, chứng từ không hợp lệ hoặc trùng
         "409":
-          description: Chiến dịch đã kết thúc, không thể thêm cập nhật
+          description: >-
+            Chiến dịch chưa phát hành/đã thất bại/bị hủy, tổng chi vượt số đã huy động,
+            hoặc chứng từ đã dùng cho báo cáo khác
 
   /ai/health:
     get:
@@ -992,11 +1065,13 @@ paths:
   /ai/predict:
     post:
       operationId: aiPredict
-      summary: Dự đoán khả năng thành công của một chiến dịch
+      summary: Dự đoán khả năng thành công của một chiến dịch (chỉ admin)
       description: >-
         `data` chỉ có khi `available: true` (AI service phản hồi được);
         `false` khi AI service lỗi/timeout — không dùng làm căn cứ từ chối,
-        chỉ hỗ trợ tham khảo.
+        chỉ hỗ trợ tham khảo. Chủ dự án dùng `GET /campaigns/{id}/prediction`.
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -1010,6 +1085,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PredictResult"
+        "401":
+          description: Chưa đăng nhập
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           description: Chiến dịch không tồn tại
   /ai/fraud:
@@ -1281,6 +1360,184 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /admin/campaigns/{id}/featured:
+    patch:
+      operationId: adminSetCampaignFeatured
+      summary: Chọn/bỏ dự án nổi bật ở trang chủ (chỉ admin)
+      description: >-
+        Chỉ chiến dịch `approved/active/success`; tối đa 6 dự án nổi bật cùng lúc.
+        Ghi audit `campaign.feature` / `campaign.unfeature`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [featured]
+              properties:
+                featured: { type: boolean }
+      responses:
+        "200":
+          description: Chiến dịch sau khi cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "400":
+          description: Chiến dịch chưa công khai
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Đã đủ 6 dự án nổi bật
+  /admin/exports/campaigns:
+    get:
+      operationId: adminExportCampaigns
+      summary: Xuất CSV thống kê theo chiến dịch (không dữ liệu cá nhân)
+      description: >-
+        Mục tiêu, đã huy động, tỷ lệ đạt, lượt ủng hộ/xem, số mốc/hoàn thành, chi đã báo cáo.
+        Chủ dự án giả danh `CDA-…` (SHA-256), không tên/email. Chống CSV injection. Audit `admin.export`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File CSV UTF-8 (có BOM)
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          description: Chưa đăng nhập
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/exports/donations-daily:
+    get:
+      operationId: adminExportDailyDonations
+      summary: Xuất CSV ủng hộ theo ngày (giờ Việt Nam) × lĩnh vực
+      description: Số lượt/tiền thành công và đã hoàn; mặc định 30 ngày gần nhất. Audit `admin.export`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: File CSV UTF-8 (có BOM)
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          description: Chưa đăng nhập
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /categories:
+    get:
+      operationId: listCategories
+      summary: Lĩnh vực đang nhận chiến dịch (công khai, theo thứ tự hiển thị)
+      responses:
+        "200":
+          description: Danh sách lĩnh vực
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+  /admin/categories:
+    get:
+      operationId: adminListCategories
+      summary: Toàn bộ lĩnh vực kèm số chiến dịch (chỉ admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Danh sách lĩnh vực
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: "#/components/schemas/Category"
+                    - type: object
+                      properties:
+                        campaignCount: { type: integer }
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: adminCreateCategory
+      summary: Thêm lĩnh vực (chỉ admin)
+      description: Tên không trùng (không phân biệt hoa thường). Audit `category.create`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 100 }
+                description: { type: string, maxLength: 300 }
+                sortOrder: { type: integer, minimum: 0, maximum: 1000 }
+      responses:
+        "201":
+          description: Đã tạo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Trùng tên
+  /admin/categories/{id}:
+    patch:
+      operationId: adminUpdateCategory
+      summary: Đổi tên/sắp xếp/tắt-bật lĩnh vực (chỉ admin)
+      description: >-
+        Đổi tên cập nhật luôn `campaigns.category` trong cùng giao dịch. Tắt: không nhận
+        chiến dịch mới (POST/PATCH /campaigns trả 400), chiến dịch cũ giữ nguyên; phải còn
+        ít nhất một lĩnh vực đang nhận. Audit `category.update`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 2, maxLength: 100 }
+                description: { type: string, maxLength: 300 }
+                sortOrder: { type: integer, minimum: 0, maximum: 1000 }
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Trùng tên hoặc tắt lĩnh vực cuối cùng
   /admin/users/{id}/status:
     patch:
       operationId: adminUpdateUserStatus
@@ -1498,7 +1755,7 @@ paths:
                   format: binary
                 purpose:
                   type: string
-                  enum: [campaign_image, progress_image, avatar]
+                  enum: [campaign_image, progress_image, avatar, expense_receipt]
                   default: campaign_image
       responses:
         "201":
@@ -1705,6 +1962,33 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /campaigns/{id}/prediction:
+    get:
+      operationId: getCampaignPrediction
+      summary: Ước lượng khả năng đạt mục tiêu (chỉ chủ dự án/admin)
+      description: >-
+        Không hiển thị công khai để tránh ảnh hưởng quyết định của người ủng hộ.
+        Chỉ để tham khảo, không dùng làm căn cứ duyệt/từ chối. `available: false`
+        khi AI service lỗi/timeout. Rate limit 30 yêu cầu/phút.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: "Kết quả dự đoán (hoặc `available: false` nếu AI service lỗi)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictResult"
+        "401":
+          description: Chưa đăng nhập
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          description: Vượt giới hạn tần suất
   /campaigns/{id}/follow:
     get:
       operationId: getCampaignFollowStatus
@@ -2343,8 +2627,9 @@ components:
       in: query
       schema:
         type: string
-        enum: [popular, ending, newest, progress, latest]
+        enum: [featured, popular, ending, newest, progress, latest]
         default: popular
+      description: "`featured`: dự án admin chọn nổi bật trước (mới chọn trước), còn lại theo độ phổ biến"
   responses:
     Forbidden:
       description: Không có quyền thực hiện hành động này
@@ -2607,6 +2892,14 @@ components:
         - failed
         - cancelled
         - ended
+    Category:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        sortOrder: { type: integer }
+        isActive: { type: boolean }
     Campaign:
       type: object
       properties:
@@ -2638,6 +2931,9 @@ components:
           format: date-time
         status:
           $ref: "#/components/schemas/CampaignStatus"
+        isFeatured:
+          type: boolean
+          description: Admin chọn hiển thị ở mục "Dự án nổi bật" trang chủ
         imageUrl:
           type: string
           nullable: true
@@ -2897,6 +3193,14 @@ components:
           type: integer
           minimum: 0
           maximum: 10000
+    MilestoneRevisionValues:
+      type: object
+      description: Chỉ có các trường đã thay đổi
+      properties:
+        title: { type: string }
+        description: { type: string, nullable: true }
+        targetDate: { type: string, format: date-time, nullable: true }
+        budget: { type: number, nullable: true }
     UpdateMilestoneRequest:
       type: object
       properties:
@@ -2915,6 +3219,11 @@ components:
           type: integer
           minimum: 0
           maximum: 10000
+        changeReason:
+          type: string
+          minLength: 10
+          maxLength: 500
+          description: Bắt buộc khi chiến dịch đã phát hành; công khai trong lịch sử thay đổi
     MilestoneListResult:
       type: object
       required: [items, total]
@@ -2942,21 +3251,46 @@ components:
         expenseAmount:
           type: number
           nullable: true
+        attachments:
+          type: array
+          description: Chứng từ chi tiêu (ảnh hóa đơn/biên lai)
+          items:
+            $ref: "#/components/schemas/MilestoneUpdateAttachment"
         createdAt:
           type: string
           format: date-time
+    MilestoneUpdateAttachment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        mediaFileId: { type: string, format: uuid }
+        url: { type: string, example: "/api/v1/media/receipts/3f1c….jpg" }
+        caption: { type: string, nullable: true }
+        sortOrder: { type: integer }
     CreateMilestoneUpdateRequest:
       type: object
       required: [content]
       properties:
         content:
           type: string
+          minLength: 10
+          maxLength: 5000
         imageUrl:
           type: string
-          format: uri
+          description: Ảnh hiện trường (link http(s) hoặc ảnh đã tải lên)
         expenseAmount:
           type: number
           minimum: 0
+        receipts:
+          type: array
+          maxItems: 6
+          description: Bắt buộc khi `expenseAmount > 0`
+          items:
+            type: object
+            required: [mediaId]
+            properties:
+              mediaId: { type: string, format: uuid, description: "`id` từ `POST /media/images` với `purpose=expense_receipt`" }
+              caption: { type: string, maxLength: 200 }
     CampaignProgress:
       type: object
       required:
@@ -2975,6 +3309,31 @@ components:
           description: Tổng giao dịch `completed`, không tính từ counter người dùng nhập
         backerCount:
           type: integer
+        overdueMilestones:
+          type: integer
+          description: Số mốc quá hạn chưa hoàn thành (kể cả đã giải trình)
+        lastUpdateAt:
+          type: string
+          format: date-time
+          nullable: true
+        revisionCount:
+          type: integer
+          description: Số lần sửa kế hoạch sau khi phát hành
+        transparency:
+          type: string
+          enum: [no_plan, on_track, late, late_explained]
+        milestoneStates:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              state:
+                type: string
+                enum: [completed, on_track, overdue, overdue_explained]
+                description: >-
+                  `overdue`: quá hạn chưa hoàn thành; `overdue_explained`: đã có bài cập nhật
+                  cho mốc sau hạn
 
     AiHealthResult:
       type: object

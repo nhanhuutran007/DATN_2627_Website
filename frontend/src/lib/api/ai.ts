@@ -85,12 +85,9 @@ export function isAiPredictAvailable(
   return result.available;
 }
 
-export async function fetchAiPrediction(campaignId: string): Promise<AiPredictResult> {
-  try {
-    return await api.post<AiPredictResult>("/ai/predict", { campaignId });
-  } catch {
-    return { available: false, campaignId };
-  }
+/** Ước lượng của mô hình — chỉ chủ dự án/admin; lỗi quyền/mạng được ném ra để UI báo. */
+export function fetchCampaignPrediction(campaignId: string): Promise<AiPredictResult> {
+  return api.get<AiPredictResult>(`/campaigns/${encodeURIComponent(campaignId)}/prediction`);
 }
 
 export type BehaviorEventType = "view" | "follow" | "contribute";

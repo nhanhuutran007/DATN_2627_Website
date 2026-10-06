@@ -1,6 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
   IsBoolean,
+  IsDateString,
   IsEnum,
   IsIn,
   IsInt,
@@ -131,4 +132,21 @@ export class RiskQueryDto {
 export class UpdateRiskStatusDto {
   @IsEnum(RiskAlertStatus)
   status!: RiskAlertStatus;
+}
+
+export class SetFeaturedDto {
+  @IsBoolean()
+  featured!: boolean;
+}
+
+export class ExportRangeQueryDto {
+  /** Ngày bắt đầu (bao gồm), ISO date. Mặc định 30 ngày trước. */
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  /** Ngày kết thúc (bao gồm cả ngày), ISO date. Mặc định hôm nay. */
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }

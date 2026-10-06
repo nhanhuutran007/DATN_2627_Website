@@ -28,7 +28,7 @@ type HomeData = {
 async function loadHome(): Promise<HomeData> {
   try {
     const [featured, all, newest, stats] = await Promise.all([
-      fetchCampaigns({ sort: "popular", limit: 3 }),
+      fetchCampaigns({ sort: "featured", limit: 3 }),
       fetchCampaigns({ sort: "latest", limit: 24 }),
       fetchCampaigns({ sort: "newest", limit: 3 }),
       fetchPlatformStats().catch(() => null),

@@ -35,7 +35,10 @@ export class AiController {
     return this.aiService.recommend(dto, user ?? undefined);
   }
 
+  /** Chỉ admin; chủ dự án dùng `GET /campaigns/:id/prediction`. */
   @Post("predict")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   predict(@Body() dto: PredictAiDto) {
     return this.aiService.predict(dto);
   }

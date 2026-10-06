@@ -15,6 +15,7 @@ import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { User } from "../users/entities/user.entity";
 import {
+  CampaignUpdatesQueryDto,
   CreateMilestoneDto,
   CreateMilestoneUpdateDto,
   MilestoneQueryDto,
@@ -42,6 +43,21 @@ export class ProgressController {
     @GetCurrentUser() user: User,
   ) {
     return this.progressService.createMilestone(id, dto, user);
+  }
+
+  /** Nhật ký tiến độ công khai của chiến dịch, kèm chứng từ chi tiêu. */
+  @Get("campaigns/:id/updates")
+  listCampaignUpdates(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query() query: CampaignUpdatesQueryDto,
+  ) {
+    return this.progressService.listCampaignUpdates(id, query);
+  }
+
+  /** Lịch sử thay đổi kế hoạch sau khi phát hành (công khai, kèm lý do). */
+  @Get("campaigns/:id/milestone-revisions")
+  listMilestoneRevisions(@Param("id", ParseUUIDPipe) id: string) {
+    return this.progressService.listMilestoneRevisions(id);
   }
 
   @Get("campaigns/:id/progress")

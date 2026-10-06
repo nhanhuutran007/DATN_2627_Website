@@ -13,6 +13,7 @@ import {
 
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { CategoriesService } from "../categories/categories.service";
 import { User } from "../users/entities/user.entity";
 import { CampaignsService } from "./campaigns.service";
 import {
@@ -24,7 +25,10 @@ import {
 
 @Controller("campaigns")
 export class CampaignsController {
-  constructor(private readonly campaignsService: CampaignsService) {}
+  constructor(
+    private readonly campaignsService: CampaignsService,
+    private readonly categoriesService: CategoriesService,
+  ) {}
 
   @Get()
   findAll(@Query() query: CampaignQueryDto) {
@@ -50,17 +54,21 @@ export class CampaignsController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  create(@Body() dto: CreateCampaignDto, @GetCurrentUser() user: User) {
+  async create(@Body() dto: CreateCampaignDto, @GetCurrentUser() user: User) {
+    await this.categoriesService.assertUsable(dto.category);
     return this.campaignsService.create(dto, user);
   }
 
   @Patch(":id")
   @UseGuards(JwtAuthGuard)
-  update(
+  async update(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateCampaignDto,
     @GetCurrentUser() user: User,
   ) {
+    if (dto.category !== undefined) {
+      await this.categoriesService.assertUsable(dto.category);
+    }
     return this.campaignsService.update(id, dto, user);
   }
 

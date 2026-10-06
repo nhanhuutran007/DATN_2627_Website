@@ -256,11 +256,13 @@ async function seed() {
     const steps = ["Khảo sát và chốt nhà cung cấp", "Triển khai giai đoạn 1", "Hoàn thiện và báo cáo quyết toán"];
     steps.forEach((title, step) => {
       const done = finished || step === 0;
+      // Kịch bản demo "chậm tiến độ": mốc 2 của phòng khám lưu động quá hạn 12 ngày, chưa giải trình.
+      const overdueDemo = index === 3 && step === 1;
       milestoneRows.push({
         campaignId: campaign.id,
         title,
         description: `${title} cho dự án "${seedRow.title}".`,
-        targetDate: at(seedRow.startedDaysAgo - seedRow.durationDays - 10 - step * 20, 0),
+        targetDate: overdueDemo ? at(12, 0) : at(seedRow.startedDaysAgo - seedRow.durationDays - 10 - step * 20, 0),
         budget: Math.round((seedRow.goal * [0.2, 0.5, 0.3][step]) / 100_000) * 100_000,
         sortOrder: step,
         isCompleted: done,

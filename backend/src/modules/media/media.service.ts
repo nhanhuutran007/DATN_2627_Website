@@ -24,6 +24,7 @@ const FOLDER_BY_PURPOSE: Record<MediaPurpose, string> = {
   [MediaPurpose.CAMPAIGN_IMAGE]: "campaigns",
   [MediaPurpose.PROGRESS_IMAGE]: "progress",
   [MediaPurpose.AVATAR]: "avatars",
+  [MediaPurpose.EXPENSE_RECEIPT]: "receipts",
 };
 
 export type IncomingFile = {

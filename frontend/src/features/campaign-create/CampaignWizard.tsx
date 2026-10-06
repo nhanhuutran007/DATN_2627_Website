@@ -20,6 +20,7 @@ import {
   updateCampaign,
   type CreateCampaignPayload,
 } from "@/lib/api/campaigns";
+import { useCategories } from "@/lib/api/categories";
 import {
   createMilestone,
   deleteMilestone,
@@ -35,7 +36,6 @@ const STEPS = [
   { title: "Kiểm tra & gửi duyệt", hint: "Rà soát trước khi gửi" },
 ];
 
-const CATEGORIES = ["Giáo dục", "Môi trường", "Nông nghiệp", "Y tế", "Khởi nghiệp", "Công nghệ"];
 
 type DraftMilestone = { title: string; deadline: string; budget: string; output: string };
 
@@ -99,6 +99,7 @@ export function CampaignWizard() {
   const user = useAuthUser();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState(initialDraft);
+  const categories = useCategories();
   const [milestones, setMilestones] = useState<DraftMilestone[]>([
     { ...emptyMilestone, title: "Chuẩn bị và khảo sát" },
     { ...emptyMilestone, title: "Triển khai hoạt động chính" },
@@ -332,7 +333,10 @@ export function CampaignWizard() {
               <label className="field">
                 <span>Lĩnh vực *</span>
                 <select value={draft.category} onChange={(e) => update("category", e.target.value)}>
-                  {CATEGORIES.map((category) => <option key={category}>{category}</option>)}
+                  {categories.map((category) => <option key={category}>{category}</option>)}
+                  {draft.category && !categories.includes(draft.category) && (
+                    <option value={draft.category}>{draft.category} (đã ngừng nhận dự án mới)</option>
+                  )}
                 </select>
               </label>
               <label className="field">

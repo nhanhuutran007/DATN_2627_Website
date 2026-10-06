@@ -10,6 +10,7 @@ import { EmailVerificationNotice } from "@/features/auth/EmailVerificationNotice
 import { CampaignStatsPanel } from "@/features/campaign-stats/CampaignStatsPanel";
 import { MyDonations } from "@/features/finance/MyDonations";
 import { MyFollows } from "@/features/follows/MyFollows";
+import { ProgressManager } from "@/features/progress/ProgressManager";
 import { RewardManager } from "@/features/rewards/RewardManager";
 import { ApiError } from "@/lib/api";
 import {
@@ -77,6 +78,7 @@ export function OwnerDashboard() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rewardsOpen, setRewardsOpen] = useState<string | null>(null);
   const [statsOpen, setStatsOpen] = useState<string | null>(null);
+  const [progressOpen, setProgressOpen] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const load = useCallback(async () => {
@@ -241,6 +243,16 @@ export function OwnerDashboard() {
                           Số liệu
                         </button>
                       )}
+                      {PUBLISHED.includes(c.status) && (
+                        <button
+                          className="button button-ghost button-sm"
+                          type="button"
+                          aria-expanded={progressOpen === c.id}
+                          onClick={() => setProgressOpen((id) => (id === c.id ? null : c.id))}
+                        >
+                          Tiến độ
+                        </button>
+                      )}
                       <button
                         className="button button-ghost button-sm"
                         type="button"
@@ -251,6 +263,7 @@ export function OwnerDashboard() {
                       </button>
                     </div>
                     {statsOpen === c.id && <CampaignStatsPanel campaignId={c.id} />}
+                    {progressOpen === c.id && <ProgressManager campaignId={c.id} readOnly={c.status === "failed"} />}
                     {rewardsOpen === c.id && (
                       <RewardManager campaignId={c.id} closed={["success", "failed", "cancelled", "ended"].includes(c.status)} />
                     )}

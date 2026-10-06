@@ -10,6 +10,7 @@ import {
   type CampaignQuery,
   type CampaignSort,
 } from "@/lib/api/campaigns";
+import { useCategories } from "@/lib/api/categories";
 import { campaigns as mockCampaigns, type Campaign } from "@/lib/data/campaigns";
 
 type CampaignExplorerProps = {
@@ -21,7 +22,6 @@ const PAGE_SIZE = 12;
 const DEBOUNCE_MS = 350;
 const MILLION = 1_000_000;
 
-const CATEGORIES = ["Giáo dục", "Môi trường", "Nông nghiệp", "Y tế", "Khởi nghiệp", "Công nghệ"];
 
 const STATUS_OPTIONS: Record<string, { label: string; statuses: ApiCampaignStatus[] }> = {
   open: { label: "Đang gây quỹ", statuses: ["approved", "active"] },
@@ -111,6 +111,7 @@ const EMPTY_FILTERS: Filters = {
 
 export function CampaignExplorer({ initialQuery = "", initialCategory = "" }: CampaignExplorerProps) {
   const [filters, setFilters] = useState<Filters>({ ...EMPTY_FILTERS, q: initialQuery, category: initialCategory });
+  const categories = useCategories();
   // Ô gõ chữ chỉ gửi lên server sau khi người dùng ngừng gõ.
   const [text, setText] = useState({ q: initialQuery.trim(), location: "" });
   const [result, setResult] = useState<Result | null>(null);
@@ -196,7 +197,7 @@ export function CampaignExplorer({ initialQuery = "", initialCategory = "" }: Ca
           <span>Lĩnh vực</span>
           <select value={filters.category} onChange={(event) => update("category", event.target.value)}>
             <option value="">Tất cả</option>
-            {CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
+            {categories.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
         </label>
         <label className="filter-field">

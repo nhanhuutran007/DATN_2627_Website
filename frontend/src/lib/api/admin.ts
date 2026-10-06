@@ -1,4 +1,4 @@
-import { api } from "../api";
+import { api, apiDownload } from "../api";
 import type { ApiCampaign, ApiCampaignStatus } from "./campaigns";
 
 export type AdminUserRole = "user" | "campaign_owner" | "admin";
@@ -263,4 +263,38 @@ function toParams(
     params.set(key, String(value));
   }
   return params.toString();
+}
+
+/** Tối đa dự án nổi bật cùng lúc (khớp backend `MAX_FEATURED`). */
+export const MAX_FEATURED = 6;
+
+/** Chọn/bỏ dự án nổi bật ở trang chủ. */
+export function setCampaignFeatured(id: string, featured: boolean): Promise<ApiCampaign> {
+  return api.patch<ApiCampaign>(`/admin/campaigns/${encodeURIComponent(id)}/featured`, { featured });
+}
+
+async function saveDownload(path: string, fallbackName: string): Promise<void> {
+  const { blob, filename } = await apiDownload(path);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename ?? fallbackName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** CSV thống kê theo chiến dịch (không dữ liệu cá nhân, chủ dự án giả danh). */
+export function downloadCampaignStatsCsv(): Promise<void> {
+  return saveDownload("/admin/exports/campaigns", "thong-ke-chien-dich.csv");
+}
+
+/** CSV ủng hộ theo ngày × lĩnh vực trong khoảng ngày (mặc định 30 ngày). */
+export function downloadDailyDonationsCsv(range: { from?: string; to?: string }): Promise<void> {
+  const params = new URLSearchParams();
+  if (range.from) params.set("from", range.from);
+  if (range.to) params.set("to", range.to);
+  const qs = params.toString();
+  return saveDownload(`/admin/exports/donations-daily${qs ? `?${qs}` : ""}`, "ung-ho-theo-ngay.csv");
 }

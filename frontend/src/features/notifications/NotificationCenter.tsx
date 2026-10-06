@@ -30,6 +30,14 @@ const ICONS: Partial<Record<NotificationType, IconName>> = {
   milestone_completed: "check",
   progress_update: "chart",
   report_resolved: "shield",
+  comment_new: "message",
+  comment_reply: "message",
+  comment_hidden: "shield",
+  refund_approved: "wallet",
+  refund_rejected: "wallet",
+  donation_refunded: "wallet",
+  milestone_overdue: "clock",
+  milestone_rescheduled: "clock",
 };
 
 type LoadState = "loading" | "ready" | "error";

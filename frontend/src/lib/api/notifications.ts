@@ -12,6 +12,14 @@ export type NotificationType =
   | "milestone_completed"
   | "progress_update"
   | "report_resolved"
+  | "comment_new"
+  | "comment_reply"
+  | "comment_hidden"
+  | "refund_approved"
+  | "refund_rejected"
+  | "donation_refunded"
+  | "milestone_overdue"
+  | "milestone_rescheduled"
   | "system";
 
 export type AppNotification = {

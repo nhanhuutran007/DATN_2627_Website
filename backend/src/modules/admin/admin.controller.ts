@@ -7,9 +7,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   SerializeOptions,
   UseGuards,
 } from "@nestjs/common";
+import type { Response } from "express";
 
 import { AuditLogQueryDto } from "../../common/audit/audit.dto";
 import { AuditService } from "../../common/audit/audit.service";
@@ -19,15 +21,28 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entity";
 import { AdminService } from "./admin.service";
+import { ContentService } from "./content.service";
 import {
   AdminCampaignQueryDto,
   AdminDonationQueryDto,
   AdminUserQueryDto,
+  ExportRangeQueryDto,
   RiskQueryDto,
+  SetFeaturedDto,
   UpdateRiskStatusDto,
   UpdateUserStatusDto,
 } from "./dto/admin.dto";
+import { type CsvFile, ExportService } from "./export.service";
 import { RiskAlertService } from "./risk-alert.service";
+
+function sendCsv(res: Response, file: CsvFile): void {
+  res.set({
+    "Content-Type": "text/csv; charset=utf-8",
+    "Content-Disposition": `attachment; filename="${file.filename}"`,
+    "Cache-Control": "no-store",
+  });
+  res.send(file.content);
+}
 
 @Controller("admin")
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -38,6 +53,8 @@ export class AdminController {
     private readonly adminService: AdminService,
     private readonly riskAlertService: RiskAlertService,
     private readonly auditService: AuditService,
+    private readonly contentService: ContentService,
+    private readonly exportService: ExportService,
   ) {}
 
   @Get("overview")
@@ -82,6 +99,32 @@ export class AdminController {
     @GetCurrentUser() currentUser: User,
   ) {
     return this.riskAlertService.updateStatus(id, dto, currentUser);
+  }
+
+  /** Chọn/bỏ dự án nổi bật ở trang chủ (tối đa 6). */
+  @Patch("campaigns/:id/featured")
+  setFeatured(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: SetFeaturedDto,
+    @GetCurrentUser() currentUser: User,
+  ) {
+    return this.contentService.setFeatured(id, dto.featured, currentUser);
+  }
+
+  /** Thống kê theo chiến dịch (CSV, không dữ liệu cá nhân). */
+  @Get("exports/campaigns")
+  async exportCampaigns(@GetCurrentUser() currentUser: User, @Res() res: Response): Promise<void> {
+    sendCsv(res, await this.exportService.exportCampaigns(currentUser));
+  }
+
+  /** Ủng hộ theo ngày × lĩnh vực (CSV tổng hợp). */
+  @Get("exports/donations-daily")
+  async exportDailyDonations(
+    @Query() query: ExportRangeQueryDto,
+    @GetCurrentUser() currentUser: User,
+    @Res() res: Response,
+  ): Promise<void> {
+    sendCsv(res, await this.exportService.exportDailyDonations(query, currentUser));
   }
 
   @Patch("users/:id/status")

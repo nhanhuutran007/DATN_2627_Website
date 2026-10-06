@@ -228,6 +228,12 @@ export class CampaignsService {
       case "latest":
         qb.orderBy("c.createdAt", "DESC");
         break;
+      case "featured":
+        // Admin chọn trước (mới chọn trước), phần còn lại theo độ phổ biến.
+        qb.orderBy("c.isFeatured", "DESC")
+          .addOrderBy("c.featuredAt", "DESC")
+          .addOrderBy("c.backerCount", "DESC");
+        break;
       case "popular":
       default:
         qb.orderBy("c.backerCount", "DESC");

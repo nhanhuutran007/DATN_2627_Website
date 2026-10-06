@@ -1,3 +1,4 @@
+import { Exclude } from "class-transformer";
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
@@ -36,6 +37,11 @@ export class Milestone extends BaseEntity {
 
   @Column({ name: "completed_at", type: "datetime", nullable: true })
   completedAt?: Date;
+
+  /** Lần cuối nhắc chủ dự án mốc quá hạn; NULL khi chưa nhắc hoặc vừa đổi hạn. */
+  @Exclude({ toPlainOnly: true })
+  @Column({ name: "overdue_notified_at", type: "datetime", nullable: true })
+  overdueNotifiedAt?: Date | null;
 
   @OneToMany("MilestoneUpdate", "milestone")
   updates!: any[];

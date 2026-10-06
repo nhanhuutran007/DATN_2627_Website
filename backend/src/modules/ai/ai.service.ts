@@ -1,4 +1,10 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, MoreThan, Repository } from "typeorm";
 
@@ -13,7 +19,7 @@ import type {
 } from "../../integrations/ai/ai.types";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
-import { User } from "../users/entities/user.entity";
+import { User, UserRole } from "../users/entities/user.entity";
 import {
   CreateBehaviorEventDto,
   FraudAiDto,
@@ -138,15 +144,36 @@ export class AiService {
     }
   }
 
+  /** Dự đoán cho admin (`POST /ai/predict`). */
   async predict(dto: PredictAiDto): Promise<PredictResult> {
+    const campaign = await this.findCampaignForPrediction(dto.campaignId);
+    return this.runPrediction(campaign);
+  }
+
+  /**
+   * Ước lượng của mô hình cho một chiến dịch — chỉ chủ dự án và admin được xem,
+   * không hiển thị công khai để tránh ảnh hưởng quyết định của người ủng hộ.
+   */
+  async predictForViewer(campaignId: string, viewer: User): Promise<PredictResult> {
+    const campaign = await this.findCampaignForPrediction(campaignId);
+    if (campaign.ownerId !== viewer.id && viewer.role !== UserRole.ADMIN) {
+      throw new ForbiddenException("Only the campaign owner or an admin can view the prediction");
+    }
+    return this.runPrediction(campaign);
+  }
+
+  private async findCampaignForPrediction(campaignId: string): Promise<Campaign> {
     const campaign = await this.campaignRepo.findOne({
-      where: { id: dto.campaignId },
+      where: { id: campaignId },
       relations: { owner: true, milestones: true },
     });
     if (!campaign) {
       throw new NotFoundException("Campaign not found");
     }
+    return campaign;
+  }
 
+  private async runPrediction(campaign: Campaign): Promise<PredictResult> {
     const features = await this.buildPredictFeatures(campaign);
 
     try {
