@@ -58,3 +58,6 @@ Thumbs.db
 # Mã nguồn/dữ liệu của dự án cũ, không thuộc đồ án này
 baocao/
 nhlsports*.sql
+
+# Tài liệu báo cáo đồ án (Word/PDF/draw.io) – chỉ lưu cục bộ, không đưa lên GitHub
+TaiLieuWeb/

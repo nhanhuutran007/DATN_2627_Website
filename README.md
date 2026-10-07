@@ -25,7 +25,7 @@ _Tích hợp trí tuệ nhân tạo trong gợi ý dự án, dự đoán khả n
 | **Tên đề tài**           | Xây dựng nền tảng gây quỹ cộng đồng cho các dự án xã hội và khởi nghiệp |
 | **Mã đề tài**            | DATN_2627                                                               |
 | **Loại đồ án**           | Đồ án tốt nghiệp                                                        |
-| **Sinh viên thực hiện**  | Trần Hữu Nhân                                                           |
+| **Sinh viên thực hiện**  | Trần Hữu Nhân, Nguyễn Nhật Hào                                          |
 | **Giảng viên hướng dẫn** | _ThS. Dương Hữu Phước_                                                  |
 | **Đơn vị**               | _Khoa Công nghệ thông tin , TDTU _                                      |
 | **Năm thực hiện**        | 2026                                                                    |
