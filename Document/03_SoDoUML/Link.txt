@@ -1,0 +1,56 @@
+==========================================================
+ LINK SƠ ĐỒ UML (draw.io) - ĐỒ ÁN GÓP MẦM (DATN_2627)
+==========================================================
+Mỗi sơ đồ có 2 file cùng tên trong thư mục con:
+  - .drawio : bản gốc, mở/sửa bằng draw.io (app.diagrams.net hoặc bản desktop)
+  - .png    : ảnh xuất sẵn để chèn vào báo cáo
+Sau khi đưa file .drawio lên draw.io / Google Drive, dán link vào sau "Link:".
+
+
+----------------------------------------------------------
+1. USE CASE DIAGRAM   (ảnh lưu tại: 01_UseCaseDiagram/)
+----------------------------------------------------------
+UC00_TongQuat              - Use case tổng quát toàn hệ thống           Link:
+UC01_KhachVaNguoiTaiTro    - Phân rã: Khách truy cập, Người tài trợ      Link:
+UC02_ChuDuAn               - Phân rã: Chủ dự án                          Link:
+UC03_QuanTriVien           - Phân rã: Quản trị viên, Bộ lập lịch         Link:
+
+
+----------------------------------------------------------
+2. ACTIVITY DIAGRAM   (ảnh lưu tại: 02_ActivityDiagram/)
+----------------------------------------------------------
+AD01_DangKyVaXacMinhEmail     - Đăng ký tài khoản và xác minh email     Link:
+AD02_DangNhap                 - Đăng nhập (khóa tạm sau 5 lần sai)      Link:
+AD03_TaoVaGuiDuyetChienDich   - Tạo chiến dịch 4 bước, gửi xét duyệt    Link:
+AD04_XetDuyetChienDich        - Xét duyệt và phát hành chiến dịch       Link:
+AD05_TaiTroDuAn               - Tài trợ qua ví demo (idempotency)       Link:
+AD06_HoanTien                 - Yêu cầu và xử lý hoàn tiền              Link:
+AD07_BaoCaoViPham             - Báo cáo vi phạm và xử lý                Link:
+AD08_CapNhatTienDo            - Cập nhật tiến độ, minh bạch quỹ         Link:
+AD09_TuDongChotChienDich      - Cron chốt chiến dịch hết hạn            Link:
+AD10_GoiYDuAnAI               - Gợi ý dự án AI + phương án dự phòng     Link:
+AD11_CanhBaoRuiRo             - Quét và xử lý cảnh báo rủi ro gian lận  Link:
+
+
+----------------------------------------------------------
+3. SEQUENCE DIAGRAM   (ảnh lưu tại: 03_SequenceDiagram/)
+----------------------------------------------------------
+SD01_DangNhap                 - Đăng nhập                               Link:
+SD02_DangKyVaXacMinhEmail     - Đăng ký và xác minh email               Link:
+SD03_TaoVaGuiDuyetChienDich   - Tạo chiến dịch và gửi xét duyệt         Link:
+SD04_XetDuyetChienDich        - Quản trị viên xét duyệt chiến dịch      Link:
+SD05_TaiTroDuAn               - Tài trợ và xác nhận thanh toán ví demo  Link:
+SD06_WebhookThanhToan         - Webhook thanh toán (HMAC, chống replay) Link:
+SD07_HoanTien                 - Yêu cầu và duyệt hoàn tiền              Link:
+SD08_GoiYDuAnAI               - Gợi ý dự án (AI có dự phòng)            Link:
+SD09_DuDoanThanhCong          - Dự đoán khả năng thành công             Link:
+SD10_BaoCaoViPham             - Báo cáo vi phạm và xử lý                Link:
+SD11_TuDongChotChienDich      - Tự động chốt chiến dịch hết hạn         Link:
+
+
+----------------------------------------------------------
+4. CLASS DIAGRAM      (ảnh lưu tại: 04_ClassDiagram/)
+----------------------------------------------------------
+CD01_LopThucThe               - Lớp thực thể (domain model, 17 entity)  Link:
+CD02_TangDichVuVaTichHop      - Tầng service + gateway tích hợp         Link:
+
