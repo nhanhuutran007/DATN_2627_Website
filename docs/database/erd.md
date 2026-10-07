@@ -1,6 +1,6 @@
 # Database Design
 
-Schema MySQL 8 gồm **18 bảng** (khớp migration tới `1790000000002`). Định nghĩa cột đầy đủ ở [`schema.dbml`](./schema.dbml) (dán vào dbdiagram.io để vẽ ERD vật lý); đặc tả chi tiết từng thực thể và quan hệ ở [`dac-ta-erd.md`](./dac-ta-erd.md).
+Schema MySQL 8 gồm **22 bảng** (khớp migration tới `1790000000006`). Định nghĩa cột đầy đủ ở [`schema.dbml`](./schema.dbml) (dán vào dbdiagram.io để vẽ ERD vật lý); đặc tả chi tiết từng thực thể và quan hệ ở [`dac-ta-erd.md`](./dac-ta-erd.md).
 
 ## ERD Overview
 
@@ -19,6 +19,7 @@ erDiagram
     users ||--o{ password_reset_tokens : "đặt lại mật khẩu"
     users ||--o{ revoked_tokens : "đăng xuất"
     users |o--o{ risk_alerts : "xử lý cảnh báo"
+    users ||--o{ milestone_revisions : "sửa mốc"
 
     campaigns ||--o{ donations : "nhận"
     campaigns ||--o{ milestones : "có"
@@ -27,8 +28,12 @@ erDiagram
     campaigns ||--o{ campaign_follows : "được theo dõi"
     campaigns |o--o{ reports : "bị báo cáo"
     campaigns ||--o{ behavior_events : "được tương tác"
+    campaigns ||--o{ campaign_view_daily : "thống kê lượt xem"
 
     milestones ||--o{ milestone_updates : "có"
+    milestones ||--o{ milestone_revisions : "lịch sử thay đổi"
+    milestone_updates ||--o{ milestone_update_attachments : "đính kèm chứng từ"
+    media_files ||--o| milestone_update_attachments : "là chứng từ"
     reward_tiers |o--o{ donations : "được chọn"
     donations ||--o{ refund_requests : "có"
     campaign_comments |o--o{ campaign_comments : "trả lời"
@@ -56,7 +61,20 @@ erDiagram
         datetime start_date
         datetime end_date
         enum status
+        boolean is_featured
+        datetime featured_at
         int backer_count
+    }
+    categories {
+        char36 id PK
+        varchar name UK
+        int sort_order
+        boolean is_active
+    }
+    campaign_view_daily {
+        char36 campaign_id PK, FK
+        date view_date PK
+        int views
     }
     donations {
         char36 id PK
@@ -90,12 +108,28 @@ erDiagram
         varchar title
         decimal budget
         boolean is_completed
+        datetime overdue_notified_at
     }
     milestone_updates {
         char36 id PK
         char36 milestone_id FK
         text content
         decimal expense_amount
+    }
+    milestone_update_attachments {
+        char36 id PK
+        char36 milestone_update_id FK
+        char36 media_file_id FK, UK
+        varchar url
+        varchar caption
+    }
+    milestone_revisions {
+        char36 id PK
+        char36 milestone_id FK
+        char36 changed_by FK
+        varchar reason
+        text old_values
+        text new_values
     }
     campaign_comments {
         char36 id PK
@@ -177,7 +211,7 @@ erDiagram
     }
 ```
 
-Sơ đồ chỉ hiện các cột chính; `created_at`/`updated_at` có ở mọi bảng (trừ `revoked_tokens` chỉ có `created_at`). Các quan hệ tới `users` qua cột người xử lý (`campaign_comments.hidden_by`, `reports.resolved_by`, `refund_requests.reviewed_by`) có FK nhưng không vẽ để sơ đồ đỡ rối — xem [`dac-ta-erd.md`](./dac-ta-erd.md).
+Sơ đồ chỉ hiện các cột chính; `created_at`/`updated_at` có ở mọi bảng (trừ `revoked_tokens` chỉ có `created_at`, `campaign_view_daily` không có cột thời gian). `campaigns.category` lưu tên danh mục nên `categories` không nối FK với `campaigns`. Các quan hệ tới `users` qua cột người xử lý (`campaign_comments.hidden_by`, `reports.resolved_by`, `refund_requests.reviewed_by`) có FK nhưng không vẽ để sơ đồ đỡ rối — xem [`dac-ta-erd.md`](./dac-ta-erd.md).
 
 ## Tables Description
 
@@ -187,9 +221,13 @@ Sơ đồ chỉ hiện các cột chính; `created_at`/`updated_at` có ở mọ
 | | `email_verification_tokens`, `password_reset_tokens` | Token một lần (lưu hash SHA-256) |
 | | `revoked_tokens` | `jti` của JWT đã đăng xuất |
 | Chiến dịch & tiến độ | `campaigns` | Vòng đời chiến dịch từ nháp đến kết thúc |
+| | `categories` | Danh mục lĩnh vực do admin quản lý |
+| | `campaign_view_daily` | Lượt xem theo ngày (khóa chính ghép) cho thống kê chủ dự án |
 | | `milestones`, `milestone_updates` | Mốc tiến độ và cập nhật minh bạch chi tiêu |
+| | `milestone_update_attachments` | Chứng từ chi tiêu (hóa đơn/biên lai) gắn với bài cập nhật |
+| | `milestone_revisions` | Lịch sử sửa mốc sau khi phát hành, kèm lý do |
 | | `reward_tiers` | Mức ủng hộ kèm quà |
-| | `media_files` | Ảnh tải lên (chiến dịch, tiến độ, avatar) |
+| | `media_files` | Ảnh tải lên (chiến dịch, tiến độ, avatar, chứng từ) |
 | Giao dịch | `donations` | Giao dịch ủng hộ; `idempotency_key` chống ghi trùng |
 | | `refund_requests` | Yêu cầu hoàn tiền do admin duyệt |
 | Cộng đồng | `campaign_comments` | Bình luận/hỏi đáp, trả lời 1 cấp |

@@ -1,10 +1,10 @@
 # ĐẶC TẢ ERD — NỀN TẢNG GÂY QUỸ CỘNG ĐỒNG GÓP MẦM
 
-> Bản nháp theo cấu trúc tài liệu đặc tả ERD mẫu của khoa. Nguồn: các file `backend/src/**/entities/*.entity.ts` và migration trong `backend/database/migrations/` (tới `1790000000002`). Hình ERD vật lý vẽ từ [`schema.dbml`](./schema.dbml), sơ đồ tổng quan ở [`erd.md`](./erd.md).
+> Bản nháp theo cấu trúc tài liệu đặc tả ERD mẫu của khoa. Nguồn: các file `backend/src/**/entities/*.entity.ts` và migration trong `backend/database/migrations/` (tới `1790000000006`). Hình ERD vật lý vẽ từ [`schema.dbml`](./schema.dbml), sơ đồ tổng quan ở [`erd.md`](./erd.md).
 
 ## CHƯƠNG 1. TỔNG QUAN HỆ THỐNG
 
-Góp Mầm là nền tảng gây quỹ cộng đồng cho dự án xã hội và khởi nghiệp. Cơ sở dữ liệu quản lý toàn bộ quy trình: đăng ký tài khoản, tạo và kiểm duyệt chiến dịch, ủng hộ trực tuyến kèm mức quà, cập nhật tiến độ giải ngân, hoàn tiền, tương tác cộng đồng (bình luận, theo dõi), kiểm duyệt vi phạm, phát hiện gian lận bằng AI và thông báo. Hệ thống gồm **18 thực thể**, **28 mối quan hệ có khóa ngoại** và 4 tham chiếu logic không có khóa ngoại.
+Góp Mầm là nền tảng gây quỹ cộng đồng cho dự án xã hội và khởi nghiệp. Cơ sở dữ liệu quản lý toàn bộ quy trình: đăng ký tài khoản, tạo và kiểm duyệt chiến dịch, ủng hộ trực tuyến kèm mức quà, cập nhật tiến độ giải ngân kèm chứng từ chi tiêu, theo dõi chậm tiến độ và lịch sử thay đổi kế hoạch, hoàn tiền, tương tác cộng đồng (bình luận, theo dõi), quản trị nội dung (danh mục, dự án nổi bật), thống kê lượt xem, kiểm duyệt vi phạm, phát hiện gian lận bằng AI và thông báo. Hệ thống gồm **22 thực thể**, **33 mối quan hệ có khóa ngoại** và 5 tham chiếu logic không có khóa ngoại.
 
 Hệ quản trị: MySQL 8 (tương thích MariaDB), engine InnoDB. Schema chỉ thay đổi qua migration TypeORM có thứ tự và có rollback.
 
@@ -113,26 +113,57 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `id`, `created_at`, `updated_at`
 - `title` (VARCHAR(200), NOT NULL): Tên chiến dịch
 - `description` (TEXT, NOT NULL): Nội dung mô tả
-- `category` (VARCHAR(100), NOT NULL): Danh mục
+- `category` (VARCHAR(100), NOT NULL): Tên danh mục, lấy từ `categories.name` (tham chiếu logic, không có FK)
 - `owner_id` (CHAR(36), NOT NULL, FK): Chủ chiến dịch
 - `goal_amount` (DECIMAL(15,2), NOT NULL): Mục tiêu gây quỹ
 - `current_amount` (DECIMAL(15,2), NOT NULL): Số tiền đã gây được, mặc định 0 (chỉ cộng từ giao dịch đã xác minh)
 - `start_date` (DATETIME, NOT NULL): Ngày bắt đầu
 - `end_date` (DATETIME, NOT NULL): Ngày kết thúc
 - `status` (ENUM, NOT NULL): draft / pending / approved / rejected / needs_info / active / paused / success / failed / cancelled / ended, mặc định `draft`
+- `is_featured` (TINYINT(1), NOT NULL): Được quản trị viên chọn làm dự án nổi bật trên trang chủ, mặc định 0
+- `featured_at` (DATETIME): Thời điểm được chọn nổi bật (dùng để sắp xếp)
 - `image_url` (VARCHAR(500)): Ảnh đại diện
 - `video_url` (VARCHAR(500)): Video giới thiệu
 - `location` (VARCHAR(255)): Địa điểm
 - `backer_count` (INT, NOT NULL): Số người ủng hộ, mặc định 0
-- `view_count` (INT, NOT NULL): Lượt xem, mặc định 0
+- `view_count` (INT, NOT NULL): Tổng lượt xem tích lũy, mặc định 0 (chi tiết theo ngày ở `campaign_view_daily`)
 - `rejection_reason` (TEXT): Lý do từ chối/yêu cầu bổ sung khi kiểm duyệt
 
 **Ràng buộc**:
 
 - FK `owner_id` tham chiếu `users(id)`
-- INDEX `status`, INDEX `category`
+- INDEX `status`, INDEX `category`, INDEX (`is_featured`, `featured_at`)
 
-### 2.6. MILESTONES (Mốc tiến độ)
+### 2.6. CATEGORIES (Danh mục lĩnh vực)
+
+**Mục đích**: Danh mục lĩnh vực chiến dịch do quản trị viên quản lý, thay cho danh sách viết cứng trong giao diện. Migration khởi tạo sẵn 6 danh mục mặc định (Giáo dục, Môi trường, Nông nghiệp, Y tế, Khởi nghiệp, Công nghệ) cùng mọi lĩnh vực chiến dịch đang dùng.
+
+**Thuộc tính**:
+
+- `id`, `created_at`, `updated_at`
+- `name` (VARCHAR(100), NOT NULL, UNIQUE): Tên danh mục; đổi tên thì tầng dịch vụ cập nhật luôn `campaigns.category`
+- `description` (VARCHAR(300)): Mô tả ngắn
+- `sort_order` (INT, NOT NULL): Thứ tự hiển thị, mặc định 0
+- `is_active` (TINYINT(1), NOT NULL): Đang dùng, mặc định 1; tắt thì không nhận chiến dịch mới, chiến dịch cũ giữ nguyên
+
+**Ràng buộc**: UNIQUE trên `name`. Không có FK (xem 5.2).
+
+### 2.7. CAMPAIGN_VIEW_DAILY (Lượt xem theo ngày)
+
+**Mục đích**: Bảng đếm tổng hợp lượt xem chiến dịch theo ngày (UTC) để chủ dự án xem diễn biến theo thời gian và tính tỷ lệ chuyển đổi. Mỗi lượt xem hợp lệ cộng 1 vào đúng dòng (chiến dịch, ngày); `campaigns.view_count` vẫn là tổng tích lũy.
+
+**Thuộc tính** (không theo quy ước chung — không có `id`, `created_at`, `updated_at`):
+
+- `campaign_id` (CHAR(36), NOT NULL, PK, FK): Chiến dịch
+- `view_date` (DATE, NOT NULL, PK): Ngày thống kê (UTC)
+- `views` (INT, NOT NULL): Số lượt xem trong ngày, mặc định 0
+
+**Ràng buộc**:
+
+- PRIMARY KEY (`campaign_id`, `view_date`)
+- FK `campaign_id` tham chiếu `campaigns(id)` ON DELETE CASCADE
+
+### 2.8. MILESTONES (Mốc tiến độ)
 
 **Mục đích**: Các mốc sử dụng quỹ của chiến dịch, giúp người ủng hộ theo dõi việc giải ngân.
 
@@ -147,12 +178,13 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `sort_order` (INT, NOT NULL): Thứ tự hiển thị, mặc định 0
 - `is_completed` (TINYINT(1), NOT NULL): Đã hoàn thành, mặc định 0
 - `completed_at` (DATETIME): Thời điểm hoàn thành
+- `overdue_notified_at` (DATETIME): Lần cuối hệ thống nhắc chủ dự án mốc đã quá `target_date` mà chưa hoàn thành (nhắc lại tối đa 7 ngày/lần); đặt lại NULL khi đổi hạn
 
 **Ràng buộc**: FK `campaign_id` tham chiếu `campaigns(id)`.
 
-### 2.7. MILESTONE_UPDATES (Cập nhật tiến độ)
+### 2.9. MILESTONE_UPDATES (Cập nhật tiến độ)
 
-**Mục đích**: Bài cập nhật cho từng mốc (nội dung, hình ảnh chứng từ, khoản chi).
+**Mục đích**: Bài cập nhật cho từng mốc (nội dung, hình ảnh, khoản chi). Chứng từ chi tiêu chi tiết nằm ở `milestone_update_attachments`.
 
 **Thuộc tính**:
 
@@ -164,7 +196,46 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 
 **Ràng buộc**: FK `milestone_id` tham chiếu `milestones(id)`.
 
-### 2.8. REWARD_TIERS (Mức quà tặng)
+### 2.10. MILESTONE_UPDATE_ATTACHMENTS (Chứng từ chi tiêu)
+
+**Mục đích**: Gắn ảnh hóa đơn/biên lai (tệp `media_files` có `purpose = expense_receipt`) vào bài cập nhật tiến độ để minh bạch khoản chi với người ủng hộ.
+
+**Thuộc tính**:
+
+- `id`, `created_at`, `updated_at`
+- `milestone_update_id` (CHAR(36), NOT NULL, FK): Bài cập nhật chứa chứng từ
+- `media_file_id` (CHAR(36), NOT NULL, UNIQUE, FK): Tệp chứng từ đã tải lên
+- `url` (VARCHAR(500), NOT NULL): Đường dẫn công khai của chứng từ
+- `caption` (VARCHAR(200)): Chú thích khoản chi
+- `sort_order` (INT, NOT NULL): Thứ tự hiển thị, mặc định 0
+
+**Ràng buộc**:
+
+- UNIQUE trên `media_file_id`: một chứng từ không được dùng lại cho nhiều khoản chi
+- INDEX (`milestone_update_id`, `sort_order`)
+- FK `milestone_update_id` → `milestone_updates(id)` ON DELETE CASCADE (xóa bài cập nhật thì xóa liên kết, tệp vẫn còn trong kho)
+- FK `media_file_id` → `media_files(id)`
+
+### 2.11. MILESTONE_REVISIONS (Lịch sử thay đổi mốc)
+
+**Mục đích**: Ghi lại mỗi lần chủ dự án sửa mốc tiến độ sau khi chiến dịch đã phát hành (giá trị cũ/mới và lý do bắt buộc), công khai cho người ủng hộ.
+
+**Thuộc tính**:
+
+- `id`, `created_at`, `updated_at`
+- `milestone_id` (CHAR(36), NOT NULL, FK): Mốc bị thay đổi
+- `changed_by` (CHAR(36), NOT NULL, FK): Người thực hiện thay đổi
+- `reason` (VARCHAR(500), NOT NULL): Lý do thay đổi
+- `old_values` (TEXT, NOT NULL): Giá trị trước khi sửa (chuỗi JSON: tiêu đề, hạn, ngân sách...)
+- `new_values` (TEXT, NOT NULL): Giá trị sau khi sửa (chuỗi JSON)
+
+**Ràng buộc**:
+
+- INDEX (`milestone_id`, `created_at`)
+- FK `milestone_id` → `milestones(id)` ON DELETE CASCADE
+- FK `changed_by` → `users(id)`
+
+### 2.12. REWARD_TIERS (Mức quà tặng)
 
 **Mục đích**: Các mức ủng hộ kèm phần quà do chủ chiến dịch thiết lập.
 
@@ -189,9 +260,9 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - INDEX (`campaign_id`, `sort_order`)
 - FK `campaign_id` tham chiếu `campaigns(id)`
 
-### 2.9. MEDIA_FILES (Tệp đa phương tiện)
+### 2.13. MEDIA_FILES (Tệp đa phương tiện)
 
-**Mục đích**: Quản lý ảnh người dùng tải lên (ảnh chiến dịch, ảnh tiến độ, avatar).
+**Mục đích**: Quản lý ảnh người dùng tải lên (ảnh chiến dịch, ảnh tiến độ, avatar, ảnh hóa đơn/biên lai chi tiêu).
 
 **Thuộc tính**:
 
@@ -200,7 +271,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `storage_key` (VARCHAR(120), NOT NULL, UNIQUE): Khóa trong kho lưu trữ do server sinh, ví dụ `campaigns/<uuid>.webp`
 - `mime_type` (VARCHAR(50), NOT NULL): Kiểu MIME
 - `size_bytes` (INT, NOT NULL): Dung lượng
-- `purpose` (ENUM: campaign_image / progress_image / avatar, NOT NULL): Mục đích sử dụng
+- `purpose` (ENUM: campaign_image / progress_image / avatar / expense_receipt, NOT NULL): Mục đích sử dụng; `expense_receipt` lưu trong thư mục `receipts/`
 - `original_name` (VARCHAR(255)): Tên file gốc (chỉ để hiển thị)
 - `deleted_at` (DATETIME(6)): Xóa mềm
 
@@ -210,7 +281,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - INDEX (`owner_id`, `created_at`)
 - FK `owner_id` tham chiếu `users(id)`
 
-### 2.10. DONATIONS (Khoản ủng hộ)
+### 2.14. DONATIONS (Khoản ủng hộ)
 
 **Mục đích**: Ghi nhận giao dịch ủng hộ qua cổng thanh toán và trạng thái của giao dịch.
 
@@ -239,7 +310,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - INDEX `user_id`, INDEX `campaign_id`, INDEX (`status`, `created_at`)
 - FK `user_id` → `users(id)`, FK `campaign_id` → `campaigns(id)`, FK `reward_tier_id` → `reward_tiers(id)`
 
-### 2.11. REFUND_REQUESTS (Yêu cầu hoàn tiền)
+### 2.15. REFUND_REQUESTS (Yêu cầu hoàn tiền)
 
 **Mục đích**: Người ủng hộ gửi yêu cầu hoàn tiền, quản trị viên duyệt hoặc từ chối.
 
@@ -259,7 +330,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - INDEX (`status`, `created_at`), INDEX (`donation_id`, `status`)
 - FK `donation_id` → `donations(id)`, FK `user_id` → `users(id)`, FK `reviewed_by` → `users(id)`
 
-### 2.12. CAMPAIGN_COMMENTS (Bình luận chiến dịch)
+### 2.16. CAMPAIGN_COMMENTS (Bình luận chiến dịch)
 
 **Mục đích**: Bình luận và câu hỏi của cộng đồng trên trang chiến dịch, hỗ trợ trả lời một cấp.
 
@@ -282,7 +353,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - INDEX (`campaign_id`, `parent_id`, `created_at`), INDEX (`status`, `created_at`)
 - FK `campaign_id` → `campaigns(id)`, FK `user_id` → `users(id)`, FK `parent_id` → `campaign_comments(id)`, FK `hidden_by` → `users(id)`
 
-### 2.13. CAMPAIGN_FOLLOWS (Theo dõi chiến dịch)
+### 2.17. CAMPAIGN_FOLLOWS (Theo dõi chiến dịch)
 
 **Mục đích**: Bảng trung gian thể hiện người dùng theo dõi chiến dịch để nhận thông báo cập nhật.
 
@@ -298,7 +369,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - INDEX `campaign_id`
 - FK `user_id` → `users(id)` ON DELETE CASCADE, FK `campaign_id` → `campaigns(id)` ON DELETE CASCADE
 
-### 2.14. REPORTS (Báo cáo vi phạm)
+### 2.18. REPORTS (Báo cáo vi phạm)
 
 **Mục đích**: Người dùng báo cáo chiến dịch hoặc bình luận vi phạm; quản trị viên xử lý.
 
@@ -322,7 +393,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - INDEX (`status`, `created_at`), INDEX (`campaign_id`, `reporter_id`)
 - FK `reporter_id` → `users(id)`, FK `campaign_id` → `campaigns(id)`, FK `comment_id` → `campaign_comments(id)`, FK `resolved_by` → `users(id)`
 
-### 2.15. RISK_ALERTS (Cảnh báo rủi ro)
+### 2.19. RISK_ALERTS (Cảnh báo rủi ro)
 
 **Mục đích**: Cảnh báo gian lận do mô-đun AI hoặc bộ luật sinh ra cho chiến dịch hoặc người dùng.
 
@@ -346,7 +417,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - INDEX `status`, INDEX (`entity_type`, `entity_id`)
 - FK `resolved_by` → `users(id)`
 
-### 2.16. BEHAVIOR_EVENTS (Sự kiện hành vi)
+### 2.20. BEHAVIOR_EVENTS (Sự kiện hành vi)
 
 **Mục đích**: Ghi nhận hành vi xem, theo dõi, ủng hộ làm dữ liệu cho gợi ý AI. Chỉ ghi khi người dùng bật `ai_tracking_consent`.
 
@@ -364,7 +435,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - INDEX (`user_id`, `event_type`), INDEX `campaign_id`
 - FK `user_id` → `users(id)`, FK `campaign_id` → `campaigns(id)`
 
-### 2.17. NOTIFICATIONS (Thông báo)
+### 2.21. NOTIFICATIONS (Thông báo)
 
 **Mục đích**: Thông báo trong ứng dụng cho người dùng về các sự kiện liên quan.
 
@@ -372,7 +443,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 
 - `id`, `created_at`, `updated_at`
 - `user_id` (CHAR(36), NOT NULL, FK): Người nhận
-- `type` (ENUM, NOT NULL): campaign_approved, campaign_rejected, campaign_needs_info, campaign_paused, campaign_resumed, campaign_ended, donation_received, donation_confirmed, milestone_completed, progress_update, report_resolved, comment_new, comment_reply, comment_hidden, refund_approved, refund_rejected, donation_refunded, system
+- `type` (ENUM, NOT NULL): campaign_approved, campaign_rejected, campaign_needs_info, campaign_paused, campaign_resumed, campaign_ended, donation_received, donation_confirmed, milestone_completed, progress_update, report_resolved, comment_new, comment_reply, comment_hidden, refund_approved, refund_rejected, donation_refunded, milestone_overdue, milestone_rescheduled, system
 - `title` (VARCHAR(200), NOT NULL): Tiêu đề
 - `message` (TEXT, NOT NULL): Nội dung
 - `link` (VARCHAR(300)): Đường dẫn tương đối để mở khi bấm, ví dụ `/du-an/<id>`
@@ -384,7 +455,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - INDEX (`user_id`, `is_read`, `created_at`)
 - FK `user_id` → `users(id)`
 
-### 2.18. AUDIT_LOGS (Nhật ký kiểm toán)
+### 2.22. AUDIT_LOGS (Nhật ký kiểm toán)
 
 **Mục đích**: Ghi lại các thay đổi quan trọng (kiểm duyệt, đổi trạng thái, hoàn tiền...) để truy vết.
 
@@ -404,7 +475,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 
 ## CHƯƠNG 3. MỐI QUAN HỆ (RELATIONSHIPS)
 
-Tất cả quan hệ dưới đây là 1-N và có ràng buộc FOREIGN KEY trong CSDL. "Bắt buộc" nghĩa là cột FK là NOT NULL.
+Các quan hệ dưới đây là 1-N (trừ 3.31 là 1-1) và đều có ràng buộc FOREIGN KEY trong CSDL. "Bắt buộc" nghĩa là cột FK là NOT NULL.
 
 | # | Quan hệ | Tên quan hệ | Khóa ngoại | Bắt buộc | Mô tả |
 | --- | --- | --- | --- | --- | --- |
@@ -436,6 +507,11 @@ Tất cả quan hệ dưới đây là 1-N và có ràng buộc FOREIGN KEY tron
 | 3.26 | USERS – EMAIL_VERIFICATION_TOKENS | xác minh | `email_verification_tokens.user_id → users.id` (CASCADE) | Có | Mỗi lần gửi lại email tạo token mới |
 | 3.27 | USERS – PASSWORD_RESET_TOKENS | đặt lại mật khẩu | `password_reset_tokens.user_id → users.id` (CASCADE) | Có | Mỗi lần yêu cầu tạo token mới |
 | 3.28 | USERS – REVOKED_TOKENS | đăng xuất | `revoked_tokens.user_id → users.id` (CASCADE) | Có | Mỗi lần đăng xuất thu hồi một JWT |
+| 3.29 | CAMPAIGNS – CAMPAIGN_VIEW_DAILY | thống kê lượt xem | `campaign_view_daily.campaign_id → campaigns.id` (CASCADE) | Có | Một chiến dịch có một dòng thống kê cho mỗi ngày có lượt xem |
+| 3.30 | MILESTONE_UPDATES – MILESTONE_UPDATE_ATTACHMENTS | đính kèm | `milestone_update_attachments.milestone_update_id → milestone_updates.id` (CASCADE) | Có | Một bài cập nhật có nhiều chứng từ chi tiêu |
+| 3.31 | MEDIA_FILES – MILESTONE_UPDATE_ATTACHMENTS | là chứng từ | `milestone_update_attachments.media_file_id → media_files.id` (UNIQUE) | Có | Quan hệ **1-1 (tùy chọn phía tệp)**: mỗi tệp chứng từ gắn với tối đa một bài cập nhật |
+| 3.32 | MILESTONES – MILESTONE_REVISIONS | có lịch sử | `milestone_revisions.milestone_id → milestones.id` (CASCADE) | Có | Một mốc có nhiều lần sửa sau khi phát hành |
+| 3.33 | USERS – MILESTONE_REVISIONS | sửa mốc | `milestone_revisions.changed_by → users.id` | Có | Một chủ dự án thực hiện nhiều lần sửa mốc |
 
 **Quan hệ N-N**: USERS – CAMPAIGNS (theo dõi) được tách thành hai quan hệ 1-N qua bảng trung gian `campaign_follows` (3.15, 3.16) với UNIQUE (`user_id`, `campaign_id`). Tương tự, `donations` có thể xem là bảng liên kết N-N USERS – CAMPAIGNS kèm thuộc tính giao dịch.
 
@@ -447,18 +523,21 @@ Tất cả quan hệ dưới đây là 1-N và có ràng buộc FOREIGN KEY tron
 | `audit_logs.entity_id` | Bất kỳ bảng nào theo `entity` | Tham chiếu đa hình |
 | `audit_logs.user_id` | `users.id` | Giữ nhật ký kể cả khi tài khoản bị xóa |
 | `notifications.related_id` | Chiến dịch/khoản ủng hộ/bình luận... theo `type` | Tham chiếu đa hình |
+| `campaigns.category` | `categories.name` | Lưu tên để không đổi schema chiến dịch; đổi tên danh mục thì tầng dịch vụ cập nhật đồng loạt, tắt danh mục không ảnh hưởng chiến dịch cũ |
 
 ## CHƯƠNG 4. QUY TRÌNH NGHIỆP VỤ
 
 ### 4.1. Quy trình tổng quan
 
 1. **Đăng ký tài khoản** → tạo `USERS`, gửi `EMAIL_VERIFICATION_TOKENS`.
-2. **Tạo chiến dịch** → tạo `CAMPAIGNS` (status `draft`), kèm `MILESTONES`, `REWARD_TIERS`, ảnh trong `MEDIA_FILES`.
-3. **Gửi duyệt và kiểm duyệt** → `campaigns.status`: `pending` → `approved`/`rejected`/`needs_info` → `active`; ghi `AUDIT_LOGS`, gửi `NOTIFICATIONS`.
-4. **Ủng hộ** → tạo `DONATIONS` (`pending`); webhook cổng thanh toán xác nhận → `completed`, cộng `campaigns.current_amount`, `backer_count`, `reward_tiers.claimed_count`. Đơn quá hạn → `expired`; người dùng hủy → `cancelled`.
-5. **Cập nhật tiến độ** → tạo `MILESTONE_UPDATES`, đánh dấu `milestones.is_completed`; thông báo tới người ủng hộ và người theo dõi (`CAMPAIGN_FOLLOWS`).
-6. **Kết thúc chiến dịch** → `success`/`failed`/`ended`.
-7. **Hoàn tiền** → tạo `REFUND_REQUESTS`; quản trị viên duyệt → `donations.status = refunded`, ghi `refunded_at`, `refund_reference`.
+2. **Tạo chiến dịch** → tạo `CAMPAIGNS` (status `draft`, `category` chọn từ `CATEGORIES` đang bật), kèm `MILESTONES`, `REWARD_TIERS`, ảnh trong `MEDIA_FILES`.
+3. **Gửi duyệt và kiểm duyệt** → `campaigns.status`: `pending` → `approved`/`rejected`/`needs_info` → `active`; ghi `AUDIT_LOGS`, gửi `NOTIFICATIONS`. Quản trị viên có thể đặt `is_featured` để đưa lên trang chủ.
+4. **Xem chiến dịch** → tăng `campaigns.view_count` và cộng `CAMPAIGN_VIEW_DAILY.views` của ngày hiện tại (dùng cho biểu đồ và tỷ lệ chuyển đổi của chủ dự án).
+5. **Ủng hộ** → tạo `DONATIONS` (`pending`); webhook cổng thanh toán xác nhận → `completed`, cộng `campaigns.current_amount`, `backer_count`, `reward_tiers.claimed_count`. Đơn quá hạn → `expired`; người dùng hủy → `cancelled`.
+6. **Cập nhật tiến độ** → tạo `MILESTONE_UPDATES` kèm chứng từ chi tiêu (`MEDIA_FILES` mục đích `expense_receipt` + `MILESTONE_UPDATE_ATTACHMENTS`), đánh dấu `milestones.is_completed`; thông báo tới người ủng hộ và người theo dõi (`CAMPAIGN_FOLLOWS`).
+7. **Theo dõi chậm tiến độ** → tác vụ định kỳ tìm mốc quá `target_date` chưa hoàn thành, gửi `NOTIFICATIONS` loại `milestone_overdue` và ghi `milestones.overdue_notified_at`. Chủ dự án sửa mốc sau khi chiến dịch phát hành → tạo `MILESTONE_REVISIONS` (lý do bắt buộc); nếu đổi hạn hoặc ngân sách thì gửi thông báo `milestone_rescheduled` tới người ủng hộ.
+8. **Kết thúc chiến dịch** → `success`/`failed`/`ended`.
+9. **Hoàn tiền** → tạo `REFUND_REQUESTS`; quản trị viên duyệt → `donations.status = refunded`, ghi `refunded_at`, `refund_reference`.
 
 ### 4.2. Các nghiệp vụ phụ
 
@@ -467,6 +546,8 @@ Tất cả quan hệ dưới đây là 1-N và có ràng buộc FOREIGN KEY tron
 - Kiểm duyệt vi phạm (`REPORTS`; có thể tạm dừng chiến dịch hoặc ẩn bình luận)
 - Phát hiện gian lận (`RISK_ALERTS`)
 - Gợi ý chiến dịch bằng AI (`BEHAVIOR_EVENTS`, khi người dùng đồng ý)
+- Quản trị nội dung (`CATEGORIES`, cờ `campaigns.is_featured`)
+- Thống kê cho chủ dự án (`CAMPAIGN_VIEW_DAILY` kết hợp `DONATIONS` để tính tỷ lệ chuyển đổi)
 
 ## CHƯƠNG 5. CÁC ĐIỂM LƯU Ý ĐẶC BIỆT
 
@@ -478,35 +559,45 @@ Tất cả quan hệ dưới đây là 1-N và có ràng buộc FOREIGN KEY tron
 
 - `risk_alerts.entity_id`, `audit_logs.entity_id`, `notifications.related_id` trỏ tới nhiều bảng tùy cột loại đi kèm nên không đặt FK; tính toàn vẹn do tầng ứng dụng đảm bảo.
 - `audit_logs.user_id` cố ý không có FK để nhật ký không bị mất hay chặn khi xóa tài khoản.
+- `campaigns.category` lưu tên danh mục thay vì `categories.id`; đổi tên danh mục được đồng bộ ở tầng dịch vụ, tắt danh mục (`is_active = 0`) không làm chiến dịch cũ mất danh mục.
 
 ### 5.3. Nhiều khóa ngoại cùng trỏ về USERS
 
 - `refund_requests` (`user_id`, `reviewed_by`), `reports` (`reporter_id`, `resolved_by`), `campaign_comments` (`user_id`, `hidden_by`): cùng một bảng `users` nhưng đóng vai trò khác nhau (người dùng thường và quản trị viên/người xử lý).
+- `milestone_revisions.changed_by`: người sửa mốc (chủ dự án), tách khỏi `audit_logs` vì lịch sử này được công khai cho người ủng hộ.
 
-### 5.4. Khóa chính và giá trị mặc định quan trọng
+### 5.4. Quan hệ 1-1 và khóa chính ghép
 
-- Khóa chính là UUID `CHAR(36)`; riêng `revoked_tokens` dùng `jti` của JWT làm khóa chính.
+- `milestone_update_attachments.media_file_id` vừa là FK vừa UNIQUE nên mỗi tệp `media_files` chỉ làm chứng từ cho tối đa một khoản chi (quan hệ 1-1, phía tệp tùy chọn), ngăn dùng lại một hóa đơn cho nhiều khoản chi.
+- `campaign_view_daily` dùng khóa chính ghép (`campaign_id`, `view_date`) thay cho UUID: đây là bảng đếm tổng hợp, mỗi lượt xem chỉ tăng `views` của đúng một dòng (upsert), không sinh bản ghi mới cho từng lượt.
+
+### 5.5. Khóa chính và giá trị mặc định quan trọng
+
+- Khóa chính là UUID `CHAR(36)`; riêng `revoked_tokens` dùng `jti` của JWT làm khóa chính và `campaign_view_daily` dùng khóa ghép (xem 5.4).
 - `created_at`/`updated_at` dùng `CURRENT_TIMESTAMP(6)`; `updated_at` tự cập nhật.
 - `campaigns.status` mặc định `draft`; `donations.status`, `refund_requests.status`, `reports.status` mặc định `pending`; `risk_alerts.status` mặc định `open`.
 - `users.role` mặc định `user`; `users.ai_tracking_consent` mặc định 0 (opt-in).
 - `donations.currency` mặc định `VND`.
+- `campaigns.is_featured` mặc định 0; `categories.is_active` mặc định 1.
 
-### 5.5. Toàn vẹn giao dịch
+### 5.6. Toàn vẹn giao dịch
 
 - `donations.idempotency_key` UNIQUE và `transaction_id` UNIQUE chống ghi nhận trùng khi webhook gửi lại.
 - `campaigns.current_amount` chỉ cộng từ khoản ủng hộ đã xác minh.
 - CHECK trên `reward_tiers` chặn vượt số suất quà.
+- Chứng từ chi tiêu là tệp riêng (UNIQUE `media_file_id`) và lịch sử sửa mốc (`milestone_revisions`) chỉ được thêm mới (ứng dụng không có thao tác sửa/xóa), giúp người ủng hộ đối chiếu việc giải ngân.
 
-### 5.6. Xóa mềm và xóa dây chuyền
+### 5.7. Xóa mềm và xóa dây chuyền
 
 - Xóa mềm (`deleted_at`): `campaign_comments`, `reward_tiers`, `media_files`.
-- ON DELETE CASCADE: các bảng token và `campaign_follows` (dữ liệu phụ, không cần giữ khi xóa người dùng/chiến dịch). Các bảng nghiệp vụ khác không cascade để tránh mất dữ liệu tài chính.
+- ON DELETE CASCADE: các bảng token, `campaign_follows`, `campaign_view_daily` (dữ liệu phụ, không cần giữ khi xóa người dùng/chiến dịch); `milestone_update_attachments` theo bài cập nhật (tệp gốc vẫn còn trong kho); `milestone_revisions` theo mốc. Các bảng nghiệp vụ khác không cascade để tránh mất dữ liệu tài chính.
 
 ## TỔNG KẾT
 
 Cơ sở dữ liệu Góp Mầm được thiết kế với:
 
-- **18 thực thể** chia 6 nhóm: tài khoản, chiến dịch và tiến độ, giao dịch, cộng đồng, kiểm duyệt và rủi ro, AI và hệ thống
-- **28 mối quan hệ có khóa ngoại** và 4 tham chiếu logic, bảo đảm toàn vẹn dữ liệu
+- **22 thực thể** chia 6 nhóm: tài khoản, chiến dịch và tiến độ, giao dịch, cộng đồng, kiểm duyệt và rủi ro, AI và hệ thống
+- **33 mối quan hệ có khóa ngoại** (32 quan hệ 1-N, 1 quan hệ 1-1) và 5 tham chiếu logic, bảo đảm toàn vẹn dữ liệu
+- **Minh bạch giải ngân** nhờ chứng từ chi tiêu gắn với từng bài cập nhật, nhắc mốc quá hạn và lịch sử thay đổi kế hoạch công khai
 - **An toàn giao dịch** nhờ idempotency key, unique constraint, CHECK constraint và nhật ký kiểm toán
 - **Khả năng mở rộng** qua migration có thứ tự và có rollback, cho phép bổ sung loại thông báo, trạng thái và mô-đun AI mà không phá vỡ dữ liệu cũ

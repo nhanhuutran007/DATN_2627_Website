@@ -1,4 +1,4 @@
-// Góp Mầm — schema MySQL 8 (khớp migration tới 1790000000002).
+// Góp Mầm — schema MySQL 8 (khớp migration tới 1790000000006).
 // Dán vào https://dbdiagram.io để vẽ ERD vật lý, hoặc xuất PNG/PDF cho báo cáo.
 
 Project gop_mam {
@@ -6,6 +6,131 @@ Project gop_mam {
   Note: 'Nền tảng gây quỹ cộng đồng Góp Mầm (DATN_2627)'
 }
 
+// ───────────── Kiểu liệt kê (ENUM) ─────────────
+
+Enum users_role {
+  user
+  campaign_owner
+  admin
+}
+
+Enum users_status {
+  active
+  inactive
+  banned
+}
+
+Enum campaigns_status {
+  draft
+  pending
+  approved
+  rejected
+  needs_info
+  active
+  paused
+  success
+  failed
+  cancelled
+  ended
+}
+
+Enum media_files_purpose {
+  campaign_image
+  progress_image
+  avatar
+  expense_receipt
+}
+
+Enum donations_status {
+  pending
+  completed
+  failed
+  refunded
+  expired
+  cancelled
+}
+
+Enum refund_requests_status {
+  pending
+  approved
+  rejected
+}
+
+Enum campaign_comments_kind {
+  comment
+  question
+}
+
+Enum campaign_comments_status {
+  visible
+  hidden
+}
+
+Enum reports_reason {
+  spam
+  fraud
+  inappropriate
+  misinformation
+  other
+}
+
+Enum reports_status {
+  pending
+  reviewing
+  resolved
+  dismissed
+}
+
+Enum risk_alerts_entity_type {
+  campaign
+  user
+}
+
+Enum risk_alerts_risk_level {
+  low
+  medium
+  high
+}
+
+Enum risk_alerts_method {
+  ai
+  rule
+}
+
+Enum risk_alerts_status {
+  open
+  resolved
+  dismissed
+}
+
+Enum behavior_events_event_type {
+  view
+  follow
+  contribute
+}
+
+Enum notifications_type {
+  campaign_approved
+  campaign_rejected
+  campaign_needs_info
+  campaign_paused
+  campaign_resumed
+  campaign_ended
+  donation_received
+  donation_confirmed
+  milestone_completed
+  progress_update
+  report_resolved
+  comment_new
+  comment_reply
+  comment_hidden
+  refund_approved
+  refund_rejected
+  donation_refunded
+  milestone_overdue
+  milestone_rescheduled
+  system
+}
 // ───────────── Tài khoản ─────────────
 
 Table users {
@@ -13,8 +138,8 @@ Table users {
   name varchar(100) [not null]
   email varchar(255) [not null, unique]
   password_hash varchar(255) [not null]
-  role enum('user','campaign_owner','admin') [not null, default: 'user']
-  status enum('active','inactive','banned') [not null, default: 'active']
+  role users_role [not null, default: 'user']
+  status users_status [not null, default: 'active']
   avatar varchar(255)
   bio varchar(500)
   phone varchar(100)
@@ -73,13 +198,15 @@ Table campaigns {
   id char(36) [pk]
   title varchar(200) [not null]
   description text [not null]
-  category varchar(100) [not null]
+  category varchar(100) [not null, note: 'tên danh mục (categories.name), không có FK']
   owner_id char(36) [not null, ref: > users.id]
   goal_amount decimal(15,2) [not null]
   current_amount decimal(15,2) [not null, default: 0]
   start_date datetime [not null]
   end_date datetime [not null]
-  status enum('draft','pending','approved','rejected','needs_info','active','paused','success','failed','cancelled','ended') [not null, default: 'draft']
+  status campaigns_status [not null, default: 'draft']
+  is_featured tinyint(1) [not null, default: 0, note: 'admin chọn nổi bật trên trang chủ']
+  featured_at datetime
   image_url varchar(500)
   video_url varchar(500)
   location varchar(255)
@@ -91,6 +218,26 @@ Table campaigns {
   indexes {
     status
     category
+    (is_featured, featured_at)
+  }
+}
+
+Table categories {
+  id char(36) [pk]
+  name varchar(100) [not null, unique]
+  description varchar(300)
+  sort_order int [not null, default: 0]
+  is_active tinyint(1) [not null, default: 1, note: '0 = không nhận chiến dịch mới']
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+}
+
+Table campaign_view_daily {
+  campaign_id char(36) [not null, ref: > campaigns.id, note: 'ON DELETE CASCADE']
+  view_date date [not null, note: 'ngày UTC']
+  views int [not null, default: 0]
+  indexes {
+    (campaign_id, view_date) [pk]
   }
 }
 
@@ -104,6 +251,7 @@ Table milestones {
   sort_order int [not null, default: 0]
   is_completed tinyint(1) [not null, default: 0]
   completed_at datetime
+  overdue_notified_at datetime [note: 'lần cuối nhắc mốc quá hạn']
   created_at datetime(6) [not null]
   updated_at datetime(6) [not null]
 }
@@ -116,6 +264,34 @@ Table milestone_updates {
   expense_amount decimal(15,2)
   created_at datetime(6) [not null]
   updated_at datetime(6) [not null]
+}
+
+Table milestone_update_attachments {
+  id char(36) [pk]
+  milestone_update_id char(36) [not null, ref: > milestone_updates.id, note: 'ON DELETE CASCADE']
+  media_file_id char(36) [not null, unique, ref: - media_files.id, note: 'mỗi chứng từ chỉ gắn một lần']
+  url varchar(500) [not null]
+  caption varchar(200)
+  sort_order int [not null, default: 0]
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    (milestone_update_id, sort_order)
+  }
+}
+
+Table milestone_revisions {
+  id char(36) [pk]
+  milestone_id char(36) [not null, ref: > milestones.id, note: 'ON DELETE CASCADE']
+  changed_by char(36) [not null, ref: > users.id]
+  reason varchar(500) [not null]
+  old_values text [not null, note: 'JSON giá trị cũ']
+  new_values text [not null, note: 'JSON giá trị mới']
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    (milestone_id, created_at)
+  }
 }
 
 Table reward_tiers {
@@ -143,7 +319,7 @@ Table media_files {
   storage_key varchar(120) [not null, unique]
   mime_type varchar(50) [not null]
   size_bytes int [not null]
-  purpose enum('campaign_image','progress_image','avatar') [not null]
+  purpose media_files_purpose [not null]
   original_name varchar(255)
   created_at datetime(6) [not null]
   updated_at datetime(6) [not null]
@@ -162,7 +338,7 @@ Table donations {
   reward_tier_id char(36) [ref: > reward_tiers.id]
   amount decimal(15,2) [not null]
   currency varchar(3) [not null, default: 'VND']
-  status enum('pending','completed','failed','refunded','expired','cancelled') [not null, default: 'pending']
+  status donations_status [not null, default: 'pending']
   payment_method varchar(50)
   transaction_id varchar(255) [unique]
   idempotency_key varchar(255) [not null, unique]
@@ -186,7 +362,7 @@ Table refund_requests {
   donation_id char(36) [not null, ref: > donations.id]
   user_id char(36) [not null, ref: > users.id]
   reason text [not null]
-  status enum('pending','approved','rejected') [not null, default: 'pending']
+  status refund_requests_status [not null, default: 'pending']
   admin_notes text
   reviewed_by char(36) [ref: > users.id]
   reviewed_at datetime
@@ -205,9 +381,9 @@ Table campaign_comments {
   campaign_id char(36) [not null, ref: > campaigns.id]
   user_id char(36) [not null, ref: > users.id]
   parent_id char(36) [ref: > campaign_comments.id, note: 'trả lời 1 cấp']
-  kind enum('comment','question') [not null, default: 'comment']
+  kind campaign_comments_kind [not null, default: 'comment']
   content text [not null]
-  status enum('visible','hidden') [not null, default: 'visible']
+  status campaign_comments_status [not null, default: 'visible']
   hidden_reason varchar(500)
   hidden_by char(36) [ref: > users.id]
   hidden_at datetime
@@ -239,9 +415,9 @@ Table reports {
   reporter_id char(36) [not null, ref: > users.id]
   campaign_id char(36) [ref: > campaigns.id]
   comment_id char(36) [ref: > campaign_comments.id]
-  reason enum('spam','fraud','inappropriate','misinformation','other') [not null]
+  reason reports_reason [not null]
   description text [not null]
-  status enum('pending','reviewing','resolved','dismissed') [not null, default: 'pending']
+  status reports_status [not null, default: 'pending']
   admin_notes text
   resolved_by char(36) [ref: > users.id]
   resolved_at datetime
@@ -257,15 +433,15 @@ Table reports {
 
 Table risk_alerts {
   id char(36) [pk]
-  entity_type enum('campaign','user') [not null]
+  entity_type risk_alerts_entity_type [not null]
   entity_id char(36) [not null, note: 'đa hình: campaigns.id hoặc users.id, không có FK']
   entity_name varchar(255) [not null]
-  risk_level enum('low','medium','high') [not null, default: 'medium']
+  risk_level risk_alerts_risk_level [not null, default: 'medium']
   risk_score float [not null, default: 0]
-  method enum('ai','rule') [not null, default: 'ai']
+  method risk_alerts_method [not null, default: 'ai']
   reasons json [not null]
   evidences json [not null]
-  status enum('open','resolved','dismissed') [not null, default: 'open']
+  status risk_alerts_status [not null, default: 'open']
   resolved_by char(36) [ref: > users.id]
   resolved_at datetime(6)
   created_at datetime(6) [not null]
@@ -282,7 +458,7 @@ Table behavior_events {
   id char(36) [pk]
   user_id char(36) [not null, ref: > users.id]
   campaign_id char(36) [not null, ref: > campaigns.id]
-  event_type enum('view','follow','contribute') [not null]
+  event_type behavior_events_event_type [not null]
   category varchar(100) [not null]
   event_data json
   created_at datetime(6) [not null]
@@ -298,7 +474,7 @@ Table behavior_events {
 Table notifications {
   id char(36) [pk]
   user_id char(36) [not null, ref: > users.id]
-  type enum('campaign_approved','campaign_rejected','campaign_needs_info','campaign_paused','campaign_resumed','campaign_ended','donation_received','donation_confirmed','milestone_completed','progress_update','report_resolved','comment_new','comment_reply','comment_hidden','refund_approved','refund_rejected','donation_refunded','system') [not null]
+  type notifications_type [not null]
   title varchar(200) [not null]
   message text [not null]
   link varchar(300)
@@ -333,8 +509,12 @@ TableGroup tai_khoan {
 }
 TableGroup chien_dich {
   campaigns
+  categories
+  campaign_view_daily
   milestones
   milestone_updates
+  milestone_update_attachments
+  milestone_revisions
   reward_tiers
   media_files
 }
