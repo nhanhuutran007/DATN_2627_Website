@@ -9,6 +9,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Brackets, In, Repository, SelectQueryBuilder } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
+import { sanitizeRichText } from "../../common/html/rich-text";
 import { NotificationsService } from "../notifications/notifications.service";
 import { User, UserRole } from "../users/entities/user.entity";
 import { campaignStatusNotifications } from "./campaign-notifications";
@@ -253,10 +254,23 @@ export class CampaignsService {
     return campaign;
   }
 
+  /** Ngày kết thúc phải cách hiện tại ít nhất 1 tháng (cho phép lệch 1 ngày do múi giờ). */
+  private assertMinDuration(endDate: string): void {
+    const min = new Date();
+    min.setMonth(min.getMonth() + 1);
+    min.setDate(min.getDate() - 1);
+    if (new Date(endDate).getTime() < min.getTime()) {
+      throw new BadRequestException(
+        "Ngày kết thúc phải cách hôm nay ít nhất 1 tháng",
+      );
+    }
+  }
+
   async create(dto: CreateCampaignDto, owner: User): Promise<Campaign> {
+    this.assertMinDuration(dto.endDate);
     const campaign = this.campaignRepo.create({
       title: dto.title,
-      description: dto.description,
+      description: sanitizeRichText(dto.description),
       category: dto.category,
       ownerId: owner.id,
       goalAmount: dto.goalAmount,
@@ -285,6 +299,9 @@ export class CampaignsService {
         "Only draft, rejected or needs-info campaigns can be edited before approval",
       );
     }
+
+    if (dto.endDate) this.assertMinDuration(dto.endDate);
+    if (dto.description !== undefined) dto.description = sanitizeRichText(dto.description);
 
     const current = campaign as unknown as Record<string, unknown>;
     const oldValues: Record<string, unknown> = {};

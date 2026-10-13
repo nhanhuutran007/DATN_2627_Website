@@ -2263,6 +2263,129 @@ h3 {
   line-height: 1.8;
 }
 
+/* Nội dung HTML từ trình soạn thảo (mô tả chiến dịch). */
+.rich-text {
+  color: var(--text-2);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.rich-text > p:first-child {
+  color: var(--navy);
+  font-size: 1.06rem;
+  font-weight: 500;
+}
+
+.rich-text h3,
+.rich-text h4 {
+  margin: 1.4em 0 0.5em;
+  color: var(--navy);
+  font-family: var(--font-heading);
+  line-height: 1.35;
+}
+
+.rich-text h3 { font-size: 1.15rem; }
+.rich-text h4 { font-size: 1rem; }
+
+.rich-text ul,
+.rich-text ol {
+  margin: 0 0 1em;
+  padding-left: 1.4em;
+}
+
+.rich-text a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.rich-text blockquote {
+  margin: 0 0 1em;
+  padding: 0.4em 1em;
+  border-left: 4px solid var(--primary);
+  background: var(--soft);
+}
+
+.rich-text figure {
+  margin: 1em 0;
+}
+
+.rich-text img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 8px;
+}
+
+.rich-text figure.image-style-side {
+  float: right;
+  max-width: 50%;
+  margin: 0 0 1em 1.2em;
+}
+
+.rich-text figcaption {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.rich-text figure.table {
+  overflow-x: auto;
+}
+
+.rich-text table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rich-text th,
+.rich-text td {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.rich-text th {
+  background: var(--soft);
+  color: var(--navy);
+}
+
+.rich-text::after {
+  display: block;
+  clear: both;
+  content: "";
+}
+
+/* Trình soạn thảo CKEditor trong form tạo chiến dịch. */
+.rich-editor .ck-editor__editable_inline {
+  min-height: 180px;
+  max-height: 520px;
+}
+
+.rich-editor .ck.ck-editor__main > .ck-editor__editable,
+.rich-editor .ck.ck-toolbar {
+  border-color: var(--line);
+}
+
+.rich-editor .ck.ck-toolbar {
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.rich-editor .ck.ck-editor__main > .ck-editor__editable {
+  border-radius: 0 0 var(--radius) var(--radius);
+  font-family: var(--font-text);
+}
+
+.rich-editor-loading {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+}
+
 .fund-card {
   border-top: 4px solid var(--primary);
 }

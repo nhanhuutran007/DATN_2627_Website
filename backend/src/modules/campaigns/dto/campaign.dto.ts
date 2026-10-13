@@ -24,6 +24,8 @@ export class CreateCampaignDto {
   title!: string;
 
   @IsString()
+  // Nội dung HTML từ trình soạn thảo (ảnh lưu dạng link, không nhúng base64).
+  @MaxLength(200000)
   description!: string;
 
   @IsString()
@@ -59,6 +61,7 @@ export class UpdateCampaignDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(200000)
   description?: string;
 
   @IsOptional()

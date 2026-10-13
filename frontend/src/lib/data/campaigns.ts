@@ -31,6 +31,8 @@ export type Campaign = {
   endDate?: string;
   aiReason: string;
   story: string[];
+  /** Mô tả dạng HTML từ trình soạn thảo (chưa làm sạch); không có với mô tả văn bản thuần cũ. */
+  storyHtml?: string;
   transparencyScore: number;
   milestones: Array<{
     /** Có với chiến dịch thật (API); dữ liệu mẫu không có. */

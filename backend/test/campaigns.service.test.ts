@@ -131,13 +131,24 @@ describe("CampaignsService", () => {
         description: "Long description",
         category: "Giáo dục",
         goalAmount: 10000000,
-        endDate: new Date(Date.now() + 10 * 86400000).toISOString(),
+        endDate: new Date(Date.now() + 40 * 86400000).toISOString(),
       };
       const campaign = await campaignsService.create(dto as any, makeUser());
       equal(campaign.title, "New campaign");
       equal(campaign.status, CampaignStatus.DRAFT);
       equal(campaign.ownerId, "123e4567-e89b-12d3-a456-426614174001");
       equal(campaign.currentAmount, 0);
+    });
+
+    it("should reject an end date less than one month away", async () => {
+      const dto = {
+        title: "Short campaign",
+        description: "Long description",
+        category: "Giáo dục",
+        goalAmount: 10000000,
+        endDate: new Date(Date.now() + 10 * 86400000).toISOString(),
+      };
+      await rejects(campaignsService.create(dto as any, makeUser()), BadRequestException);
     });
   });
 

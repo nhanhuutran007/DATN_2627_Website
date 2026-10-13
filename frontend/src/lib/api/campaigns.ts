@@ -1,5 +1,6 @@
 import { api } from "../api";
 import type { Campaign, CampaignStatus } from "@/lib/data/campaigns";
+import { htmlToText, looksLikeHtml } from "@/lib/rich-text";
 
 export type ApiCampaignStatus =
   | "draft"
@@ -205,7 +206,7 @@ function imageByCategory(category: string): Campaign["image"] {
 }
 
 function toStory(description: string): string[] {
-  const paragraphs = description
+  const paragraphs = (looksLikeHtml(description) ? htmlToText(description) : description)
     .split(/\n+/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
@@ -269,6 +270,7 @@ export function apiCampaignToView(api: ApiCampaign): Campaign {
     endDate: formatDate(api.endDate),
     aiReason: "",
     story: toStory(api.description),
+    ...(looksLikeHtml(api.description) ? { storyHtml: api.description } : {}),
     transparencyScore: milestones.length > 0 ? 95 : 86,
     milestones,
     latestUpdate: {

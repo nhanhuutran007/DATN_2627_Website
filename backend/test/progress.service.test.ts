@@ -1,4 +1,5 @@
-import { deepEqual, equal, ok } from "node:assert/strict";
+import { BadRequestException } from "@nestjs/common";
+import { deepEqual, equal, ok, rejects } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
 import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
@@ -578,6 +579,58 @@ describe("ProgressService", () => {
       equal(revisions.length, 1);
       equal(revisions[0].milestoneTitle, "Khảo sát");
       equal(revisions[0].newValues.budget, 6000000);
+    });
+  });
+
+  describe("milestone date order", () => {
+    const DAY = 86_400_000;
+
+    it("should reject a milestone whose deadline is before the previous one", async () => {
+      repos.mockMilestone.targetDate = new Date(Date.now() + 30 * DAY);
+      await rejects(
+        service.createMilestone(
+          CAMPAIGN_ID,
+          { title: "Mốc 2", sortOrder: 2, targetDate: new Date(Date.now() + 10 * DAY).toISOString() },
+          makeUser(),
+        ),
+        BadRequestException,
+      );
+    });
+
+    it("should accept a milestone whose deadline is after the previous one", async () => {
+      repos.mockMilestone.targetDate = new Date(Date.now() + 10 * DAY);
+      const milestone = await service.createMilestone(
+        CAMPAIGN_ID,
+        { title: "Mốc 2", sortOrder: 2, targetDate: new Date(Date.now() + 30 * DAY).toISOString() },
+        makeUser(),
+      );
+      equal(milestone.title, "Mốc 2");
+    });
+
+    it("should reject a milestone deadline in the past", async () => {
+      await rejects(
+        service.createMilestone(
+          CAMPAIGN_ID,
+          { title: "Mốc cũ", targetDate: new Date(Date.now() - DAY).toISOString() },
+          makeUser(),
+        ),
+        BadRequestException,
+      );
+    });
+
+    it("should reject moving an earlier milestone after a later one", async () => {
+      repos.milestoneRepo.find = async () => [
+        { ...repos.mockMilestone },
+        { ...repos.mockMilestone, id: "later", title: "Mốc 2", sortOrder: 2, targetDate: new Date(Date.now() + 10 * DAY) },
+      ];
+      await rejects(
+        service.updateMilestone(
+          MILESTONE_ID,
+          { targetDate: new Date(Date.now() + 20 * DAY).toISOString(), changeReason: "Lùi hạn do thời tiết xấu" },
+          makeUser(),
+        ),
+        BadRequestException,
+      );
     });
   });
 

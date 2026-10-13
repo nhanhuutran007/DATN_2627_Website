@@ -1,10 +1,13 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
+import { MoneyInput } from "@/components/ui/MoneyInput";
+import { escapeHtml, htmlToText } from "@/lib/rich-text";
 import { ImageUploader } from "@/features/media/ImageUploader";
 import {
   emptyTier,
@@ -70,6 +73,44 @@ const initialDraft: Draft = {
 const MIN_STORY = 80;
 const MIN_TARGET = 1_000_000;
 
+// CKEditor dùng `window`, chỉ tải ở trình duyệt.
+const RichTextEditor = dynamic(() => import("@/components/ui/RichTextEditor"), {
+  ssr: false,
+  loading: () => <div className="rich-editor-loading">Đang tải trình soạn thảo…</div>,
+});
+
+/** Ngày theo giờ địa phương, định dạng yyyy-mm-dd như ô `<input type="date">`. */
+function toDateInput(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Ngày kết thúc sớm nhất cho phép: hôm nay + 1 tháng. */
+function minDeadline() {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  return toDateInput(d);
+}
+
+/** Hạn sớm nhất cho mốc thứ `index`: không ở quá khứ và không sớm hơn hạn của mốc trước. */
+function minMilestoneDate(milestones: DraftMilestone[], index: number) {
+  const previous = milestones.slice(0, index).map((m) => m.deadline).filter(Boolean).pop();
+  const today = toDateInput(new Date());
+  return previous && previous > today ? previous : today;
+}
+
+function validateMilestones(milestones: DraftMilestone[]): string {
+  const today = toDateInput(new Date());
+  let previous: { label: string; deadline: string } | null = null;
+  for (const [index, m] of milestones.entries()) {
+    if (!m.deadline) continue;
+    const label = `Mốc ${index + 1}`;
+    if (m.deadline < today) return `Hạn hoàn thành của ${label} không được ở quá khứ.`;
+    if (previous && m.deadline < previous.deadline) return `Hạn của ${label} phải từ ngày hạn của ${previous.label} trở về sau.`;
+    previous = { label, deadline: m.deadline };
+  }
+  return "";
+}
+
 function messageFor(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 401) return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại rồi thử tiếp.";
@@ -118,14 +159,15 @@ export function CampaignWizard() {
 
   const plannedBudget = milestones.reduce((sum, m) => sum + (Number(m.budget) || 0), 0);
   const target = Number(draft.target) || 0;
+  const storyLength = htmlToText(draft.story).length;
 
   const checks = useMemo(
     () => [
       { ok: draft.title.trim().length >= 10, label: "Tên chiến dịch rõ ràng (từ 10 ký tự)" },
       { ok: draft.summary.trim().length > 0, label: "Có mô tả ngắn hiển thị ở danh sách" },
-      { ok: draft.story.trim().length >= MIN_STORY, label: `Câu chuyện đủ chi tiết (từ ${MIN_STORY} ký tự)` },
-      { ok: draft.budget.trim().length > 0, label: "Có dự toán sử dụng vốn" },
-      { ok: draft.risks.trim().length > 0, label: "Có nêu rủi ro và phương án ứng phó" },
+      { ok: storyLength >= MIN_STORY, label: `Câu chuyện đủ chi tiết (từ ${MIN_STORY} ký tự)` },
+      { ok: htmlToText(draft.budget).length > 0, label: "Có dự toán sử dụng vốn" },
+      { ok: htmlToText(draft.risks).length > 0, label: "Có nêu rủi ro và phương án ứng phó" },
       { ok: milestones.filter((m) => m.title.trim()).length >= 2, label: "Kế hoạch có ít nhất 2 mốc" },
       {
         ok: target > 0 && plannedBudget > 0 && Math.abs(plannedBudget - target) / target <= 0.1,
@@ -133,7 +175,7 @@ export function CampaignWizard() {
       },
       { ok: isImageValue(draft.imageUrl), label: "Có ảnh đại diện cho dự án" },
     ],
-    [draft, milestones, plannedBudget, target],
+    [draft, milestones, plannedBudget, storyLength, target],
   );
   const passed = checks.filter((check) => check.ok).length;
 
@@ -151,14 +193,16 @@ export function CampaignWizard() {
     if (index === 0) {
       if (!draft.title.trim() || !draft.location.trim() || !draft.deadline) return "Vui lòng nhập tên, địa điểm và ngày kết thúc.";
       if (target < MIN_TARGET) return "Mục tiêu tối thiểu là 1.000.000 ₫.";
-      if (new Date(`${draft.deadline}T23:59:59`).getTime() <= Date.now()) return "Ngày kết thúc phải ở tương lai.";
+      if (draft.deadline < minDeadline()) return "Ngày kết thúc phải cách hôm nay ít nhất 1 tháng.";
       if (draft.imageUrl.trim() && !isImageValue(draft.imageUrl.trim())) return "Link ảnh phải bắt đầu bằng http:// hoặc https://";
     }
     if (index === 1) {
-      if (draft.story.trim().length < MIN_STORY) return `Câu chuyện cần ít nhất ${MIN_STORY} ký tự.`;
-      if (!draft.budget.trim() || !draft.risks.trim()) return "Vui lòng nhập dự toán sử dụng vốn và rủi ro.";
+      if (storyLength < MIN_STORY) return `Câu chuyện cần ít nhất ${MIN_STORY} ký tự.`;
+      if (!htmlToText(draft.budget) || !htmlToText(draft.risks)) return "Vui lòng nhập dự toán sử dụng vốn và rủi ro.";
     }
     if (index === 2) {
+      const milestoneError = validateMilestones(milestones);
+      if (milestoneError) return milestoneError;
       const tierError = validateTiers(tiers);
       if (tierError) return tierError;
     }
@@ -174,16 +218,17 @@ export function CampaignWizard() {
   const toPayload = (): CreateCampaignPayload => {
     const deadline = new Date(`${draft.deadline}T23:59:59`);
     if (Number.isNaN(deadline.getTime())) throw new Error("Vui lòng chọn ngày kết thúc trước khi lưu.");
-    const parts = [draft.summary.trim(), draft.story.trim()];
-    if (draft.budget.trim()) parts.push(`Kế hoạch sử dụng vốn:\n${draft.budget.trim()}`);
-    if (draft.risks.trim()) parts.push(`Rủi ro và phương án ứng phó:\n${draft.risks.trim()}`);
+    // Mô tả lưu dạng HTML: mô tả ngắn (đoạn đầu, dùng làm tóm tắt) + các phần từ trình soạn thảo.
+    const parts = [draft.summary.trim() ? `<p>${escapeHtml(draft.summary.trim())}</p>` : "", draft.story.trim()];
+    if (htmlToText(draft.budget)) parts.push(`<h3>Kế hoạch sử dụng vốn</h3>${draft.budget.trim()}`);
+    if (htmlToText(draft.risks)) parts.push(`<h3>Rủi ro và phương án ứng phó</h3>${draft.risks.trim()}`);
     return {
       title: draft.title.trim(),
       category: draft.category,
       goalAmount: target,
       endDate: deadline.toISOString(),
       location: draft.location.trim(),
-      description: parts.filter(Boolean).join("\n\n"),
+      description: parts.filter(Boolean).join("\n"),
       ...(isImageValue(draft.imageUrl.trim()) ? { imageUrl: draft.imageUrl.trim() } : {}),
     };
   };
@@ -196,22 +241,24 @@ export function CampaignWizard() {
     setCampaignId(id);
 
     await Promise.all(savedMilestoneIds.map((milestoneId) => deleteMilestone(milestoneId)));
-    const created = await Promise.all(
-      milestones
-        .map((m, index): CreateMilestonePayload | null => {
-          if (!m.title.trim()) return null;
-          return {
-            title: m.title.trim(),
-            sortOrder: index,
-            ...(m.deadline ? { targetDate: new Date(`${m.deadline}T23:59:59`).toISOString() } : {}),
-            ...(m.budget ? { budget: Number(m.budget) } : {}),
-            ...(m.output.trim() ? { description: m.output.trim() } : {}),
-          };
-        })
-        .filter((payloadItem): payloadItem is CreateMilestonePayload => payloadItem !== null)
-        .map((payloadItem) => createMilestone(id, payloadItem)),
-    );
-    setSavedMilestoneIds(created.map((milestone) => milestone.id));
+    const payloads = milestones
+      .map((m, index): CreateMilestonePayload | null => {
+        if (!m.title.trim()) return null;
+        return {
+          title: m.title.trim(),
+          sortOrder: index,
+          ...(m.deadline ? { targetDate: new Date(`${m.deadline}T23:59:59`).toISOString() } : {}),
+          ...(m.budget ? { budget: Number(m.budget) } : {}),
+          ...(m.output.trim() ? { description: m.output.trim() } : {}),
+        };
+      })
+      .filter((payloadItem): payloadItem is CreateMilestonePayload => payloadItem !== null);
+    // Tạo lần lượt để backend kiểm tra thứ tự hạn các mốc trên dữ liệu đầy đủ.
+    const createdIds: string[] = [];
+    for (const payloadItem of payloads) {
+      createdIds.push((await createMilestone(id, payloadItem)).id);
+    }
+    setSavedMilestoneIds(createdIds);
 
     // Bản nháp chưa ai ủng hộ nên thay thế toàn bộ mức quà giống mốc.
     await Promise.all(savedTierIds.map((tierId) => deleteRewardTier(tierId)));
@@ -234,7 +281,7 @@ export function CampaignWizard() {
       setStep(0);
       return;
     }
-    const tierError = validateTiers(tiers);
+    const tierError = validateMilestones(milestones) || validateTiers(tiers);
     if (tierError) {
       setError(tierError);
       setStep(2);
@@ -345,12 +392,11 @@ export function CampaignWizard() {
               </label>
               <label className="field">
                 <span>Mục tiêu (VNĐ) *</span>
-                <input type="number" min={MIN_TARGET} step={100000} value={draft.target} placeholder="50000000" onChange={(e) => update("target", e.target.value)} />
-                {target > 0 && <small>{target.toLocaleString("vi-VN")} ₫</small>}
+                <MoneyInput value={draft.target} placeholder="50.000.000đ" onChange={(digits) => update("target", digits)} />
               </label>
               <label className="field">
                 <span>Ngày kết thúc *</span>
-                <input type="date" value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
+                <input type="date" min={minDeadline()} value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
               </label>
             </div>
             <ImageUploader
@@ -370,20 +416,18 @@ export function CampaignWizard() {
 
         {step === 1 && (
           <div className="form">
-            <label className="field">
+            <div className="field">
               <span>Câu chuyện dự án *</span>
-              <textarea rows={8} value={draft.story} placeholder="Vấn đề là gì, ai được hưởng lợi, dự án giải quyết bằng cách nào…" onChange={(e) => update("story", e.target.value)} />
-              <small>{draft.story.trim().length}/{MIN_STORY} ký tự tối thiểu</small>
-            </label>
-            <div className="field-row field-row-2">
-              <label className="field">
-                <span>Dự toán sử dụng vốn *</span>
-                <textarea rows={6} value={draft.budget} placeholder="Hạng mục, số tiền và căn cứ ước tính" onChange={(e) => update("budget", e.target.value)} />
-              </label>
-              <label className="field">
-                <span>Rủi ro và phương án ứng phó *</span>
-                <textarea rows={6} value={draft.risks} placeholder="Rủi ro về tiến độ, chi phí, vận hành…" onChange={(e) => update("risks", e.target.value)} />
-              </label>
+              <RichTextEditor value={draft.story} placeholder="Vấn đề là gì, ai được hưởng lợi, dự án giải quyết bằng cách nào…" disabled={busy} onChange={(html) => update("story", html)} />
+              <small>{storyLength}/{MIN_STORY} ký tự tối thiểu</small>
+            </div>
+            <div className="field">
+              <span>Dự toán sử dụng vốn *</span>
+              <RichTextEditor value={draft.budget} placeholder="Hạng mục, số tiền và căn cứ ước tính" disabled={busy} onChange={(html) => update("budget", html)} />
+            </div>
+            <div className="field">
+              <span>Rủi ro và phương án ứng phó *</span>
+              <RichTextEditor value={draft.risks} placeholder="Rủi ro về tiến độ, chi phí, vận hành…" disabled={busy} onChange={(html) => update("risks", html)} />
             </div>
           </div>
         )}
@@ -401,7 +445,7 @@ export function CampaignWizard() {
                   </label>
                   <label className="field">
                     <span>Hạn hoàn thành</span>
-                    <input type="date" value={milestone.deadline} onChange={(e) => updateMilestone(index, "deadline", e.target.value)} />
+                    <input type="date" min={minMilestoneDate(milestones, index)} value={milestone.deadline} onChange={(e) => updateMilestone(index, "deadline", e.target.value)} />
                   </label>
                   <label className="field">
                     <span>Ngân sách (VNĐ)</span>

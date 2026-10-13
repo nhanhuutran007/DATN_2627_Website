@@ -27,6 +27,7 @@ import { fetchRewardTiers, type RewardTier } from "@/lib/api/rewards";
 import { coverFor } from "@/lib/covers";
 import { campaignProgress, campaigns as mockCampaigns, findCampaign, type Campaign } from "@/lib/data/campaigns";
 import { formatVnd, isLiveId } from "@/lib/format";
+import { sanitizeRichText } from "@/lib/rich-text.server";
 import { timeAgo } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -138,11 +139,15 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
         <div className="detail-main">
           <section className="panel" aria-labelledby="gioi-thieu-du-an">
             <h2 id="gioi-thieu-du-an">Giới thiệu dự án</h2>
-            <div className="detail-story">
-              {campaign.story.map((paragraph, index) => (
-                <p className={index === 0 ? "detail-lead" : undefined} key={paragraph}>{paragraph}</p>
-              ))}
-            </div>
+            {campaign.storyHtml ? (
+              <div className="detail-story rich-text" dangerouslySetInnerHTML={{ __html: sanitizeRichText(campaign.storyHtml) }} />
+            ) : (
+              <div className="detail-story">
+                {campaign.story.map((paragraph, index) => (
+                  <p className={index === 0 ? "detail-lead" : undefined} key={paragraph}>{paragraph}</p>
+                ))}
+              </div>
+            )}
             {cover.illustrative && <p className="hint">Ảnh đầu trang là ảnh minh họa theo lĩnh vực.</p>}
           </section>
 

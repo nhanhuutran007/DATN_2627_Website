@@ -146,6 +146,12 @@ export class ProgressService {
     this.assertEditable(campaign);
 
     const sortOrder = dto.sortOrder ?? (await this.nextSortOrder(campaignId));
+    if (dto.targetDate) {
+      if (new Date(dto.targetDate).getTime() < Date.now()) {
+        throw new BadRequestException("Hạn hoàn thành của mốc không được ở quá khứ.");
+      }
+      await this.assertChronological(campaignId, { sortOrder, targetDate: new Date(dto.targetDate) });
+    }
     const milestone = this.milestoneRepo.create({
       campaignId,
       title: dto.title,
@@ -208,6 +214,17 @@ export class ProgressService {
     }
     if (published && milestone.isCompleted && scheduleChanged) {
       throw new ConflictException("Mốc đã hoàn thành, không thể đổi hạn hoặc ngân sách.");
+    }
+
+    if ("targetDate" in newValues || sortChanged) {
+      const targetDate = "targetDate" in newValues
+        ? (newValues.targetDate ? new Date(newValues.targetDate) : undefined)
+        : milestone.targetDate;
+      await this.assertChronological(milestone.campaignId, {
+        id: milestone.id,
+        sortOrder: sortChanged ? sortOrder : milestone.sortOrder,
+        targetDate,
+      });
     }
 
     if (newValues.title !== undefined) milestone.title = newValues.title ?? milestone.title;
@@ -513,6 +530,33 @@ export class ProgressService {
       throw new NotFoundException("Milestone not found");
     }
     return milestone;
+  }
+
+  /**
+   * Hạn các mốc phải theo đúng thứ tự: mốc sau không được có hạn sớm hơn mốc trước.
+   * Mốc chưa đặt hạn được bỏ qua.
+   */
+  private async assertChronological(
+    campaignId: string,
+    candidate: { id?: string; sortOrder: number; targetDate?: Date | null },
+  ): Promise<void> {
+    if (!candidate.targetDate) return;
+    const time = new Date(candidate.targetDate).getTime();
+    const others = await this.milestoneRepo.find({ where: { campaignId } });
+    for (const other of others) {
+      if (other.id === candidate.id || !other.targetDate) continue;
+      const otherTime = new Date(other.targetDate).getTime();
+      if (other.sortOrder < candidate.sortOrder && otherTime > time) {
+        throw new BadRequestException(
+          `Hạn của mốc này phải từ ngày hạn của mốc "${other.title}" trở về sau.`,
+        );
+      }
+      if (other.sortOrder > candidate.sortOrder && otherTime < time) {
+        throw new BadRequestException(
+          `Hạn của mốc này phải trước hoặc bằng hạn của mốc "${other.title}".`,
+        );
+      }
+    }
   }
 
   private async nextSortOrder(campaignId: string): Promise<number> {

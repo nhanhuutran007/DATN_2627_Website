@@ -21,7 +21,7 @@ export class Campaign extends BaseEntity {
   @Column({ length: 200 })
   title!: string;
 
-  @Column({ type: "text" })
+  @Column({ type: "mediumtext" })
   description!: string;
 
   @Column({ length: 100 })
