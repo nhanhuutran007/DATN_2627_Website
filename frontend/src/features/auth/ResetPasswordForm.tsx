@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+import { PasswordRules } from "@/components/ui/PasswordRules";
 import { ApiError, resetPasswordRequest } from "@/lib/api";
+import { passwordPolicyError } from "@/lib/password-policy";
 
 const TOKEN_LENGTH = 43;
 
@@ -48,8 +50,8 @@ export function ResetPasswordForm() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
-    if (password.length < 8) return setError("Mật khẩu mới cần ít nhất 8 ký tự.");
-    if (password.length > 72) return setError("Mật khẩu mới tối đa 72 ký tự.");
+    const policyError = passwordPolicyError(password);
+    if (policyError) return setError(policyError);
     if (password !== confirm) return setError("Mật khẩu xác nhận không khớp.");
 
     setBusy(true);
@@ -69,11 +71,12 @@ export function ResetPasswordForm() {
           type="password"
           required
           value={password}
-          placeholder="Ít nhất 8 ký tự"
           autoComplete="new-password"
+          aria-describedby="reset-password-rules"
           onChange={(event) => setPassword(event.target.value)}
         />
       </label>
+      <PasswordRules value={password} id="reset-password-rules" />
       <label className="field">
         <span>Nhập lại mật khẩu mới</span>
         <input

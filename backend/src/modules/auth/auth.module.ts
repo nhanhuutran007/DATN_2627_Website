@@ -4,6 +4,7 @@ import { PassportModule } from "@nestjs/passport";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { createEmailGateway } from "../../integrations/email/email.gateway";
+import { createGoogleIdentityGateway } from "../../integrations/identity/google-identity.gateway";
 import { UsersModule } from "../users/users.module";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
@@ -34,6 +35,10 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
     {
       provide: "EmailGateway",
       useFactory: () => createEmailGateway(),
+    },
+    {
+      provide: "GoogleIdentityGateway",
+      useFactory: () => createGoogleIdentityGateway(),
     },
   ],
   // EmailGateway dùng chung (vd. NotificationsService gửi email thông báo)

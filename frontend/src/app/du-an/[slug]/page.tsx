@@ -1,21 +1,29 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CampaignCard } from "@/components/campaign/CampaignCard";
-import { ProgressBar } from "@/components/campaign/ProgressBar";
-import { PageBanner } from "@/components/layout/PageBanner";
+import { CollapsibleStory } from "@/components/campaign/CollapsibleStory";
+import { ProgressRing } from "@/components/campaign/ProgressRing";
 import { Icon } from "@/components/ui/Icon";
 import { CampaignComments } from "@/features/comments/CampaignComments";
 import { CampaignLedger } from "@/features/donations/CampaignLedger";
-import { DonationPanel } from "@/features/donations/DonationPanel";
+import { DonateDialogButton } from "@/features/donations/DonateDialogButton";
+import { DonorHighlights } from "@/features/donations/DonorHighlights";
 import { FollowCampaignButton } from "@/features/follows/FollowCampaignButton";
 import { MilestoneRevisions } from "@/features/progress/MilestoneRevisions";
 import { ProgressTimeline } from "@/features/progress/ProgressTimeline";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { CampaignViewTracker } from "@/features/campaign-stats/CampaignViewTracker";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
-import { apiCampaignToView, fetchCampaign, fetchCampaigns } from "@/lib/api/campaigns";
+import {
+  apiCampaignToView,
+  fetchCampaign,
+  fetchCampaigns,
+  isPublishedStatus,
+  reviewStatusLabel,
+} from "@/lib/api/campaigns";
 import {
   fetchCampaignProgress,
   MILESTONE_STATE_LABEL,
@@ -111,44 +119,102 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   ]);
   const percent = campaignProgress(campaign);
   const open = campaign.status === "Đang gây quỹ";
+  // Hồ sơ chưa công khai: các API theo dõi/lượt xem/sổ cái/bình luận/báo cáo trả 404.
+  const published = live && isPublishedStatus(campaign.apiStatus);
   const plannedBudget = campaign.milestones.reduce((sum, milestone) => sum + milestone.budget, 0);
   const totalMilestones = progress?.totalMilestones ?? campaign.milestones.length;
   const budget = progress?.totalBudget ?? plannedBudget;
   const cover = coverFor(campaign);
   const stateById = new Map((progress?.milestoneStates ?? []).map((item) => [item.id, item.state]));
 
+  const crumbs = [{ href: "/", label: "Trang chủ" }, { href: "/du-an", label: "Dự án" }, { label: campaign.category }];
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((crumb, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: crumb.label,
+      ...(crumb.href ? { item: crumb.href } : {}),
+    })),
+  };
+
   return (
-    <main>
-      <PageBanner
-        title={campaign.title}
-        crumbs={[{ href: "/", label: "Trang chủ" }, { href: "/du-an", label: "Dự án" }, { label: campaign.category }]}
-        image={cover}
-      >
-        <ul className="banner-meta">
-          <li><Icon name="document" size={15} /> {campaign.category}</li>
-          <li><Icon name="location" size={15} /> {campaign.location}</li>
-          <li><Icon name="user" size={15} /> {campaign.owner}</li>
-          <li className={open ? "is-open" : ""}>{campaign.status}</li>
-        </ul>
-      </PageBanner>
+    <main className="detail-page">
+      <div className="container detail-head">
+        <nav className="detail-crumbs" aria-label="Vị trí trang">
+          {crumbs.map((crumb, index) => (
+            <span key={crumb.label}>
+              {crumb.href ? <Link href={crumb.href}>{crumb.label}</Link> : <span aria-current="page">{crumb.label}</span>}
+              {index < crumbs.length - 1 && <span aria-hidden="true"> / </span>}
+            </span>
+          ))}
+        </nav>
+        <h1 className="detail-title">{campaign.title}</h1>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      </div>
 
       <div className="container detail-layout">
-        {live && <CampaignViewTracker campaignId={campaign.slug} />}
+        {published && <CampaignViewTracker campaignId={campaign.slug} />}
         {!live && <p className="notice-sample">Dữ liệu mẫu — không phải chiến dịch thật trên hệ thống.</p>}
+        {live && !published && (
+          <p className="notice-sample" role="status">
+            Hồ sơ chưa công khai ({campaign.status.toLowerCase()}): chưa hiển thị trong danh sách dự án, chưa nhận ủng hộ, theo dõi hay bình luận.
+          </p>
+        )}
 
         <div className="detail-main">
-          <section className="panel" aria-labelledby="gioi-thieu-du-an">
-            <h2 id="gioi-thieu-du-an">Giới thiệu dự án</h2>
-            {campaign.storyHtml ? (
-              <div className="detail-story rich-text" dangerouslySetInnerHTML={{ __html: sanitizeRichText(campaign.storyHtml) }} />
-            ) : (
-              <div className="detail-story">
-                {campaign.story.map((paragraph, index) => (
-                  <p className={index === 0 ? "detail-lead" : undefined} key={paragraph}>{paragraph}</p>
-                ))}
+          <figure className="detail-cover">
+            <Image src={cover.src} alt={cover.alt} fill priority sizes="(max-width: 960px) 100vw, 720px" unoptimized={!cover.illustrative} />
+            {!open && <span className="detail-cover-status">{campaign.status}</span>}
+            {cover.illustrative && <figcaption>Ảnh minh họa theo lĩnh vực</figcaption>}
+          </figure>
+
+          <div className="detail-organizer">
+            <span className="organizer-avatar" aria-hidden="true">{campaign.owner.charAt(0).toUpperCase()}</span>
+            <p>
+              <b>{campaign.owner}</b> đang tổ chức gây quỹ
+              <span className="detail-organizer-meta"><Icon name="location" size={14} /> {campaign.location}</span>
+            </p>
+          </div>
+
+          <ul className="detail-badges">
+            {published && <li><Icon name="shield" size={15} /> Hồ sơ đã được kiểm duyệt</li>}
+            <li><Icon name="receipt" size={15} /> Chỉ ghi nhận giao dịch đã xác nhận</li>
+          </ul>
+
+          <section className="detail-story-block" aria-labelledby="gioi-thieu-du-an">
+            <h2 id="gioi-thieu-du-an" className="sr-only">Câu chuyện dự án</h2>
+            <CollapsibleStory>
+              {campaign.storyHtml ? (
+                <div className="detail-story rich-text" dangerouslySetInnerHTML={{ __html: sanitizeRichText(campaign.storyHtml) }} />
+              ) : (
+                <div className="detail-story">
+                  {campaign.story.map((paragraph, index) => (
+                    <p className={index === 0 ? "detail-lead" : undefined} key={paragraph}>{paragraph}</p>
+                  ))}
+                </div>
+              )}
+            </CollapsibleStory>
+
+            {open && published && (
+              <div className="detail-actions">
+                <DonateDialogButton
+                  campaignId={campaign.slug}
+                  campaignTitle={campaign.title}
+                  rewardTiers={rewardTiers}
+                  className="button button-outline"
+                  label="Ủng hộ"
+                />
+                <ShareCampaignButton campaignId={campaign.slug} title={campaign.title} />
               </div>
             )}
-            {cover.illustrative && <p className="hint">Ảnh đầu trang là ảnh minh họa theo lĩnh vực.</p>}
+
+            <p className="detail-meta">
+              <span>{campaign.category}</span>
+              {campaign.endDate && <span>Hạn gây quỹ {campaign.endDate}</span>}
+            </p>
+            {published && <div className="detail-report"><ReportCampaignButton campaignId={campaign.slug} campaignSlug={campaign.slug} /></div>}
           </section>
 
           <section className="panel" aria-labelledby="ke-hoach">
@@ -214,46 +280,62 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           <section className="panel" aria-labelledby="so-cai">
             <h2 id="so-cai">Sổ cái giao dịch</h2>
             <p className="hint">Các khoản ủng hộ đã được cổng thanh toán xác nhận, mới nhất ở trên.</p>
-            {live ? <CampaignLedger campaignId={campaign.slug} /> : <p className="hint">Dữ liệu mẫu không có sổ cái.</p>}
+            {published ? (
+              <CampaignLedger key={campaign.backers} campaignId={campaign.slug} />
+            ) : (
+              <p className="hint">{live ? "Sổ cái mở khi hồ sơ được duyệt và công khai." : "Dữ liệu mẫu không có sổ cái."}</p>
+            )}
           </section>
 
           <section className="panel" id="hoi-dap" aria-labelledby="hoi-dap-title">
             <h2 id="hoi-dap-title">Hỏi đáp &amp; bình luận</h2>
             <p className="hint">Đặt câu hỏi cho chủ dự án hoặc chia sẻ ý kiến. Nội dung vi phạm có thể bị quản trị viên ẩn.</p>
-            {live ? <CampaignComments campaignId={campaign.slug} /> : <p className="hint">Dữ liệu mẫu không có bình luận.</p>}
+            {published ? (
+              <CampaignComments campaignId={campaign.slug} />
+            ) : (
+              <p className="hint">{live ? "Hỏi đáp mở khi hồ sơ được duyệt và công khai." : "Dữ liệu mẫu không có bình luận."}</p>
+            )}
           </section>
         </div>
 
         <aside className="detail-side">
           <section className="panel fund-card" aria-label="Tiến độ gây quỹ">
-            <p className="fund-amount">{formatVnd(campaign.raised)}</p>
-            <p className="fund-target">đã nhận / mục tiêu {formatVnd(campaign.target)}</p>
-            <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
-            <ul className="fund-stats">
-              <li><strong>{percent}%</strong><span>hoàn thành</span></li>
-              <li><strong>{campaign.backers.toLocaleString("vi-VN")}</strong><span>lượt ủng hộ</span></li>
-              <li><strong>{open ? campaign.daysLeft : "—"}</strong><span>{open ? "ngày còn lại" : campaign.status}</span></li>
-            </ul>
-            {open && <a className="button button-primary button-block" href="#ung-ho">Ủng hộ ngay</a>}
-            {live && (
+            <div className="fund-head">
+              <ProgressRing value={percent} />
+              <div>
+                <p className="fund-amount">{formatVnd(campaign.raised)} <span>đã nhận</span></p>
+                <p className="fund-target">trên mục tiêu {formatVnd(campaign.target)}</p>
+                <p className="fund-sub">
+                  {campaign.backers.toLocaleString("vi-VN")} lượt ủng hộ · {open ? `còn ${campaign.daysLeft} ngày` : campaign.status}
+                </p>
+              </div>
+            </div>
+            {open && (
+              <DonateDialogButton
+                campaignId={campaign.slug}
+                campaignTitle={campaign.title}
+                enabled={published}
+                rewardTiers={rewardTiers}
+                className="button button-primary button-block button-lg"
+              />
+            )}
+            {published && (
               <div className="fund-social">
                 <FollowCampaignButton campaignId={campaign.slug} />
                 <ShareCampaignButton campaignId={campaign.slug} title={campaign.title} />
               </div>
             )}
-            {live && <div className="fund-report"><ReportCampaignButton campaignId={campaign.slug} campaignSlug={campaign.slug} /></div>}
+            {/* key theo số lượt ủng hộ: tải lại khi trang làm mới sau một khoản ủng hộ mới. */}
+            {published && <DonorHighlights key={campaign.backers} campaignId={campaign.slug} />}
           </section>
-
-          {open && (
-            <div className="panel" id="ung-ho">
-              <DonationPanel campaignId={campaign.slug} campaignTitle={campaign.title} enabled={live} rewardTiers={rewardTiers} />
-            </div>
-          )}
 
           <section className="panel" aria-labelledby="thong-tin-ho-so">
             <h2 id="thong-tin-ho-so" className="panel-title-sm">Thông tin hồ sơ</h2>
             <ul className="facts">
-              <li><span>Kiểm duyệt</span><span>Đã được quản trị viên duyệt</span></li>
+              <li>
+                <span>Kiểm duyệt</span>
+                <span className={published || !live ? undefined : "fact-warn"}>{reviewStatusLabel(campaign.apiStatus)}</span>
+              </li>
               <li>
                 <span>Kế hoạch</span>
                 <span>

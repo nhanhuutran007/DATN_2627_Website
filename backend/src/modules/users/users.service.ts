@@ -5,7 +5,7 @@ import { Repository } from "typeorm";
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { BehaviorEvent } from "../ai/entities/behavior-event.entity";
 import { CreateUserDto, UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
-import { User } from "./entities/user.entity";
+import { User, UserRole } from "./entities/user.entity";
 
 export const MAX_LOGIN_ATTEMPTS = 5;
 export const LOGIN_LOCK_MINUTES = 15;
@@ -180,6 +180,33 @@ export class UsersService {
     await this.userRepo.update({ id: user.id }, { sessionsRevokedAt: now });
     user.sessionsRevokedAt = now;
     return now;
+  }
+
+  async findByGoogleId(googleId: string): Promise<User | null> {
+    return this.userRepo.findOneBy({ googleId });
+  }
+
+  /** Liên kết tài khoản sẵn có với Google; email Google đã xác minh nên đánh dấu luôn email. */
+  async linkGoogleAccount(user: User, googleId: string): Promise<User> {
+    user.googleId = googleId;
+    user.emailVerified = true;
+    return this.userRepo.save(user);
+  }
+
+  /**
+   * Tài khoản mới tạo qua Google. `passwordHash` là hash của chuỗi ngẫu nhiên không ai biết:
+   * không đăng nhập bằng mật khẩu được cho tới khi người dùng tự đặt qua "Quên mật khẩu".
+   */
+  async createFromGoogle(input: { name: string; email: string; googleId: string; passwordHash: string }): Promise<User> {
+    const user = this.userRepo.create({
+      name: input.name,
+      email: input.email,
+      googleId: input.googleId,
+      passwordHash: input.passwordHash,
+      role: UserRole.USER,
+      emailVerified: true,
+    });
+    return this.userRepo.save(user);
   }
 
   async recordLoginSuccess(user: User): Promise<User> {

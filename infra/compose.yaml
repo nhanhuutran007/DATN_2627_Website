@@ -53,6 +53,8 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-local-access-secret-change-me}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-refresh-secret-change-me}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-local-webhook-secret-change-me}
+      # Đăng nhập Google (để trống = ẩn nút Google)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
       # Gốc URL frontend để tạo link trong email (vd. đặt lại mật khẩu)
       FRONTEND_URL: ${SITE_URL:-http://localhost:8080}

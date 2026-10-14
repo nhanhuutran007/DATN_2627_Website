@@ -472,9 +472,9 @@ export class DonationsService {
   /**
    * Sổ cái công khai của một chiến dịch: chỉ giao dịch đã được xác nhận, trả
    * về đối tượng thu gọn (không email, không lời nhắn, mã giao dịch bị che).
-   * Người chọn ẩn danh hiển thị `donorName = null`.
+   * Người chọn ẩn danh hiển thị `donorName = null`. `sort=top`: khoản lớn nhất trước.
    */
-  async listPublicLedger(campaignId: string, limit = 20): Promise<PublicLedger> {
+  async listPublicLedger(campaignId: string, limit = 20, sort: LedgerSort = "recent"): Promise<PublicLedger> {
     const campaign = await this.campaignRepo.findOneBy({ id: campaignId });
     if (!campaign || !LEDGER_VISIBLE_STATUSES.includes(campaign.status)) {
       throw new NotFoundException("Campaign not found");
@@ -484,7 +484,10 @@ export class DonationsService {
     const [donations, total] = await this.donationRepo.findAndCount({
       where: { campaignId, status: DonationStatus.COMPLETED },
       relations: { user: true },
-      order: { completedAt: "DESC", createdAt: "DESC" },
+      order:
+        sort === "top"
+          ? { amount: "DESC", completedAt: "DESC" }
+          : { completedAt: "DESC", createdAt: "DESC" },
       take,
     });
 
@@ -502,6 +505,9 @@ export class DonationsService {
     };
   }
 }
+
+export const LEDGER_SORTS = ["recent", "top"] as const;
+export type LedgerSort = (typeof LEDGER_SORTS)[number];
 
 const LEDGER_VISIBLE_STATUSES = [
   CampaignStatus.APPROVED,

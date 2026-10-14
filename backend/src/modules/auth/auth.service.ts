@@ -1,8 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import {
   ForbiddenException,
+  Inject,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
@@ -11,6 +13,7 @@ import * as bcrypt from "bcryptjs";
 import { LessThan, Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
+import type { GoogleIdentityGateway, GoogleProfile } from "../../integrations/identity/google-identity.gateway";
 import { User, UserRole, UserStatus } from "../users/entities/user.entity";
 import { isUserLocked, UsersService } from "../users/users.service";
 import { LoginDto, RegisterDto, TokenResponseDto } from "./dto/auth.dto";
@@ -51,6 +54,8 @@ export class AuthService {
     private readonly auditService: AuditService,
     @InjectRepository(RevokedToken)
     private readonly revokedTokenRepo: Repository<RevokedToken>,
+    @Inject("GoogleIdentityGateway")
+    private readonly googleIdentity: GoogleIdentityGateway,
   ) {}
 
   async register(dto: RegisterDto): Promise<TokenResponseDto> {
@@ -123,6 +128,83 @@ export class AuthService {
       action: "auth.login.success",
       entity: "user",
       entityId: user.id,
+    });
+    return this.generateTokens(user);
+  }
+
+  /**
+   * Bước 1 của đăng nhập kiểu "nhập email trước": cho biết email đã có tài khoản chưa
+   * để frontend chuyển sang bước mật khẩu hay form đăng ký. Đánh đổi: cho phép dò email
+   * có tài khoản → endpoint bị giới hạn tần suất ở controller.
+   */
+  async checkEmailExists(email: string): Promise<{ exists: boolean }> {
+    const user = await this.usersService.findByEmail(email.trim().toLowerCase());
+    return { exists: Boolean(user) };
+  }
+
+  /** Client ID công khai cho nút Google ở frontend; null = chưa cấu hình. */
+  googleClientId(): string | null {
+    return this.googleIdentity.clientId;
+  }
+
+  /**
+   * Đăng nhập bằng Google ID token (Google Identity Services ở frontend).
+   * Nhận diện theo `googleId`; nếu chưa liên kết thì nối với tài khoản có cùng
+   * email (Google đã xác minh email đó), nếu chưa có tài khoản thì tạo mới vai trò `user`.
+   */
+  async loginWithGoogle(credential: string): Promise<TokenResponseDto> {
+    if (!this.googleIdentity.clientId) {
+      throw new ServiceUnavailableException("Google sign-in is not configured");
+    }
+    let profile: GoogleProfile;
+    try {
+      profile = await this.googleIdentity.verifyIdToken(credential);
+    } catch {
+      throw new UnauthorizedException("Invalid Google credential");
+    }
+    if (!profile.emailVerified) {
+      throw new UnauthorizedException("Google email is not verified");
+    }
+
+    let action = "auth.google.login";
+    let user = await this.usersService.findByGoogleId(profile.googleId);
+    if (!user) {
+      const existing = await this.usersService.findByEmail(profile.email);
+      if (existing?.googleId) {
+        // Email này đã gắn với một tài khoản Google khác.
+        throw new UnauthorizedException("Invalid Google credential");
+      }
+      if (existing) {
+        if (existing.status === UserStatus.BANNED) {
+          await this.recordLoginBlocked(existing, "banned");
+          throw new ForbiddenException("Account has been banned");
+        }
+        user = await this.usersService.linkGoogleAccount(existing, profile.googleId);
+        action = "auth.google.link";
+      } else {
+        const passwordHash = await bcrypt.hash(randomBytes(32).toString("base64url"), 10);
+        user = await this.usersService.createFromGoogle({
+          name: profile.name.slice(0, 100),
+          email: profile.email,
+          googleId: profile.googleId,
+          passwordHash,
+        });
+        action = "auth.google.register";
+      }
+    }
+
+    if (user.status === UserStatus.BANNED) {
+      await this.recordLoginBlocked(user, "banned");
+      throw new ForbiddenException("Account has been banned");
+    }
+
+    await this.usersService.recordLoginSuccess(user);
+    await this.auditService.record({
+      userId: user.id,
+      action,
+      entity: "user",
+      entityId: user.id,
+      newValues: { provider: "google" },
     });
     return this.generateTokens(user);
   }

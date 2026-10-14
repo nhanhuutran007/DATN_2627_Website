@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { AiRecommendations } from "@/components/ai/AiRecommendations";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
+import { HeroArc } from "@/components/home/HeroArc";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { CategoryShowcase } from "@/features/discovery/CategoryShowcase";
 import {
@@ -51,6 +52,13 @@ async function loadHome(): Promise<HomeData> {
   }
 }
 
+/** Ảnh vòng cung ở hero (trái · giữa · phải). */
+const heroImages: Parameters<typeof HeroArc>[0]["images"] = [
+  { src: "/images/cover-library.webp", alt: "Học sinh vùng cao trong lớp học ở Bát Xát, Lào Cai" },
+  { src: "/images/cover-mangrove.webp", alt: "Tình nguyện viên trồng cây ngập mặn trên bãi bồi" },
+  { src: "/images/cover-health.webp", alt: "Khám mắt miễn phí cho người dân tại một điểm khám cộng đồng" },
+];
+
 const aboutPoints = [
   "Hồ sơ được kiểm duyệt trước khi phát hành",
   "Tiền chỉ ghi nhận khi thanh toán được xác nhận",
@@ -98,27 +106,20 @@ export default async function Home() {
     <main>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }} />
 
-      <section className="hero">
-        <Image
-          className="hero-img"
-          src="/images/cover-mangrove.webp"
-          alt="Tình nguyện viên trồng cây ngập mặn trên bãi bồi"
-          fill
-          priority
-          sizes="100vw"
-        />
+      <section className="hero" aria-labelledby="hero-title">
         <div className="container hero-inner">
-          <span className="pill pill-light">Nền tảng gây quỹ cộng đồng</span>
-          <h1>Chung tay gieo mầm cho dự án cộng đồng</h1>
+          <span className="hero-tag">Nền tảng gây quỹ cộng đồng</span>
+          <h1 id="hero-title">Chung tay gieo mầm cho dự án cộng đồng</h1>
           <p>
             Góp Mầm kết nối các dự án xã hội và khởi nghiệp với những người sẵn lòng ủng hộ. Mọi chiến dịch đều được
             kiểm duyệt, mọi khoản ủng hộ đều có trong sổ cái công khai.
           </p>
           <div className="hero-cta">
-            <Link className="button button-primary button-lg" href="/du-an">Khám phá dự án <Icon name="arrow-right" size={18} /></Link>
-            <Link className="button button-ghost-white button-lg" href="/tao-chien-dich">Tạo chiến dịch</Link>
+            <Link className="hero-button hero-button-primary" href="/du-an">Khám phá dự án</Link>
+            <Link className="hero-button hero-button-outline" href="/tao-chien-dich">Tạo chiến dịch</Link>
           </div>
         </div>
+        <HeroArc images={heroImages} />
       </section>
 
       {!live && (

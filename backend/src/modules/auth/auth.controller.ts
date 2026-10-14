@@ -1,12 +1,16 @@
-import { Body, Controller, Headers, HttpCode, HttpStatus, Ip, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Ip, Post, UseGuards } from "@nestjs/common";
 
 import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.module";
 import { User } from "../users/entities/user.entity";
 import { AuthService } from "./auth.service";
 import { GetCurrentUser } from "./decorators/get-current-user.decorator";
 import {
+  AuthProvidersDto,
   ChangePasswordDto,
+  CheckEmailDto,
+  CheckEmailResponseDto,
   ForgotPasswordDto,
+  GoogleLoginDto,
   LoginDto,
   LogoutDto,
   RefreshTokenDto,
@@ -57,6 +61,29 @@ export class AuthController {
   @RateLimit({ limit: 5, windowMs: 60_000, keyPrefix: "auth-login" })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  /** Phương thức đăng nhập đang bật (frontend biết nút Google đã dùng được chưa). */
+  @Get("providers")
+  providers(): AuthProvidersDto {
+    return { googleClientId: this.authService.googleClientId() };
+  }
+
+  /** Bước 1 đăng nhập: email đã có tài khoản chưa (→ mật khẩu hay → đăng ký). */
+  @Post("check-email")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 10, windowMs: 60_000, keyPrefix: "auth-check-email" })
+  checkEmail(@Body() dto: CheckEmailDto): Promise<CheckEmailResponseDto> {
+    return this.authService.checkEmailExists(dto.email);
+  }
+
+  @Post("google")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 10, windowMs: 60_000, keyPrefix: "auth-google" })
+  loginWithGoogle(@Body() dto: GoogleLoginDto) {
+    return this.authService.loginWithGoogle(dto.credential);
   }
 
   @Post("refresh")
