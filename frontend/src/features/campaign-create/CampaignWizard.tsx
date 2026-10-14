@@ -3,10 +3,11 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
 import { MoneyInput } from "@/components/ui/MoneyInput";
+import { PROVINCES } from "@/lib/provinces";
 import { escapeHtml, htmlToText } from "@/lib/rich-text";
 import { ImageUploader } from "@/features/media/ImageUploader";
 import {
@@ -139,6 +140,20 @@ export function CampaignWizard() {
   const router = useRouter();
   const user = useAuthUser();
   const [step, setStep] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
+  const firstRender = useRef(true);
+
+  // Đổi bước: đưa về đầu form, không để trình duyệt giữ vị trí cuộn của nút "Tiếp tục" ở cuối trang.
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const form = formRef.current;
+    if (!form) return;
+    form.scrollIntoView({ behavior: "smooth", block: "start" });
+    form.focus({ preventScroll: true });
+  }, [step]);
   const [draft, setDraft] = useState(initialDraft);
   const categories = useCategories();
   const [milestones, setMilestones] = useState<DraftMilestone[]>([
@@ -191,7 +206,7 @@ export function CampaignWizard() {
 
   const validateStep = (index: number): string => {
     if (index === 0) {
-      if (!draft.title.trim() || !draft.location.trim() || !draft.deadline) return "Vui lòng nhập tên, địa điểm và ngày kết thúc.";
+      if (!draft.title.trim() || !draft.location.trim() || !draft.deadline) return "Vui lòng nhập tên, chọn địa điểm và ngày kết thúc.";
       if (target < MIN_TARGET) return "Mục tiêu tối thiểu là 1.000.000 ₫.";
       if (draft.deadline < minDeadline()) return "Ngày kết thúc phải cách hôm nay ít nhất 1 tháng.";
       if (draft.imageUrl.trim() && !isImageValue(draft.imageUrl.trim())) return "Link ảnh phải bắt đầu bằng http:// hoặc https://";
@@ -365,7 +380,7 @@ export function CampaignWizard() {
         {campaignId && <p className="hint">Bản nháp đã lưu. Các lần lưu sau sẽ cập nhật bản nháp này.</p>}
       </aside>
 
-      <form className="panel wizard-form" onSubmit={submit} noValidate>
+      <form ref={formRef} className="panel wizard-form" tabIndex={-1} onSubmit={submit} noValidate>
         <p className="wizard-count">Bước {step + 1}/{STEPS.length}</p>
         <h2>{STEPS[step].title}</h2>
 
@@ -388,7 +403,10 @@ export function CampaignWizard() {
               </label>
               <label className="field">
                 <span>Địa điểm thực hiện *</span>
-                <input value={draft.location} placeholder="Huyện, tỉnh/thành" onChange={(e) => update("location", e.target.value)} />
+                <select value={draft.location} onChange={(e) => update("location", e.target.value)}>
+                  <option value="" disabled>Chọn tỉnh/thành</option>
+                  {PROVINCES.map((province) => <option key={province}>{province}</option>)}
+                </select>
               </label>
               <label className="field">
                 <span>Mục tiêu (VNĐ) *</span>

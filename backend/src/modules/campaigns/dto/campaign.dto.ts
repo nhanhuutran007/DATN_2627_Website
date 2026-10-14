@@ -15,6 +15,8 @@ import {
   Min,
 } from "class-validator";
 
+import { PROVINCES } from "../../../common/constants/provinces";
+
 import { IsImageUrl } from "../../../common/validators/is-image-url";
 import { CampaignStatus } from "../entities/campaign.entity";
 
@@ -48,8 +50,7 @@ export class CreateCampaignDto {
   imageUrl?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(255)
+  @IsIn(PROVINCES, { message: "Địa điểm phải là một trong 34 tỉnh/thành phố" })
   location?: string;
 }
 
@@ -87,8 +88,7 @@ export class UpdateCampaignDto {
   imageUrl?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(255)
+  @IsIn(PROVINCES, { message: "Địa điểm phải là một trong 34 tỉnh/thành phố" })
   location?: string;
 }
 

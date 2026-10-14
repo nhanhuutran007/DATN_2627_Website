@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
+import { PAGE_SIZE, Pagination, pageSlice } from "@/components/ui/Pagination";
 import { ApiError } from "@/lib/api";
 import {
   approveRefund,
@@ -19,11 +20,14 @@ import { formatVnd } from "@/lib/format";
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 const errorText = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
-/** Hoàn tiền (duyệt yêu cầu) và đối soát cho trang quản trị. */
-export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
+/** Hoàn tiền (duyệt yêu cầu) hoặc đối soát cho trang quản trị, tùy `view`. */
+export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconciliation"; onChanged?: () => void }) {
   const dialog = useDialog();
   const [refunds, setRefunds] = useState<RefundRequest[]>([]);
   const [refundFilter, setRefundFilter] = useState<RefundRequestStatus | "">("pending");
+  const [refundPage, setRefundPage] = useState(0);
+  const [refundTotal, setRefundTotal] = useState(0);
+  const [reportPage, setReportPage] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -32,9 +36,18 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
   const [report, setReport] = useState<ReconciliationReport | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
 
-  const loadRefunds = useCallback(async (status: RefundRequestStatus | "") => {
+  const loadRefunds = useCallback(async (status: RefundRequestStatus | "", page: number) => {
     try {
-      setRefunds((await fetchAdminRefunds(status || undefined)).items);
+      const fetchPage = (p: number) => fetchAdminRefunds(status || undefined, { offset: p * PAGE_SIZE, limit: PAGE_SIZE });
+      let result = await fetchPage(page);
+      // Trang vừa xử lý hết mục cuối: lùi về trang cuối còn dữ liệu.
+      if (result.items.length === 0 && page > 0) {
+        page = Math.max(0, Math.ceil(result.total / PAGE_SIZE) - 1);
+        result = await fetchPage(page);
+      }
+      setRefunds(result.items);
+      setRefundTotal(result.total);
+      setRefundPage(page);
     } catch (err) {
       setNotice(errorText(err, "Không tải được yêu cầu hoàn tiền"));
     }
@@ -42,8 +55,8 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchAdminRefunds("pending")
-      .then((r) => { if (!cancelled) setRefunds(r.items); })
+    fetchAdminRefunds("pending", { limit: PAGE_SIZE })
+      .then((r) => { if (!cancelled) { setRefunds(r.items); setRefundTotal(r.total); } })
       .catch((err) => { if (!cancelled) setNotice(errorText(err, "Không tải được yêu cầu hoàn tiền")); });
     fetchReconciliation({})
       .then((r) => { if (!cancelled) setReport(r); })
@@ -75,7 +88,7 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
     try {
       if (approve) await approveRefund(request.id, input);
       else await rejectRefund(request.id, input);
-      await loadRefunds(refundFilter);
+      await loadRefunds(refundFilter, refundPage);
       setNotice(approve ? `Đã hoàn ${amount} qua cổng thanh toán sandbox.` : "Đã từ chối yêu cầu hoàn tiền.");
       if (approve) onChanged?.();
     } catch (err) {
@@ -90,6 +103,7 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
     setReportError(null);
     try {
       setReport(await fetchReconciliation({ from, to }));
+      setReportPage(0);
     } catch (err) {
       setReportError(errorText(err, "Không tải được đối soát"));
     }
@@ -109,6 +123,7 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
 
   return (
     <>
+      {view === "refunds" && (
       <section className="admin-card risk-card" id="hoan-tien">
         <div className="card-heading">
           <div><p className="eyebrow">Tài chính</p><h2>Yêu cầu hoàn tiền</h2></div>
@@ -116,7 +131,7 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
             className="filter-button"
             aria-label="Lọc yêu cầu hoàn tiền"
             value={refundFilter}
-            onChange={(e) => { const v = e.target.value as RefundRequestStatus | ""; setRefundFilter(v); void loadRefunds(v); }}
+            onChange={(e) => { const v = e.target.value as RefundRequestStatus | ""; setRefundFilter(v); void loadRefunds(v, 0); }}
           >
             <option value="pending">Chờ xử lý</option>
             <option value="approved">Đã hoàn tiền</option>
@@ -154,9 +169,12 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
             ))
           )}
         </div>
+        <Pagination page={refundPage} total={refundTotal} onChange={(page) => void loadRefunds(refundFilter, page)} />
         <p className="risk-footnote"><Icon name="shield" size={15} /> Hoàn tiền gọi cổng thanh toán sandbox, trừ số liệu chiến dịch, trả lại suất quà và ghi nhật ký kiểm toán.</p>
       </section>
+      )}
 
+      {view === "reconciliation" && (
       <section className="admin-card admin-table-card" id="doi-soat">
         <div className="card-heading">
           <div><p className="eyebrow">Tài chính</p><h2>Đối soát giao dịch</h2></div>
@@ -195,7 +213,7 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
                   {report.campaigns.length === 0 ? (
                     <tr><td colSpan={7} className="table-muted">Không có giao dịch trong kỳ.</td></tr>
                   ) : (
-                    report.campaigns.map((c) => (
+                    pageSlice(report.campaigns, reportPage).map((c) => (
                       <tr key={c.campaignId}>
                         <td><b>{c.title}</b></td>
                         <td className="num">{formatVnd(c.completedAmount)}</td>
@@ -210,10 +228,12 @@ export function AdminFinance({ onChanged }: { onChanged?: () => void }) {
                 </tbody>
               </table>
             </div>
+            <Pagination page={reportPage} total={report.campaigns.length} onChange={setReportPage} />
             <p className="risk-footnote"><Icon name="shield" size={15} /> File CSV giả danh người ủng hộ (mã NUH-…), không chứa tên/email; mỗi lần xuất được ghi nhật ký.</p>
           </>
         )}
       </section>
+      )}
     </>
   );
 }

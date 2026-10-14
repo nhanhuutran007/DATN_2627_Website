@@ -27,7 +27,7 @@ export function SiteHeader() {
   const logout = async () => {
     close();
     await logoutRequest();
-    if (pathname === "/dashboard" || pathname === "/admin" || pathname === "/ho-so") router.push("/");
+    if (pathname === "/dashboard" || pathname.startsWith("/admin") || pathname === "/ho-so") router.push("/");
     else router.refresh();
   };
 
@@ -80,7 +80,7 @@ export function SiteHeader() {
               </Link>
             )}
             {user?.role === "admin" && (
-              <Link aria-current={pathname === "/admin" ? "page" : undefined} href="/admin" onClick={close}>
+              <Link aria-current={pathname.startsWith("/admin") ? "page" : undefined} href="/admin" onClick={close}>
                 Quản trị
               </Link>
             )}

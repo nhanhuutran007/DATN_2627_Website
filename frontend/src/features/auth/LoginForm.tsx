@@ -36,8 +36,9 @@ export function LoginForm() {
     setBusy(true);
     setError("");
     try {
-      await loginRequest(email.trim(), password);
-      router.push(next);
+      const session = await loginRequest(email.trim(), password);
+      // Admin chỉ làm việc trong trang quản trị, bỏ qua "next" trỏ tới trang khác.
+      router.push(session.user.role === "admin" ? "/admin" : next);
       router.refresh();
     } catch (err) {
       setError(messageFor(err));

@@ -82,8 +82,16 @@ export function fetchMyRefundRequests(): Promise<RefundRequest[]> {
   return api.get<RefundRequest[]>("/refund-requests/mine");
 }
 
-export function fetchAdminRefunds(status?: RefundRequestStatus): Promise<RefundRequestList> {
-  return api.get<RefundRequestList>(`/admin/refunds${status ? `?status=${status}` : ""}`);
+export function fetchAdminRefunds(
+  status?: RefundRequestStatus,
+  page: { offset?: number; limit?: number } = {},
+): Promise<RefundRequestList> {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (page.offset !== undefined) params.set("offset", String(page.offset));
+  if (page.limit !== undefined) params.set("limit", String(page.limit));
+  const qs = params.toString();
+  return api.get<RefundRequestList>(`/admin/refunds${qs ? `?${qs}` : ""}`);
 }
 
 export function approveRefund(id: string, adminNotes: string): Promise<RefundRequest> {

@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
+import { PAGE_SIZE, Pagination, pageSlice } from "@/components/ui/Pagination";
 import { ApiError } from "@/lib/api";
 import { downloadCampaignStatsCsv, downloadDailyDonationsCsv } from "@/lib/api/admin";
 import { createCategory, fetchAdminCategories, updateCategory, type AdminCategory } from "@/lib/api/categories";
@@ -15,18 +16,10 @@ function errorText(err: unknown, fallback: string): string {
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 
 /** Quản trị nội dung: danh mục lĩnh vực và xuất thống kê ẩn danh. */
-export function AdminContent() {
-  return (
-    <>
-      <CategoryManager />
-      <StatsExport />
-    </>
-  );
-}
-
-function CategoryManager() {
+export function CategoryManager() {
   const dialog = useDialog();
   const [categories, setCategories] = useState<AdminCategory[] | null>(null);
+  const [page, setPage] = useState(0);
   const [requestKey, setRequestKey] = useState(0);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -128,7 +121,10 @@ function CategoryManager() {
             {categories === null ? (
               <tr><td colSpan={5}><span className="table-muted">Đang tải…</span></td></tr>
             ) : (
-              categories.map((category, index) => (
+              pageSlice(categories, page).map((category, pageIndex) => {
+                // Vị trí trong toàn danh sách (dùng cho sắp xếp), không phải trong trang.
+                const index = page * PAGE_SIZE + pageIndex;
+                return (
                 <tr key={category.id}>
                   <td><b>{category.name}</b></td>
                   <td>{category.campaignCount.toLocaleString("vi-VN")}</td>
@@ -152,11 +148,13 @@ function CategoryManager() {
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
+      {categories && <Pagination page={page} total={categories.length} onChange={setPage} />}
       <p className="risk-footnote">
         <Icon name="shield" size={15} /> Ngừng nhận: không cho tạo chiến dịch mới trong lĩnh vực, chiến dịch cũ giữ nguyên. Đổi tên cập nhật luôn các chiến dịch. Mọi thay đổi được ghi nhật ký kiểm toán.
       </p>
@@ -164,7 +162,7 @@ function CategoryManager() {
   );
 }
 
-function StatsExport() {
+export function StatsExport() {
   const [today] = useState(() => isoDay(new Date()));
   const [from, setFrom] = useState(() => isoDay(new Date(Date.now() - 30 * 86_400_000)));
   const [to, setTo] = useState(today);

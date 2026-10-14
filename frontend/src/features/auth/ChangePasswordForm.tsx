@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState, useSyncExternalStore } from "react";
 
 import { ApiError, AUTH_EVENT, changePasswordRequest, hasSession } from "@/lib/api";
+import { useAuthUser } from "@/lib/auth";
 
 function subscribe(onChange: () => void): () => void {
   window.addEventListener(AUTH_EVENT, onChange);
@@ -26,6 +27,7 @@ function messageFor(error: unknown): string {
 export function ChangePasswordForm() {
   // `null` khi render trên server: chưa biết trạng thái đăng nhập (localStorage).
   const loggedIn = useSyncExternalStore(subscribe, hasSession, () => null);
+  const isAdmin = useAuthUser()?.role === "admin";
 
   const [current, setCurrent] = useState("");
   const [password, setPassword] = useState("");
@@ -44,7 +46,7 @@ export function ChangePasswordForm() {
         <p className="form-notice" role="status">
           Đổi mật khẩu thành công. Các thiết bị khác đang đăng nhập đã được đăng xuất.
         </p>
-        <Link className="button button-primary button-block" href="/dashboard">Về trang quản lý</Link>
+        <Link className="button button-primary button-block" href={isAdmin ? "/admin" : "/dashboard"}>Về trang quản lý</Link>
       </div>
     );
   }

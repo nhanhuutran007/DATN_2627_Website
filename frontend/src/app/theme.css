@@ -3378,6 +3378,15 @@ button {
   text-transform: uppercase;
 }
 
+/* Chừa chỗ cho header dính khi cuộn về đầu form lúc đổi bước. */
+.wizard-form {
+  scroll-margin-top: 110px;
+}
+
+.wizard-form:focus {
+  outline: none;
+}
+
 .wizard-form > h2 {
   margin: 4px 0 20px;
   padding-bottom: 12px;
@@ -3929,6 +3938,74 @@ button {
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
+}
+
+/* Đủ chỗ cho tiêu đề; thiếu chỗ thì nút hành động xuống dòng thay vì bóp tiêu đề */
+.admin-content-title {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.admin-menu-toggle {
+  display: grid;
+  flex: none;
+  place-items: center;
+  align-self: flex-start;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: #c9cfdf;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.admin-menu-toggle:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Cột nội dung cố định ở cột 2 để không nhảy sang khi sidebar thành lớp phủ */
+.admin-content {
+  grid-column: 2;
+}
+
+/* Dải icon: ẩn chữ, nhãn hiện qua tooltip (title) */
+.admin-shell.is-rail {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.is-rail .admin-sidebar {
+  padding: 16px 12px;
+}
+
+.is-rail .admin-menu-toggle {
+  align-self: center;
+}
+
+.is-rail .admin-profile > div,
+.is-rail .admin-sidebar nav a span,
+.is-rail .admin-policy {
+  display: none;
+}
+
+.is-rail .admin-profile {
+  justify-content: center;
+}
+
+.is-rail .admin-sidebar nav a {
+  position: relative;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.is-rail .admin-sidebar nav a i {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  padding: 0 5px;
+  font-size: 0.65rem;
 }
 
 .admin-content-header h1 {
@@ -4582,22 +4659,40 @@ button {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .wizard-steps,
-  .admin-sidebar {
+  .wizard-steps {
     position: static;
   }
 
+  /* Màn hẹp: sidebar luôn là dải icon, nút hamburger mở rộng đè lên nội dung */
+  .admin-shell,
+  .admin-shell.is-rail {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
   .admin-sidebar {
-    height: auto;
+    top: 64px;
+    height: calc(100vh - 64px);
   }
 
-  .admin-sidebar nav {
-    flex-direction: row;
-    flex-wrap: wrap;
+  .is-rail .admin-sidebar {
+    padding: 14px 8px;
   }
 
-  .admin-policy {
-    display: none;
+  .admin-sidebar.is-open {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 70;
+    width: min(280px, 85vw);
+    height: 100vh;
+    box-shadow: 8px 0 32px rgba(21, 29, 54, 0.3);
+  }
+
+  .admin-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 65;
+    background: rgba(21, 29, 54, 0.45);
   }
 
   .kpis {
@@ -6065,4 +6160,258 @@ button {
     grid-column: 2;
     justify-self: start;
   }
+}
+
+/* Hồ sơ chiến dịch để admin xét duyệt. */
+.admin-table-card td > button.review-open.is-primary {
+  color: var(--white);
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.admin-table-card td > button.review-open.is-primary:hover {
+  color: var(--white);
+  background: var(--primary-dark);
+}
+
+.review-dialog {
+  width: min(920px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+
+.review-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.review-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px 14px;
+  border-top: 4px solid var(--primary);
+  border-bottom: 1px solid var(--line);
+}
+
+.review-head h2 {
+  margin: 4px 0 0;
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  line-height: 1.35;
+}
+
+.review-close {
+  display: grid;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--muted);
+}
+
+.review-close:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.review-body {
+  display: grid;
+  gap: 20px;
+  padding: 18px 22px;
+  overflow-y: auto;
+}
+
+.review-body h3 {
+  margin: 0 0 10px;
+  color: var(--navy);
+  font-size: 1rem;
+}
+
+.review-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 18px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--soft);
+}
+
+.review-facts dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.review-facts dd {
+  margin: 2px 0 0;
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.review-facts dd small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.review-note {
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 4px solid #d97706;
+  border-radius: 6px;
+  background: #fef6e7;
+}
+
+.review-cover {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+
+.review-description-frame {
+  display: block;
+  width: 100%;
+  border: 0;
+}
+
+.review-plain p {
+  margin: 0 0 0.8em;
+  color: var(--text-2);
+  line-height: 1.75;
+}
+
+.review-milestones th:first-child,
+.review-milestones td:first-child {
+  width: 36px;
+  color: var(--muted);
+}
+
+.review-milestones .nowrap {
+  white-space: nowrap;
+}
+
+.review-milestones td:nth-child(2) {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.review-budget {
+  margin: 10px 0 0;
+  color: var(--text-2);
+}
+
+.review-budget.is-off {
+  color: var(--primary-dark);
+}
+
+.review-tiers {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-tiers li {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.review-tiers small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.review-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--soft);
+}
+
+.review-foot .admin-actions button {
+  padding: 9px 16px;
+  font-size: 0.88rem;
+}
+
+/* Trang quản trị trên điện thoại: dải icon sidebar chiếm 64px nên nội dung xếp 1 cột */
+.filter-button {
+  max-width: 100%;
+}
+
+@media (max-width: 480px) {
+  .admin-stat-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Phân trang danh sách (10 mục/trang) */
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pagination-info {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pagination-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagination-pages button {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  color: var(--navy);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pagination-pages button:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pagination-pages button.is-active {
+  color: var(--white);
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.pagination-pages button:disabled:not(.is-active) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pagination-gap {
+  padding: 0 4px;
+  color: var(--muted);
 }
