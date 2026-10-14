@@ -15,6 +15,35 @@ export type ApiCampaignStatus =
   | "cancelled"
   | "ended";
 
+/**
+ * Trạng thái đã công khai: backend chỉ mở theo dõi, lượt xem, sổ cái, bình luận
+ * và báo cáo cho các trạng thái này (các trạng thái khác trả 404).
+ */
+const PUBLISHED_STATUSES: readonly ApiCampaignStatus[] = ["approved", "active", "paused", "success", "failed", "ended"];
+
+/** Dữ liệu mẫu (không có `apiStatus`) coi như đã công khai. */
+export function isPublishedStatus(status: ApiCampaignStatus | undefined): boolean {
+  return status === undefined || PUBLISHED_STATUSES.includes(status);
+}
+
+/** Nhãn kết quả kiểm duyệt hiển thị ở trang chi tiết. */
+export function reviewStatusLabel(status: ApiCampaignStatus | undefined): string {
+  switch (status) {
+    case "draft":
+      return "Chưa gửi duyệt";
+    case "pending":
+      return "Đang chờ quản trị viên duyệt";
+    case "needs_info":
+      return "Quản trị viên yêu cầu bổ sung";
+    case "rejected":
+      return "Bị từ chối";
+    case "cancelled":
+      return "Đã hủy";
+    default:
+      return "Đã được quản trị viên duyệt";
+  }
+}
+
 export type ApiOwner = {
   id: string;
   name: string;
@@ -265,6 +294,7 @@ export function apiCampaignToView(api: ApiCampaign): Campaign {
     backers: toNumber(api.backerCount),
     daysLeft,
     status: statusToDisplay(api.status),
+    apiStatus: api.status,
     image: imageByCategory(api.category),
     imageUrl: api.imageUrl ?? null,
     endDate: formatDate(api.endDate),

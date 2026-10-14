@@ -36,6 +36,11 @@ export class User extends BaseEntity {
   @Column({ name: "password_hash", length: 255 })
   passwordHash!: string;
 
+  /** Mã tài khoản Google (`sub`) khi người dùng đăng nhập bằng Google; NULL nếu chưa liên kết. */
+  @Exclude({ toPlainOnly: true })
+  @Column({ name: "google_id", type: "varchar", length: 64, nullable: true, unique: true })
+  googleId?: string | null;
+
   @Column({ type: "enum", enum: UserRole, default: UserRole.USER })
   role!: UserRole;
 

@@ -67,6 +67,91 @@ paths:
           description: Sai email hoặc mật khẩu, hoặc tài khoản đang bị khóa
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /auth/providers:
+    get:
+      operationId: getAuthProviders
+      summary: Phương thức đăng nhập đang bật
+      description: Frontend dùng để hiện nút "Đăng nhập với Google" khi máy chủ đã cấu hình `GOOGLE_CLIENT_ID`.
+      responses:
+        "200":
+          description: Client ID công khai của Google (null nếu chưa cấu hình)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [googleClientId]
+                properties:
+                  googleClientId:
+                    type: string
+                    nullable: true
+  /auth/check-email:
+    post:
+      operationId: checkEmail
+      summary: Kiểm tra email đã có tài khoản (bước 1 đăng nhập)
+      description: >-
+        Trang đăng nhập hỏi trước: có tài khoản → bước nhập mật khẩu, chưa có → form đăng ký.
+        Đánh đổi: cho phép dò email đã đăng ký, nên giới hạn 10 lần/phút theo IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Kết quả kiểm tra
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [exists]
+                properties:
+                  exists:
+                    type: boolean
+        "400":
+          description: Email không hợp lệ
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/google:
+    post:
+      operationId: loginWithGoogle
+      summary: Đăng nhập bằng Google
+      description: >-
+        Nhận Google ID token từ Google Identity Services, máy chủ xác minh chữ ký và `aud`
+        (= `GOOGLE_CLIENT_ID`). Tài khoản đã liên kết → đăng nhập; email trùng tài khoản sẵn có →
+        liên kết (email Google đã xác minh); chưa có → tạo tài khoản vai trò `user`.
+        Rate limit 10 lần/phút theo IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [credential]
+              properties:
+                credential:
+                  type: string
+                  description: Google ID token (JWT)
+      responses:
+        "200":
+          description: Đăng nhập thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: ID token không hợp lệ, email Google chưa xác minh, hoặc email đã gắn với tài khoản Google khác
+        "403":
+          description: Tài khoản bị khóa bởi quản trị viên
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "503":
+          description: Máy chủ chưa cấu hình đăng nhập Google
   /auth/refresh:
     post:
       operationId: refreshToken
@@ -1707,7 +1792,7 @@ paths:
       operationId: getCampaignLedger
       summary: Sổ cái giao dịch công khai của một chiến dịch
       description: >-
-        Chỉ giao dịch `completed`, mới nhất trước. Không trả email, lời nhắn hay mã giao dịch đầy đủ
+        Chỉ giao dịch `completed`, mới nhất trước (`sort=top`: số tiền lớn nhất trước). Không trả email, lời nhắn hay mã giao dịch đầy đủ
         (`reference` chỉ giữ 6 ký tự cuối). Người chọn ẩn danh có `donorName = null`.
         Chiến dịch chưa công khai trả 404.
       parameters:
@@ -1719,6 +1804,12 @@ paths:
             minimum: 1
             maximum: 50
             default: 20
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [recent, top]
+            default: recent
       responses:
         "200":
           description: Danh sách giao dịch đã xác nhận

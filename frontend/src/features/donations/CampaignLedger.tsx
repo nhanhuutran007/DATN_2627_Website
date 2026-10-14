@@ -15,13 +15,18 @@ const METHOD_LABEL: Record<string, string> = {
   payos: "PayOS sandbox",
 };
 
+/** Số dòng hiển thị ban đầu; bấm "Xem tất cả" để tải tối đa FULL_ROWS (giới hạn của API). */
+const PREVIEW_ROWS = 5;
+const FULL_ROWS = 50;
+
 export function CampaignLedger({ campaignId }: CampaignLedgerProps) {
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [failed, setFailed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetchCampaignLedger(campaignId, 20)
+    fetchCampaignLedger(campaignId, expanded ? FULL_ROWS : PREVIEW_ROWS)
       .then((result) => {
         if (active) setLedger(result);
       })
@@ -31,7 +36,7 @@ export function CampaignLedger({ campaignId }: CampaignLedgerProps) {
     return () => {
       active = false;
     };
-  }, [campaignId]);
+  }, [campaignId, expanded]);
 
   if (failed) return <p className="empty-line">Không tải được sổ cái giao dịch.</p>;
   if (!ledger) return <p className="empty-line" aria-live="polite">Đang tải sổ cái…</p>;
@@ -66,6 +71,11 @@ export function CampaignLedger({ campaignId }: CampaignLedgerProps) {
           </tbody>
         </table>
       </div>
+      {!expanded && ledger.total > ledger.items.length && (
+        <button className="button button-outline button-sm ledger-more" type="button" onClick={() => setExpanded(true)}>
+          Xem tất cả {ledger.total.toLocaleString("vi-VN")} giao dịch
+        </button>
+      )}
       <p className="fineprint">
         Hiển thị {ledger.items.length} / {ledger.total} giao dịch đã xác nhận. Mã tham chiếu được rút gọn; người
         chọn ẩn danh không hiện tên.

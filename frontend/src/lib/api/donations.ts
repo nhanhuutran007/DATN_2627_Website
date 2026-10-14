@@ -91,8 +91,12 @@ export type CampaignLedger = {
 };
 
 /** Sổ cái công khai: chỉ giao dịch đã xác nhận, ẩn danh được tôn trọng. */
-export async function fetchCampaignLedger(campaignId: string, limit = 20): Promise<CampaignLedger> {
+export async function fetchCampaignLedger(
+  campaignId: string,
+  limit = 20,
+  sort: "recent" | "top" = "recent",
+): Promise<CampaignLedger> {
   return api.get<CampaignLedger>(
-    `/campaigns/${encodeURIComponent(campaignId)}/donations?limit=${limit}`,
+    `/campaigns/${encodeURIComponent(campaignId)}/donations?limit=${limit}&sort=${sort}`,
   );
 }

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { FormEvent, useState, useSyncExternalStore } from "react";
 
+import { PasswordRules } from "@/components/ui/PasswordRules";
 import { ApiError, AUTH_EVENT, changePasswordRequest, hasSession } from "@/lib/api";
 import { useAuthUser } from "@/lib/auth";
+import { passwordPolicyError } from "@/lib/password-policy";
 
 function subscribe(onChange: () => void): () => void {
   window.addEventListener(AUTH_EVENT, onChange);
@@ -65,8 +67,8 @@ export function ChangePasswordForm() {
     event.preventDefault();
     setError("");
     if (!current) return setError("Vui lòng nhập mật khẩu hiện tại.");
-    if (password.length < 8) return setError("Mật khẩu mới cần ít nhất 8 ký tự.");
-    if (password.length > 72) return setError("Mật khẩu mới tối đa 72 ký tự.");
+    const policyError = passwordPolicyError(password);
+    if (policyError) return setError(policyError);
     if (password === current) return setError("Mật khẩu mới phải khác mật khẩu hiện tại.");
     if (password !== confirm) return setError("Mật khẩu xác nhận không khớp.");
 
@@ -100,11 +102,12 @@ export function ChangePasswordForm() {
           type="password"
           required
           value={password}
-          placeholder="Ít nhất 8 ký tự"
           autoComplete="new-password"
+          aria-describedby="change-password-rules"
           onChange={(event) => setPassword(event.target.value)}
         />
       </label>
+      <PasswordRules value={password} id="change-password-rules" />
       <label className="field">
         <span>Nhập lại mật khẩu mới</span>
         <input

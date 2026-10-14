@@ -7,6 +7,7 @@ import { AuthService, issuedBeforeSessionCutoff } from "../src/modules/auth/auth
 import { RevokedToken } from "../src/modules/auth/entities/revoked-token.entity";
 import { UsersService } from "../src/modules/users/users.service";
 import { User, UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
+import type { GoogleIdentityGateway, GoogleProfile } from "../src/integrations/identity/google-identity.gateway";
 import { makeAuditRecorder } from "./helpers/audit";
 
 const VALID_PASSWORD = "password123";
@@ -44,6 +45,24 @@ function createMockDependencies() {
   return { mockUser, usersService, jwtService };
 }
 
+const GOOGLE_PROFILE: GoogleProfile = {
+  googleId: "google-sub-123",
+  email: "test@example.com",
+  emailVerified: true,
+  name: "Google User",
+};
+
+/** Gateway Google giả: `clientId = null` = chưa cấu hình; token "bad" bị từ chối. */
+function makeGoogleGateway(clientId: string | null, profile: GoogleProfile = GOOGLE_PROFILE): GoogleIdentityGateway {
+  return {
+    clientId,
+    verifyIdToken: async (idToken: string) => {
+      if (idToken === "bad") throw new Error("invalid");
+      return profile;
+    },
+  };
+}
+
 /** Bảng `revoked_tokens` giả: lưu theo `jti`, `delete` bỏ các dòng đã quá hạn. */
 function makeRevokedTokenRepo() {
   const rows = new Map<string, RevokedToken>();
@@ -78,7 +97,7 @@ describe("AuthService", () => {
     mockUser = deps.mockUser;
     audit = makeAuditRecorder();
     revoked = makeRevokedTokenRepo();
-    authService = new AuthService(usersService, jwtService, audit.service, revoked.repo);
+    authService = new AuthService(usersService, jwtService, audit.service, revoked.repo, makeGoogleGateway(null));
   });
 
   describe("register", () => {
@@ -380,5 +399,110 @@ describe("issuedBeforeSessionCutoff", () => {
     equal(issuedBeforeSessionCutoff({ sessionsRevokedAt: at } as User, seconds - 1), true);
     equal(issuedBeforeSessionCutoff({ sessionsRevokedAt: at } as User, seconds), false);
     equal(issuedBeforeSessionCutoff({ sessionsRevokedAt: at } as User, undefined), true);
+  });
+});
+
+describe("AuthService.loginWithGoogle", () => {
+  function setup(options: {
+    clientId?: string | null;
+    profile?: GoogleProfile;
+    byGoogleId?: Partial<User> | null;
+    byEmail?: Partial<User> | null;
+  }) {
+    const deps = createMockDependencies();
+    const calls = { linked: [] as string[], created: [] as Array<Record<string, unknown>> };
+    const usersService = {
+      ...deps.usersService,
+      findByGoogleId: async () => options.byGoogleId ?? null,
+      findByEmail: async () => options.byEmail ?? null,
+      recordLoginSuccess: async (user: Partial<User>) => user,
+      linkGoogleAccount: async (user: Partial<User>, googleId: string) => {
+        calls.linked.push(googleId);
+        return { ...user, googleId, emailVerified: true };
+      },
+      createFromGoogle: async (input: Record<string, unknown>) => {
+        calls.created.push(input);
+        return { id: "new-user", role: UserRole.USER, status: UserStatus.ACTIVE, ...input };
+      },
+    } as unknown as UsersService;
+    const audit = makeAuditRecorder();
+    const service = new AuthService(
+      usersService,
+      deps.jwtService,
+      audit.service,
+      makeRevokedTokenRepo().repo,
+      makeGoogleGateway(options.clientId === undefined ? "client.apps.googleusercontent.com" : options.clientId, options.profile),
+    );
+    return { service, audit, calls, mockUser: deps.mockUser };
+  }
+
+  it("trả 503 khi máy chủ chưa cấu hình GOOGLE_CLIENT_ID", async () => {
+    const { service } = setup({ clientId: null });
+    await rejects(service.loginWithGoogle("token"), { status: 503 });
+    equal(service.googleClientId(), null);
+  });
+
+  it("từ chối ID token không hợp lệ hoặc email Google chưa xác minh", async () => {
+    await rejects(setup({}).service.loginWithGoogle("bad"), { status: 401 });
+    const unverified = setup({ profile: { ...GOOGLE_PROFILE, emailVerified: false } });
+    await rejects(unverified.service.loginWithGoogle("token"), { status: 401 });
+  });
+
+  it("đăng nhập tài khoản đã liên kết Google", async () => {
+    const { service, audit, mockUser } = setup({ byGoogleId: { ...createMockDependencies().mockUser, googleId: "google-sub-123" } });
+    const result = await service.loginWithGoogle("token");
+    equal(result.user.email, mockUser.email);
+    equal(audit.entries.at(-1)?.action, "auth.google.login");
+  });
+
+  it("liên kết tài khoản email sẵn có và đánh dấu email đã xác minh", async () => {
+    const { service, audit, calls } = setup({ byEmail: createMockDependencies().mockUser });
+    const result = await service.loginWithGoogle("token");
+    deepEqual(calls.linked, ["google-sub-123"]);
+    equal(result.user.emailVerified, true);
+    equal(audit.entries.at(-1)?.action, "auth.google.link");
+  });
+
+  it("không liên kết nếu email đã gắn với tài khoản Google khác", async () => {
+    const { service, calls } = setup({ byEmail: { ...createMockDependencies().mockUser, googleId: "other-sub" } });
+    await rejects(service.loginWithGoogle("token"), { status: 401 });
+    deepEqual(calls.linked, []);
+  });
+
+  it("tạo tài khoản mới vai trò user, mật khẩu ngẫu nhiên đã hash", async () => {
+    const { service, audit, calls } = setup({});
+    const result = await service.loginWithGoogle("token");
+    equal(calls.created.length, 1);
+    equal(calls.created[0]?.email, "test@example.com");
+    equal(calls.created[0]?.googleId, "google-sub-123");
+    ok(String(calls.created[0]?.passwordHash).startsWith("$2"));
+    equal(result.user.role, UserRole.USER);
+    equal(audit.entries.at(-1)?.action, "auth.google.register");
+  });
+
+  it("chặn tài khoản bị khóa bởi quản trị viên", async () => {
+    const banned = { ...createMockDependencies().mockUser, googleId: "google-sub-123", status: UserStatus.BANNED };
+    const { service, audit } = setup({ byGoogleId: banned });
+    await rejects(service.loginWithGoogle("token"), { status: 403 });
+    equal(audit.entries.at(-1)?.action, "auth.login.blocked");
+  });
+});
+
+describe("AuthService.checkEmailExists", () => {
+  it("cho biết email đã có tài khoản hay chưa (không phân biệt hoa thường, bỏ khoảng trắng)", async () => {
+    const deps = createMockDependencies();
+    const asked: string[] = [];
+    const usersService = {
+      ...deps.usersService,
+      findByEmail: async (email: string) => {
+        asked.push(email);
+        return email === "test@example.com" ? deps.mockUser : null;
+      },
+    } as unknown as UsersService;
+    const service = new AuthService(usersService, deps.jwtService, makeAuditRecorder().service, makeRevokedTokenRepo().repo, makeGoogleGateway(null));
+
+    deepEqual(await service.checkEmailExists("  Test@Example.com "), { exists: true });
+    deepEqual(await service.checkEmailExists("moi@example.com"), { exists: false });
+    deepEqual(asked, ["test@example.com", "moi@example.com"]);
   });
 });

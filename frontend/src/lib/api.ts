@@ -245,6 +245,25 @@ export async function loginRequest(email: string, password: string): Promise<Aut
   return session;
 }
 
+/** Đăng nhập bằng Google ID token (Google Identity Services). */
+export async function googleLoginRequest(credential: string): Promise<AuthSession> {
+  const session = await api.post<LoginResponse>("/auth/google", { credential });
+  saveSession(session);
+  return session;
+}
+
+export type AuthProviders = { googleClientId: string | null };
+
+/** Phương thức đăng nhập máy chủ đang bật (null = chưa cấu hình Google). */
+export function fetchAuthProviders(): Promise<AuthProviders> {
+  return api.get<AuthProviders>("/auth/providers");
+}
+
+/** Bước 1 đăng nhập: email đã có tài khoản chưa (→ mật khẩu hay → đăng ký). */
+export function checkEmailRequest(email: string): Promise<{ exists: boolean }> {
+  return api.post<{ exists: boolean }>("/auth/check-email", { email });
+}
+
 export type RegisterPayload = {
   name: string;
   email: string;

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 
-import { AuthShell } from "@/features/auth/AuthShell";
+import { LogoMark } from "@/components/ui/LogoMark";
 import { LoginForm } from "@/features/auth/LoginForm";
 
 export const metadata: Metadata = {
@@ -10,16 +11,22 @@ export const metadata: Metadata = {
   alternates: { canonical: "/dang-nhap" },
 };
 
+/**
+ * Trang đăng nhập/đăng ký toàn màn hình (không header/footer — xem ChromeGate):
+ * một thẻ ở giữa trên nền họa tiết, các bước email → mật khẩu | tạo tài khoản.
+ */
 export default function LoginPage() {
   return (
-    <AuthShell
-      title="Đăng nhập"
-      lead="Tiếp tục theo dõi các dự án bạn ủng hộ và quản lý chiến dịch của mình."
-      image={{ src: "/images/cover-mangrove.webp", alt: "" }}
-    >
-      <Suspense fallback={<p className="hint">Đang tải biểu mẫu…</p>}>
-        <LoginForm />
-      </Suspense>
-    </AuthShell>
+    <main className="signin-page">
+      <div className="signin-card">
+        <Link className="logo signin-logo" href="/" aria-label="Góp Mầm – Trang chủ">
+          <LogoMark className="logo-mark" />
+          <span className="logo-text">GÓP <b>MẦM</b></span>
+        </Link>
+        <Suspense fallback={<p className="signin-lead">Đang tải…</p>}>
+          <LoginForm />
+        </Suspense>
+      </div>
+    </main>
   );
 }

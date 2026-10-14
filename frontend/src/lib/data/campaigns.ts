@@ -1,3 +1,5 @@
+import type { ApiCampaignStatus } from "@/lib/api/campaigns";
+
 export type CampaignStatus =
   | "Đang gây quỹ"
   | "Sắp kết thúc"
@@ -24,6 +26,8 @@ export type Campaign = {
   backers: number;
   daysLeft: number;
   status: CampaignStatus;
+  /** Trạng thái gốc từ API; dữ liệu mẫu không có. */
+  apiStatus?: ApiCampaignStatus;
   image: "mangrove" | "startup" | "library" | "health";
   /** Ảnh do chủ dự án cung cấp; không có thì giao diện hiển thị dạng chữ, không dùng ảnh minh họa. */
   imageUrl?: string | null;
