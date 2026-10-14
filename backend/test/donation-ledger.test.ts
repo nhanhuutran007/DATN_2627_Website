@@ -61,6 +61,14 @@ describe("DonationsService.listPublicLedger", () => {
     await service.listPublicLedger(CAMPAIGN_ID, 500);
     deepEqual(findCalls[0]?.where, { campaignId: CAMPAIGN_ID, status: DonationStatus.COMPLETED });
     equal(findCalls[0]?.take, 50);
+    deepEqual(findCalls[0]?.order, { completedAt: "DESC", createdAt: "DESC" });
+  });
+
+  it("should order by amount when sort=top", async () => {
+    const { service, findCalls } = setup(CampaignStatus.ACTIVE, []);
+    await service.listPublicLedger(CAMPAIGN_ID, 1, "top");
+    deepEqual(findCalls[0]?.order, { amount: "DESC", completedAt: "DESC" });
+    equal(findCalls[0]?.take, 1);
   });
 
   it("should hide anonymous donors, emails and full transaction ids", async () => {
