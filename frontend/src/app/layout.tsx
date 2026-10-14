@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, Montserrat } from "next/font/google";
 
+import { ChromeGate } from "@/components/layout/ChromeGate";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { DialogProvider } from "@/components/ui/DialogProvider";
@@ -60,11 +61,15 @@ export default function RootLayout({
     <html lang="vi" className={`${bodyFont.variable} ${headingFont.variable}`}>
       <body>
         <DialogProvider>
-          <a className="skip-link" href="#noi-dung">Bỏ qua điều hướng</a>
-          <SiteHeader />
-          <AiConsentBanner />
+          <ChromeGate>
+            <a className="skip-link" href="#noi-dung">Bỏ qua điều hướng</a>
+            <SiteHeader />
+            <AiConsentBanner />
+          </ChromeGate>
           <div id="noi-dung">{children}</div>
-          <SiteFooter />
+          <ChromeGate>
+            <SiteFooter />
+          </ChromeGate>
         </DialogProvider>
       </body>
     </html>

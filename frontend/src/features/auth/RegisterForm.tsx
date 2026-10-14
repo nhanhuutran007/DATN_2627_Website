@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+import { PasswordRules } from "@/components/ui/PasswordRules";
 import { ApiError, registerRequest } from "@/lib/api";
+import { passwordPolicyError } from "@/lib/password-policy";
 
 import { safeNext } from "./safeNext";
 
@@ -36,7 +38,8 @@ export function RegisterForm() {
     event.preventDefault();
     setError("");
     if (name.trim().length < 2) return setError("Tên hiển thị cần ít nhất 2 ký tự.");
-    if (password.length < 8) return setError("Mật khẩu cần ít nhất 8 ký tự.");
+    const policyError = passwordPolicyError(password);
+    if (policyError) return setError(policyError);
     if (password !== confirm) return setError("Mật khẩu xác nhận không khớp.");
 
     setBusy(true);
@@ -68,13 +71,14 @@ export function RegisterForm() {
       <div className="field-row">
         <label className="field">
           <span>Mật khẩu</span>
-          <input type="password" required value={password} placeholder="Ít nhất 8 ký tự" autoComplete="new-password" onChange={(event) => setPassword(event.target.value)} />
+          <input type="password" required value={password} autoComplete="new-password" aria-describedby="register-password-rules" onChange={(event) => setPassword(event.target.value)} />
         </label>
         <label className="field">
           <span>Nhập lại mật khẩu</span>
           <input type="password" required value={confirm} autoComplete="new-password" onChange={(event) => setConfirm(event.target.value)} />
         </label>
       </div>
+      <PasswordRules value={password} id="register-password-rules" />
 
       <label className="check-row">
         <input type="checkbox" checked={campaignOwner} onChange={(event) => setCampaignOwner(event.target.checked)} />
