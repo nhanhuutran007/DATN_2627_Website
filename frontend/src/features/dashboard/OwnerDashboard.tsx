@@ -307,7 +307,6 @@ export function OwnerDashboard() {
             <Link className="profile-side-link" href="/ho-so">
               <Icon name="user" size={18} />
               <span>Hồ sơ, bảo mật và quyền riêng tư</span>
-              <Icon name="arrow-right" size={16} />
             </Link>
             <section className="panel" aria-labelledby="minh-bach-note">
               <h2 id="minh-bach-note" className="panel-title-sm">Số liệu được tính thế nào?</h2>

@@ -151,10 +151,6 @@ export default async function Home() {
                 <li key={point}><Icon name="check" size={15} /> {point}</li>
               ))}
             </ul>
-            <div className="about-actions">
-              <Link className="button button-primary" href="/du-an">Xem dự án</Link>
-              <Link className="link-arrow" href="/tao-chien-dich">Bạn có dự án? Tạo chiến dịch <Icon name="arrow-right" size={16} /></Link>
-            </div>
           </div>
         </div>
       </section>
@@ -175,7 +171,7 @@ export default async function Home() {
           ) : (
             <p className="muted-center">Chưa có chiến dịch nào được phát hành.</p>
           )}
-          <div className="block-more"><Link className="button button-outline" href="/du-an">Xem tất cả dự án</Link></div>
+          <div className="block-more"><Link className="button button-outline" href="/tim-kiem">Xem tất cả dự án</Link></div>
         </div>
       </section>
 

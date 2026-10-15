@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { AccountShell } from "@/features/profile/AccountShell";
 import { useAuthUser } from "@/lib/auth";
 import { timeAgo } from "@/lib/time";
 import {
@@ -135,22 +136,24 @@ export function NotificationCenter() {
   };
 
   return (
-    <main className="container notification-page">
-      <header className="notification-head">
-        <div>
-          <h1>Thông báo</h1>
-          <p>{unread > 0 ? `Bạn có ${unread} thông báo chưa đọc.` : "Bạn đã đọc hết thông báo."}</p>
+    <AccountShell active="notifications">
+      <section className="account-intro" aria-labelledby="notification-title">
+        <h2 id="notification-title">Không bỏ lỡ cập nhật nào</h2>
+        <p>
+          Kết quả xét duyệt, khoản ủng hộ và tiến độ của các dự án bạn tạo, ủng hộ hoặc theo dõi đều được gửi về đây.{" "}
+          {unread > 0 ? <b>Bạn có {unread} thông báo chưa đọc.</b> : "Bạn đã đọc hết thông báo."}
+        </p>
+      </section>
+
+      <div className="notification-tools">
+        <div className="notification-filter" role="group" aria-label="Lọc thông báo">
+          <button className="account-chip" type="button" aria-pressed={!unreadOnly} onClick={() => changeFilter(false)}>Tất cả</button>
+          <button className="account-chip" type="button" aria-pressed={unreadOnly} onClick={() => changeFilter(true)}>Chưa đọc</button>
         </div>
-        <div className="notification-tools">
-          <div className="notification-filter" role="group" aria-label="Lọc thông báo">
-            <button className="tab" type="button" aria-pressed={!unreadOnly} onClick={() => changeFilter(false)}>Tất cả</button>
-            <button className="tab" type="button" aria-pressed={unreadOnly} onClick={() => changeFilter(true)}>Chưa đọc</button>
-          </div>
-          <button className="button button-outline button-sm" type="button" disabled={busy || unread === 0} onClick={readAll}>
-            <Icon name="check" size={16} /> Đánh dấu tất cả đã đọc
-          </button>
-        </div>
-      </header>
+        <button className="account-pill" type="button" disabled={busy || unread === 0} onClick={readAll}>
+          Đánh dấu tất cả đã đọc
+        </button>
+      </div>
 
       {state === "loading" && <p className="empty-line" role="status">Đang tải thông báo…</p>}
 
@@ -196,9 +199,9 @@ export function NotificationCenter() {
 
       {state === "ready" && items.length < total && (
         <div className="notification-more">
-          <button className="button button-outline" type="button" onClick={loadMore}>Xem thêm</button>
+          <button className="account-pill" type="button" onClick={loadMore}>Xem thêm</button>
         </div>
       )}
-    </main>
+    </AccountShell>
   );
 }

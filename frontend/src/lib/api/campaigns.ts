@@ -218,7 +218,8 @@ function statusToDisplay(status: ApiCampaignStatus): CampaignStatus {
   }
 }
 
-function imageByCategory(category: string): Campaign["image"] {
+/** Ảnh minh họa theo lĩnh vực khi chiến dịch chưa có ảnh riêng. */
+export function imageByCategory(category: string): Campaign["image"] {
   switch (category) {
     case "Môi trường":
     case "Nông nghiệp":

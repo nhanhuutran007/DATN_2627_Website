@@ -211,8 +211,8 @@ export function CampaignReviewDialog({ campaign, statusLabel, actions, onClose }
       </div>
 
       <footer className="review-foot">
-        <a className="link-inline" href={`/du-an/${campaign.id}`} target="_blank" rel="noreferrer">
-          Xem như người ủng hộ <Icon name="arrow-right" size={14} />
+        <a className="button button-outline button-sm" href={`/du-an/${campaign.id}`} target="_blank" rel="noreferrer">
+          Xem như người ủng hộ<span className="sr-only"> (mở tab mới)</span>
         </a>
         {detail ? actions : <span />}
       </footer>

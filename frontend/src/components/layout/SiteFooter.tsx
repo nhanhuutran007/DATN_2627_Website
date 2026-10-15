@@ -32,6 +32,7 @@ const COLUMNS: Array<{ id: string; title: string; links: FooterLink[] }> = [
       { href: "/#quy-trinh", label: "Cách hoạt động" },
       { href: "/#minh-bach", label: "Cam kết minh bạch" },
       { href: "/nguon-anh", label: "Nguồn ảnh" },
+      { href: "/chinh-sach-bao-mat", label: "Quyền riêng tư" },
     ],
   },
   {
@@ -40,7 +41,7 @@ const COLUMNS: Array<{ id: string; title: string; links: FooterLink[] }> = [
     links: [
       { href: "/dang-nhap", label: "Đăng nhập" },
       { href: "/dang-ky", label: "Đăng ký" },
-      { href: "/ho-so", label: "Hồ sơ cá nhân" },
+      { href: "/ho-so", label: "Cài đặt tài khoản" },
     ],
   },
 ];

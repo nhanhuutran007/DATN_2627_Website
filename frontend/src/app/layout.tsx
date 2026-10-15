@@ -1,11 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro, Montserrat } from "next/font/google";
+import { Suspense } from "react";
 
 import { ChromeGate } from "@/components/layout/ChromeGate";
+import { RouteTransition } from "@/components/layout/RouteTransition";
+import { ScrollReset } from "@/components/layout/ScrollReset";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { DialogProvider } from "@/components/ui/DialogProvider";
 import { AiConsentBanner } from "@/features/ai-consent/AiConsentBanner";
+import { PrivacyNotice } from "@/features/privacy/PrivacyNotice";
 import { siteUrl } from "@/lib/site";
 
 import "./theme.css";
@@ -58,7 +62,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className={`${bodyFont.variable} ${headingFont.variable}`}>
+    // data-scroll-behavior: Next tạm tắt cuộn mượt (theme.css) khi chuyển trang, tránh trang dừng lệch giữa chừng.
+    <html lang="vi" className={`${bodyFont.variable} ${headingFont.variable}`} data-scroll-behavior="smooth">
       <body>
         <DialogProvider>
           <ChromeGate>
@@ -70,6 +75,11 @@ export default function RootLayout({
           <ChromeGate>
             <SiteFooter />
           </ChromeGate>
+          <PrivacyNotice />
+          <RouteTransition />
+          <Suspense fallback={null}>
+            <ScrollReset />
+          </Suspense>
         </DialogProvider>
       </body>
     </html>
