@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { LogoMark } from "@/components/ui/LogoMark";
 import { Icon } from "@/components/ui/Icon";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { PROVINCES } from "@/lib/provinces";
@@ -33,12 +34,26 @@ import {
 import { createRewardTier, deleteRewardTier } from "@/lib/api/rewards";
 import { useAuthUser } from "@/lib/auth";
 
+/** Mỗi bước một chủ đề như GoFundMe: tiêu đề + lời dẫn hiện ở cột trái, câu hỏi ở cột phải. */
 const STEPS = [
-  { title: "Thông tin cơ bản", hint: "Tên, lĩnh vực, mục tiêu, thời hạn" },
-  { title: "Câu chuyện & ngân sách", hint: "Vấn đề, cách làm, dự toán, rủi ro" },
-  { title: "Kế hoạch theo mốc", hint: "Các đầu ra có hạn và ngân sách" },
-  { title: "Kiểm tra & gửi duyệt", hint: "Rà soát trước khi gửi" },
+  { title: "Hãy bắt đầu hành trình gây quỹ của bạn", intro: "Góp Mầm đồng hành cùng bạn qua từng bước." },
+  { title: "Đặt mục tiêu gây quỹ", intro: "Chọn số tiền cần huy động và thời hạn. Bạn vẫn chỉnh lại được trước khi gửi duyệt." },
+  { title: "Thêm ảnh đại diện cho dự án", intro: "Ảnh thật giúp người ủng hộ hình dung rõ dự án và tin tưởng hơn." },
+  { title: "Kể câu chuyện của dự án", intro: "Vấn đề là gì, ai được hưởng lợi và bạn sẽ giải quyết bằng cách nào." },
+  { title: "Minh bạch ngân sách và rủi ro", intro: "Người ủng hộ muốn biết tiền được dùng vào đâu và bạn đã lường trước những khó khăn gì." },
+  { title: "Lập kế hoạch theo mốc", intro: "Mỗi mốc là một đầu ra kiểm chứng được. Sau khi được duyệt, bạn báo cáo tiến độ và chi tiêu theo từng mốc." },
+  { title: "Quà tri ân người ủng hộ", intro: "Không bắt buộc. Bạn có thể tặng quà theo mức ủng hộ để cảm ơn cộng đồng." },
+  { title: "Kiểm tra và gửi duyệt", intro: "Rà soát lần cuối. Hồ sơ chỉ được công khai sau khi quản trị viên duyệt." },
 ];
+
+const STEP_BASICS = 0;
+const STEP_GOAL = 1;
+const STEP_IMAGE = 2;
+const STEP_STORY = 3;
+const STEP_BUDGET = 4;
+const STEP_MILESTONES = 5;
+const STEP_REWARDS = 6;
+const LAST_STEP = STEPS.length - 1;
 
 
 type DraftMilestone = { title: string; deadline: string; budget: string; output: string };
@@ -60,7 +75,7 @@ const emptyMilestone: DraftMilestone = { title: "", deadline: "", budget: "", ou
 
 const initialDraft: Draft = {
   title: "",
-  category: "Giáo dục",
+  category: "",
   location: "",
   target: "",
   deadline: "",
@@ -143,16 +158,14 @@ export function CampaignWizard() {
   const formRef = useRef<HTMLFormElement>(null);
   const firstRender = useRef(true);
 
-  // Đổi bước: đưa về đầu form, không để trình duyệt giữ vị trí cuộn của nút "Tiếp tục" ở cuối trang.
+  // Đổi bước: về đầu trang và đưa focus vào form (để trình đọc màn hình đọc câu hỏi mới).
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
-    const form = formRef.current;
-    if (!form) return;
-    form.scrollIntoView({ behavior: "smooth", block: "start" });
-    form.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: "instant" });
+    formRef.current?.focus({ preventScroll: true });
   }, [step]);
   const [draft, setDraft] = useState(initialDraft);
   const categories = useCategories();
@@ -175,6 +188,8 @@ export function CampaignWizard() {
   const plannedBudget = milestones.reduce((sum, m) => sum + (Number(m.budget) || 0), 0);
   const target = Number(draft.target) || 0;
   const storyLength = htmlToText(draft.story).length;
+  // Lĩnh vực đã chọn nhưng admin vừa tắt: vẫn hiện để người dùng thấy và đổi.
+  const categoryChoices = draft.category && !categories.includes(draft.category) ? [...categories, draft.category] : categories;
 
   const checks = useMemo(
     () => [
@@ -204,30 +219,50 @@ export function CampaignWizard() {
     setNotice("");
   };
 
-  const validateStep = (index: number): string => {
-    if (index === 0) {
-      if (!draft.title.trim() || !draft.location.trim() || !draft.deadline) return "Vui lòng nhập tên, chọn địa điểm và ngày kết thúc.";
+  /** Lỗi của một bước; `forDraft` chỉ đòi các trường bắt buộc để lưu nháp (bước câu chuyện chỉ cần tên). */
+  const validateStep = (index: number, forDraft = false): string => {
+    if (index === STEP_BASICS) {
+      if (!draft.location.trim()) return "Vui lòng chọn tỉnh/thành nơi thực hiện dự án.";
+      if (!draft.category) return "Vui lòng chọn lĩnh vực của dự án.";
+    }
+    if (index === STEP_GOAL) {
       if (target < MIN_TARGET) return "Mục tiêu tối thiểu là 1.000.000 ₫.";
+      if (!draft.deadline) return "Vui lòng chọn ngày kết thúc gây quỹ.";
       if (draft.deadline < minDeadline()) return "Ngày kết thúc phải cách hôm nay ít nhất 1 tháng.";
+    }
+    if (index === STEP_IMAGE) {
       if (draft.imageUrl.trim() && !isImageValue(draft.imageUrl.trim())) return "Link ảnh phải bắt đầu bằng http:// hoặc https://";
     }
-    if (index === 1) {
-      if (storyLength < MIN_STORY) return `Câu chuyện cần ít nhất ${MIN_STORY} ký tự.`;
+    if (index === STEP_STORY) {
+      if (!draft.title.trim()) return "Vui lòng đặt tên cho chiến dịch.";
+      if (!forDraft && storyLength < MIN_STORY) return `Câu chuyện cần ít nhất ${MIN_STORY} ký tự.`;
+    }
+    if (index === STEP_BUDGET && !forDraft) {
       if (!htmlToText(draft.budget) || !htmlToText(draft.risks)) return "Vui lòng nhập dự toán sử dụng vốn và rủi ro.";
     }
-    if (index === 2) {
-      const milestoneError = validateMilestones(milestones);
-      if (milestoneError) return milestoneError;
-      const tierError = validateTiers(tiers);
-      if (tierError) return tierError;
-    }
+    if (index === STEP_MILESTONES) return validateMilestones(milestones);
+    if (index === STEP_REWARDS) return validateTiers(tiers);
     return "";
+  };
+
+  /** Bước đầu tiên còn lỗi (để nhảy tới đó), hoặc null nếu tất cả hợp lệ. */
+  const firstInvalid = (forDraft: boolean): { index: number; message: string } | null => {
+    for (let index = 0; index < LAST_STEP; index += 1) {
+      const message = validateStep(index, forDraft);
+      if (message) return { index, message };
+    }
+    return null;
+  };
+
+  const goTo = (index: number) => {
+    setError("");
+    setStep(Math.max(0, Math.min(LAST_STEP, index)));
   };
 
   const goNext = () => {
     const message = validateStep(step);
     setError(message);
-    if (!message) setStep((current) => Math.min(STEPS.length - 1, current + 1));
+    if (!message) setStep((current) => Math.min(LAST_STEP, current + 1));
   };
 
   const toPayload = (): CreateCampaignPayload => {
@@ -290,16 +325,10 @@ export function CampaignWizard() {
 
   const saveDraft = async () => {
     if (requireLogin()) return;
-    const message = validateStep(0);
-    if (message) {
-      setError(message);
-      setStep(0);
-      return;
-    }
-    const tierError = validateMilestones(milestones) || validateTiers(tiers);
-    if (tierError) {
-      setError(tierError);
-      setStep(2);
+    const invalid = firstInvalid(true);
+    if (invalid) {
+      setError(invalid.message);
+      setStep(invalid.index);
       return;
     }
     setError("");
@@ -317,14 +346,15 @@ export function CampaignWizard() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setNotice("");
-    if (step < STEPS.length - 1) {
+    if (step < LAST_STEP) {
       goNext();
       return;
     }
     if (requireLogin()) return;
-    const firstInvalid = [0, 1, 2].map(validateStep).find(Boolean);
-    if (firstInvalid) {
-      setError(firstInvalid);
+    const invalid = firstInvalid(false);
+    if (invalid) {
+      setError(invalid.message);
+      setStep(invalid.index);
       return;
     }
     if (!declared) {
@@ -344,197 +374,257 @@ export function CampaignWizard() {
     }
   };
 
-  if (submitted && campaignId) {
-    return (
-      <section className="panel wizard-done" aria-live="polite">
-        <span className="done-icon"><Icon name="check" size={30} /></span>
-        <h2>Đã gửi hồ sơ, đang chờ kiểm duyệt</h2>
-        <p>Quản trị viên sẽ duyệt, yêu cầu bổ sung hoặc từ chối kèm lý do. Bạn theo dõi trạng thái trong trang quản lý.</p>
-        <div className="wizard-done-actions">
-          <Link className="button button-primary" href="/dashboard">Về trang quản lý</Link>
-          <Link className="button button-outline" href={`/du-an/${campaignId}`}>Xem hồ sơ</Link>
-        </div>
-      </section>
-    );
-  }
+  const done = submitted && campaignId;
+  const side = done
+    ? { title: "Cảm ơn bạn đã gửi hồ sơ", intro: "Chúng tôi sẽ thông báo cho bạn ngay khi có kết quả xét duyệt." }
+    : STEPS[step];
 
   return (
-    <div className="wizard">
-      <aside className="wizard-steps panel">
-        <h2 className="panel-title-sm">Các bước</h2>
-        <ol>
-          {STEPS.map((item, index) => (
-            <li className={index === step ? "is-current" : index < step ? "is-done" : ""} key={item.title}>
-              <button type="button" disabled={index > step} onClick={() => { setError(""); setStep(index); }}>
-                <span className="wizard-no">{index < step ? <Icon name="check" size={14} /> : index + 1}</span>
-                <span><b>{item.title}</b><small>{item.hint}</small></span>
-              </button>
-            </li>
-          ))}
-        </ol>
-        <div className="wizard-progress">
-          <span>Hồ sơ đạt <b>{passed}/{checks.length}</b> tiêu chí</span>
-          <div className="meter"><span style={{ width: `${(passed / checks.length) * 100}%` }} /></div>
+    <div className="create-shell">
+      <aside className="create-side">
+        <Link className="create-logo" href="/" aria-label="Góp Mầm – Trang chủ">
+          <LogoMark size={36} />
+        </Link>
+        <div className="create-side-copy">
+          {!done && <p className="create-step-count">Bước {step + 1}/{STEPS.length}</p>}
+          <h1>{side.title}</h1>
+          <p>{side.intro}</p>
         </div>
-        {!user && <p className="hint">Bạn cần đăng nhập để lưu nháp hoặc gửi hồ sơ.</p>}
-        {campaignId && <p className="hint">Bản nháp đã lưu. Các lần lưu sau sẽ cập nhật bản nháp này.</p>}
+        {!done && (
+          <p className="create-side-meta">
+            Hồ sơ đạt <b>{passed}/{checks.length}</b> tiêu chí
+            {campaignId && <> · Đã lưu nháp</>}
+          </p>
+        )}
       </aside>
 
-      <form ref={formRef} className="panel wizard-form" tabIndex={-1} onSubmit={submit} noValidate>
-        <p className="wizard-count">Bước {step + 1}/{STEPS.length}</p>
-        <h2>{STEPS[step].title}</h2>
+      <section className="create-main">
+        <div className="create-top">
+          {user ? (
+            <Link href="/dashboard">Trang quản lý</Link>
+          ) : (
+            <Link href="/dang-nhap?next=/tao-chien-dich">Đăng nhập</Link>
+          )}
+        </div>
 
-        {step === 0 && (
-          <div className="form">
-            <label className="field">
-              <span>Tên chiến dịch *</span>
-              <input value={draft.title} maxLength={200} placeholder="Ví dụ: Thư viện nhỏ cho điểm trường vùng cao" onChange={(e) => update("title", e.target.value)} />
-              <small>{draft.title.length}/200</small>
-            </label>
-            <div className="field-row">
-              <label className="field">
-                <span>Lĩnh vực *</span>
-                <select value={draft.category} onChange={(e) => update("category", e.target.value)}>
-                  {categories.map((category) => <option key={category}>{category}</option>)}
-                  {draft.category && !categories.includes(draft.category) && (
-                    <option value={draft.category}>{draft.category} (đã ngừng nhận dự án mới)</option>
-                  )}
-                </select>
-              </label>
-              <label className="field">
-                <span>Địa điểm thực hiện *</span>
-                <select value={draft.location} onChange={(e) => update("location", e.target.value)}>
-                  <option value="" disabled>Chọn tỉnh/thành</option>
-                  {PROVINCES.map((province) => <option key={province}>{province}</option>)}
-                </select>
-              </label>
-              <label className="field">
-                <span>Mục tiêu (VNĐ) *</span>
-                <MoneyInput value={draft.target} placeholder="50.000.000đ" onChange={(digits) => update("target", digits)} />
-              </label>
-              <label className="field">
-                <span>Ngày kết thúc *</span>
-                <input type="date" min={minDeadline()} value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
-              </label>
-            </div>
-            <ImageUploader
-              label="Ảnh đại diện"
-              value={draft.imageUrl}
-              onChange={(url) => update("imageUrl", url)}
-              disabled={busy}
-              hint="Ảnh thật của dự án giúp người ủng hộ tin tưởng hơn. Bỏ trống sẽ dùng ảnh minh họa theo lĩnh vực."
-            />
-            <label className="field">
-              <span>Mô tả ngắn</span>
-              <textarea rows={3} maxLength={220} value={draft.summary} placeholder="Tác động chính của dự án trong 1–2 câu" onChange={(e) => update("summary", e.target.value)} />
-              <small>{draft.summary.length}/220</small>
-            </label>
-          </div>
-        )}
-
-        {step === 1 && (
-          <div className="form">
-            <div className="field">
-              <span>Câu chuyện dự án *</span>
-              <RichTextEditor value={draft.story} placeholder="Vấn đề là gì, ai được hưởng lợi, dự án giải quyết bằng cách nào…" disabled={busy} onChange={(html) => update("story", html)} />
-              <small>{storyLength}/{MIN_STORY} ký tự tối thiểu</small>
-            </div>
-            <div className="field">
-              <span>Dự toán sử dụng vốn *</span>
-              <RichTextEditor value={draft.budget} placeholder="Hạng mục, số tiền và căn cứ ước tính" disabled={busy} onChange={(html) => update("budget", html)} />
-            </div>
-            <div className="field">
-              <span>Rủi ro và phương án ứng phó *</span>
-              <RichTextEditor value={draft.risks} placeholder="Rủi ro về tiến độ, chi phí, vận hành…" disabled={busy} onChange={(html) => update("risks", html)} />
+        {done ? (
+          <div className="create-body create-done" aria-live="polite">
+            <span className="done-icon"><Icon name="check" size={30} /></span>
+            <h2>Đã gửi hồ sơ, đang chờ kiểm duyệt</h2>
+            <p>Quản trị viên sẽ duyệt, yêu cầu bổ sung hoặc từ chối kèm lý do. Bạn theo dõi trạng thái trong trang quản lý.</p>
+            <div className="wizard-done-actions">
+              <Link className="button button-primary" href="/dashboard">Về trang quản lý</Link>
+              <Link className="button button-outline" href={`/du-an/${campaignId}`}>Xem hồ sơ</Link>
             </div>
           </div>
-        )}
+        ) : (
+          <form ref={formRef} className="create-form" tabIndex={-1} onSubmit={submit} noValidate aria-label={STEPS[step].title}>
+            <div className="create-body">
+              {!user && step === STEP_BASICS && (
+                <p className="create-login-hint">
+                  Bạn có thể soạn trước; cần <Link href="/dang-nhap?next=/tao-chien-dich">đăng nhập</Link> để lưu nháp hoặc gửi duyệt.
+                </p>
+              )}
 
-        {step === 2 && (
-          <div className="form">
-            <p className="hint">Mỗi mốc là một đầu ra kiểm chứng được. Sau khi dự án được duyệt, bạn báo cáo tiến độ và chi tiêu theo từng mốc.</p>
-            {milestones.map((milestone, index) => (
-              <fieldset className="milestone" key={index}>
-                <legend>Mốc {index + 1}</legend>
-                <div className="field-row">
-                  <label className="field field-span-2">
-                    <span>Tên mốc</span>
-                    <input value={milestone.title} placeholder="Ví dụ: Mua sách và kệ" onChange={(e) => updateMilestone(index, "title", e.target.value)} />
-                  </label>
-                  <label className="field">
-                    <span>Hạn hoàn thành</span>
-                    <input type="date" min={minMilestoneDate(milestones, index)} value={milestone.deadline} onChange={(e) => updateMilestone(index, "deadline", e.target.value)} />
-                  </label>
-                  <label className="field">
-                    <span>Ngân sách (VNĐ)</span>
-                    <input type="number" min={0} value={milestone.budget} placeholder="0" onChange={(e) => updateMilestone(index, "budget", e.target.value)} />
-                  </label>
-                  <label className="field field-span-4">
-                    <span>Kết quả đầu ra</span>
-                    <input value={milestone.output} placeholder="Sản phẩm hoặc chỉ số có thể kiểm chứng" onChange={(e) => updateMilestone(index, "output", e.target.value)} />
+              {step === STEP_BASICS && (
+                <>
+                  <div className="create-q">
+                    <label htmlFor="create-location">Dự án được thực hiện ở đâu?</label>
+                    <p>Chọn tỉnh/thành nơi dự án diễn ra.</p>
+                    <select id="create-location" value={draft.location} onChange={(e) => update("location", e.target.value)}>
+                      <option value="" disabled>Chọn tỉnh/thành</option>
+                      {PROVINCES.map((province) => <option key={province}>{province}</option>)}
+                    </select>
+                  </div>
+                  <fieldset className="create-q">
+                    <legend>Lĩnh vực nào mô tả đúng nhất dự án của bạn?</legend>
+                    <div className="create-chips">
+                      {categoryChoices.map((category) => (
+                        <button
+                          aria-pressed={draft.category === category}
+                          className="create-chip"
+                          key={category}
+                          type="button"
+                          onClick={() => update("category", category)}
+                        >
+                          {category}
+                          {!categories.includes(category) && " (đã ngừng nhận dự án mới)"}
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                </>
+              )}
+
+              {step === STEP_GOAL && (
+                <>
+                  <div className="create-q">
+                    <label htmlFor="create-target">Bạn cần huy động bao nhiêu?</label>
+                    <p>Tối thiểu 1.000.000 ₫. Tổng ngân sách các mốc ở bước sau nên khớp với con số này.</p>
+                    <MoneyInput id="create-target" value={draft.target} placeholder="50.000.000đ" onChange={(digits) => update("target", digits)} />
+                  </div>
+                  <div className="create-q">
+                    <label htmlFor="create-deadline">Khi nào kết thúc gây quỹ?</label>
+                    <p>Cách hôm nay ít nhất 1 tháng.</p>
+                    <input id="create-deadline" type="date" min={minDeadline()} value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
+                  </div>
+                </>
+              )}
+
+              {step === STEP_IMAGE && (
+                <div className="create-q">
+                  <ImageUploader
+                    label="Ảnh đại diện"
+                    value={draft.imageUrl}
+                    onChange={(url) => update("imageUrl", url)}
+                    disabled={busy}
+                    hint="Bỏ trống sẽ dùng ảnh minh họa theo lĩnh vực."
+                  />
+                </div>
+              )}
+
+              {step === STEP_STORY && (
+                <>
+                  <div className="create-q">
+                    <label htmlFor="create-title">Đặt tên cho chiến dịch</label>
+                    <input id="create-title" value={draft.title} maxLength={200} placeholder="Ví dụ: Thư viện nhỏ cho điểm trường vùng cao" onChange={(e) => update("title", e.target.value)} />
+                    <small>{draft.title.length}/200</small>
+                  </div>
+                  <div className="create-q">
+                    <label htmlFor="create-summary">Mô tả ngắn</label>
+                    <p>Tác động chính của dự án trong 1–2 câu, hiển thị ở danh sách dự án.</p>
+                    <textarea id="create-summary" rows={3} maxLength={220} value={draft.summary} onChange={(e) => update("summary", e.target.value)} />
+                    <small>{draft.summary.length}/220</small>
+                  </div>
+                  <div className="create-q">
+                    <span className="create-q-label">Câu chuyện dự án</span>
+                    <RichTextEditor value={draft.story} placeholder="Vấn đề là gì, ai được hưởng lợi, dự án giải quyết bằng cách nào…" disabled={busy} onChange={(html) => update("story", html)} />
+                    <small>{storyLength}/{MIN_STORY} ký tự tối thiểu</small>
+                  </div>
+                </>
+              )}
+
+              {step === STEP_BUDGET && (
+                <>
+                  <div className="create-q">
+                    <span className="create-q-label">Dự toán sử dụng vốn</span>
+                    <p>Hạng mục, số tiền và căn cứ ước tính.</p>
+                    <RichTextEditor value={draft.budget} placeholder="Ví dụ: Mua 500 đầu sách – 25.000.000 ₫ (theo báo giá nhà sách)" disabled={busy} onChange={(html) => update("budget", html)} />
+                  </div>
+                  <div className="create-q">
+                    <span className="create-q-label">Rủi ro và phương án ứng phó</span>
+                    <p>Rủi ro về tiến độ, chi phí, vận hành và cách bạn xử lý.</p>
+                    <RichTextEditor value={draft.risks} placeholder="Ví dụ: Giá sách tăng – ưu tiên đầu sách thiết yếu, kêu gọi tặng sách cũ" disabled={busy} onChange={(html) => update("risks", html)} />
+                  </div>
+                </>
+              )}
+
+              {step === STEP_MILESTONES && (
+                <div className="form">
+                  {milestones.map((milestone, index) => (
+                    <fieldset className="milestone" key={index}>
+                      <legend>Mốc {index + 1}</legend>
+                      <div className="field-row">
+                        <label className="field field-span-4">
+                          <span>Tên mốc</span>
+                          <input value={milestone.title} placeholder="Ví dụ: Mua sách và kệ" onChange={(e) => updateMilestone(index, "title", e.target.value)} />
+                        </label>
+                        <label className="field field-span-2">
+                          <span>Hạn hoàn thành</span>
+                          <input type="date" min={minMilestoneDate(milestones, index)} value={milestone.deadline} onChange={(e) => updateMilestone(index, "deadline", e.target.value)} />
+                        </label>
+                        <label className="field field-span-2">
+                          <span>Ngân sách (VNĐ)</span>
+                          <input type="number" min={0} value={milestone.budget} placeholder="0" onChange={(e) => updateMilestone(index, "budget", e.target.value)} />
+                        </label>
+                        <label className="field field-span-4">
+                          <span>Kết quả đầu ra</span>
+                          <input value={milestone.output} placeholder="Sản phẩm hoặc chỉ số có thể kiểm chứng" onChange={(e) => updateMilestone(index, "output", e.target.value)} />
+                        </label>
+                      </div>
+                      {milestones.length > 1 && (
+                        <button className="link-danger" type="button" onClick={() => setMilestones((c) => c.filter((_, i) => i !== index))}>
+                          Xóa mốc này
+                        </button>
+                      )}
+                    </fieldset>
+                  ))}
+                  <div className="milestone-foot">
+                    <button className="button button-outline" type="button" onClick={() => setMilestones((c) => [...c, { ...emptyMilestone }])}>
+                      + Thêm mốc
+                    </button>
+                    <span>Tổng ngân sách các mốc: <b>{plannedBudget.toLocaleString("vi-VN")} ₫</b>{target > 0 && ` / mục tiêu ${target.toLocaleString("vi-VN")} ₫`}</span>
+                  </div>
+                </div>
+              )}
+
+              {step === STEP_REWARDS && (
+                <RewardTiersEditor tiers={tiers} onChange={(next) => { setTiers(next); setNotice(""); }} />
+              )}
+
+              {step === LAST_STEP && (
+                <div className="form">
+                  <dl className="review-grid">
+                    <div><dt>Tên chiến dịch</dt><dd>{draft.title || "—"}</dd></div>
+                    <div><dt>Lĩnh vực</dt><dd>{draft.category || "—"}</dd></div>
+                    <div><dt>Địa điểm</dt><dd>{draft.location || "—"}</dd></div>
+                    <div><dt>Mục tiêu</dt><dd>{target ? `${target.toLocaleString("vi-VN")} ₫` : "—"}</dd></div>
+                    <div><dt>Ngày kết thúc</dt><dd>{draft.deadline ? new Date(draft.deadline).toLocaleDateString("vi-VN") : "—"}</dd></div>
+                    <div><dt>Số mốc</dt><dd>{milestones.filter((m) => m.title.trim()).length}</dd></div>
+                    <div><dt>Mức quà</dt><dd>{tiersToPayloads(tiers).length || "Không có"}</dd></div>
+                  </dl>
+                  <div className="checklist-box">
+                    <h3>Tiêu chí hồ sơ ({passed}/{checks.length})</h3>
+                    <ul>
+                      {checks.map((check) => (
+                        <li className={check.ok ? "is-ok" : ""} key={check.label}>
+                          <Icon name={check.ok ? "check" : "clock"} size={15} /> {check.label}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="hint">Đây là danh sách tự kiểm tra, không phải điểm chấm. Quản trị viên là người quyết định duyệt hồ sơ.</p>
+                  </div>
+                  <label className="check-row">
+                    <input type="checkbox" checked={declared} onChange={(e) => setDeclared(e.target.checked)} />
+                    <span>Tôi xác nhận thông tin là trung thực và cam kết báo cáo tiến độ, chi tiêu theo kế hoạch đã nêu.</span>
                   </label>
                 </div>
-                {milestones.length > 1 && (
-                  <button className="link-danger" type="button" onClick={() => setMilestones((c) => c.filter((_, i) => i !== index))}>
-                    Xóa mốc này
+              )}
+
+              {error && <p className="form-error" role="alert">{error}</p>}
+              {notice && <p className="form-notice" role="status">{notice}</p>}
+            </div>
+
+            <div className="create-bar">
+              <div
+                className="create-progress"
+                role="progressbar"
+                aria-label="Tiến độ soạn hồ sơ"
+                aria-valuemin={1}
+                aria-valuemax={STEPS.length}
+                aria-valuenow={step + 1}
+              >
+                <span style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
+              </div>
+              <div className="create-bar-inner">
+                {step > 0 ? (
+                  <button className="create-back" type="button" disabled={busy} aria-label="Quay lại bước trước" onClick={() => goTo(step - 1)}>
+                    <Icon name="arrow-right" size={20} className="icon-flip" />
                   </button>
+                ) : (
+                  <span />
                 )}
-              </fieldset>
-            ))}
-            <div className="milestone-foot">
-              <button className="button button-outline" type="button" onClick={() => setMilestones((c) => [...c, { ...emptyMilestone }])}>
-                + Thêm mốc
-              </button>
-              <span>Tổng ngân sách các mốc: <b>{plannedBudget.toLocaleString("vi-VN")} ₫</b>{target > 0 && ` / mục tiêu ${target.toLocaleString("vi-VN")} ₫`}</span>
+                <div className="create-bar-actions">
+                  <button className="button button-ghost" type="button" disabled={busy} onClick={() => void saveDraft()}>Lưu nháp</button>
+                  <button className="button button-primary create-next" type="submit" disabled={busy}>
+                    {busy ? "Đang lưu…" : step === LAST_STEP ? "Gửi duyệt" : "Tiếp tục"}
+                  </button>
+                </div>
+              </div>
             </div>
-            <RewardTiersEditor tiers={tiers} onChange={(next) => { setTiers(next); setNotice(""); }} />
-          </div>
+          </form>
         )}
-
-        {step === 3 && (
-          <div className="form">
-            <dl className="review-grid">
-              <div><dt>Tên chiến dịch</dt><dd>{draft.title || "—"}</dd></div>
-              <div><dt>Lĩnh vực</dt><dd>{draft.category}</dd></div>
-              <div><dt>Địa điểm</dt><dd>{draft.location || "—"}</dd></div>
-              <div><dt>Mục tiêu</dt><dd>{target ? `${target.toLocaleString("vi-VN")} ₫` : "—"}</dd></div>
-              <div><dt>Ngày kết thúc</dt><dd>{draft.deadline ? new Date(draft.deadline).toLocaleDateString("vi-VN") : "—"}</dd></div>
-              <div><dt>Số mốc</dt><dd>{milestones.filter((m) => m.title.trim()).length}</dd></div>
-              <div><dt>Mức quà</dt><dd>{tiersToPayloads(tiers).length || "Không có"}</dd></div>
-            </dl>
-            <div className="checklist-box">
-              <h3>Tiêu chí hồ sơ ({passed}/{checks.length})</h3>
-              <ul>
-                {checks.map((check) => (
-                  <li className={check.ok ? "is-ok" : ""} key={check.label}>
-                    <Icon name={check.ok ? "check" : "clock"} size={15} /> {check.label}
-                  </li>
-                ))}
-              </ul>
-              <p className="hint">Đây là danh sách tự kiểm tra, không phải điểm chấm. Quản trị viên là người quyết định duyệt hồ sơ.</p>
-            </div>
-            <label className="check-row">
-              <input type="checkbox" checked={declared} onChange={(e) => setDeclared(e.target.checked)} />
-              <span>Tôi xác nhận thông tin là trung thực và cam kết báo cáo tiến độ, chi tiêu theo kế hoạch đã nêu.</span>
-            </label>
-          </div>
-        )}
-
-        {error && <p className="form-error" role="alert">{error}</p>}
-        {notice && <p className="form-notice" role="status">{notice}</p>}
-
-        <div className="wizard-actions">
-          <button className="button button-outline" type="button" disabled={step === 0 || busy} onClick={() => { setError(""); setStep((c) => Math.max(0, c - 1)); }}>
-            Quay lại
-          </button>
-          <div>
-            <button className="button button-ghost" type="button" disabled={busy} onClick={saveDraft}>Lưu nháp</button>
-            <button className="button button-primary" type="submit" disabled={busy}>
-              {busy ? "Đang lưu…" : step === STEPS.length - 1 ? "Gửi duyệt" : "Tiếp tục"}
-            </button>
-          </div>
-        </div>
-      </form>
+      </section>
     </div>
   );
 }

@@ -8,7 +8,6 @@ import { Icon } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { logoutRequest } from "@/lib/api";
-import { useCategories } from "@/lib/api/categories";
 import { useAuthUser } from "@/lib/auth";
 
 type MenuKey = "ung-ho" | "gay-quy" | "gioi-thieu" | "tai-khoan";
@@ -17,6 +16,17 @@ type MenuKey = "ung-ho" | "gay-quy" | "gioi-thieu" | "tai-khoan";
 const SCROLL_THRESHOLD = 80;
 type MenuLink = { href: string; label: string; hint?: string };
 
+const ROLE_LABEL: Record<"user" | "campaign_owner" | "admin", string> = {
+  user: "Người ủng hộ",
+  campaign_owner: "Chủ dự án",
+  admin: "Quản trị viên",
+};
+
+/** Tên gọi kiểu Việt: chữ cuối của họ tên ("Trần Hữu Nhân" → "Nhân"). */
+function givenName(name: string): string {
+  return name.trim().split(/\s+/).pop() ?? name;
+}
+
 const ABOUT_LINKS: MenuLink[] = [
   { href: "/#quy-trinh", label: "Cách hoạt động", hint: "Từ tạo hồ sơ đến báo cáo chi tiêu" },
   { href: "/#minh-bach", label: "Cam kết minh bạch", hint: "Kiểm duyệt, sổ cái, chứng từ" },
@@ -24,17 +34,15 @@ const ABOUT_LINKS: MenuLink[] = [
 ];
 
 /**
- * Header 3 phần: trái (Tìm kiếm · Ủng hộ · Gây quỹ), logo ở giữa, phải (Giới thiệu ·
- * tài khoản · Tạo chiến dịch). Màn hình hẹp: chỉ còn tìm kiếm, logo, chuông và nút trình đơn.
+ * Header 3 phần: trái (Tìm kiếm · Ủng hộ · Gây quỹ · Giới thiệu), logo ở giữa, phải (tài khoản ·
+ * thông báo · Tạo chiến dịch) — "Giới thiệu" ở bên trái để hai bên logo cân nhau khi đã đăng nhập. Màn hình hẹp: chỉ còn tìm kiếm, logo, chuông và nút trình đơn.
  */
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const user = useAuthUser();
-  const categories = useCategories();
   const [menu, setMenu] = useState<MenuKey | null>(null);
   const [drawer, setDrawer] = useState(false);
-  const [search, setSearch] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
 
@@ -52,24 +60,21 @@ export function SiteHeader() {
   const closeAll = () => {
     setMenu(null);
     setDrawer(false);
-    setSearch(false);
   };
 
-  // Bấm ra ngoài header hoặc nhấn Esc: đóng menu thả xuống / ô tìm kiếm / trình đơn.
+  // Bấm ra ngoài header hoặc nhấn Esc: đóng menu thả xuống / trình đơn.
   useEffect(() => {
-    if (!menu && !drawer && !search) return;
+    if (!menu && !drawer) return;
     const onPointer = (event: PointerEvent) => {
       if (!headerRef.current?.contains(event.target as Node)) {
         setMenu(null);
         setDrawer(false);
-        setSearch(false);
       }
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setMenu(null);
         setDrawer(false);
-        setSearch(false);
       }
     };
     document.addEventListener("pointerdown", onPointer);
@@ -78,7 +83,7 @@ export function SiteHeader() {
       document.removeEventListener("pointerdown", onPointer);
       document.removeEventListener("keydown", onKey);
     };
-  }, [menu, drawer, search]);
+  }, [menu, drawer]);
 
   const logout = async () => {
     closeAll();
@@ -88,25 +93,24 @@ export function SiteHeader() {
   };
 
   const toggleMenu = (key: MenuKey) => {
-    setSearch(false);
     setMenu((current) => (current === key ? null : key));
   };
 
   const donateLinks: MenuLink[] = [
-    { href: "/du-an", label: "Khám phá dự án", hint: "Tất cả chiến dịch đã được duyệt" },
-    ...categories.slice(0, 6).map((name) => ({ href: `/du-an?category=${encodeURIComponent(name)}`, label: name })),
+    { href: "/du-an", label: "Khám phá dự án", hint: "Duyệt dự án theo lĩnh vực" },
   ];
   const fundraiseLinks: MenuLink[] = [
-    { href: "/tao-chien-dich", label: "Tạo chiến dịch", hint: "Soạn hồ sơ 4 bước, gửi duyệt" },
+    { href: "/tao-chien-dich", label: "Tạo chiến dịch", hint: "Soạn hồ sơ theo từng bước, gửi duyệt" },
     { href: "/#quy-trinh", label: "Quy trình gây quỹ", hint: "Kiểm duyệt, nhận ủng hộ, báo cáo tiến độ" },
     ...(user ? [{ href: "/dashboard", label: "Quản lý chiến dịch", hint: "Tiến độ, số liệu, chi tiêu" }] : []),
   ];
+  // Theo menu tài khoản GoFundMe (Profile · Your impact · Messages · Account settings · Sign out), admin có thêm trang quản trị.
   const accountLinks: MenuLink[] = user
     ? [
-        { href: "/dashboard", label: "Trang quản lý" },
-        { href: "/ho-so", label: "Hồ sơ cá nhân" },
+        ...(user.role === "admin" ? [{ href: "/admin", label: "Trang quản trị" }] : []),
+        { href: "/dashboard", label: "Hoạt động của bạn" },
         { href: "/thong-bao", label: "Thông báo" },
-        ...(user.role === "admin" ? [{ href: "/admin", label: "Quản trị hệ thống" }] : []),
+        { href: "/ho-so", label: "Cài đặt tài khoản" },
       ]
     : [];
 
@@ -114,25 +118,19 @@ export function SiteHeader() {
     <header className={`site-top${scrolled ? " is-scrolled" : ""}`} ref={headerRef}>
       <div className="container gh-bar">
         <div className="gh-left">
-          <button
-            className="gh-link gh-search-toggle"
-            type="button"
-            aria-expanded={search}
-            aria-controls="gh-search"
-            onClick={() => {
-              setMenu(null);
-              setDrawer(false);
-              setSearch((value) => !value);
-            }}
-          >
+          {/* Như GoFundMe: "Tìm kiếm" mở hẳn trang tìm kiếm (ô tìm lớn + bộ lọc), không mở thanh trượt. */}
+          <Link className="gh-link gh-search-toggle" href="/tim-kiem" onClick={closeAll}>
             <Icon name="search" size={18} /> <span className="gh-label">Tìm kiếm</span>
-          </button>
+          </Link>
           <nav className="gh-nav" aria-label="Điều hướng chính">
             <Dropdown id="ung-ho" label="Ủng hộ" open={menu === "ung-ho"} onToggle={toggleMenu}>
               <MenuList links={donateLinks} onNavigate={closeAll} />
             </Dropdown>
             <Dropdown id="gay-quy" label="Gây quỹ" open={menu === "gay-quy"} onToggle={toggleMenu}>
               <MenuList links={fundraiseLinks} onNavigate={closeAll} />
+            </Dropdown>
+            <Dropdown id="gioi-thieu" label="Giới thiệu" open={menu === "gioi-thieu"} onToggle={toggleMenu}>
+              <MenuList links={ABOUT_LINKS} onNavigate={closeAll} />
             </Dropdown>
           </nav>
         </div>
@@ -144,14 +142,31 @@ export function SiteHeader() {
 
         <div className="gh-right">
           <div className="gh-nav">
-            <Dropdown id="gioi-thieu" label="Giới thiệu" open={menu === "gioi-thieu"} onToggle={toggleMenu} align="end">
-              <MenuList links={ABOUT_LINKS} onNavigate={closeAll} />
-            </Dropdown>
             {user ? (
-              <Dropdown id="tai-khoan" label={user.name} open={menu === "tai-khoan"} onToggle={toggleMenu} align="end">
-                <MenuList links={accountLinks} onNavigate={closeAll} />
-                <button className="gh-menu-item gh-menu-logout" type="button" onClick={logout}>Đăng xuất</button>
-              </Dropdown>
+              <div className="gh-dropdown">
+                <button
+                  className="gh-link gh-account"
+                  type="button"
+                  aria-expanded={menu === "tai-khoan"}
+                  aria-controls="gh-menu-tai-khoan"
+                  aria-label={`Menu tài khoản: ${user.name}`}
+                  onClick={() => toggleMenu("tai-khoan")}
+                >
+                  <span className="gh-link-text">{givenName(user.name)}</span>
+                  <Icon name="chevron-down" size={14} className={menu === "tai-khoan" ? "gh-caret is-open" : "gh-caret"} />
+                </button>
+                {menu === "tai-khoan" && (
+                  <div className="gh-menu gh-menu-end gh-account-menu" id="gh-menu-tai-khoan">
+                    <div className="gh-account-head">
+                      <b>{user.name}</b>
+                      <small>{user.email}</small>
+                      <span className={`tag ${user.role === "admin" ? "tag-blue" : "tag-green"}`}>{ROLE_LABEL[user.role]}</span>
+                    </div>
+                    <MenuList links={accountLinks} onNavigate={closeAll} />
+                    <button className="gh-menu-item gh-menu-logout" type="button" onClick={logout}>Đăng xuất</button>
+                  </div>
+                )}
+              </div>
             ) : (
               <Link className="gh-link" href="/dang-nhap" onClick={closeAll}>Đăng nhập</Link>
             )}
@@ -166,7 +181,6 @@ export function SiteHeader() {
             aria-controls="gh-drawer"
             onClick={() => {
               setMenu(null);
-              setSearch(false);
               setDrawer((value) => !value);
             }}
           >
@@ -174,28 +188,6 @@ export function SiteHeader() {
           </button>
         </div>
       </div>
-
-      {search && (
-        <div className="gh-search" id="gh-search">
-          <form
-            className="container gh-search-form"
-            action="/du-an"
-            role="search"
-            onSubmit={(event) => {
-              // Điều hướng bằng router: đóng ô tìm kiếm trước khi form gửi sẽ hủy việc gửi.
-              event.preventDefault();
-              const q = String(new FormData(event.currentTarget).get("q") ?? "").trim();
-              setSearch(false);
-              router.push(q ? `/du-an?q=${encodeURIComponent(q)}` : "/du-an");
-            }}
-          >
-            <label className="sr-only" htmlFor="gh-search-input">Tìm dự án</label>
-            <Icon name="search" size={20} />
-            <input id="gh-search-input" name="q" placeholder="Tìm theo tên dự án, nội dung hoặc địa phương" autoFocus />
-            <button className="button button-primary" type="submit">Tìm</button>
-          </form>
-        </div>
-      )}
 
       {drawer && (
         <div className="gh-drawer" id="gh-drawer">

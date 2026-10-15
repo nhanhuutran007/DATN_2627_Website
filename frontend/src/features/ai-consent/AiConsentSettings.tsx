@@ -7,7 +7,7 @@ import { updateAiConsent } from "@/lib/api/ai";
 
 type MeResponse = { aiTrackingConsent?: boolean; aiConsentUpdatedAt?: string | null };
 
-/** Công tắc đồng ý cá nhân hóa gợi ý AI trong Trang quản lý. */
+/** Dòng công tắc đồng ý cá nhân hóa gợi ý AI ở trang Cài đặt › Tài khoản. */
 export function AiConsentSettings({ user }: { user: AuthUser }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
@@ -55,26 +55,30 @@ export function AiConsentSettings({ user }: { user: AuthUser }) {
   };
 
   return (
-    <section className="panel" aria-labelledby="ai-consent-settings">
-      <h2 id="ai-consent-settings" className="panel-title-sm">Gợi ý cá nhân hóa</h2>
-      <p className="hint">
-        Khi bật, các dự án bạn xem được ghi nhận để gợi ý dự án phù hợp hơn. Tắt đi sẽ xóa lịch sử đã ghi; gợi ý khi
-        đó dựa trên độ phổ biến chung.
-      </p>
-      <label className="ai-consent-switch">
+    <section className="account-row" aria-labelledby="ai-consent-settings">
+      <div className="account-row-main">
+        <h2 id="ai-consent-settings" className="account-label">Gợi ý cá nhân hóa</h2>
+        <p className="account-value" id="ai-consent-desc">
+          Khi bật, các dự án bạn xem được ghi nhận để gợi ý dự án phù hợp hơn. Tắt đi sẽ xóa lịch sử đã ghi; gợi ý khi
+          đó dựa trên độ phổ biến chung.
+        </p>
+        {message && (
+          <p className={message.tone === "ok" ? "form-notice" : "form-error"} role="status">{message.text}</p>
+        )}
+      </div>
+      <label className="account-switch">
         <input
           type="checkbox"
           role="switch"
           aria-labelledby="ai-consent-settings"
+          aria-describedby="ai-consent-desc"
           checked={enabled}
           disabled={busy}
           onChange={() => void toggle()}
         />
-        <span>{enabled ? "Đang bật" : "Đang tắt"}</span>
+        <span className="account-switch-track" aria-hidden="true" />
+        <span className="sr-only">{enabled ? "Đang bật" : "Đang tắt"}</span>
       </label>
-      {message && (
-        <p className={message.tone === "ok" ? "form-notice" : "form-error"} role="status">{message.text}</p>
-      )}
     </section>
   );
 }

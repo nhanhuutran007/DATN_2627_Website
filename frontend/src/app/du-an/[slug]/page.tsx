@@ -375,7 +375,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                 <span className="pill">Dự án liên quan</span>
                 <h2 id="lien-quan">Có thể bạn cũng quan tâm</h2>
               </div>
-              <Link className="link-arrow" href="/du-an">Xem tất cả <Icon name="arrow-right" size={16} /></Link>
+              <Link className="button button-outline button-sm" href="/tim-kiem">Xem tất cả dự án</Link>
             </div>
             <div className="card-grid">
               {related.map((item) => <CampaignCard campaign={item} key={item.slug} />)}

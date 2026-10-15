@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { CampaignCard } from "@/components/campaign/CampaignCard";
+import { Icon } from "@/components/ui/Icon";
 import {
   apiCampaignToView,
   fetchCampaigns,
@@ -117,8 +118,6 @@ export function CampaignExplorer({ initialQuery = "", initialCategory = "" }: Ca
   const [result, setResult] = useState<Result | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState("");
-  // Chỉ có tác dụng trên màn hình hẹp (CSS): thu gọn nhóm lọc nâng cao.
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -177,129 +176,226 @@ export function CampaignExplorer({ initialQuery = "", initialCategory = "" }: Ca
     setFilters((current) => ({ ...current, [key]: value }));
 
   const hasFilter = Object.entries(filters).some(([key, value]) => key !== "sort" && value !== "");
-  const advancedCount = [filters.location, filters.goal, filters.progress, filters.timeLeft].filter(Boolean).length;
   const reset = () => setFilters(EMPTY_FILTERS);
+  const categoryOptions = Object.fromEntries(categories.map((item) => [item, item]));
 
   return (
     <>
-      <form className="filter-bar" role="search" onSubmit={(event) => event.preventDefault()}>
-        <label className="filter-field filter-field-wide">
-          <span>Từ khóa</span>
+      <form className="search-hero" role="search" onSubmit={(event) => event.preventDefault()}>
+        <label className="sr-only" htmlFor="search-q">Tìm dự án</label>
+        <div className="search-box">
+          <Icon name="search" size={20} />
           <input
+            id="search-q"
             type="search"
             value={filters.q}
             maxLength={200}
+            autoComplete="off"
             onChange={(event) => update("q", event.target.value)}
-            placeholder="Tên dự án, nội dung, địa phương…"
+            placeholder="Tìm theo tên dự án, nội dung hoặc địa phương"
           />
-        </label>
-        <label className="filter-field">
-          <span>Lĩnh vực</span>
-          <select value={filters.category} onChange={(event) => update("category", event.target.value)}>
-            <option value="">Tất cả</option>
-            {categories.map((item) => <option key={item} value={item}>{item}</option>)}
-          </select>
-        </label>
-        <label className="filter-field">
-          <span>Trạng thái</span>
-          <select value={filters.status} onChange={(event) => update("status", event.target.value)}>
-            <option value="">Tất cả</option>
-            {Object.entries(STATUS_OPTIONS).map(([value, option]) => (
-              <option key={value} value={value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="filter-field">
-          <span>Sắp xếp</span>
-          <select value={filters.sort} onChange={(event) => update("sort", event.target.value as Filters["sort"])}>
-            {Object.entries(SORT_OPTIONS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </label>
-
-        <button
-          className="button button-outline filter-toggle"
-          type="button"
-          aria-expanded={showAdvanced}
-          aria-controls="loc-nang-cao"
-          onClick={() => setShowAdvanced((value) => !value)}
-        >
-          {showAdvanced ? "Ẩn lọc nâng cao" : "Lọc nâng cao"}
-          {advancedCount > 0 && <span className="follow-count">{advancedCount}</span>}
-        </button>
-
-        <div className={`filter-more${showAdvanced ? " is-open" : ""}`} id="loc-nang-cao">
-          <label className="filter-field">
-            <span>Địa điểm</span>
-            <input
-              value={filters.location}
-              maxLength={100}
-              onChange={(event) => update("location", event.target.value)}
-              placeholder="VD: Đà Nẵng"
-            />
-          </label>
-          <label className="filter-field">
-            <span>Mục tiêu vốn</span>
-            <select value={filters.goal} onChange={(event) => update("goal", event.target.value)}>
-              <option value="">Mọi mức</option>
-              {Object.entries(GOAL_OPTIONS).map(([value, option]) => (
-                <option key={value} value={value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="filter-field">
-            <span>Tỷ lệ hoàn thành</span>
-            <select value={filters.progress} onChange={(event) => update("progress", event.target.value)}>
-              <option value="">Mọi mức</option>
-              {Object.entries(PROGRESS_OPTIONS).map(([value, option]) => (
-                <option key={value} value={value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="filter-field">
-            <span>Thời gian còn lại</span>
-            <select value={filters.timeLeft} onChange={(event) => update("timeLeft", event.target.value)}>
-              <option value="">Không giới hạn</option>
-              {Object.entries(TIME_LEFT_OPTIONS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </label>
+          {filters.q && (
+            <button className="search-clear" type="button" aria-label="Xóa từ khóa" onClick={() => update("q", "")}>
+              <Icon name="x" size={18} />
+            </button>
+          )}
         </div>
       </form>
 
-      <div className="results-line" aria-live="polite">
-        {loading ? (
-          <span>Đang tải danh sách…</span>
-        ) : (
-          <span>
-            <b className="num">{total.toLocaleString("vi-VN")}</b> hồ sơ{hasFilter ? " khớp bộ lọc" : ""}
-            {hasFilter && <button type="button" onClick={reset}>Bỏ lọc</button>}
-          </span>
-        )}
-        {result?.source === "sample" && (
-          <span className="sample-flag">Dữ liệu mẫu — không kết nối được máy chủ (chỉ lọc theo từ khóa, lĩnh vực)</span>
+      <div className="search-filters" role="group" aria-label="Bộ lọc dự án">
+        <FilterPill label="Lĩnh vực" allLabel="Tất cả lĩnh vực" value={filters.category} options={categoryOptions} onChange={(value) => update("category", value)} />
+        <FilterPill
+          label="Trạng thái"
+          allLabel="Mọi trạng thái"
+          value={filters.status}
+          options={Object.fromEntries(Object.entries(STATUS_OPTIONS).map(([key, option]) => [key, option.label]))}
+          onChange={(value) => update("status", value)}
+        />
+        <LocationPill value={filters.location} onChange={(value) => update("location", value)} />
+        <FilterPill
+          label="Mục tiêu vốn"
+          allLabel="Mọi mức"
+          value={filters.goal}
+          options={Object.fromEntries(Object.entries(GOAL_OPTIONS).map(([key, option]) => [key, option.label]))}
+          onChange={(value) => update("goal", value)}
+        />
+        <FilterPill
+          label="Tiến độ"
+          allLabel="Mọi mức"
+          value={filters.progress}
+          options={Object.fromEntries(Object.entries(PROGRESS_OPTIONS).map(([key, option]) => [key, option.label]))}
+          onChange={(value) => update("progress", value)}
+        />
+        <FilterPill label="Thời gian còn lại" allLabel="Không giới hạn" value={filters.timeLeft} options={TIME_LEFT_OPTIONS} onChange={(value) => update("timeLeft", value)} />
+        <FilterPill
+          label="Sắp xếp"
+          value={filters.sort}
+          options={SORT_OPTIONS}
+          onChange={(value) => update("sort", value as Filters["sort"])}
+          showValue
+        />
+        {hasFilter && (
+          <button className="search-reset" type="button" onClick={reset}>Xóa bộ lọc</button>
         )}
       </div>
 
+      <div className="search-head">
+        <h1>{filters.q.trim() ? `Kết quả cho “${filters.q.trim()}”` : "Dự án"}</h1>
+        <p aria-live="polite">
+          {loading ? "Đang tải…" : `${total.toLocaleString("vi-VN")} dự án${hasFilter ? " phù hợp" : ""}`}
+        </p>
+      </div>
+      {result?.source === "sample" && (
+        <p className="sample-flag">Dữ liệu mẫu — không kết nối được máy chủ (chỉ lọc theo từ khóa, lĩnh vực)</p>
+      )}
+
       {!loading && items.length === 0 ? (
-        <div className="empty-box">
-          <p>Không có hồ sơ nào khớp. Thử bỏ bớt điều kiện hoặc dùng từ khóa ngắn hơn.</p>
-          {hasFilter && <button className="button button-outline" type="button" onClick={reset}>Bỏ lọc</button>}
+        <div className="search-empty">
+          <h2>Không tìm thấy dự án phù hợp</h2>
+          <p>Thử từ khóa ngắn hơn hoặc bỏ bớt bộ lọc.</p>
+          {hasFilter && <button className="account-pill" type="button" onClick={reset}>Xóa bộ lọc</button>}
         </div>
       ) : (
-        <div className={`card-grid${loading ? " is-loading" : ""}`} aria-busy={loading}>
+        <div className={`card-grid search-grid${loading ? " is-loading" : ""}`} aria-busy={loading}>
           {items.map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
         </div>
       )}
 
       {canLoadMore && (
-        <div className="load-more">
-          <button className="button button-outline" type="button" disabled={loadingMore} onClick={loadMore}>
-            {loadingMore ? "Đang tải…" : `Xem thêm (${(total - items.length).toLocaleString("vi-VN")} hồ sơ)`}
+        <div className="search-more">
+          <button className="account-pill" type="button" disabled={loadingMore} onClick={loadMore}>
+            {loadingMore ? "Đang tải…" : "Xem thêm"}
           </button>
         </div>
       )}
       {moreError && <p className="form-error" role="alert">{moreError}</p>}
     </>
+  );
+}
+
+/** Đóng bảng chọn khi bấm ra ngoài hoặc nhấn Esc. */
+function useDismiss(open: boolean, close: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) close();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, close]);
+  return ref;
+}
+
+type FilterPillProps = {
+  label: string;
+  /** Lựa chọn "không lọc" (giá trị rỗng); bỏ qua với bộ lọc luôn có giá trị như Sắp xếp. */
+  allLabel?: string;
+  value: string;
+  options: Record<string, string>;
+  onChange: (value: string) => void;
+  /** Luôn hiện giá trị đang chọn thay vì tên bộ lọc (vd. Sắp xếp). */
+  showValue?: boolean;
+};
+
+/** Nút bo tròn mở danh sách lựa chọn; đang lọc thì tô đậm và hiện giá trị đã chọn. */
+function FilterPill({ label, allLabel, value, options, onChange, showValue = false }: FilterPillProps) {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const ref = useDismiss(open, close);
+  const id = useId();
+  const active = value !== "" && !showValue;
+  const choices: Array<[string, string]> = [...(allLabel ? [["", allLabel] as [string, string]] : []), ...Object.entries(options)];
+  const text = showValue ? `${label}: ${options[value] ?? ""}` : active ? options[value] ?? value : label;
+
+  return (
+    <div className="filter-pill" ref={ref}>
+      <button
+        className={`filter-pill-btn${active ? " is-active" : ""}`}
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        aria-label={`${label}: ${value ? options[value] ?? value : allLabel ?? ""}`}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span>{text}</span>
+        <Icon name="chevron-down" size={14} className={open ? "gh-caret is-open" : "gh-caret"} />
+      </button>
+      {open && (
+        <div className="filter-pop" id={id} role="radiogroup" aria-label={label}>
+          {choices.map(([key, optionText]) => (
+            <label className="filter-option" key={key || "all"}>
+              <input
+                type="radio"
+                name={id}
+                checked={value === key}
+                onChange={() => {
+                  onChange(key);
+                  setOpen(false);
+                }}
+              />
+              <span>{optionText}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Lọc theo địa điểm: ô nhập tự do trong bảng chọn. */
+function LocationPill({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const close = useCallback(() => setOpen(false), []);
+  const ref = useDismiss(open, close);
+  const id = useId();
+  const active = value.trim() !== "";
+
+  const apply = (next: string) => {
+    onChange(next);
+    setOpen(false);
+  };
+
+  return (
+    <div className="filter-pill" ref={ref}>
+      <button
+        className={`filter-pill-btn${active ? " is-active" : ""}`}
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => {
+          setDraft(value);
+          setOpen((current) => !current);
+        }}
+      >
+        <span>{active ? value : "Địa điểm"}</span>
+        <Icon name="chevron-down" size={14} className={open ? "gh-caret is-open" : "gh-caret"} />
+      </button>
+      {open && (
+        <form
+          className="filter-pop filter-pop-form"
+          id={id}
+          onSubmit={(event) => {
+            event.preventDefault();
+            apply(draft.trim());
+          }}
+        >
+          <label htmlFor={`${id}-input`}>Tỉnh/thành hoặc địa phương</label>
+          <input id={`${id}-input`} value={draft} maxLength={100} placeholder="VD: Đà Nẵng" autoFocus onChange={(event) => setDraft(event.target.value)} />
+          <div className="filter-pop-actions">
+            {active && <button className="filter-pop-link" type="button" onClick={() => apply("")}>Bỏ lọc</button>}
+            <button className="account-pill account-pill-solid" type="submit">Áp dụng</button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }

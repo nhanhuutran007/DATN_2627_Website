@@ -27,18 +27,17 @@ export function coverByKey(key: CoverKey) {
   return COVERS[key];
 }
 
+const CATEGORY_ICONS: Record<string, IconName> = {
+  "Giáo dục": "book",
+  "Môi trường": "leaf",
+  "Nông nghiệp": "sprout",
+  "Y tế": "heart",
+  "Khởi nghiệp": "rocket",
+  "Văn hóa nghệ thuật": "palette",
+  "Công nghệ": "cpu",
+};
+
+/** Icon minh họa cho lĩnh vực; lĩnh vực admin mới tạo dùng icon chung. */
 export function categoryIcon(category: string): IconName {
-  switch (category) {
-    case "Giáo dục":
-      return "document";
-    case "Y tế":
-      return "heart";
-    case "Khởi nghiệp":
-    case "Công nghệ":
-      return "rocket";
-    case "Môi trường":
-    case "Nông nghiệp":
-    default:
-      return "leaf";
-  }
+  return CATEGORY_ICONS[category] ?? "grid";
 }

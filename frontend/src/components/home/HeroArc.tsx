@@ -1,78 +1,74 @@
 type ArcImage = { src: string; alt: string };
 
-type Panel = {
-  /** Tâm khung trong hệ tọa độ viewBox 1440×560. */
-  cx: number;
-  cy: number;
-  width: number;
-  height: number;
-  /** Độ nghiêng (độ); âm = nghiêng sang trái. */
-  rotate: number;
-};
-
 /**
- * Bố cục đo từ ảnh vòng cung ở hero GoFundMe (quy về khung 1440px): khung giữa thẳng,
- * hai khung bên nghiêng ±11,3° và thấp hơn, cạnh trên/dưới phình như đặt trên một vòng tròn.
+ * Hình học đo từ vòng cung ảnh ở hero GoFundMe (khung 1440px): mỗi ảnh là một hình quạt
+ * của vành khăn tâm O(0, 0), bán kính ngoài 1206 và trong 984; các ảnh cách nhau 15°
+ * và mỗi ảnh chiếm 14°, nên khe giữa hai ảnh đều nhau dọc theo cạnh xuyên tâm.
  */
-const PANELS: [Panel, Panel, Panel] = [
-  { cx: 225, cy: 292, width: 410, height: 430, rotate: -11.3 },
-  { cx: 720, cy: 232, width: 570, height: 427, rotate: 0 },
-  { cx: 1215, cy: 292, width: 410, height: 430, rotate: 11.3 },
-];
+const OUTER_RADIUS = 1206;
+const INNER_RADIUS = 984;
+const STEP_DEG = 15;
+const SPAN_DEG = 14;
+const CORNER = 28;
 
-const RADIUS = 40;
-const BULGE = 12;
+/** Khung bao sát 3 ảnh (trái · giữa · phải), gốc tại tâm vòng tròn; SVG trải trọn bề ngang màn hình. */
+const VIEW_BOX = "-466 -1210 932 304";
 
-/** Khung bo góc có cạnh trên phình lên và cạnh dưới phình xuống, tâm tại (0, 0). */
-function panelPath(width: number, height: number): string {
-  const a = width / 2;
-  const c = height / 2;
-  const r = RADIUS;
-  const b = BULGE * 2;
+function point(radius: number, angle: number): string {
+  return `${(radius * Math.sin(angle)).toFixed(2)} ${(-radius * Math.cos(angle)).toFixed(2)}`;
+}
+
+/** Hình quạt đối xứng quanh trục đứng, bo góc bằng đường cong bậc hai. */
+function sectorPath(): string {
+  const h = ((SPAN_DEG / 2) * Math.PI) / 180;
+  const ro = OUTER_RADIUS;
+  const ri = INNER_RADIUS;
+  const r = CORNER;
   return [
-    `M ${-a + r} ${-c}`,
-    `Q 0 ${-c - b} ${a - r} ${-c}`,
-    `Q ${a} ${-c} ${a} ${-c + r}`,
-    `L ${a} ${c - r}`,
-    `Q ${a} ${c} ${a - r} ${c}`,
-    `Q 0 ${c + b} ${-a + r} ${c}`,
-    `Q ${-a} ${c} ${-a} ${c - r}`,
-    `L ${-a} ${-c + r}`,
-    `Q ${-a} ${-c} ${-a + r} ${-c}`,
+    `M ${point(ro, -h + r / ro)}`,
+    `A ${ro} ${ro} 0 0 1 ${point(ro, h - r / ro)}`,
+    `Q ${point(ro, h)} ${point(ro - r, h)}`,
+    `L ${point(ri + r, h)}`,
+    `Q ${point(ri, h)} ${point(ri, h - r / ri)}`,
+    `A ${ri} ${ri} 0 0 0 ${point(ri, -h + r / ri)}`,
+    `Q ${point(ri, -h)} ${point(ri + r, -h)}`,
+    `L ${point(ro - r, -h)}`,
+    `Q ${point(ro, -h)} ${point(ro, -h + r / ro)}`,
     "Z",
   ].join(" ");
 }
 
-/** Ba ảnh xếp theo vòng cung (trái · giữa · phải); màn hình rộng thì hai ảnh bên tràn khỏi mép. */
+const SECTOR = sectorPath();
+const HALF_SPAN = ((SPAN_DEG / 2) * Math.PI) / 180;
+/** Khung ảnh phủ trọn hình quạt (góc dưới của quạt thấp hơn đáy cung trong). */
+const HALF_WIDTH = OUTER_RADIUS * Math.sin(HALF_SPAN);
+const IMAGE_HEIGHT = OUTER_RADIUS - INNER_RADIUS * Math.cos(HALF_SPAN);
+
+/** Ba ảnh xếp hình quạt trên một vòng tròn lớn, ngay dưới các nút ở hero. */
 export function HeroArc({ images }: { images: [ArcImage, ArcImage, ArcImage] }) {
   return (
     <div className="hero-arc">
-      <svg viewBox="0 0 1440 560" preserveAspectRatio="xMidYMin slice" role="group" aria-label="Hình ảnh các dự án cộng đồng">
+      <svg viewBox={VIEW_BOX} role="group" aria-label="Hình ảnh các dự án cộng đồng">
         <defs>
-          {PANELS.map((panel, index) => (
-            <clipPath id={`hero-arc-clip-${index}`} key={index} clipPathUnits="userSpaceOnUse">
-              <path d={panelPath(panel.width, panel.height)} />
-            </clipPath>
-          ))}
+          <clipPath id="hero-arc-clip" clipPathUnits="userSpaceOnUse">
+            <path d={SECTOR} />
+          </clipPath>
         </defs>
-        {PANELS.map((panel, index) => {
-          const image = images[index];
-          return (
-            <g key={image.src} transform={`translate(${panel.cx} ${panel.cy}) rotate(${panel.rotate})`}>
-              <image
-                href={image.src}
-                x={-panel.width / 2}
-                y={-panel.height / 2 - BULGE}
-                width={panel.width}
-                height={panel.height + BULGE * 2}
-                preserveAspectRatio="xMidYMid slice"
-                clipPath={`url(#hero-arc-clip-${index})`}
-              >
-                <title>{image.alt}</title>
-              </image>
-            </g>
-          );
-        })}
+        {images.map((image, index) => (
+          <g key={image.src} transform={`rotate(${(index - 1) * STEP_DEG})`}>
+            <image
+              href={image.src}
+              x={-HALF_WIDTH}
+              y={-OUTER_RADIUS}
+              width={HALF_WIDTH * 2}
+              height={IMAGE_HEIGHT}
+              preserveAspectRatio="xMidYMid slice"
+              clipPath="url(#hero-arc-clip)"
+            >
+              <title>{image.alt}</title>
+            </image>
+          </g>
+        ))}
       </svg>
     </div>
   );
