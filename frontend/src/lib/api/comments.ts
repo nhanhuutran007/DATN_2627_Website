@@ -58,9 +58,20 @@ export async function deleteComment(id: string): Promise<void> {
   await api.del(`/comments/${encodeURIComponent(id)}`);
 }
 
-export function fetchAdminComments(query: { status?: CommentStatus; offset?: number; limit?: number } = {}): Promise<AdminCommentList> {
+export function fetchAdminComments(query: {
+  status?: CommentStatus;
+  kind?: CommentKind;
+  /** Bình luận gốc hay câu trả lời. */
+  level?: "root" | "reply";
+  q?: string;
+  offset?: number;
+  limit?: number;
+} = {}): Promise<AdminCommentList> {
   const params = new URLSearchParams();
   if (query.status) params.set("status", query.status);
+  if (query.kind) params.set("kind", query.kind);
+  if (query.level) params.set("level", query.level);
+  if (query.q) params.set("q", query.q);
   if (query.offset !== undefined) params.set("offset", String(query.offset));
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   const qs = params.toString();

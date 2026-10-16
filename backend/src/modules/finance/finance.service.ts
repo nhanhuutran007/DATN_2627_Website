@@ -9,9 +9,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Between, DataSource, FindOptionsWhere, In, Repository } from "typeorm";
+import { Between, DataSource, FindOptionsWhere, In, Like, Repository } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
+import { rangeFilter } from "../../common/query/range";
 import type { PaymentGateway } from "../../integrations/payment/payment.gateway";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
@@ -132,8 +133,20 @@ export class FinanceService {
   async adminList(query: RefundQueryDto): Promise<RefundRequestList> {
     const offset = query.offset ?? 0;
     const limit = query.limit ?? 30;
+    const base: FindOptionsWhere<RefundRequest> = query.status ? { status: query.status } : {};
+    const amount = rangeFilter(query.minAmount, query.maxAmount, "amount");
+    const keyword = query.q?.trim();
+    const like = keyword ? Like(`%${keyword}%`) : undefined;
+    const where: FindOptionsWhere<RefundRequest>[] = like
+      ? [
+          { ...base, reason: like, ...(amount ? { donation: { amount } } : {}) },
+          { ...base, user: { name: like }, ...(amount ? { donation: { amount } } : {}) },
+          { ...base, user: { email: like }, ...(amount ? { donation: { amount } } : {}) },
+          { ...base, donation: { campaign: { title: like }, ...(amount ? { amount } : {}) } },
+        ]
+      : [{ ...base, ...(amount ? { donation: { amount } } : {}) }];
     const [items, total] = await this.refundRepo.findAndCount({
-      where: query.status ? { status: query.status } : {},
+      where,
       relations: { donation: { campaign: true }, user: true },
       order: { createdAt: "DESC" },
       skip: offset,

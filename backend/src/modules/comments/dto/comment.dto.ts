@@ -1,5 +1,5 @@
 import { Transform, Type } from "class-transformer";
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
 
 import { CommentKind, CommentStatus } from "../entities/campaign-comment.entity";
 
@@ -41,6 +41,22 @@ export class AdminCommentQueryDto extends CommentListQueryDto {
   @IsOptional()
   @IsEnum(CommentStatus)
   status?: CommentStatus;
+
+  @IsOptional()
+  @IsEnum(CommentKind)
+  kind?: CommentKind;
+
+  /** Bình luận gốc (`root`) hay câu trả lời (`reply`). */
+  @IsOptional()
+  @IsIn(["root", "reply"])
+  level?: "root" | "reply";
+
+  /** Tìm trong nội dung, tên/email người viết, tên chiến dịch. */
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(200)
+  q?: string;
 }
 
 export class HideCommentDto {

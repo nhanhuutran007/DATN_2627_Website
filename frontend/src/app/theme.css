@@ -4512,6 +4512,68 @@ button {
   border-radius: 10px;
 }
 
+/* Sao lưu & khôi phục dữ liệu */
+.backup-restore {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #f3c7c0;
+  border-radius: 10px;
+  background: #fff8f6;
+}
+
+.backup-restore h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 0.98rem;
+}
+
+.backup-schema {
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.backup-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 18px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  font-size: 0.84rem;
+}
+
+.backup-tables li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.backup-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+}
+
+.backup-danger {
+  justify-self: start;
+}
+
+.backup-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
 .export-grid h3 {
   margin: 0;
   color: var(--navy);
@@ -5650,6 +5712,20 @@ button {
 
 .app-dialog::backdrop {
   background: rgba(21, 29, 54, 0.55);
+}
+
+/* Khi đang mở hộp thoại: khóa cuộn trang và sidebar quản trị phía sau, chỉ cuộn trong hộp thoại */
+html:has(dialog:modal) {
+  overflow: hidden;
+}
+
+html:has(dialog:modal) .admin-sidebar {
+  overflow-y: hidden;
+}
+
+.app-dialog,
+.app-dialog .review-body {
+  overscroll-behavior: contain;
 }
 
 .app-dialog[open] {
@@ -7152,6 +7228,65 @@ button {
   font-weight: 400;
 }
 
+/* Tên chủ dự án trong bảng duyệt: bấm để xem hồ sơ người dùng */
+.owner-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--navy);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.owner-link:hover,
+.owner-link:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.user-detail-dialog {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.user-detail-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.user-detail-avatar {
+  display: grid;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--primary);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.user-detail-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-detail-profile p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.user-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
 .review-note {
   margin: 0;
   padding: 10px 14px;
@@ -7243,6 +7378,37 @@ button {
 /* Trang quản trị trên điện thoại: dải icon sidebar chiếm 64px nên nội dung xếp 1 cột */
 .filter-button {
   max-width: 100%;
+}
+
+/* Thanh tìm kiếm + lọc hạng mục / khoảng mục tiêu ở mục duyệt chiến dịch */
+.admin-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.admin-filter-search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.admin-filter-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.admin-filter-range input {
+  width: 96px;
+}
+
+.admin-filter-submit {
+  height: 38px;
+  padding: 0 18px;
 }
 
 @media (max-width: 480px) {

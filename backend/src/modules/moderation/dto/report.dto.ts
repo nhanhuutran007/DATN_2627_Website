@@ -50,6 +50,18 @@ export class ReportQueryDto {
   @IsUUID()
   campaignId?: string;
 
+  /** Báo cáo nhắm vào chiến dịch hay vào một bình luận. */
+  @IsOptional()
+  @IsIn(["campaign", "comment"])
+  target?: "campaign" | "comment";
+
+  /** Tìm trong nội dung báo cáo, tên chiến dịch, tên/email người báo cáo. */
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(200)
+  q?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()

@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindOptionsWhere, In, IsNull, Repository } from "typeorm";
+import { FindOptionsWhere, In, IsNull, Like, Not, Repository } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { CampaignsService } from "../campaigns/campaigns.service";
@@ -141,11 +141,21 @@ export class ModerationService {
   async list(query: ReportQueryDto): Promise<ReportListResult> {
     const limit = query.limit ?? 20;
     const offset = query.offset ?? 0;
-    const where: FindOptionsWhere<Report> = {
+    const base: FindOptionsWhere<Report> = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.reason ? { reason: query.reason } : {}),
       ...(query.campaignId ? { campaignId: query.campaignId } : {}),
+      ...(query.target ? { commentId: query.target === "comment" ? Not(IsNull()) : IsNull() } : {}),
     };
+    const like = query.q ? `%${query.q}%` : null;
+    const where: FindOptionsWhere<Report> | FindOptionsWhere<Report>[] = like
+      ? [
+          { ...base, description: Like(like) },
+          { ...base, campaign: { title: Like(like) } },
+          { ...base, reporter: { name: Like(like) } },
+          { ...base, reporter: { email: Like(like) } },
+        ]
+      : base;
     const [items, total] = await this.reportRepo.findAndCount({
       where,
       relations: { campaign: true, reporter: true, comment: true },
