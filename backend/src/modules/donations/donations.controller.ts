@@ -32,6 +32,12 @@ export class DonationsController {
     return this.donationsService.create(dto, user);
   }
 
+  /** Kênh thanh toán đang bật (công khai, không chứa số tài khoản). */
+  @Get("payment-options")
+  paymentOptions() {
+    return this.donationsService.paymentOptions();
+  }
+
   @Post("webhook")
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 30, windowMs: 60_000, keyPrefix: "donation-webhook" })
@@ -64,6 +70,14 @@ export class DonationsController {
   @UseGuards(JwtAuthGuard)
   findMine(@GetCurrentUser() user: User) {
     return this.donationsService.findMine(user.id);
+  }
+
+  /** Form có chữ ký để trình duyệt chuyển sang trang thanh toán SePay (chỉ người ủng hộ). */
+  @Post(":id/sepay-checkout")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  sepayCheckout(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
+    return this.donationsService.createSepayCheckout(id, user);
   }
 
   @Get(":id/receipt")

@@ -783,12 +783,110 @@ paths:
           $ref: "#/components/responses/NotFound"
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /donations/payment-options:
+    get:
+      operationId: getPaymentOptions
+      summary: Kênh thanh toán đang bật (công khai)
+      description: >-
+        `sepay` null khi chưa cấu hình merchant SePay. `demoWallet` false khi SePay chạy
+        `production` (ví demo bị tắt hẳn để không tự xác nhận khoản không có tiền).
+      responses:
+        "200":
+          description: Kênh thanh toán
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sepay:
+                    type: object
+                    nullable: true
+                    properties:
+                      env:
+                        type: string
+                        enum: [sandbox, production]
+                  demoWallet:
+                    type: boolean
+  /donations/{id}/sepay-checkout:
+    post:
+      operationId: createSepayCheckout
+      summary: Tạo form thanh toán SePay đã ký cho đơn đang chờ
+      description: >-
+        Chỉ chủ đơn, đơn `pending` với `paymentMethod=sepay`. Trả URL trang SePay và các trường
+        ẩn đã ký HMAC-SHA256 ở server (secret key không xuống trình duyệt); trình duyệt POST form
+        này sang SePay. `order_invoice_number` = `transferCode` của đơn. URL chuyển hướng
+        `success/error/cancel` chỉ để hiển thị, trạng thái đơn chỉ đổi qua IPN.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Form thanh toán
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  action:
+                    type: string
+                    example: https://pay-sandbox.sepay.vn/v1/checkout/init
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: string
+        "404":
+          description: SePay chưa cấu hình hoặc không tìm thấy đơn của người dùng hiện tại
+        "409":
+          description: Đơn không còn chờ thanh toán hoặc không thanh toán qua SePay
+  /payments/sepay/ipn:
+    post:
+      operationId: sepayIpn
+      summary: IPN của cổng SePay (server-to-server)
+      description: >-
+        Xác thực header `X-Secret-Key` (auth type SECRET_KEY trên SePay) trước mọi truy vấn.
+        Chỉ `notification_type=ORDER_PAID` + `order.order_status=CAPTURED` với đúng số tiền VND
+        mới ghi nhận đơn (idempotent, thông báo + email cho người ủng hộ và chủ dự án). Sai số
+        tiền, không khớp đơn hoặc loại thông báo khác chỉ ghi audit (`donation.sepay.*`) và
+        vẫn trả 200 để SePay không gửi lại.
+      parameters:
+        - in: header
+          name: X-Secret-Key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Payload IPN của SePay (chỉ đọc `notification_type`, `order.*`, `transaction.transaction_id`)
+      responses:
+        "200":
+          description: Đã nhận
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  applied:
+                    type: boolean
+        "400":
+          description: Payload thiếu mã đơn/số tiền/mã giao dịch
+        "401":
+          description: Sai hoặc thiếu `X-Secret-Key` (ghi audit `donation.sepay.rejected`)
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /donations/{id}/confirm:
     post:
       operationId: confirmDemoDonation
       summary: Xác nhận thanh toán ví demo (sandbox)
       description: >-
-        Chỉ hoạt động khi cổng thanh toán đang ở chế độ `demo`. Chỉ chủ đơn
+        Chỉ hoạt động khi ví demo còn bật (tắt khi SePay chạy `production`); không áp dụng cho
+        đơn `paymentMethod=sepay`. Chỉ chủ đơn
         tài trợ mới xác nhận được (404 thay vì 403 để không lộ sự tồn tại của
         đơn thuộc người khác).
       security:
@@ -809,7 +907,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Donation"
         "403":
-          description: Cổng thanh toán hiện không ở chế độ demo
+          description: Ví demo đã tắt hoặc đơn thanh toán qua SePay
         "404":
           description: Không tìm thấy đơn tài trợ thuộc về người dùng hiện tại
         "409":
@@ -3153,6 +3251,10 @@ components:
         transactionId:
           type: string
           nullable: true
+        transferCode:
+          type: string
+          nullable: true
+          description: Mã đơn gửi SePay làm `order_invoice_number` (vd. `GM7K2QX9AB`)
         idempotencyKey:
           type: string
         message:
@@ -3179,7 +3281,7 @@ components:
           minimum: 20000
         paymentMethod:
           type: string
-          enum: [wallet, payos]
+          enum: [wallet, payos, sepay]
         message:
           type: string
           maxLength: 500

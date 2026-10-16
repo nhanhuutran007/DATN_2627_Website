@@ -8,8 +8,6 @@ import { CollapsibleStory } from "@/components/campaign/CollapsibleStory";
 import { ProgressRing } from "@/components/campaign/ProgressRing";
 import { Icon } from "@/components/ui/Icon";
 import { CampaignComments } from "@/features/comments/CampaignComments";
-import { CampaignLedger } from "@/features/donations/CampaignLedger";
-import { DonateDialogButton } from "@/features/donations/DonateDialogButton";
 import { DonorHighlights } from "@/features/donations/DonorHighlights";
 import { FollowCampaignButton } from "@/features/follows/FollowCampaignButton";
 import { MilestoneRevisions } from "@/features/progress/MilestoneRevisions";
@@ -22,7 +20,6 @@ import {
   fetchCampaign,
   fetchCampaigns,
   isPublishedStatus,
-  reviewStatusLabel,
 } from "@/lib/api/campaigns";
 import {
   fetchCampaignProgress,
@@ -31,10 +28,9 @@ import {
   TRANSPARENCY_LABEL,
   type CampaignProgress,
 } from "@/lib/api/progress";
-import { fetchRewardTiers, type RewardTier } from "@/lib/api/rewards";
 import { coverFor } from "@/lib/covers";
 import { campaignProgress, campaigns as mockCampaigns, findCampaign, type Campaign } from "@/lib/data/campaigns";
-import { formatVnd, isLiveId } from "@/lib/format";
+import { formatVnd, formatVndShort, isLiveId } from "@/lib/format";
 import { sanitizeRichText } from "@/lib/rich-text.server";
 import { timeAgo } from "@/lib/time";
 
@@ -63,14 +59,6 @@ async function loadProgress(id: string): Promise<CampaignProgress | null> {
     return await fetchCampaignProgress(id);
   } catch {
     return null;
-  }
-}
-
-async function loadRewardTiers(id: string): Promise<RewardTier[]> {
-  try {
-    return await fetchRewardTiers(id);
-  } catch {
-    return [];
   }
 }
 
@@ -112,10 +100,9 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   if (!loaded) notFound();
 
   const { campaign, live } = loaded;
-  const [progress, related, rewardTiers] = await Promise.all([
+  const [progress, related] = await Promise.all([
     live ? loadProgress(campaign.slug) : Promise.resolve(null),
     loadRelated(campaign, live),
-    live ? loadRewardTiers(campaign.slug) : Promise.resolve([]),
   ]);
   const percent = campaignProgress(campaign);
   const open = campaign.status === "Đang gây quỹ";
@@ -125,6 +112,8 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   const totalMilestones = progress?.totalMilestones ?? campaign.milestones.length;
   const budget = progress?.totalBudget ?? plannedBudget;
   const cover = coverFor(campaign);
+  const donateHref = `/du-an/${encodeURIComponent(campaign.slug)}/ung-ho`;
+  const ownerInitial = campaign.owner.charAt(0).toUpperCase();
   const stateById = new Map((progress?.milestoneStates ?? []).map((item) => [item.id, item.state]));
 
   const crumbs = [{ href: "/", label: "Trang chủ" }, { href: "/du-an", label: "Dự án" }, { label: campaign.category }];
@@ -170,18 +159,17 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             {cover.illustrative && <figcaption>Ảnh minh họa theo lĩnh vực</figcaption>}
           </figure>
 
-          <div className="detail-organizer">
-            <span className="organizer-avatar" aria-hidden="true">{campaign.owner.charAt(0).toUpperCase()}</span>
-            <p>
-              <b>{campaign.owner}</b> đang tổ chức gây quỹ
-              <span className="detail-organizer-meta"><Icon name="location" size={14} /> {campaign.location}</span>
-            </p>
-          </div>
+          <a className="detail-organizer" href="#nguoi-to-chuc">
+            <span className="organizer-avatar" aria-hidden="true">{ownerInitial}</span>
+            <span><b>{campaign.owner}</b> đang tổ chức gây quỹ</span>
+          </a>
 
-          <ul className="detail-badges">
-            {published && <li><Icon name="shield" size={15} /> Hồ sơ đã được kiểm duyệt</li>}
-            <li><Icon name="receipt" size={15} /> Chỉ ghi nhận giao dịch đã xác nhận</li>
-          </ul>
+          <p className="detail-protected">
+            <Icon name="shield" size={16} />
+            {published
+              ? "Ủng hộ được bảo vệ · hồ sơ đã kiểm duyệt, chỉ ghi nhận giao dịch đã xác nhận"
+              : "Chỉ ghi nhận giao dịch đã xác nhận"}
+          </p>
 
           <section className="detail-story-block" aria-labelledby="gioi-thieu-du-an">
             <h2 id="gioi-thieu-du-an" className="sr-only">Câu chuyện dự án</h2>
@@ -199,26 +187,64 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
 
             {open && published && (
               <div className="detail-actions">
-                <DonateDialogButton
-                  campaignId={campaign.slug}
-                  campaignTitle={campaign.title}
-                  rewardTiers={rewardTiers}
-                  className="button button-outline"
-                  label="Ủng hộ"
-                />
+                <Link className="button button-primary" href={donateHref}>Ủng hộ</Link>
                 <ShareCampaignButton campaignId={campaign.slug} title={campaign.title} />
               </div>
             )}
 
+          </section>
+
+          <section className="detail-organizer-block" id="nguoi-to-chuc" aria-labelledby="nguoi-to-chuc-title">
+            <h2 id="nguoi-to-chuc-title">Người tổ chức</h2>
+            <div className="organizer-card">
+              <span className="organizer-avatar organizer-avatar-lg" aria-hidden="true">{ownerInitial}</span>
+              <div>
+                <b>{campaign.owner}</b>
+                <span>Người tổ chức</span>
+                <span className="organizer-location"><Icon name="location" size={14} /> {campaign.location}</span>
+              </div>
+            </div>
             <p className="detail-meta">
-              <span>{campaign.category}</span>
+              {campaign.createdDate && <span>Tạo ngày {campaign.createdDate}</span>}
+              <span><Link href={`/du-an?category=${encodeURIComponent(campaign.category)}`}>{campaign.category}</Link></span>
               {campaign.endDate && <span>Hạn gây quỹ {campaign.endDate}</span>}
             </p>
-            {published && <div className="detail-report"><ReportCampaignButton campaignId={campaign.slug} campaignSlug={campaign.slug} /></div>}
+            {published && (
+              <div className="detail-report">
+                <FollowCampaignButton campaignId={campaign.slug} compact />
+                <ReportCampaignButton campaignId={campaign.slug} campaignSlug={campaign.slug} />
+              </div>
+            )}
           </section>
 
           <section className="panel" aria-labelledby="ke-hoach">
             <h2 id="ke-hoach">Kế hoạch và ngân sách</h2>
+            <ul className="plan-facts">
+              <li>
+                <span>Tiến độ</span>
+                <b>
+                  {totalMilestones === 0
+                    ? "Chưa có mốc"
+                    : progress
+                      ? `${progress.completedMilestones}/${totalMilestones} mốc hoàn thành`
+                      : `${totalMilestones} mốc`}
+                </b>
+              </li>
+              {progress && (
+                <li>
+                  <span>Tình trạng</span>
+                  <b className={progress.transparency === "late" ? "fact-warn" : undefined}>{TRANSPARENCY_LABEL[progress.transparency]}</b>
+                </li>
+              )}
+              {progress && progress.totalMilestones > 0 && (
+                <li>
+                  <span>Cập nhật gần nhất</span>
+                  <b>{progress.lastUpdateAt ? timeAgo(progress.lastUpdateAt) : "Chưa có"}</b>
+                </li>
+              )}
+              <li><span>Chi tiêu đã báo cáo</span><b>{progress && progress.totalExpense > 0 ? formatVnd(progress.totalExpense) : "Chưa có"}</b></li>
+              <li><span>Ngân sách kế hoạch</span><b>{budget > 0 ? formatVnd(budget) : "—"}</b></li>
+            </ul>
             {campaign.milestones.length > 0 ? (
               <div className="table-wrap">
                 <table className="data-table">
@@ -273,23 +299,12 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
 
           <section className="panel" id="nhat-ky" aria-labelledby="nhat-ky-title">
             <h2 id="nhat-ky-title">Nhật ký tiến độ &amp; chi tiêu</h2>
-            <p className="hint">Cập nhật của chủ dự án theo từng mốc. Mỗi khoản chi kèm ảnh chứng từ; tổng chi không vượt số tiền đã được xác nhận.</p>
-            {live ? <ProgressTimeline campaignId={campaign.slug} /> : <p className="hint">Dữ liệu mẫu không có nhật ký tiến độ.</p>}
-          </section>
-
-          <section className="panel" aria-labelledby="so-cai">
-            <h2 id="so-cai">Sổ cái giao dịch</h2>
-            <p className="hint">Các khoản ủng hộ đã được cổng thanh toán xác nhận, mới nhất ở trên.</p>
-            {published ? (
-              <CampaignLedger key={campaign.backers} campaignId={campaign.slug} />
-            ) : (
-              <p className="hint">{live ? "Sổ cái mở khi hồ sơ được duyệt và công khai." : "Dữ liệu mẫu không có sổ cái."}</p>
-            )}
+            <p className="hint">Mỗi khoản chi kèm ảnh chứng từ; tổng chi không vượt số tiền đã được xác nhận.</p>
+            {live ? <ProgressTimeline campaignId={campaign.slug} initialSize={3} /> : <p className="hint">Dữ liệu mẫu không có nhật ký tiến độ.</p>}
           </section>
 
           <section className="panel" id="hoi-dap" aria-labelledby="hoi-dap-title">
             <h2 id="hoi-dap-title">Hỏi đáp &amp; bình luận</h2>
-            <p className="hint">Đặt câu hỏi cho chủ dự án hoặc chia sẻ ý kiến. Nội dung vi phạm có thể bị quản trị viên ẩn.</p>
             {published ? (
               <CampaignComments campaignId={campaign.slug} />
             ) : (
@@ -303,67 +318,28 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             <div className="fund-head">
               <ProgressRing value={percent} />
               <div>
-                <p className="fund-amount">{formatVnd(campaign.raised)} <span>đã nhận</span></p>
-                <p className="fund-target">trên mục tiêu {formatVnd(campaign.target)}</p>
+                <p className="fund-amount">{formatVnd(campaign.raised)}</p>
+                <p className="fund-target">
+                  đã nhận / mục tiêu <abbr title={formatVnd(campaign.target)}>{formatVndShort(campaign.target)}</abbr>
+                </p>
                 <p className="fund-sub">
                   {campaign.backers.toLocaleString("vi-VN")} lượt ủng hộ · {open ? `còn ${campaign.daysLeft} ngày` : campaign.status}
                 </p>
               </div>
             </div>
-            {open && (
-              <DonateDialogButton
-                campaignId={campaign.slug}
-                campaignTitle={campaign.title}
-                enabled={published}
-                rewardTiers={rewardTiers}
-                className="button button-primary button-block button-lg"
-              />
-            )}
-            {published && (
-              <div className="fund-social">
-                <FollowCampaignButton campaignId={campaign.slug} />
-                <ShareCampaignButton campaignId={campaign.slug} title={campaign.title} />
+            {open && published && (
+              <div className="fund-actions">
+                <Link className="button button-primary button-block button-lg" href={donateHref}>Ủng hộ ngay</Link>
+                <ShareCampaignButton
+                  campaignId={campaign.slug}
+                  title={campaign.title}
+                  className="button button-dark button-block button-lg"
+                />
               </div>
             )}
             {/* key theo số lượt ủng hộ: tải lại khi trang làm mới sau một khoản ủng hộ mới. */}
             {published && <DonorHighlights key={campaign.backers} campaignId={campaign.slug} />}
           </section>
-
-          <section className="panel" aria-labelledby="thong-tin-ho-so">
-            <h2 id="thong-tin-ho-so" className="panel-title-sm">Thông tin hồ sơ</h2>
-            <ul className="facts">
-              <li>
-                <span>Kiểm duyệt</span>
-                <span className={published || !live ? undefined : "fact-warn"}>{reviewStatusLabel(campaign.apiStatus)}</span>
-              </li>
-              <li>
-                <span>Kế hoạch</span>
-                <span>
-                  {totalMilestones === 0
-                    ? "Chưa có mốc"
-                    : progress
-                      ? `${progress.completedMilestones}/${totalMilestones} mốc hoàn thành`
-                      : `${totalMilestones} mốc`}
-                </span>
-              </li>
-              {progress && (
-                <li>
-                  <span>Tình trạng tiến độ</span>
-                  <span className={progress.transparency === "late" ? "fact-warn" : undefined}>{TRANSPARENCY_LABEL[progress.transparency]}</span>
-                </li>
-              )}
-              {progress && progress.totalMilestones > 0 && (
-                <li>
-                  <span>Cập nhật gần nhất</span>
-                  <span>{progress.lastUpdateAt ? timeAgo(progress.lastUpdateAt) : "Chưa có"}</span>
-                </li>
-              )}
-              <li><span>Chi tiêu đã báo cáo</span><span>{progress && progress.totalExpense > 0 ? formatVnd(progress.totalExpense) : "Chưa có"}</span></li>
-              <li><span>Ngân sách kế hoạch</span><span>{budget > 0 ? formatVnd(budget) : "—"}</span></li>
-              {campaign.endDate && <li><span>Hạn gây quỹ</span><span>{campaign.endDate}</span></li>}
-            </ul>
-          </section>
-
         </aside>
       </div>
 

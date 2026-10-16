@@ -11,6 +11,8 @@ import { useIsAuthenticated } from "@/lib/auth";
 
 type FollowCampaignButtonProps = {
   campaignId: string;
+  /** Nút chữ nhỏ (cạnh "Báo cáo vi phạm") thay cho nút viền toàn chiều rộng. */
+  compact?: boolean;
 };
 
 function errorMessage(error: unknown): string {
@@ -23,7 +25,7 @@ function errorMessage(error: unknown): string {
 }
 
 /** Theo dõi để nhận thông báo khi chiến dịch có cập nhật, đạt mốc hoặc đổi trạng thái. */
-export function FollowCampaignButton({ campaignId }: FollowCampaignButtonProps) {
+export function FollowCampaignButton({ campaignId, compact = false }: FollowCampaignButtonProps) {
   const loggedIn = useIsAuthenticated();
   const [status, setStatus] = useState<FollowStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -60,12 +62,13 @@ export function FollowCampaignButton({ campaignId }: FollowCampaignButtonProps) 
   };
 
   const count = status ? status.followerCount.toLocaleString("vi-VN") : "…";
+  const base = compact ? "follow-compact" : "button button-outline button-block";
 
   return (
-    <div className="follow-box">
+    <div className={compact ? "follow-box follow-box-compact" : "follow-box"}>
       {loggedIn ? (
         <button
-          className={`button button-outline button-block${status?.following ? " is-following" : ""}`}
+          className={`${base}${status?.following ? " is-following" : ""}`}
           type="button"
           aria-pressed={status?.following ?? false}
           disabled={busy || !status}
@@ -76,7 +79,7 @@ export function FollowCampaignButton({ campaignId }: FollowCampaignButtonProps) 
           <span className="follow-count" aria-label={`${count} người theo dõi`}>{count}</span>
         </button>
       ) : (
-        <Link className="button button-outline button-block" href={`/dang-nhap?next=/du-an/${campaignId}`}>
+        <Link className={base} href={`/dang-nhap?next=/du-an/${campaignId}`}>
           <Icon name="bell" size={16} /> Đăng nhập để theo dõi
           <span className="follow-count" aria-label={`${count} người theo dõi`}>{count}</span>
         </Link>
