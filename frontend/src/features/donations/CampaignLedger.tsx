@@ -3,18 +3,12 @@
 import { useEffect, useState } from "react";
 
 import { fetchCampaignLedger, type CampaignLedger as Ledger } from "@/lib/api/donations";
-import { formatDateTime, formatVnd } from "@/lib/format";
+import { formatDateTime, formatVnd, paymentMethodLabel } from "@/lib/format";
 
 type CampaignLedgerProps = {
   campaignId: string;
   /** "recent": mới nhất trước; "top": số tiền lớn nhất trước. */
   sort?: "recent" | "top";
-};
-
-const METHOD_LABEL: Record<string, string> = {
-  wallet: "Ví demo",
-  wallet_demo: "Ví demo",
-  payos: "PayOS sandbox",
 };
 
 /** Số dòng hiển thị ban đầu; bấm "Xem tất cả" để tải tối đa FULL_ROWS (giới hạn của API). */
@@ -65,7 +59,7 @@ export function CampaignLedger({ campaignId, sort = "recent" }: CampaignLedgerPr
               <tr key={entry.id}>
                 <td className="mono nowrap">{formatDateTime(entry.completedAt)}</td>
                 <td>{entry.donorName ?? <i>Ẩn danh</i>}</td>
-                <td>{METHOD_LABEL[entry.paymentMethod ?? ""] ?? "—"}</td>
+                <td>{paymentMethodLabel(entry.paymentMethod)}</td>
                 <td className="num">{formatVnd(entry.amount)}</td>
                 <td className="mono">{entry.reference}</td>
               </tr>

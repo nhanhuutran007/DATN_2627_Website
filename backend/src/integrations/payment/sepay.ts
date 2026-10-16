@@ -96,6 +96,21 @@ export class SepayGateway {
     };
   }
 
+  /**
+   * Tra trạng thái đơn trên SePay theo `order_invoice_number` (API chỉ đọc). Dùng để
+   * đối soát khi IPN không tới (tunnel/mạng lỗi). `null` nếu SePay không có đơn này.
+   */
+  async fetchOrder(invoiceNumber: string): Promise<SepayOrder | null> {
+    try {
+      const response = await this.client.order.retrieve(encodeURIComponent(invoiceNumber));
+      return parseSepayOrder(asRecord(response.data)?.data);
+    } catch (error) {
+      const status = (error as { response?: { status?: number } }).response?.status;
+      if (status === 404) return null;
+      throw error;
+    }
+  }
+
   /** So khớp `X-Secret-Key` của IPN, thời gian hằng để không lộ khóa qua timing. */
   verifyIpnSecret(received: string | undefined): boolean {
     if (!received) return false;
@@ -103,6 +118,34 @@ export class SepayGateway {
     const actual = Buffer.from(received.trim(), "utf8");
     return expected.length === actual.length && timingSafeEqual(expected, actual);
   }
+}
+
+/** Trạng thái đơn trả về từ API tra cứu của SePay. */
+export type SepayOrder = {
+  /** Mã đơn phía SePay, vd. `PAY48496AD1D9C286A73`. */
+  orderId: string;
+  invoiceNumber: string;
+  /** `CAPTURED` = đã thanh toán, `CANCELLED`, `AUTHENTICATION_NOT_NEEDED` = đang chờ. */
+  orderStatus: string;
+  amount: number;
+  currency: string;
+};
+
+/** Đọc `data` của API chi tiết đơn; `null` nếu thiếu trường bắt buộc. */
+export function parseSepayOrder(data: unknown): SepayOrder | null {
+  const order = asRecord(data);
+  if (!order) return null;
+  const orderId = asText(order.order_id);
+  const invoiceNumber = asText(order.order_invoice_number);
+  const amount = Number(asText(order.order_amount));
+  if (!orderId || !invoiceNumber || !Number.isFinite(amount)) return null;
+  return {
+    orderId,
+    invoiceNumber,
+    orderStatus: asText(order.order_status).toUpperCase(),
+    amount,
+    currency: (asText(order.order_currency) || "VND").toUpperCase(),
+  };
 }
 
 /** Phần IPN hệ thống cần (SePay gửi thêm thông tin thẻ/khách hàng — bỏ qua). */

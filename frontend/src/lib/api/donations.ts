@@ -95,6 +95,17 @@ export async function createSepayCheckout(donationId: string): Promise<SepayChec
   return api.post<SepayCheckoutForm>(`/donations/${encodeURIComponent(donationId)}/sepay-checkout`);
 }
 
+export type SepaySyncResult = {
+  donation: ApiDonation;
+  sepayStatus: string | null;
+  applied: boolean;
+};
+
+/** Nhờ server hỏi lại SePay trạng thái đơn (khi IPN chưa tới). */
+export async function syncSepayDonation(donationId: string): Promise<SepaySyncResult> {
+  return api.post<SepaySyncResult>(`/donations/${encodeURIComponent(donationId)}/sepay-sync`);
+}
+
 /** POST form đã ký sang SePay (trình duyệt rời trang hiện tại). */
 export function submitSepayCheckout(form: SepayCheckoutForm): void {
   const element = document.createElement("form");

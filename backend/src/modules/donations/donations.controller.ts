@@ -72,6 +72,15 @@ export class DonationsController {
     return this.donationsService.findMine(user.id);
   }
 
+  /** Hỏi lại SePay trạng thái đơn khi IPN không tới (người ủng hộ của đơn hoặc admin). */
+  @Post(":id/sepay-sync")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 20, windowMs: 60_000, keyPrefix: "sepay-sync" })
+  sepaySync(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
+    return this.donationsService.syncSepayDonation(id, user);
+  }
+
   /** Form có chữ ký để trình duyệt chuyển sang trang thanh toán SePay (chỉ người ủng hộ). */
   @Post(":id/sepay-checkout")
   @HttpCode(HttpStatus.OK)

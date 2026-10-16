@@ -839,6 +839,43 @@ paths:
           description: SePay chưa cấu hình hoặc không tìm thấy đơn của người dùng hiện tại
         "409":
           description: Đơn không còn chờ thanh toán hoặc không thanh toán qua SePay
+  /donations/{id}/sepay-sync:
+    post:
+      operationId: syncSepayDonation
+      summary: Đối soát đơn với API tra cứu của SePay (khi IPN không tới)
+      description: >-
+        Người ủng hộ của đơn hoặc admin. Chỉ hỏi SePay với đơn `pending/expired/cancelled`
+        (`paymentMethod=sepay`). SePay báo `CAPTURED` đúng số tiền VND thì ghi nhận như IPN
+        (nguồn `sepay-sync`, audit `donation.payment.completed`; đơn đã hết hạn/hủy được đánh dấu
+        `lateCompletion`). Sai số tiền chỉ ghi audit `donation.sepay.amount-mismatch`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Kết quả đối soát
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  donation:
+                    $ref: "#/components/schemas/Donation"
+                  sepayStatus:
+                    type: string
+                    nullable: true
+                    example: CAPTURED
+                  applied:
+                    type: boolean
+        "404":
+          description: SePay chưa cấu hình hoặc không tìm thấy đơn
+        "409":
+          description: Đơn không thanh toán qua SePay
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "503":
+          description: Không kết nối được SePay
   /payments/sepay/ipn:
     post:
       operationId: sepayIpn
@@ -3281,7 +3318,7 @@ components:
           minimum: 20000
         paymentMethod:
           type: string
-          enum: [wallet, payos, sepay]
+          enum: [wallet, sepay]
         message:
           type: string
           maxLength: 500
