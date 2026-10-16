@@ -52,6 +52,11 @@ locals {
     { name = "JWT_ACCESS_SECRET", value = var.jwt_access_secret },
     { name = "JWT_REFRESH_SECRET", value = var.jwt_refresh_secret },
     { name = "PAYMENT_WEBHOOK_SECRET", value = var.payment_webhook_secret },
+    # Cổng SePay; IPN URL khai báo trên SePay: <public_url>/api/v1/payments/sepay/ipn
+    { name = "SEPAY_ENV", value = var.sepay_env },
+    { name = "SEPAY_MERCHANT_ID", value = var.sepay_merchant_id },
+    { name = "SEPAY_SECRET_KEY", value = var.sepay_secret_key },
+    { name = "SEPAY_IPN_SECRET", value = var.sepay_ipn_secret },
     # Chỉ dùng khi chạy migration/seed bằng ts-node (one-off task), bỏ bước typecheck cho nhanh
     { name = "TS_NODE_TRANSPILE_ONLY", value = "true" },
   ]
