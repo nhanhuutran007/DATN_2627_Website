@@ -1,15 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FormEvent, useCallback, useEffect, useId, useState } from "react";
 
+import { Icon } from "@/components/ui/Icon";
+import { SepayPaymentStatus, type SepayReturn } from "@/features/donations/SepayPaymentStatus";
+import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ApiError, hasSession } from "@/lib/api";
 import {
   cancelDonation,
   confirmDonation,
   createDonation,
+  createSepayCheckout,
+  fetchCampaignLedger,
+  fetchDonation,
+  fetchPaymentOptions,
   generateIdempotencyKey,
   type ApiDonation,
+  type LedgerEntry,
+  type PaymentOptions,
+  submitSepayCheckout,
 } from "@/lib/api/donations";
 import { formatVnd } from "@/lib/format";
 import type { RewardTier } from "@/lib/api/rewards";
@@ -17,31 +28,120 @@ import type { RewardTier } from "@/lib/api/rewards";
 type DonationPanelProps = {
   campaignId: string;
   campaignTitle: string;
-  /** false khi đang xem dữ liệu mẫu — không cho gửi giao dịch. */
+  /** false khi chiến dịch chưa công khai/đã đóng — không cho gửi giao dịch. */
   enabled?: boolean;
   /** Mức quà đang nhận của chiến dịch. */
   rewardTiers?: RewardTier[];
+  /** Quay về từ trang SePay (`?donation=…&payment=…`): hiện trạng thái đơn đó. */
+  sepayReturn?: { donationId: string; result: SepayReturn } | null;
 };
 
-const PRESETS = [100_000, 200_000, 500_000, 1_000_000];
+const PRESETS = [50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000];
+const SUGGESTED = 200_000;
 const MIN_AMOUNT = 20_000;
+const MAX_DIGITS = 12;
 
-export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewardTiers = [] }: DonationPanelProps) {
-  const [amount, setAmount] = useState(200_000);
-  const [customAmount, setCustomAmount] = useState("");
+type PaymentMethod = { value: string; label: string; note: string };
+
+const DEMO_METHODS: PaymentMethod[] = [
+  { value: "wallet", label: "Ví demo Góp Mầm", note: "Xác nhận ngay, dùng cho buổi demo" },
+  { value: "payos", label: "PayOS sandbox", note: "Cổng thanh toán thử nghiệm" },
+];
+
+const METHOD_LABELS: Record<string, string> = {
+  wallet: "Ví demo",
+  payos: "PayOS sandbox",
+  sepay: "Chuyển khoản qua SePay",
+};
+
+/** SePay (khi máy chủ đã cấu hình) đứng đầu và được chọn sẵn; ví demo chỉ khi còn bật. */
+function paymentMethods(options: PaymentOptions | null): PaymentMethod[] {
+  if (!options) return DEMO_METHODS;
+  const sepay: PaymentMethod[] = options.sepay
+    ? [{
+        value: "sepay",
+        label: options.sepay.env === "sandbox" ? "Chuyển khoản QR · SePay (sandbox)" : "Chuyển khoản QR · SePay",
+        note: "Quét mã VietQR bằng app ngân hàng bất kỳ, xác nhận tự động",
+      }]
+    : [];
+  return [...sepay, ...(options.demoWallet ? DEMO_METHODS : [])];
+}
+
+const vnNumber = new Intl.NumberFormat("vi-VN");
+
+/**
+ * Form ủng hộ trên trang /du-an/[id]/ung-ho (bố cục theo trang donate của GoFundMe):
+ * chọn nhanh số tiền hoặc nhập ô lớn → quà (nếu có) → kênh thanh toán → tóm tắt → xác nhận.
+ */
+export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewardTiers = [], sepayReturn = null }: DonationPanelProps) {
+  const router = useRouter();
+  const [digits, setDigits] = useState("");
   const [anonymous, setAnonymous] = useState(false);
   const [payment, setPayment] = useState("wallet");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [donation, setDonation] = useState<ApiDonation | null>(null);
   const [rewardTierId, setRewardTierId] = useState("");
+  const [recent, setRecent] = useState<LedgerEntry | null>(null);
+  const [options, setOptions] = useState<PaymentOptions | null>(null);
+  const methods = paymentMethods(options);
+  const amountId = useId();
   const selectedTier = rewardTiers.find((tier) => tier.id === rewardTierId) ?? null;
+  const amount = digits ? Number(digits) : 0;
 
-  const effectiveAmount = useMemo(() => {
-    if (!customAmount) return amount;
-    const parsed = Number(customAmount.replace(/\D/g, ""));
-    return Number.isFinite(parsed) ? parsed : 0;
-  }, [amount, customAmount]);
+  // Một dòng "ai đó vừa ủng hộ" dưới ô số tiền, lấy từ sổ cái đã xác nhận.
+  useEffect(() => {
+    if (!enabled) return;
+    let active = true;
+    fetchCampaignLedger(campaignId, 1, "recent")
+      .then((page) => {
+        if (active) setRecent(page.items[0] ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [campaignId, enabled]);
+
+  useEffect(() => {
+    let active = true;
+    fetchPaymentOptions()
+      .then((data) => {
+        if (!active) return;
+        setOptions(data);
+        if (data.sepay) setPayment("sepay");
+        else if (!data.demoWallet) setPayment("");
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Quay về từ SePay: tải lại đơn (trạng thái thật do IPN quyết định, không theo URL).
+  const returnDonationId = sepayReturn?.donationId;
+  useEffect(() => {
+    if (!returnDonationId || !hasSession()) return;
+    let active = true;
+    fetchDonation(returnDonationId)
+      .then((found) => {
+        if (active) setDonation(found);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [returnDonationId]);
+
+  const handleStatusChange = useCallback((next: ApiDonation) => setDonation(next), []);
+
+  // Giao dịch vừa xác nhận: tải lại số liệu tiến độ ở đầu trang từ server.
+  const completed = donation?.status === "completed";
+  useEffect(() => {
+    if (completed) router.refresh();
+  }, [completed, router]);
+
+  const setAmount = (value: number) => setDigits(String(value));
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -50,11 +150,11 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
       setError("login");
       return;
     }
-    if (effectiveAmount < MIN_AMOUNT) {
+    if (amount < MIN_AMOUNT) {
       setError(`Số tiền tối thiểu là ${formatVnd(MIN_AMOUNT)}.`);
       return;
     }
-    if (selectedTier && effectiveAmount < selectedTier.minAmount) {
+    if (selectedTier && amount < selectedTier.minAmount) {
       setError(`Mức quà "${selectedTier.title}" cần ủng hộ tối thiểu ${formatVnd(selectedTier.minAmount)}.`);
       return;
     }
@@ -64,7 +164,7 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
     try {
       created = await createDonation({
         campaignId,
-        amount: effectiveAmount,
+        amount,
         paymentMethod: payment,
         isAnonymous: anonymous,
         idempotencyKey: generateIdempotencyKey(),
@@ -72,6 +172,11 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
       });
       // Đơn đã tạo: dù xác nhận lỗi vẫn hiển thị để người dùng thanh toán lại hoặc hủy.
       setDonation(created);
+      if (payment === "sepay") {
+        // Sang trang SePay quét QR; kết quả về qua IPN, trang này chỉ hiển thị lại.
+        submitSepayCheckout(await createSepayCheckout(created.id));
+        return;
+      }
       setDonation(await confirmDonation({ donationId: created.id, status: "completed" }));
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
@@ -114,6 +219,16 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
     setError("");
   };
 
+  if (donation?.status === "pending" && donation.paymentMethod === "sepay") {
+    return (
+      <SepayPaymentStatus
+        donation={donation}
+        result={sepayReturn?.donationId === donation.id ? sepayReturn.result : "error"}
+        onChange={handleStatusChange}
+      />
+    );
+  }
+
   if (donation && donation.status !== "completed") {
     const pending = donation.status === "pending";
     const outcome = {
@@ -124,26 +239,26 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
       refunded: { title: "Khoản ủng hộ đã được hoàn tiền", text: "" },
     }[donation.status];
     return (
-      <div className="give give-done" aria-live="polite">
-        <h2 className="give-title">{outcome.title}</h2>
+      <div className="donate-result" aria-live="polite">
+        <h2>{outcome.title}</h2>
         <p>{outcome.text}</p>
         <dl className="receipt">
-          <div><dt>Số tiền</dt><dd className="num">{formatVnd(Number(donation.amount) || effectiveAmount)}</dd></div>
+          <div><dt>Số tiền</dt><dd className="num">{formatVnd(Number(donation.amount) || amount)}</dd></div>
           <div><dt>Mã giao dịch</dt><dd className="mono">{donation.transactionId ?? donation.id}</dd></div>
         </dl>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="give-done-actions">
+        <div className="donate-result-actions">
           {pending ? (
             <>
-              <button className="button button-primary" type="button" disabled={loading} onClick={retryPayment}>
+              <button className="button button-primary button-lg" type="button" disabled={loading} onClick={retryPayment}>
                 {loading ? "Đang xử lý…" : "Thanh toán lại"}
               </button>
-              <button className="button button-outline" type="button" disabled={loading} onClick={cancelPending}>
+              <button className="button button-outline button-lg" type="button" disabled={loading} onClick={cancelPending}>
                 Hủy giao dịch
               </button>
             </>
           ) : (
-            <button className="button button-primary" type="button" onClick={startOver}>Tạo giao dịch mới</button>
+            <button className="button button-primary button-lg" type="button" onClick={startOver}>Tạo giao dịch mới</button>
           )}
         </div>
       </div>
@@ -152,58 +267,69 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
 
   if (donation) {
     return (
-      <div className="give give-done" aria-live="polite">
-        <h2 className="give-title">Đã ghi nhận khoản ủng hộ</h2>
-        <p>Cảm ơn bạn đã ủng hộ “{campaignTitle}”. Khoản này sẽ xuất hiện trong sổ cái của chiến dịch.</p>
+      <div className="donate-result" aria-live="polite">
+        <span className="donate-result-icon" aria-hidden="true"><Icon name="heart" size={28} /></span>
+        <h2>Cảm ơn bạn đã ủng hộ!</h2>
+        <p>
+          Khoản ủng hộ cho “{campaignTitle}” đã được xác nhận và ghi vào sổ cái công khai của dự án. Biên nhận cũng được
+          gửi tới email của bạn.
+        </p>
         <dl className="receipt">
-          <div><dt>Số tiền</dt><dd className="num">{formatVnd(Number(donation.amount) || effectiveAmount)}</dd></div>
+          <div><dt>Số tiền</dt><dd className="num">{formatVnd(Number(donation.amount) || amount)}</dd></div>
           <div><dt>Mã giao dịch</dt><dd className="mono">{donation.transactionId ?? donation.id}</dd></div>
-          <div><dt>Kênh</dt><dd>{donation.paymentMethod === "payos" ? "PayOS sandbox" : "Ví demo"}</dd></div>
+          <div><dt>Kênh</dt><dd>{METHOD_LABELS[donation.paymentMethod ?? ""] ?? "Ví demo"}</dd></div>
           <div><dt>Hiển thị</dt><dd>{donation.isAnonymous ? "Ẩn danh" : "Tên của bạn"}</dd></div>
           {selectedTier && <div><dt>Phần quà</dt><dd>{donation.rewardTierId ? selectedTier.title : "Hết suất — ghi nhận không kèm quà"}</dd></div>}
-          <div><dt>Trạng thái</dt><dd>Đã xác nhận</dd></div>
         </dl>
-        <div className="give-done-actions">
-          <Link className="button button-primary" href={`/bien-nhan/${donation.id}`}>Xem biên nhận</Link>
-          <button className="button button-outline" type="button" onClick={startOver}>
-            Ủng hộ thêm
-          </button>
+        <p className="donate-result-share">Chia sẻ dự án để thêm nhiều người biết đến — đó cũng là một cách ủng hộ.</p>
+        <div className="donate-result-actions">
+          <ShareCampaignButton campaignId={campaignId} title={campaignTitle} className="button button-dark button-lg" label="Chia sẻ dự án" />
+          <Link className="button button-outline button-lg" href={`/bien-nhan/${donation.id}`}>Xem biên nhận</Link>
         </div>
+        <Link className="donate-result-back" href={`/du-an/${encodeURIComponent(campaignId)}`}>Quay lại trang dự án</Link>
       </div>
     );
   }
 
   return (
-    <form className="give" onSubmit={submit} noValidate>
-      <h2 className="give-title">Ủng hộ dự án</h2>
-
-      <fieldset className="give-amounts">
-        <legend>Số tiền</legend>
+    <form className="donate-form" onSubmit={submit} noValidate>
+      <fieldset className="donate-presets">
+        <legend className="sr-only">Chọn nhanh số tiền</legend>
         {PRESETS.map((preset) => (
-          <button
-            aria-pressed={!customAmount && amount === preset}
-            key={preset}
-            type="button"
-            onClick={() => { setAmount(preset); setCustomAmount(""); }}
-          >
-            <span className="num">{new Intl.NumberFormat("vi-VN").format(preset)}</span>
+          <button aria-pressed={amount === preset} key={preset} type="button" onClick={() => setAmount(preset)}>
+            <span className="num">{vnNumber.format(preset)}</span>
+            {preset === SUGGESTED && <small>Gợi ý</small>}
           </button>
         ))}
       </fieldset>
 
-      <label className="give-field">
-        <span>Số khác (VNĐ)</span>
+      <div className="donate-amount">
+        <label htmlFor={amountId}>
+          <b>₫</b>
+          <span>VNĐ</span>
+        </label>
         <input
+          id={amountId}
           inputMode="numeric"
-          placeholder={`Tối thiểu ${new Intl.NumberFormat("vi-VN").format(MIN_AMOUNT)}`}
-          value={customAmount}
-          onChange={(event) => setCustomAmount(event.target.value)}
+          autoComplete="off"
+          placeholder="0"
+          aria-describedby={`${amountId}-hint`}
+          value={digits ? vnNumber.format(amount) : ""}
+          onChange={(event) => setDigits(event.target.value.replace(/\D/g, "").replace(/^0+/, "").slice(0, MAX_DIGITS))}
         />
-      </label>
+      </div>
+      <p className="donate-amount-hint" id={`${amountId}-hint`}>
+        Tối thiểu {formatVnd(MIN_AMOUNT)}
+        {recent && (
+          <span className="donate-recent">
+            <Icon name="heart" size={14} /> {recent.donorName ?? "Một người ẩn danh"} vừa ủng hộ {formatVnd(recent.amount)}
+          </span>
+        )}
+      </p>
 
       {rewardTiers.length > 0 && (
-        <fieldset className="give-rewards">
-          <legend>Chọn phần quà</legend>
+        <fieldset className="donate-section give-rewards">
+          <legend>Chọn phần quà <small>(không bắt buộc)</small></legend>
           <label className="reward-option">
             <input type="radio" name="reward" value="" checked={!rewardTierId} onChange={() => setRewardTierId("")} />
             <span className="reward-option-body"><b>Ủng hộ không nhận quà</b></span>
@@ -220,9 +346,7 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
                   disabled={soldOut}
                   onChange={() => {
                     setRewardTierId(tier.id);
-                    if (effectiveAmount < tier.minAmount) {
-                      setCustomAmount(String(tier.minAmount));
-                    }
+                    if (amount < tier.minAmount) setAmount(tier.minAmount);
                   }}
                 />
                 <span className="reward-option-body">
@@ -242,38 +366,55 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
         </fieldset>
       )}
 
-      <fieldset className="give-methods">
-        <legend>Kênh thanh toán (thử nghiệm)</legend>
-        <label>
-          <input type="radio" name="payment" value="wallet" checked={payment === "wallet"} onChange={(event) => setPayment(event.target.value)} />
-          <span>Ví demo Góp Mầm</span>
-        </label>
-        <label>
-          <input type="radio" name="payment" value="payos" checked={payment === "payos"} onChange={(event) => setPayment(event.target.value)} />
-          <span>PayOS sandbox</span>
-        </label>
+      <fieldset className="donate-section donate-methods">
+        <legend>Phương thức thanh toán</legend>
+        {methods.map((method) => (
+          <label key={method.value}>
+            <input type="radio" name="payment" value={method.value} checked={payment === method.value} onChange={() => setPayment(method.value)} />
+            <span>
+              <b>{method.label}</b>
+              <small>{method.note}</small>
+            </span>
+          </label>
+        ))}
       </fieldset>
 
-      <label className="give-check">
+      <label className="donate-check">
         <input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} />
-        <span>Không hiện tên tôi trong sổ cái</span>
+        <span>Không hiển thị tên tôi công khai trên dự án và sổ cái.</span>
       </label>
+
+      <section className="donate-summary" aria-labelledby={`${amountId}-summary`}>
+        <h2 id={`${amountId}-summary`}>Khoản ủng hộ của bạn</h2>
+        <dl>
+          <div><dt>Số tiền ủng hộ</dt><dd className="num">{formatVnd(amount)}</dd></div>
+          {selectedTier && <div><dt>Phần quà</dt><dd>{selectedTier.title}</dd></div>}
+          <div className="donate-summary-total"><dt>Tổng thanh toán hôm nay</dt><dd className="num">{formatVnd(amount)}</dd></div>
+        </dl>
+      </section>
 
       {error === "login" ? (
         <p className="form-error" role="alert">
-          Bạn cần <Link href={`/dang-nhap?next=/du-an/${encodeURIComponent(campaignId)}`}>đăng nhập</Link> để ủng hộ.
+          Bạn cần <Link href={`/dang-nhap?next=/du-an/${encodeURIComponent(campaignId)}/ung-ho`}>đăng nhập</Link> để ủng hộ.
         </p>
       ) : error ? (
         <p className="form-error" role="alert">{error}</p>
       ) : null}
 
-      <button className="button button-primary button-block" type="submit" disabled={loading || !enabled}>
-        {loading ? "Đang xử lý…" : `Ủng hộ ${formatVnd(effectiveAmount)}`}
+      <button className="button button-primary button-block button-lg" type="submit" disabled={loading || !enabled || !payment}>
+        {loading ? "Đang xử lý…" : "Ủng hộ ngay"}
       </button>
       <p className="fineprint">
-        {enabled
-          ? "Bản demo dùng thanh toán sandbox, không trừ tiền thật và không lưu dữ liệu thẻ. Số tiền chỉ được cộng khi giao dịch được xác nhận."
-          : "Đây là dữ liệu mẫu, không thể ủng hộ."}
+        {enabled ? (
+          <>
+            Khi bấm “Ủng hộ ngay”, bạn đồng ý với <Link href="/chinh-sach-bao-mat">chính sách quyền riêng tư</Link> của Góp Mầm.
+            {payment === "sepay"
+              ? "Bạn sẽ được chuyển sang trang thanh toán SePay để quét QR. Góp Mầm không lưu thông tin tài khoản hay thẻ của bạn."
+              : "Bản demo dùng thanh toán sandbox, không trừ tiền thật và không lưu dữ liệu thẻ."}
+          </>
+        ) : (
+          "Dự án hiện không nhận ủng hộ."
+        )}
       </p>
     </form>
   );

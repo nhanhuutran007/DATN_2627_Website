@@ -33,6 +33,8 @@ export type Campaign = {
   imageUrl?: string | null;
   /** Ngày kết thúc dạng dd/mm/yyyy. */
   endDate?: string;
+  /** Ngày tạo chiến dịch dạng dd/mm/yyyy; dữ liệu mẫu không có. */
+  createdDate?: string;
   aiReason: string;
   story: string[];
   /** Mô tả dạng HTML từ trình soạn thảo (chưa làm sạch); không có với mô tả văn bản thuần cũ. */

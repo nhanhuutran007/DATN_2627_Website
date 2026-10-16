@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -14,6 +15,13 @@ import {
   PaymentGateway,
   WEBHOOK_MAX_SKEW_MS,
 } from "../../integrations/payment/payment.gateway";
+import { frontendBaseUrl } from "../../integrations/email/email.gateway";
+import {
+  generateTransferCode,
+  parseSepayIpn,
+  type SepayCheckoutForm,
+  SepayGateway,
+} from "../../integrations/payment/sepay";
 import { AuditService } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { NotificationType } from "../notifications/entities/notification.entity";
@@ -38,6 +46,17 @@ export type DonationReceipt = {
   rewardTitle: string | null;
   refund: { refundedAt: Date | null; reference: string | null; reason: string | null } | null;
 };
+
+/** Kênh thanh toán đang bật, để frontend chỉ hiện lựa chọn dùng được. */
+export type PaymentOptions = {
+  /** Cổng SePay (QR chuyển khoản thật); null khi chưa cấu hình merchant. */
+  sepay: { env: "sandbox" | "production" } | null;
+  /** Ví demo: người ủng hộ tự bấm xác nhận (không có tiền thật). */
+  demoWallet: boolean;
+};
+
+/** Phản hồi cho SePay: luôn 200 khi đã xác thực để SePay không gửi lại vô ích. */
+export type SepayIpnResult = { success: true; applied: boolean };
 
 const STATUS_FROM_GATEWAY: Record<WebhookStatus, DonationStatus> = {
   completed: DonationStatus.COMPLETED,
@@ -69,7 +88,112 @@ export class DonationsService {
     @Inject("PaymentGateway") private readonly paymentGateway: PaymentGateway,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
+    @Optional()
+    @Inject("SepayGateway")
+    private readonly sepay: SepayGateway | null = null,
   ) {}
+
+  /**
+   * Ví demo chỉ dùng khi chưa nhận tiền thật: SePay chạy production thì tắt hẳn để
+   * không ai tự "xác nhận" khoản ủng hộ không có tiền làm sai số liệu quỹ.
+   */
+  private demoWalletEnabled(): boolean {
+    return this.paymentGateway.mode === "demo" && this.sepay?.env !== "production";
+  }
+
+  paymentOptions(): PaymentOptions {
+    return {
+      sepay: this.sepay ? { env: this.sepay.env } : null,
+      demoWallet: this.demoWalletEnabled(),
+    };
+  }
+
+  /**
+   * Form thanh toán SePay cho đơn `pending` của chính người ủng hộ. `order_invoice_number`
+   * là `transferCode` của đơn để IPN tìm lại đúng đơn. URL trả về chỉ để hiển thị.
+   */
+  async createSepayCheckout(donationId: string, user: User): Promise<SepayCheckoutForm> {
+    if (!this.sepay) {
+      throw new NotFoundException("Cổng SePay chưa được cấu hình");
+    }
+    const donation = await this.donationRepo.findOne({ where: { id: donationId } });
+    if (!donation || donation.userId !== user.id) {
+      throw new NotFoundException("Donation not found");
+    }
+    if (donation.status !== DonationStatus.PENDING) {
+      throw new ConflictException("Giao dịch không còn chờ thanh toán. Vui lòng tạo giao dịch mới.");
+    }
+    if (donation.paymentMethod !== "sepay" || !donation.transferCode) {
+      throw new ConflictException("Giao dịch này không thanh toán qua SePay");
+    }
+    const returnUrl = (result: string) =>
+      `${frontendBaseUrl()}/du-an/${encodeURIComponent(donation.campaignId)}/ung-ho?donation=${donation.id}&payment=${result}`;
+    return this.sepay.buildCheckout({
+      invoiceNumber: donation.transferCode,
+      amount: Math.round(Number(donation.amount)),
+      description: `Ung ho Gop Mam ${donation.transferCode}`,
+      successUrl: returnUrl("success"),
+      errorUrl: returnUrl("error"),
+      cancelUrl: returnUrl("cancel"),
+    });
+  }
+
+  /**
+   * IPN của SePay. Xác thực `X-Secret-Key` TRƯỚC mọi truy vấn; chỉ `ORDER_PAID` +
+   * `CAPTURED` với đúng số tiền/tiền tệ mới được ghi nhận. Sai lệch (số tiền khác,
+   * hủy giao dịch đã thu) chỉ ghi audit để admin xử lý — không tự đổi số liệu quỹ.
+   */
+  async handleSepayIpn(body: unknown, secretKey: string | undefined): Promise<SepayIpnResult> {
+    if (!this.sepay || !this.sepay.verifyIpnSecret(secretKey)) {
+      await this.auditService.record({
+        action: "donation.sepay.rejected",
+        entity: "donation",
+        newValues: { reason: this.sepay ? "invalid-secret" : "sepay-disabled" },
+      });
+      throw new UnauthorizedException("Invalid IPN secret");
+    }
+    const ipn = parseSepayIpn(body);
+    if (!ipn) {
+      throw new BadRequestException("Invalid IPN payload");
+    }
+    const donation = await this.donationRepo.findOne({ where: { transferCode: ipn.invoiceNumber } });
+    if (!donation) {
+      await this.auditService.record({
+        action: "donation.sepay.unmatched",
+        entity: "donation",
+        newValues: { invoiceNumber: ipn.invoiceNumber, amount: ipn.amount, transactionId: ipn.transactionId },
+      });
+      return { success: true, applied: false };
+    }
+    const paid = ipn.notificationType === "ORDER_PAID" && ipn.orderStatus === "CAPTURED";
+    const amountMatches = ipn.currency === "VND" && Math.round(ipn.amount) === Math.round(Number(donation.amount));
+    if (!paid || !amountMatches) {
+      await this.auditService.record({
+        action: paid ? "donation.sepay.amount-mismatch" : "donation.sepay.ignored",
+        entity: "donation",
+        entityId: donation.id,
+        newValues: {
+          notificationType: ipn.notificationType,
+          orderStatus: ipn.orderStatus,
+          amount: ipn.amount,
+          currency: ipn.currency,
+          expectedAmount: Number(donation.amount),
+          transactionId: ipn.transactionId,
+        },
+      });
+      return { success: true, applied: false };
+    }
+    const result = await this.applyPaymentResult(
+      {
+        donationId: donation.id,
+        status: "completed",
+        transactionId: `SEPAY-${ipn.transactionId}`.slice(0, 255),
+        timestamp: Date.now(),
+      },
+      "sepay-ipn",
+    );
+    return { success: true, applied: result.status === DonationStatus.COMPLETED };
+  }
 
   async create(dto: CreateDonationDto, user: User): Promise<Donation> {
     const existing = await this.donationRepo.findOne({
@@ -98,6 +222,13 @@ export class DonationsService {
       await this.assertRewardTierAvailable(dto.rewardTierId, campaign.id, dto.amount);
     }
 
+    if (dto.paymentMethod === "sepay" && !this.sepay) {
+      throw new BadRequestException("Cổng SePay chưa được cấu hình");
+    }
+    if (dto.paymentMethod !== "sepay" && !this.demoWalletEnabled()) {
+      throw new BadRequestException("Kênh thanh toán demo đã tắt. Vui lòng chọn SePay.");
+    }
+
     const paymentResult = await this.paymentGateway.createTransaction({
       amount: dto.amount,
       currency: "VND",
@@ -112,6 +243,7 @@ export class DonationsService {
       status: DonationStatus.PENDING,
       paymentMethod: dto.paymentMethod,
       transactionId: paymentResult.transactionId,
+      transferCode: generateTransferCode(),
       idempotencyKey: dto.idempotencyKey,
       message: dto.message,
       isAnonymous: dto.isAnonymous ?? false,
@@ -191,7 +323,7 @@ export class DonationsService {
     status: "completed" | "failed",
     user: User,
   ): Promise<Donation> {
-    if (this.paymentGateway.mode !== "demo") {
+    if (!this.demoWalletEnabled()) {
       throw new ForbiddenException(
         "Client-side confirmation is only available with the demo wallet",
       );
@@ -201,6 +333,10 @@ export class DonationsService {
     });
     if (!donation || donation.userId !== user.id) {
       throw new NotFoundException("Donation not found");
+    }
+    if (donation.paymentMethod === "sepay") {
+      // Tiền thật: chỉ IPN có xác thực của SePay mới được xác nhận đơn.
+      throw new ForbiddenException("Giao dịch SePay chỉ được xác nhận bởi cổng thanh toán");
     }
     if (donation.status === DonationStatus.EXPIRED || donation.status === DonationStatus.CANCELLED) {
       // Ví demo mô phỏng người dùng bấm thanh toán: cổng không cho trả đơn đã hết hạn/hủy.
@@ -224,7 +360,7 @@ export class DonationsService {
 
   private async applyPaymentResult(
     dto: WebhookDonationDto,
-    source: "payment-webhook" | "demo-wallet",
+    source: "payment-webhook" | "demo-wallet" | "sepay-ipn",
     actorId?: string,
   ): Promise<Donation> {
     const donation = await this.donationRepo.findOne({
@@ -358,9 +494,10 @@ export class DonationsService {
         userId: donation.userId,
         type: NotificationType.DONATION_CONFIRMED,
         title: "Ủng hộ thành công",
-        message: `Khoản ủng hộ ${amount} cho chiến dịch "${campaign.title}" đã được cổng thanh toán xác nhận.${rewardNote} Cảm ơn bạn!`,
-        link: `/du-an/${campaign.id}`,
+        message: `Khoản ủng hộ ${amount} cho chiến dịch "${campaign.title}" đã được xác nhận.${rewardNote} Cảm ơn bạn!`,
+        link: `/bien-nhan/${donation.id}`,
         relatedId: donation.id,
+        email: true,
       },
       ...(campaign.ownerId !== donation.userId
         ? [
@@ -371,6 +508,7 @@ export class DonationsService {
               message: `Chiến dịch "${campaign.title}" vừa nhận ${amount} (đã xác nhận).`,
               link: "/dashboard",
               relatedId: campaign.id,
+              email: true,
             },
           ]
         : []),
