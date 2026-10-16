@@ -14,7 +14,7 @@ import {
   type RefundRequest,
 } from "@/lib/api/finance";
 import { useAuthUser } from "@/lib/auth";
-import { formatVnd } from "@/lib/format";
+import { formatVnd, paymentMethodLabel } from "@/lib/format";
 
 type LoadState = "loading" | "ready" | "notfound" | "error";
 
@@ -157,7 +157,7 @@ export function ReceiptView({ donationId }: { donationId: string }) {
           <div><dt>Chiến dịch</dt><dd><Link href={`/du-an/${receipt.campaign.id}`}>{receipt.campaign.title}</Link></dd></div>
           <div><dt>Số tiền</dt><dd className="num receipt-amount">{formatVnd(receipt.amount)}</dd></div>
           <div><dt>Thời gian xác nhận</dt><dd>{dateTime(receipt.completedAt)}</dd></div>
-          <div><dt>Kênh thanh toán</dt><dd>{receipt.paymentMethod === "payos" ? "PayOS sandbox" : "Ví demo Góp Mầm"}</dd></div>
+          <div><dt>Kênh thanh toán</dt><dd>{paymentMethodLabel(receipt.paymentMethod)}</dd></div>
           <div><dt>Mã giao dịch</dt><dd className="mono">{receipt.transactionId ?? receipt.donationId}</dd></div>
           {receipt.rewardTitle && <div><dt>Phần quà</dt><dd>{receipt.rewardTitle}</dd></div>}
           <div><dt>Trạng thái</dt><dd>{refunded ? "Đã hoàn tiền" : "Đã xác nhận"}</dd></div>

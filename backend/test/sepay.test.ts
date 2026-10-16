@@ -6,13 +6,14 @@ import { DemoWalletGateway } from "../src/integrations/payment/payment.gateway";
 import {
   generateTransferCode,
   parseSepayIpn,
+  parseSepayOrder,
   SepayGateway,
   sepayConfigFromEnv,
 } from "../src/integrations/payment/sepay";
 import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import { DonationsService } from "../src/modules/donations/donations.service";
 import { type Donation, DonationStatus } from "../src/modules/donations/entities/donation.entity";
-import type { User } from "../src/modules/users/entities/user.entity";
+import { type User, UserRole } from "../src/modules/users/entities/user.entity";
 import { makeAuditRecorder } from "./helpers/audit";
 import { makeNotifierRecorder } from "./helpers/notifications";
 
@@ -222,5 +223,77 @@ describe("DonationsService – SePay", () => {
     const { service, audit } = setup();
     deepEqual(await service.handleSepayIpn(ipnBody({ invoice: "GMZZZZZZZZ" }), SECRET), { success: true, applied: false });
     ok(audit.entries.some((r) => r.action === "donation.sepay.unmatched"));
+  });
+});
+
+describe("DonationsService – đối soát SePay", () => {
+  const order = (overrides: { status?: string; amount?: number } = {}) => ({
+    orderId: "PAY48496AD1D9C286A73",
+    invoiceNumber: "GM7K2QX9AB",
+    orderStatus: overrides.status ?? "CAPTURED",
+    amount: overrides.amount ?? 200000,
+    currency: "VND",
+  });
+  const withOrder = (result: ReturnType<typeof order> | null | Error) => {
+    const gw = gateway();
+    gw.fetchOrder = async () => {
+      if (result instanceof Error) throw result;
+      return result;
+    };
+    return gw;
+  };
+
+  it("đọc phản hồi API chi tiết đơn", () => {
+    deepEqual(
+      parseSepayOrder({ order_id: "PAY1", order_invoice_number: "GM7K2QX9AB", order_status: "CAPTURED", order_amount: "20000.00", order_currency: "VND" }),
+      { orderId: "PAY1", invoiceNumber: "GM7K2QX9AB", orderStatus: "CAPTURED", amount: 20000, currency: "VND" },
+    );
+    equal(parseSepayOrder({ order_status: "CAPTURED" }), null);
+  });
+
+  it("SePay đã CAPTURED → ghi nhận đơn, kể cả đơn đã hết hạn (thanh toán muộn)", async () => {
+    const { service, updates, notifier } = setup({ sepay: withOrder(order()), donation: { status: DonationStatus.EXPIRED } });
+    const result = await service.syncSepayDonation(DONATION_ID, donor);
+    equal(result.applied, true);
+    equal(result.sepayStatus, "CAPTURED");
+    equal(updates[0]?.status, DonationStatus.COMPLETED);
+    equal(updates[0]?.transactionId, "SEPAY-PAY48496AD1D9C286A73");
+    equal(notifier.notified.find((n) => n.userId === DONOR_ID)?.email, true);
+  });
+
+  it("chưa thanh toán hoặc sai số tiền thì không đổi gì", async () => {
+    const waiting = setup({ sepay: withOrder(order({ status: "AUTHENTICATION_NOT_NEEDED" })) });
+    deepEqual((await waiting.service.syncSepayDonation(DONATION_ID, donor)).applied, false);
+    equal(waiting.updates.length, 0);
+
+    const mismatch = setup({ sepay: withOrder(order({ amount: 10000 })) });
+    equal((await mismatch.service.syncSepayDonation(DONATION_ID, donor)).applied, false);
+    equal(mismatch.updates.length, 0);
+    ok(mismatch.audit.entries.some((e) => e.action === "donation.sepay.amount-mismatch"));
+  });
+
+  it("đơn đã hoàn tất thì không gọi SePay", async () => {
+    let called = false;
+    const gw = gateway();
+    gw.fetchOrder = async () => {
+      called = true;
+      return null;
+    };
+    const { service } = setup({ sepay: gw, donation: { status: DonationStatus.COMPLETED } });
+    equal((await service.syncSepayDonation(DONATION_ID, donor)).applied, false);
+    equal(called, false);
+  });
+
+  it("chỉ người ủng hộ của đơn hoặc admin; SePay lỗi mạng → 503", async () => {
+    await rejects(
+      setup({ sepay: withOrder(order()) }).service.syncSepayDonation(DONATION_ID, { id: OWNER_ID, role: UserRole.USER } as User),
+      (err: { status?: number }) => err.status === 404,
+    );
+    const asAdmin = await setup({ sepay: withOrder(order()) }).service.syncSepayDonation(DONATION_ID, { id: OWNER_ID, role: UserRole.ADMIN } as User);
+    equal(asAdmin.applied, true);
+    await rejects(
+      setup({ sepay: withOrder(new Error("ECONNRESET")) }).service.syncSepayDonation(DONATION_ID, donor),
+      (err: { status?: number }) => err.status === 503,
+    );
   });
 });

@@ -6,6 +6,7 @@ import {
   createSepayCheckout,
   fetchDonation,
   submitSepayCheckout,
+  syncSepayDonation,
   type ApiDonation,
 } from "@/lib/api/donations";
 import { formatVnd } from "@/lib/format";
@@ -22,6 +23,8 @@ type SepayPaymentStatusProps = {
 
 /** Hỏi lại trạng thái đơn theo chu kỳ này cho tới khi IPN của SePay tới. */
 const POLL_MS = 3000;
+/** Cứ chừng này lần hỏi thì nhờ server tra thẳng SePay (phòng khi IPN bị lỡ). */
+const SYNC_EVERY = 3;
 
 const COPY: Record<SepayReturn, { title: string; text: string }> = {
   success: {
@@ -39,8 +42,9 @@ const COPY: Record<SepayReturn, { title: string; text: string }> = {
 };
 
 /**
- * Màn hình sau khi quay về từ trang SePay. Luôn hỏi server vì chỉ IPN có xác thực
- * mới đổi trạng thái đơn; người dùng đã chuyển khoản mà quay về trang lỗi vẫn được cập nhật.
+ * Màn hình sau khi quay về từ trang SePay. Luôn hỏi server vì chỉ IPN có xác thực (hoặc
+ * server tự tra SePay khi đối soát) mới đổi trạng thái đơn; người dùng đã chuyển khoản mà
+ * quay về trang lỗi vẫn được cập nhật.
  */
 export function SepayPaymentStatus({ donation, result, onChange }: SepayPaymentStatusProps) {
   const [busy, setBusy] = useState(false);
@@ -48,8 +52,14 @@ export function SepayPaymentStatus({ donation, result, onChange }: SepayPaymentS
 
   useEffect(() => {
     let active = true;
+    let tick = 0;
     const timer = window.setInterval(() => {
-      fetchDonation(donation.id)
+      tick += 1;
+      const check =
+        tick % SYNC_EVERY === 0
+          ? syncSepayDonation(donation.id).then((result) => result.donation, () => fetchDonation(donation.id))
+          : fetchDonation(donation.id);
+      check
         .then((latest) => {
           if (active && latest.status !== "pending") onChange(latest);
         })

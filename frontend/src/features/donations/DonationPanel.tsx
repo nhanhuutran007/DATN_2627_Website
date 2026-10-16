@@ -21,8 +21,9 @@ import {
   type LedgerEntry,
   type PaymentOptions,
   submitSepayCheckout,
+  syncSepayDonation,
 } from "@/lib/api/donations";
-import { formatVnd } from "@/lib/format";
+import { formatVnd, paymentMethodLabel } from "@/lib/format";
 import type { RewardTier } from "@/lib/api/rewards";
 
 type DonationPanelProps = {
@@ -45,14 +46,7 @@ type PaymentMethod = { value: string; label: string; note: string };
 
 const DEMO_METHODS: PaymentMethod[] = [
   { value: "wallet", label: "Ví demo Góp Mầm", note: "Xác nhận ngay, dùng cho buổi demo" },
-  { value: "payos", label: "PayOS sandbox", note: "Cổng thanh toán thử nghiệm" },
 ];
-
-const METHOD_LABELS: Record<string, string> = {
-  wallet: "Ví demo",
-  payos: "PayOS sandbox",
-  sepay: "Chuyển khoản qua SePay",
-};
 
 /** SePay (khi máy chủ đã cấu hình) đứng đầu và được chọn sẵn; ví demo chỉ khi còn bật. */
 function paymentMethods(options: PaymentOptions | null): PaymentMethod[] {
@@ -124,6 +118,12 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
     if (!returnDonationId || !hasSession()) return;
     let active = true;
     fetchDonation(returnDonationId)
+      // Đơn SePay chưa ghi nhận (kể cả đã hết hạn): hỏi thẳng SePay một lần phòng IPN bị lỡ.
+      .then((found) =>
+        found.paymentMethod === "sepay" && found.status !== "completed" && found.status !== "refunded"
+          ? syncSepayDonation(found.id).then((result) => result.donation, () => found)
+          : found,
+      )
       .then((found) => {
         if (active) setDonation(found);
       })
@@ -277,7 +277,7 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
         <dl className="receipt">
           <div><dt>Số tiền</dt><dd className="num">{formatVnd(Number(donation.amount) || amount)}</dd></div>
           <div><dt>Mã giao dịch</dt><dd className="mono">{donation.transactionId ?? donation.id}</dd></div>
-          <div><dt>Kênh</dt><dd>{METHOD_LABELS[donation.paymentMethod ?? ""] ?? "Ví demo"}</dd></div>
+          <div><dt>Kênh</dt><dd>{paymentMethodLabel(donation.paymentMethod)}</dd></div>
           <div><dt>Hiển thị</dt><dd>{donation.isAnonymous ? "Ẩn danh" : "Tên của bạn"}</dd></div>
           {selectedTier && <div><dt>Phần quà</dt><dd>{donation.rewardTierId ? selectedTier.title : "Hết suất — ghi nhận không kèm quà"}</dd></div>}
         </dl>

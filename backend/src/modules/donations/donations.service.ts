@@ -6,6 +6,7 @@ import {
   Injectable,
   NotFoundException,
   Optional,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -54,6 +55,18 @@ export type PaymentOptions = {
   /** Ví demo: người ủng hộ tự bấm xác nhận (không có tiền thật). */
   demoWallet: boolean;
 };
+
+/** Kết quả đối soát một đơn với SePay. */
+export type SepaySyncResult = {
+  donation: Donation;
+  /** Trạng thái đơn phía SePay; null nếu không cần hỏi hoặc SePay không có đơn. */
+  sepayStatus: string | null;
+  /** true khi lần đối soát này ghi nhận thanh toán. */
+  applied: boolean;
+};
+
+/** Đơn có thể đã thu tiền mà hệ thống chưa biết (IPN lỡ) — đáng hỏi lại SePay. */
+const SYNCABLE_STATUSES = [DonationStatus.PENDING, DonationStatus.EXPIRED, DonationStatus.CANCELLED];
 
 /** Phản hồi cho SePay: luôn 200 khi đã xác thực để SePay không gửi lại vô ích. */
 export type SepayIpnResult = { success: true; applied: boolean };
@@ -136,6 +149,63 @@ export class DonationsService {
       errorUrl: returnUrl("error"),
       cancelUrl: returnUrl("cancel"),
     });
+  }
+
+  /**
+   * Đối soát với API tra cứu của SePay khi IPN không tới: nguồn sự thật là SePay
+   * (gọi từ server bằng secret key), không phải trình duyệt. Người ủng hộ đối soát
+   * được đơn của mình (màn hình chờ tự gọi), admin đối soát được mọi đơn.
+   */
+  async syncSepayDonation(donationId: string, user: User): Promise<SepaySyncResult> {
+    if (!this.sepay) {
+      throw new NotFoundException("Cổng SePay chưa được cấu hình");
+    }
+    const donation = await this.donationRepo.findOne({ where: { id: donationId } });
+    if (!donation || (donation.userId !== user.id && user.role !== UserRole.ADMIN)) {
+      throw new NotFoundException("Donation not found");
+    }
+    if (donation.paymentMethod !== "sepay" || !donation.transferCode) {
+      throw new ConflictException("Giao dịch này không thanh toán qua SePay");
+    }
+    if (!SYNCABLE_STATUSES.includes(donation.status)) {
+      return { donation, sepayStatus: null, applied: false };
+    }
+
+    let order;
+    try {
+      order = await this.sepay.fetchOrder(donation.transferCode);
+    } catch {
+      throw new ServiceUnavailableException("Không kết nối được SePay. Vui lòng thử lại sau.");
+    }
+    if (!order) {
+      return { donation, sepayStatus: null, applied: false };
+    }
+    const paid = order.orderStatus === "CAPTURED";
+    const amountMatches = order.currency === "VND" && Math.round(order.amount) === Math.round(Number(donation.amount));
+    if (!paid) {
+      return { donation, sepayStatus: order.orderStatus, applied: false };
+    }
+    if (!amountMatches) {
+      await this.auditService.record({
+        userId: user.id,
+        action: "donation.sepay.amount-mismatch",
+        entity: "donation",
+        entityId: donation.id,
+        newValues: { source: "sepay-sync", amount: order.amount, currency: order.currency, expectedAmount: Number(donation.amount), orderId: order.orderId },
+      });
+      return { donation, sepayStatus: order.orderStatus, applied: false };
+    }
+    const result = await this.applyPaymentResult(
+      {
+        donationId: donation.id,
+        status: "completed",
+        transactionId: `SEPAY-${order.orderId}`.slice(0, 255),
+        timestamp: Date.now(),
+      },
+      "sepay-sync",
+      user.id,
+    );
+    return { donation: result, sepayStatus: order.orderStatus, applied: result.status === DonationStatus.COMPLETED };
   }
 
   /**
@@ -360,7 +430,7 @@ export class DonationsService {
 
   private async applyPaymentResult(
     dto: WebhookDonationDto,
-    source: "payment-webhook" | "demo-wallet" | "sepay-ipn",
+    source: "payment-webhook" | "demo-wallet" | "sepay-ipn" | "sepay-sync",
     actorId?: string,
   ): Promise<Donation> {
     const donation = await this.donationRepo.findOne({
