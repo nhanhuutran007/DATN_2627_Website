@@ -129,3 +129,35 @@ variable "mail_from" {
   type        = string
   default     = ""
 }
+
+# --- Cổng thanh toán SePay (để trống merchant/secret = ẩn kênh SePay) ---
+variable "sepay_env" {
+  description = "\"sandbox\" hoặc \"production\" (production = tiền thật, ví demo tự tắt)"
+  type        = string
+  default     = "sandbox"
+
+  validation {
+    condition     = contains(["sandbox", "production"], var.sepay_env)
+    error_message = "sepay_env phải là \"sandbox\" hoặc \"production\"."
+  }
+}
+
+variable "sepay_merchant_id" {
+  description = "Mã merchant SePay (my.sepay.vn → Cổng thanh toán)"
+  type        = string
+  default     = ""
+}
+
+variable "sepay_secret_key" {
+  description = "Secret key merchant SePay (ký form thanh toán, gọi API tra cứu đơn)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "sepay_ipn_secret" {
+  description = "Khóa trong header X-Secret-Key của IPN; để trống = dùng sepay_secret_key"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
