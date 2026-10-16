@@ -13,6 +13,7 @@ import {
 } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
+import { rangeFilter } from "../../common/query/range";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
 import { User, UserRole, UserStatus } from "../users/entities/user.entity";
@@ -228,9 +229,12 @@ export class AdminService {
     const limit = query.limit ?? 20;
     const offset = query.offset ?? 0;
 
-    const base: FindOptionsWhere<Campaign> = query.status
-      ? { status: query.status }
-      : {};
+    const base: FindOptionsWhere<Campaign> = {};
+    if (query.status) base.status = query.status;
+    const category = query.category?.trim();
+    if (category) base.category = category;
+    const goal = rangeFilter(query.minGoal, query.maxGoal, "goal");
+    if (goal) base.goalAmount = goal;
     let where: FindOptionsWhere<Campaign> | FindOptionsWhere<Campaign>[];
     const keyword = query.q?.trim();
     if (keyword) {
@@ -274,7 +278,10 @@ export class AdminService {
     }
 
     const base: FindOptionsWhere<Donation> = query.status ? { status: query.status } : {};
-    let where: FindOptionsWhere<Donation> | FindOptionsWhere<Donation>[] = base;
+    const amount = rangeFilter(query.minAmount, query.maxAmount, "amount");
+    if (amount) base.amount = amount;
+    // Điều kiện OR: (cảnh báo theo chiến dịch | theo người ủng hộ) × (các trường tìm kiếm).
+    let where: FindOptionsWhere<Donation>[] = [base];
     if (query.flagged) {
       where = [
         ...(campaignRisk.size ? [{ ...base, campaignId: In([...campaignRisk.keys()]) }] : []),
@@ -283,6 +290,16 @@ export class AdminService {
       if (where.length === 0) {
         return { items: [], total: 0, limit, offset };
       }
+    }
+    const keyword = query.q?.trim();
+    if (keyword) {
+      const like = Like(`%${keyword}%`);
+      where = where.flatMap((condition) => [
+        { ...condition, campaign: { title: like } },
+        { ...condition, user: { name: like } },
+        { ...condition, user: { email: like } },
+        { ...condition, transactionId: like },
+      ]);
     }
 
     const [donations, total] = await this.donationRepo.findAndCount({
@@ -333,6 +350,73 @@ export class AdminService {
       take: limit,
     });
     return { items, total, limit, offset };
+  }
+
+  /** Hồ sơ một tài khoản cho admin: thông tin liên hệ, chiến dịch đã tạo, ủng hộ và cảnh báo đang mở. */
+  async getUserDetail(id: string): Promise<Record<string, unknown>> {
+    const user = await this.userRepo.findOneBy({ id });
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
+    const campaigns = await this.campaignRepo.find({
+      select: { id: true, title: true, status: true, category: true, goalAmount: true, currentAmount: true, backerCount: true, endDate: true, createdAt: true },
+      where: { owner: { id } },
+      order: { createdAt: "DESC" },
+    });
+    const campaignsByStatus: Record<string, number> = {};
+    for (const campaign of campaigns) {
+      campaignsByStatus[campaign.status] = (campaignsByStatus[campaign.status] ?? 0) + 1;
+    }
+
+    const donations = await this.donationRepo.find({
+      select: { amount: true },
+      where: { userId: id, status: DonationStatus.COMPLETED },
+    });
+
+    const campaignIds = campaigns.map((campaign) => campaign.id);
+    const openAlerts = await this.riskAlertRepo.find({
+      where: [
+        { status: RiskAlertStatus.OPEN, entityType: RiskEntityType.USER, entityId: id },
+        ...(campaignIds.length
+          ? [{ status: RiskAlertStatus.OPEN, entityType: RiskEntityType.CAMPAIGN, entityId: In(campaignIds) }]
+          : []),
+      ],
+      order: { createdAt: "DESC" },
+    });
+
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone ?? null,
+        organization: user.organization ?? null,
+        bio: user.bio ?? null,
+        avatar: user.avatar ?? null,
+        role: user.role,
+        status: user.status,
+        emailVerified: user.emailVerified,
+        createdAt: user.createdAt,
+      },
+      campaigns: {
+        total: campaigns.length,
+        byStatus: campaignsByStatus,
+        raisedAmount: campaigns.reduce((sum, campaign) => sum + toMoney(campaign.currentAmount), 0),
+        recent: campaigns.slice(0, 10),
+      },
+      donations: {
+        count: donations.length,
+        amount: donations.reduce((sum, donation) => sum + toMoney(donation.amount), 0),
+      },
+      openRisks: openAlerts.map((alert) => ({
+        id: alert.id,
+        entityType: alert.entityType,
+        entityName: alert.entityName,
+        level: alert.level,
+        score: alert.score,
+      })),
+    };
   }
 
   async updateUserStatus(

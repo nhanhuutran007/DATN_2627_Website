@@ -60,11 +60,17 @@ export async function submitReport(payload: {
 
 export async function fetchAdminReports(query: {
   status?: ReportStatus;
+  reason?: ReportReason;
+  target?: "campaign" | "comment";
+  q?: string;
   limit?: number;
   offset?: number;
 } = {}): Promise<ReportList> {
   const params = new URLSearchParams();
   if (query.status) params.set("status", query.status);
+  if (query.reason) params.set("reason", query.reason);
+  if (query.target) params.set("target", query.target);
+  if (query.q) params.set("q", query.q);
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   if (query.offset !== undefined) params.set("offset", String(query.offset));
   const qs = params.toString();

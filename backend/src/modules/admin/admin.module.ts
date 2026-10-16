@@ -9,6 +9,7 @@ import { Milestone } from "../progress/entities/milestone.entity";
 import { User } from "../users/entities/user.entity";
 import { AdminController } from "./admin.controller";
 import { AdminService } from "./admin.service";
+import { BackupService } from "./backup.service";
 import { ContentService } from "./content.service";
 import { ExportService } from "./export.service";
 import { RiskAlert } from "./entities/risk-alert.entity";
@@ -20,7 +21,7 @@ import { RiskAlertService } from "./risk-alert.service";
     AiModule,
   ],
   controllers: [AdminController],
-  providers: [AdminService, RiskAlertService, ContentService, ExportService],
+  providers: [AdminService, RiskAlertService, ContentService, ExportService, BackupService],
   exports: [AdminService, RiskAlertService],
 })
 export class AdminModule {}

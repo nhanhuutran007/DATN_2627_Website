@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, IsNull, Repository } from "typeorm";
+import { FindOptionsWhere, In, IsNull, Like, Not, Repository } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { CampaignsService } from "../campaigns/campaigns.service";
@@ -228,8 +228,22 @@ export class CommentsService {
   async adminList(query: AdminCommentQueryDto): Promise<AdminCommentList> {
     const offset = query.offset ?? 0;
     const limit = query.limit ?? 20;
+    const base: FindOptionsWhere<CampaignComment> = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.kind ? { kind: query.kind } : {}),
+      ...(query.level ? { parentId: query.level === "reply" ? Not(IsNull()) : IsNull() } : {}),
+    };
+    const like = query.q ? Like(`%${query.q}%`) : undefined;
+    const where: FindOptionsWhere<CampaignComment> | FindOptionsWhere<CampaignComment>[] = like
+      ? [
+          { ...base, content: like },
+          { ...base, user: { name: like } },
+          { ...base, user: { email: like } },
+          { ...base, campaign: { title: like } },
+        ]
+      : base;
     const [items, total] = await this.commentRepo.findAndCount({
-      where: query.status ? { status: query.status } : {},
+      where,
       relations: { user: true, campaign: true },
       order: { createdAt: "DESC" },
       skip: offset,

@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Max,
@@ -18,6 +19,8 @@ import { UserRole, UserStatus } from "../../users/entities/user.entity";
 import {
   RiskAlertLevel,
   RiskAlertStatus,
+  RiskEntityType,
+  RiskMethod,
 } from "../entities/risk-alert.entity";
 
 export class AdminCampaignQueryDto {
@@ -29,6 +32,23 @@ export class AdminCampaignQueryDto {
   @IsString()
   @MaxLength(200)
   q?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  category?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minGoal?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxGoal?: number;
 
   @IsOptional()
   @IsIn(["newest", "ending", "raised", "backers"])
@@ -58,6 +78,24 @@ export class AdminDonationQueryDto {
   @Transform(({ value }) => (value === "true" || value === true ? true : value === "false" || value === false ? false : value))
   @IsBoolean()
   flagged?: boolean;
+
+  /** Tìm theo tên chiến dịch, tên/email người ủng hộ, mã giao dịch. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minAmount?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxAmount?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -114,6 +152,20 @@ export class RiskQueryDto {
   @IsOptional()
   @IsEnum(RiskAlertLevel)
   level?: RiskAlertLevel;
+
+  @IsOptional()
+  @IsEnum(RiskEntityType)
+  entityType?: RiskEntityType;
+
+  @IsOptional()
+  @IsEnum(RiskMethod)
+  method?: RiskMethod;
+
+  /** Tìm theo tên đối tượng hoặc mã (ID) của đối tượng bị cảnh báo. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  q?: string;
 
   @IsOptional()
   @Type(() => Number)

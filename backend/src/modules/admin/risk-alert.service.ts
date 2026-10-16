@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindOptionsWhere, In, MoreThan, Repository } from "typeorm";
+import { FindOptionsWhere, In, Like, MoreThan, Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import type { AiFraudResponse } from "../../integrations/ai/ai.types";
@@ -126,9 +126,18 @@ export class RiskAlertService {
     const limit = query.limit ?? 20;
     const offset = query.offset ?? 0;
 
-    const where: FindOptionsWhere<RiskAlert> = {};
-    if (query.status) where.status = query.status;
-    if (query.level) where.level = query.level;
+    const base: FindOptionsWhere<RiskAlert> = {};
+    if (query.status) base.status = query.status;
+    if (query.level) base.level = query.level;
+    if (query.entityType) base.entityType = query.entityType;
+    if (query.method) base.method = query.method;
+    const keyword = query.q?.trim();
+    const where = keyword
+      ? [
+          { ...base, entityName: Like(`%${keyword}%`) },
+          { ...base, entityId: Like(`${keyword.toLowerCase()}%`) },
+        ]
+      : base;
 
     const [items, total] = await this.riskAlertRepo.findAndCount({
       where,

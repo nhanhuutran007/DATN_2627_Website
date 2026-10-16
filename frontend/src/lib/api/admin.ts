@@ -1,4 +1,4 @@
-import { api, apiDownload } from "../api";
+import { api, apiDownload, apiFetch } from "../api";
 import type { ApiCampaign, ApiCampaignStatus } from "./campaigns";
 
 export type AdminUserRole = "user" | "campaign_owner" | "admin";
@@ -93,6 +93,37 @@ export type AdminUser = {
   createdAt: string;
 };
 
+export type AdminUserDetail = {
+  user: AdminUser & {
+    phone: string | null;
+    organization: string | null;
+    bio: string | null;
+    avatar: string | null;
+  };
+  campaigns: {
+    total: number;
+    byStatus: Partial<Record<ApiCampaignStatus, number>>;
+    raisedAmount: number;
+    recent: Array<{
+      id: string;
+      title: string;
+      status: ApiCampaignStatus;
+      category: string;
+      goalAmount: number | string;
+      currentAmount: number | string;
+      backerCount: number;
+      endDate: string;
+      createdAt: string;
+    }>;
+  };
+  donations: { count: number; amount: number };
+  openRisks: Array<{ id: string; entityType: "campaign" | "user"; entityName: string; level: RiskLevel; score: number }>;
+};
+
+export async function fetchAdminUserDetail(id: string): Promise<AdminUserDetail> {
+  return api.get<AdminUserDetail>(`/admin/users/${encodeURIComponent(id)}`);
+}
+
 export type AdminUserList = {
   items: AdminUser[];
   total: number;
@@ -171,6 +202,9 @@ export type AdminRiskList = {
 export type RiskQuery = {
   status?: RiskStatus;
   level?: RiskLevel;
+  entityType?: AdminRiskAlert["entityType"];
+  method?: RiskMethod;
+  q?: string;
   limit?: number;
   offset?: number;
 };
@@ -199,6 +233,9 @@ export async function fetchAdminOverview(): Promise<AdminOverview> {
 export async function fetchAdminCampaigns(query: {
   status?: ApiCampaignStatus;
   q?: string;
+  category?: string;
+  minGoal?: number;
+  maxGoal?: number;
   sort?: string;
   limit?: number;
   offset?: number;
@@ -211,6 +248,10 @@ export async function fetchAdminDonations(query: {
   status?: AdminDonationStatus;
   /** Chỉ giao dịch của chiến dịch/người ủng hộ đang có cảnh báo rủi ro. */
   flagged?: boolean;
+  /** Tìm theo chiến dịch, người ủng hộ (tên/email) hoặc mã giao dịch. */
+  q?: string;
+  minAmount?: number;
+  maxAmount?: number;
   limit?: number;
   offset?: number;
 } = {}): Promise<AdminDonationList> {
@@ -283,6 +324,21 @@ async function saveDownload(path: string, fallbackName: string): Promise<void> {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+/** Tải bản sao lưu toàn bộ dữ liệu (.json.gz). */
+export function downloadBackup(): Promise<void> {
+  return saveDownload("/admin/backup/export", "gopmam-sao-luu.json.gz");
+}
+
+export type RestoreBackupResult = { tables: number; rows: number; createdAt: string };
+
+/** Ghi đè toàn bộ dữ liệu bằng file sao lưu; `confirm` phải là chuỗi xác nhận. */
+export function restoreBackup(file: File, confirm: string): Promise<RestoreBackupResult> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("confirm", confirm);
+  return apiFetch<RestoreBackupResult>("/admin/backup/restore", { method: "POST", body: form });
 }
 
 /** CSV thống kê theo chiến dịch (không dữ liệu cá nhân, chủ dự án giả danh). */
