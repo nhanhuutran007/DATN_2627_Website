@@ -2,7 +2,9 @@ import { createHash } from "node:crypto";
 
 import {
   BadGatewayException,
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -15,7 +17,9 @@ import { AuditService, truncateForAudit } from "../../common/audit/audit.service
 import { rangeFilter } from "../../common/query/range";
 import type { PaymentGateway } from "../../integrations/payment/payment.gateway";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
-import { Donation, DonationStatus } from "../donations/entities/donation.entity";
+import { Donation, DonationStatus, RefundMethod } from "../donations/entities/donation.entity";
+import { MediaFile, MediaPurpose } from "../media/entities/media-file.entity";
+import { MEDIA_URL_PREFIX } from "../media/media.service";
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { NotificationsService } from "../notifications/notifications.service";
 import { RewardTier } from "../rewards/entities/reward-tier.entity";
@@ -25,6 +29,7 @@ import {
   CampaignReconciliation,
   ReconciliationQueryDto,
   ReconciliationReport,
+  RefundExportQueryDto,
   RefundQueryDto,
 } from "./dto/finance.dto";
 import { RefundRequest, RefundRequestStatus } from "./entities/refund-request.entity";
@@ -39,6 +44,26 @@ const WINDOW_REFUNDABLE = [CampaignStatus.ACTIVE, CampaignStatus.PAUSED, Campaig
 const DAY_MS = 86_400_000;
 
 export type RefundRequestList = { items: RefundRequest[]; total: number; offset: number; limit: number };
+
+export type RefundRequestInput = {
+  reason: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
+};
+
+/** Thông tin chuyển khoản hoàn thủ công do admin nhập khi hoàn khoản qua SePay. */
+export type ManualTransferInput = { transferReference?: string; proofMediaId?: string };
+
+/** Kênh không hoàn được qua API (SePay không có API hoàn tiền) → admin chuyển khoản trả lại thủ công. */
+export function needsManualRefund(paymentMethod?: string | null): boolean {
+  return paymentMethod === "sepay";
+}
+
+/** Che số tài khoản trong audit log, chỉ giữ 4 số cuối. */
+function maskAccount(accountNumber: string): string {
+  return `***${accountNumber.slice(-4)}`;
+}
 
 function money(value: number): string {
   return `${Number(value).toLocaleString("vi-VN")} ₫`;
@@ -78,11 +103,14 @@ export class FinanceService {
     private readonly paymentGateway: PaymentGateway,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
+    @InjectRepository(MediaFile)
+    private readonly mediaRepo: Repository<MediaFile>,
   ) {}
 
   // ---------- Yêu cầu hoàn tiền ----------
 
-  async requestRefund(donationId: string, reason: string, user: User, now = new Date()): Promise<RefundRequest> {
+  async requestRefund(donationId: string, input: RefundRequestInput, user: User, now = new Date()): Promise<RefundRequest> {
+    const { reason } = input;
     const donation = await this.donationRepo.findOne({ where: { id: donationId } });
     if (!donation || donation.userId !== user.id) {
       throw new NotFoundException("Donation not found");
@@ -108,15 +136,35 @@ export class FinanceService {
     if (open) {
       throw new ConflictException("Khoản ủng hộ này đã có yêu cầu hoàn tiền đang chờ xử lý.");
     }
+    const bankFields = [input.bankName, input.bankAccountNumber, input.bankAccountName];
+    const hasBank = bankFields.every(Boolean);
+    if (!hasBank && (bankFields.some(Boolean) || needsManualRefund(donation.paymentMethod))) {
+      throw new BadRequestException(
+        "Vui lòng nhập đủ ngân hàng, số tài khoản và tên chủ tài khoản để nhận lại tiền chuyển khoản.",
+      );
+    }
     const saved = await this.refundRepo.save(
-      this.refundRepo.create({ donationId, userId: user.id, reason, status: RefundRequestStatus.PENDING }),
+      this.refundRepo.create({
+        donationId,
+        userId: user.id,
+        reason,
+        status: RefundRequestStatus.PENDING,
+        bankName: hasBank ? input.bankName : null,
+        bankAccountNumber: hasBank ? input.bankAccountNumber : null,
+        bankAccountName: hasBank ? input.bankAccountName : null,
+      }),
     );
     await this.auditService.record({
       userId: user.id,
       action: "refund.request",
       entity: "refund_request",
       entityId: saved.id,
-      newValues: { donationId, amount: Number(donation.amount), reason: truncateForAudit(reason) },
+      newValues: {
+        donationId,
+        amount: Number(donation.amount),
+        reason: truncateForAudit(reason),
+        bankAccount: hasBank && input.bankAccountNumber ? `${input.bankName} ${maskAccount(input.bankAccountNumber)}` : null,
+      },
     });
     return saved;
   }
@@ -166,9 +214,9 @@ export class FinanceService {
     return request;
   }
 
-  async approve(id: string, adminNotes: string, admin: User): Promise<RefundRequest> {
+  async approve(id: string, adminNotes: string, admin: User, manual: ManualTransferInput = {}): Promise<RefundRequest> {
     const request = await this.getPendingRequest(id);
-    await this.refundDonation(request.donationId, `Duyệt yêu cầu hoàn: ${adminNotes}`, admin, true);
+    await this.refundDonation(request.donationId, `Duyệt yêu cầu hoàn: ${adminNotes}`, admin, { viaRequest: true, manual });
     request.status = RefundRequestStatus.APPROVED;
     request.adminNotes = adminNotes;
     request.reviewedBy = admin.id;
@@ -217,9 +265,16 @@ export class FinanceService {
   /**
    * Hoàn toàn bộ một khoản đã xác nhận. Trong 1 transaction: đổi trạng thái có
    * điều kiện (chống hoàn 2 lần), gọi cổng thanh toán (lỗi → rollback), trừ số
-   * liệu chiến dịch và trả lại suất quà.
+   * liệu chiến dịch và trả lại suất quà. Khoản qua SePay (không có API hoàn) không
+   * gọi cổng: admin đã chuyển khoản trả lại và phải nhập mã giao dịch thật.
    */
-  async refundDonation(donationId: string, reason: string, actor: User, viaRequest = false): Promise<Donation> {
+  async refundDonation(
+    donationId: string,
+    reason: string,
+    actor: User,
+    options: { viaRequest?: boolean; manual?: ManualTransferInput } = {},
+  ): Promise<Donation> {
+    const viaRequest = options.viaRequest ?? false;
     const donation = await this.donationRepo.findOne({ where: { id: donationId } });
     if (!donation) {
       throw new NotFoundException("Donation not found");
@@ -229,6 +284,18 @@ export class FinanceService {
     }
     const amount = Number(donation.amount);
     const refundedAt = new Date();
+    const manualTransfer = needsManualRefund(donation.paymentMethod);
+    const transferReference = options.manual?.transferReference?.trim();
+    if (manualTransfer && !transferReference) {
+      throw new BadRequestException(
+        "Khoản ủng hộ qua SePay phải chuyển khoản hoàn thủ công: nhập mã giao dịch chuyển khoản đã thực hiện.",
+      );
+    }
+    const refundMethod = manualTransfer ? RefundMethod.MANUAL_TRANSFER : RefundMethod.GATEWAY;
+    const refundProofUrl =
+      manualTransfer && options.manual?.proofMediaId
+        ? await this.resolveRefundProof(options.manual.proofMediaId, actor)
+        : null;
 
     const refundReference = await this.dataSource.transaction(async (manager) => {
       const claimed = await manager.update(
@@ -239,15 +306,21 @@ export class FinanceService {
       if (!claimed.affected) {
         throw new ConflictException("Khoản ủng hộ vừa được xử lý bởi yêu cầu khác.");
       }
-      const result = await this.paymentGateway.refundTransaction({
-        transactionId: donation.transactionId ?? donation.id,
-        amount,
-        reason,
-      });
-      if (!result.success) {
-        throw new BadGatewayException("Cổng thanh toán từ chối hoàn tiền. Vui lòng thử lại sau.");
+      let refundId: string;
+      if (manualTransfer && transferReference) {
+        refundId = transferReference;
+      } else {
+        const result = await this.paymentGateway.refundTransaction({
+          transactionId: donation.transactionId ?? donation.id,
+          amount,
+          reason,
+        });
+        if (!result.success) {
+          throw new BadGatewayException("Cổng thanh toán từ chối hoàn tiền. Vui lòng thử lại sau.");
+        }
+        refundId = result.refundId;
       }
-      await manager.update(Donation, { id: donationId }, { refundReference: result.refundId });
+      await manager.update(Donation, { id: donationId }, { refundReference: refundId, refundMethod, refundProofUrl });
       await manager
         .createQueryBuilder()
         .update(Campaign)
@@ -267,7 +340,7 @@ export class FinanceService {
           .andWhere("claimed_count > 0")
           .execute();
       }
-      return result.refundId;
+      return refundId;
     });
 
     await this.auditService.record({
@@ -281,17 +354,39 @@ export class FinanceService {
         amount,
         campaignId: donation.campaignId,
         refundReference,
+        refundMethod,
+        refundProofUrl,
         reason: truncateForAudit(reason),
         viaRequest,
       },
     });
-    await this.notifyRefunded(donation, amount).catch((error: Error) =>
+    await this.notifyRefunded(donation, amount, refundReference).catch((error: Error) =>
       this.logger.error(`Không gửi được thông báo hoàn tiền ${donationId}: ${error.message}`),
     );
-    return { ...donation, status: DonationStatus.REFUNDED, refundedAt, refundReference, refundReason: reason } as Donation;
+    return {
+      ...donation,
+      status: DonationStatus.REFUNDED,
+      refundedAt,
+      refundReference,
+      refundReason: reason,
+      refundMethod,
+      refundProofUrl,
+    } as Donation;
   }
 
-  private async notifyRefunded(donation: Donation, amount: number): Promise<void> {
+  /** Chứng từ hoàn phải là ảnh `refund_proof` do chính admin đang thao tác tải lên. */
+  private async resolveRefundProof(mediaId: string, actor: User): Promise<string> {
+    const file = await this.mediaRepo.findOne({ where: { id: mediaId } });
+    if (!file || file.purpose !== MediaPurpose.REFUND_PROOF) {
+      throw new BadRequestException("Chứng từ không tồn tại hoặc không phải ảnh chứng từ hoàn tiền.");
+    }
+    if (file.ownerId !== actor.id) {
+      throw new ForbiddenException("Chỉ dùng được chứng từ do chính bạn tải lên.");
+    }
+    return `${MEDIA_URL_PREFIX}${file.storageKey}`;
+  }
+
+  private async notifyRefunded(donation: Donation, amount: number, reference: string): Promise<void> {
     const campaign = await this.campaignRepo.findOne({ where: { id: donation.campaignId } });
     const title = campaign?.title ?? "chiến dịch";
     await this.notificationsService.notify([
@@ -299,7 +394,9 @@ export class FinanceService {
         userId: donation.userId,
         type: NotificationType.REFUND_APPROVED,
         title: "Khoản ủng hộ đã được hoàn",
-        message: `Khoản ${money(amount)} cho chiến dịch "${title}" đã được hoàn qua cổng thanh toán.`,
+        message: needsManualRefund(donation.paymentMethod)
+          ? `Khoản ${money(amount)} cho chiến dịch "${title}" đã được hoàn bằng chuyển khoản về tài khoản bạn cung cấp (mã giao dịch ${reference}).`
+          : `Khoản ${money(amount)} cho chiến dịch "${title}" đã được hoàn qua cổng thanh toán.`,
         link: `/bien-nhan/${donation.id}`,
         relatedId: donation.id,
         email: true,
@@ -435,5 +532,42 @@ export class FinanceService {
     });
     const day = (date: Date) => date.toISOString().slice(0, 10);
     return { filename: `doi-soat_${day(from)}_${day(to)}.csv`, content: toCsv(header, rows), rows: rows.length };
+  }
+
+  /**
+   * CSV danh sách yêu cầu hoàn kèm tài khoản nhận để admin chuyển khoản trả lại. Có dữ liệu cá nhân
+   * (tên, email, số tài khoản) nên chỉ admin tải được và mỗi lần xuất đều ghi audit.
+   */
+  async exportRefundsCsv(
+    query: RefundExportQueryDto,
+    actor: User,
+    now = new Date(),
+  ): Promise<{ filename: string; content: string; rows: number }> {
+    const requests = await this.refundRepo.find({
+      where: query.status ? { status: query.status } : {},
+      relations: { donation: { campaign: true }, user: true },
+      order: { createdAt: "ASC" },
+      take: 5000,
+    });
+    const header = [
+      "ma_yeu_cau", "thoi_gian_yeu_cau", "trang_thai", "ma_khoan_ung_ho", "ma_noi_dung_ck", "kenh_thanh_toan",
+      "can_chuyen_khoan_tay", "so_tien", "chien_dich", "nguoi_ung_ho", "email", "ngan_hang", "so_tai_khoan",
+      "chu_tai_khoan", "ly_do", "ghi_chu_admin", "thoi_gian_xu_ly", "ma_hoan_tien",
+    ];
+    const rows = requests.map((r) => [
+      r.id, r.createdAt, r.status, r.donationId, r.donation?.transferCode ?? "", r.donation?.paymentMethod ?? "",
+      needsManualRefund(r.donation?.paymentMethod) ? "co" : "khong", Number(r.donation?.amount ?? 0),
+      r.donation?.campaign?.title ?? "", r.user?.name ?? "", r.user?.email ?? "", r.bankName ?? "",
+      r.bankAccountNumber ?? "", r.bankAccountName ?? "", r.reason, r.adminNotes ?? "", r.reviewedAt ?? "",
+      r.donation?.refundReference ?? "",
+    ]);
+    await this.auditService.record({
+      userId: actor.id,
+      action: "finance.export_refunds",
+      entity: "refund_request",
+      newValues: { status: query.status ?? null, rows: rows.length },
+    });
+    const day = now.toISOString().slice(0, 10);
+    return { filename: `hoan-tien_${query.status ?? "tat-ca"}_${day}.csv`, content: toCsv(header, rows), rows: rows.length };
   }
 }

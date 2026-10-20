@@ -3,12 +3,16 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
 import { PAGE_SIZE, Pagination, pageSlice } from "@/components/ui/Pagination";
+import { useManualRefundDialog } from "@/features/admin/ManualRefundDialog";
 import { ApiError } from "@/lib/api";
 import {
   approveRefund,
   downloadReconciliationCsv,
+  downloadRefundsCsv,
   fetchAdminRefunds,
   fetchReconciliation,
+  needsManualRefund,
+  REFUND_METHOD_LABEL,
   REFUND_STATUS_LABEL,
   rejectRefund,
   type ReconciliationReport,
@@ -35,6 +39,7 @@ const errorText = (err: unknown, fallback: string) => (err instanceof ApiError ?
 /** Hoàn tiền (duyệt yêu cầu) hoặc đối soát cho trang quản trị, tùy `view`. */
 export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconciliation"; onChanged?: () => void }) {
   const dialog = useDialog();
+  const [manualDialog, openManualRefund] = useManualRefundDialog();
   const [refunds, setRefunds] = useState<RefundRequest[]>([]);
   const [refundFilter, setRefundFilter] = useState<RefundFilters>(DEFAULT_REFUND_FILTERS);
   const [refundDraft, setRefundDraft] = useState<RefundFilters>(DEFAULT_REFUND_FILTERS);
@@ -105,8 +110,50 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
     return true;
   });
 
+  const approveManually = async (request: RefundRequest, amount: string) => {
+    const result = await openManualRefund({
+      title: "Duyệt hoàn tiền thủ công",
+      amount,
+      notesLabel: "Ghi chú (gửi cho người ủng hộ và lưu nhật ký)",
+      confirmLabel: "Đã chuyển khoản — duyệt hoàn",
+      bank: request.bankAccountNumber
+        ? { bankName: request.bankName ?? "", bankAccountNumber: request.bankAccountNumber, bankAccountName: request.bankAccountName ?? "" }
+        : null,
+      transferCode: request.donation?.transferCode,
+    });
+    if (!result) return;
+    setBusy(request.id);
+    setNotice(null);
+    try {
+      await approveRefund(request.id, result.notes, { transferReference: result.transferReference, proofMediaId: result.proofMediaId });
+      await loadRefunds(refundFilter, refundPage);
+      setNotice(`Đã ghi nhận hoàn ${amount} qua chuyển khoản (mã ${result.transferReference}).`);
+      onChanged?.();
+    } catch (err) {
+      setNotice(errorText(err, "Không xử lý được yêu cầu"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const exportRefunds = async () => {
+    setBusy("export-refunds");
+    setNotice(null);
+    try {
+      await downloadRefundsCsv(refundFilter.status || undefined);
+    } catch (err) {
+      setNotice(errorText(err, "Không xuất được CSV"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const decide = async (request: RefundRequest, approve: boolean) => {
     const amount = formatVnd(Number(request.donation?.amount ?? 0));
+    if (approve && needsManualRefund(request.donation?.paymentMethod)) {
+      await approveManually(request, amount);
+      return;
+    }
     const result = await dialog.prompt({
       title: approve ? "Duyệt yêu cầu hoàn tiền" : "Từ chối yêu cầu hoàn tiền",
       message: approve ? (
@@ -162,10 +209,20 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
 
   return (
     <>
+      {manualDialog}
       {view === "refunds" && (
       <section className="admin-card risk-card" id="hoan-tien">
         <div className="card-heading">
           <div><p className="eyebrow">Tài chính</p><h2>Yêu cầu hoàn tiền</h2></div>
+          <button
+            className="button button-outline button-sm"
+            type="button"
+            disabled={busy === "export-refunds"}
+            onClick={() => void exportRefunds()}
+            title="Danh sách kèm tài khoản nhận hoàn để chuyển khoản trả lại"
+          >
+            <Icon name="document" size={15} /> {busy === "export-refunds" ? "Đang xuất…" : "Xuất CSV"}
+          </button>
           <select
             className="filter-button"
             aria-label="Lọc yêu cầu hoàn tiền"
@@ -246,6 +303,28 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
                     {new Date(r.createdAt).toLocaleString("vi-VN")} · bởi {r.user ? `${r.user.name}${r.user.email ? ` (${r.user.email})` : ""}` : "người dùng"}
                   </p>
                   <p className="report-quote">{r.reason}</p>
+                  {needsManualRefund(r.donation?.paymentMethod) && (
+                    <div className="refund-bank-info">
+                      <span className="refund-manual-tag">Hoàn thủ công qua chuyển khoản</span>
+                      {r.bankAccountNumber ? (
+                        <span>
+                          {r.bankName} · <b className="mono">{r.bankAccountNumber}</b> · {r.bankAccountName}
+                          {r.donation?.transferCode && <> · mã ủng hộ <span className="mono">{r.donation.transferCode}</span></>}
+                        </span>
+                      ) : (
+                        <span className="table-muted">Người ủng hộ chưa khai tài khoản nhận hoàn</span>
+                      )}
+                    </div>
+                  )}
+                  {r.status === "approved" && r.donation?.refundReference && (
+                    <small>
+                      <b>{REFUND_METHOD_LABEL[r.donation.refundMethod ?? ""] ?? "Mã hoàn"}:</b>{" "}
+                      <span className="mono">{r.donation.refundReference}</span>
+                      {r.donation.refundProofUrl && (
+                        <> · <a href={r.donation.refundProofUrl} target="_blank" rel="noreferrer">chứng từ</a></>
+                      )}
+                    </small>
+                  )}
                   {r.adminNotes && <small><b>Ghi chú quản trị:</b> {r.adminNotes}</small>}
                 </div>
                 <div className="risk-actions">
@@ -261,7 +340,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
           )}
         </div>
         <Pagination page={refundPage} total={refundTotal} onChange={(page) => void loadRefunds(refundFilter, page)} />
-        <p className="risk-footnote"><Icon name="shield" size={15} /> Hoàn tiền gọi cổng thanh toán sandbox, trừ số liệu chiến dịch, trả lại suất quà và ghi nhật ký kiểm toán.</p>
+        <p className="risk-footnote"><Icon name="shield" size={15} /> Ví demo hoàn qua cổng thanh toán sandbox; khoản qua SePay phải chuyển khoản trả lại thủ công rồi nhập mã giao dịch. Mọi lần hoàn đều trừ số liệu chiến dịch, trả lại suất quà và ghi nhật ký kiểm toán.</p>
       </section>
       )}
 

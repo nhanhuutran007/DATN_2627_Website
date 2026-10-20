@@ -68,6 +68,8 @@ export type AdminDonation = {
   status: AdminDonationStatus;
   paymentMethod?: string | null;
   transactionId?: string | null;
+  /** Mã nội dung chuyển khoản (khoản qua SePay). */
+  transferCode?: string | null;
   message?: string | null;
   isAnonymous: boolean;
   completedAt?: string | null;

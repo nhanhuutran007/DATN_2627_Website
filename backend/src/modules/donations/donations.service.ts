@@ -45,7 +45,14 @@ export type DonationReceipt = {
   isAnonymous: boolean;
   campaign: { id: string; title: string };
   rewardTitle: string | null;
-  refund: { refundedAt: Date | null; reference: string | null; reason: string | null } | null;
+  refund: {
+    refundedAt: Date | null;
+    reference: string | null;
+    reason: string | null;
+    /** `manual_transfer`: hoàn thủ công qua chuyển khoản (khoản qua SePay). */
+    method: string | null;
+    proofUrl: string | null;
+  } | null;
 };
 
 /** Kênh thanh toán đang bật, để frontend chỉ hiện lựa chọn dùng được. */
@@ -633,7 +640,13 @@ export class DonationsService {
       campaign: { id: d.campaignId, title: d.campaign?.title ?? "" },
       rewardTitle: d.rewardTier?.title ?? null,
       refund: d.status === DonationStatus.REFUNDED
-        ? { refundedAt: d.refundedAt ?? null, reference: d.refundReference ?? null, reason: d.refundReason ?? null }
+        ? {
+            refundedAt: d.refundedAt ?? null,
+            reference: d.refundReference ?? null,
+            reason: d.refundReason ?? null,
+            method: d.refundMethod ?? null,
+            proofUrl: d.refundProofUrl ?? null,
+          }
         : null,
     };
   }

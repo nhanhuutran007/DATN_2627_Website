@@ -13,6 +13,11 @@ export enum DonationStatus {
   CANCELLED = "cancelled",
 }
 
+export enum RefundMethod {
+  GATEWAY = "gateway",
+  MANUAL_TRANSFER = "manual_transfer",
+}
+
 @Entity("donations")
 export class Donation extends BaseEntity {
   @Column({ name: "user_id" })
@@ -81,4 +86,12 @@ export class Donation extends BaseEntity {
 
   @Column({ name: "refund_reason", type: "varchar", length: 500, nullable: true })
   refundReason?: string | null;
+
+  /** `gateway`: cổng thanh toán hoàn; `manual_transfer`: admin chuyển khoản trả lại (khoản qua SePay). */
+  @Column({ name: "refund_method", type: "varchar", length: 20, nullable: true })
+  refundMethod?: RefundMethod | null;
+
+  /** Ảnh chứng từ chuyển khoản hoàn (chỉ với `manual_transfer`, không bắt buộc). */
+  @Column({ name: "refund_proof_url", type: "varchar", length: 500, nullable: true })
+  refundProofUrl?: string | null;
 }

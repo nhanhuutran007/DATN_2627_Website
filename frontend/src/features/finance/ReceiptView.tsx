@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api";
 import {
   fetchMyRefundRequests,
   fetchReceipt,
+  needsManualRefund,
+  REFUND_METHOD_LABEL,
   REFUND_STATUS_LABEL,
   requestRefund,
   type DonationReceipt,
@@ -18,32 +20,73 @@ import { formatVnd, paymentMethodLabel } from "@/lib/format";
 
 type LoadState = "loading" | "ready" | "notfound" | "error";
 
+/** Gợi ý tên ngân hàng phổ biến cho ô nhập (vẫn gõ tự do được). */
+const COMMON_BANKS = [
+  "Vietcombank", "VietinBank", "BIDV", "Agribank", "Techcombank", "MB Bank", "ACB", "VPBank", "Sacombank",
+  "TPBank", "VIB", "HDBank", "SHB", "OCB", "MSB", "SeABank", "Eximbank", "LPBank", "Nam A Bank", "Bac A Bank",
+];
+
+/** Số tài khoản: bỏ khoảng trắng, dấu chấm, gạch ngang — khớp chuẩn hóa ở server. */
+const accountDigits = (value: string) => value.replace(/[\s.-]/g, "");
+const ACCOUNT_PATTERN = /^\d{6,19}$/;
+const maskAccount = (value: string) => `•••• ${value.slice(-4)}`;
+
 const dateTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" }) : "—";
 
 function RefundSection({ receipt, request, onRequested }: { receipt: DonationReceipt; request: RefundRequest | null; onRequested: (r: RefundRequest) => void }) {
+  const banksId = useId();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Khoản qua SePay hoàn bằng chuyển khoản tay → cần tài khoản nhận.
+  const needsBank = needsManualRefund(receipt.paymentMethod);
 
   if (receipt.status === "refunded") return null;
   if (request) {
     return (
       <div className="receipt-refund" role="status">
         <p><b>Yêu cầu hoàn tiền:</b> {REFUND_STATUS_LABEL[request.status]} · gửi {dateTime(request.createdAt)}</p>
+        {request.bankAccountNumber && (
+          <p className="hint">
+            Tài khoản nhận hoàn: {request.bankName} · {maskAccount(request.bankAccountNumber)} · {request.bankAccountName}
+          </p>
+        )}
         {request.adminNotes && <p className="hint">Phản hồi của quản trị viên: {request.adminNotes}</p>}
       </div>
     );
   }
 
+  const digits = accountDigits(accountNumber);
+  const bankError =
+    !needsBank ? "" :
+    bankName.trim().length < 2 ? "Vui lòng nhập tên ngân hàng." :
+    !ACCOUNT_PATTERN.test(digits) ? "Số tài khoản chỉ gồm 6–19 chữ số." :
+    accountName.trim().length < 2 ? "Vui lòng nhập tên chủ tài khoản." :
+    "";
+  const canSubmit = reason.trim().length >= 10 && !bankError && !busy;
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (reason.trim().length < 10 || busy) return;
+    if (!canSubmit) {
+      if (bankError) setError(bankError);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      onRequested(await requestRefund(receipt.donationId, reason.trim()));
+      onRequested(
+        await requestRefund(receipt.donationId, {
+          reason: reason.trim(),
+          ...(needsBank
+            ? { bankName: bankName.trim(), bankAccountNumber: digits, bankAccountName: accountName.trim().toUpperCase() }
+            : {}),
+        }),
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không gửi được yêu cầu.");
     } finally {
@@ -65,10 +108,54 @@ function RefundSection({ receipt, request, onRequested }: { receipt: DonationRec
             <span>Lý do (tối thiểu 10 ký tự)</span>
             <textarea rows={3} maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} />
           </label>
+          {needsBank && (
+            <fieldset className="refund-bank">
+              <legend>Tài khoản nhận hoàn tiền</legend>
+              <p className="hint">
+                Khoản ủng hộ qua SePay được hoàn bằng chuyển khoản. Vui lòng nhập đúng tài khoản đứng tên bạn để quản trị viên
+                chuyển trả.
+              </p>
+              <label className="field">
+                <span>Ngân hàng</span>
+                <input
+                  list={banksId}
+                  maxLength={100}
+                  autoComplete="off"
+                  placeholder="Vd. Vietcombank"
+                  value={bankName}
+                  onChange={(e) => setBankName(e.target.value)}
+                />
+                <datalist id={banksId}>
+                  {COMMON_BANKS.map((bank) => <option key={bank} value={bank} />)}
+                </datalist>
+              </label>
+              <label className="field">
+                <span>Số tài khoản</span>
+                <input
+                  inputMode="numeric"
+                  maxLength={30}
+                  autoComplete="off"
+                  placeholder="Chỉ gồm chữ số"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>Tên chủ tài khoản</span>
+                <input
+                  maxLength={100}
+                  autoComplete="off"
+                  placeholder="Vd. NGUYEN VAN A"
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value.toUpperCase())}
+                />
+              </label>
+            </fieldset>
+          )}
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="comment-composer-actions">
             <button className="button button-ghost button-sm" type="button" onClick={() => setOpen(false)}>Huỷ</button>
-            <button className="button button-primary button-sm" type="submit" disabled={busy || reason.trim().length < 10}>
+            <button className="button button-primary button-sm" type="submit" disabled={!canSubmit}>
               {busy ? "Đang gửi…" : "Gửi yêu cầu"}
             </button>
           </div>
@@ -164,14 +251,27 @@ export function ReceiptView({ donationId }: { donationId: string }) {
           {receipt.refund && (
             <>
               <div><dt>Thời gian hoàn</dt><dd>{dateTime(receipt.refund.refundedAt)}</dd></div>
-              <div><dt>Mã hoàn tiền</dt><dd className="mono">{receipt.refund.reference ?? "—"}</dd></div>
+              {receipt.refund.method && (
+                <div><dt>Hình thức hoàn</dt><dd>{REFUND_METHOD_LABEL[receipt.refund.method] ?? receipt.refund.method}</dd></div>
+              )}
+              <div>
+                <dt>{receipt.refund.method === "manual_transfer" ? "Mã giao dịch chuyển khoản" : "Mã hoàn tiền"}</dt>
+                <dd className="mono">{receipt.refund.reference ?? "—"}</dd>
+              </div>
+              {receipt.refund.proofUrl && (
+                <div className="no-print">
+                  <dt>Chứng từ hoàn</dt>
+                  <dd><a href={receipt.refund.proofUrl} target="_blank" rel="noreferrer">Xem ảnh chứng từ</a></dd>
+                </div>
+              )}
             </>
           )}
         </dl>
 
         <p className="receipt-note">
           Biên nhận xác nhận khoản ủng hộ đã được cổng thanh toán ghi nhận trên nền tảng Góp Mầm. Đây không phải hóa đơn
-          giá trị gia tăng. Bản demo dùng thanh toán sandbox, không phát sinh tiền thật.
+          giá trị gia tăng.
+          {receipt.paymentMethod === "wallet" && " Khoản này thanh toán bằng Ví demo Góp Mầm (môi trường thử nghiệm), không phát sinh tiền thật."}
         </p>
       </article>
 

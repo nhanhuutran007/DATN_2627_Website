@@ -9,11 +9,30 @@ export const REFUND_STATUS_LABEL: Record<RefundRequestStatus, string> = {
   rejected: "Không chấp nhận",
 };
 
+/** Kênh không có API hoàn tiền (SePay) → admin chuyển khoản trả lại thủ công. Khớp `needsManualRefund` ở backend. */
+export function needsManualRefund(paymentMethod?: string | null): boolean {
+  return paymentMethod === "sepay";
+}
+
+export const REFUND_METHOD_LABEL: Record<string, string> = {
+  gateway: "Hoàn qua cổng thanh toán",
+  manual_transfer: "Hoàn thủ công qua chuyển khoản",
+};
+
+/** Tài khoản nhận hoàn do người ủng hộ khai. */
+export type RefundBankAccount = { bankName: string; bankAccountNumber: string; bankAccountName: string };
+
+/** Mã chuyển khoản hoàn thật (bắt buộc với khoản SePay) và ảnh chứng từ (tùy chọn). */
+export type ManualTransferInput = { transferReference?: string; proofMediaId?: string };
+
 export type RefundRequest = {
   id: string;
   donationId: string;
   userId: string;
   reason: string;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountName?: string | null;
   status: RefundRequestStatus;
   adminNotes?: string | null;
   reviewedAt?: string | null;
@@ -25,6 +44,11 @@ export type RefundRequest = {
     campaignId: string;
     campaign?: { id: string; title: string } | null;
     completedAt?: string | null;
+    paymentMethod?: string | null;
+    transferCode?: string | null;
+    refundReference?: string | null;
+    refundMethod?: string | null;
+    refundProofUrl?: string | null;
   } | null;
   user?: { id: string; name: string; email?: string } | null;
 };
@@ -44,7 +68,13 @@ export type DonationReceipt = {
   isAnonymous: boolean;
   campaign: { id: string; title: string };
   rewardTitle: string | null;
-  refund: { refundedAt: string | null; reference: string | null; reason: string | null } | null;
+  refund: {
+    refundedAt: string | null;
+    reference: string | null;
+    reason: string | null;
+    method: string | null;
+    proofUrl: string | null;
+  } | null;
 };
 
 export type CampaignReconciliation = {
@@ -74,8 +104,11 @@ export function fetchReceipt(donationId: string): Promise<DonationReceipt> {
   return api.get<DonationReceipt>(`/donations/${encodeURIComponent(donationId)}/receipt`);
 }
 
-export function requestRefund(donationId: string, reason: string): Promise<RefundRequest> {
-  return api.post<RefundRequest>(`/donations/${encodeURIComponent(donationId)}/refund-request`, { reason });
+export function requestRefund(
+  donationId: string,
+  input: { reason: string } & Partial<RefundBankAccount>,
+): Promise<RefundRequest> {
+  return api.post<RefundRequest>(`/donations/${encodeURIComponent(donationId)}/refund-request`, input);
 }
 
 export function fetchMyRefundRequests(): Promise<RefundRequest[]> {
@@ -98,16 +131,33 @@ export function fetchAdminRefunds(
   return api.get<RefundRequestList>(`/admin/refunds${qs ? `?${qs}` : ""}`);
 }
 
-export function approveRefund(id: string, adminNotes: string): Promise<RefundRequest> {
-  return api.patch<RefundRequest>(`/admin/refunds/${encodeURIComponent(id)}/approve`, { adminNotes });
+export function approveRefund(id: string, adminNotes: string, manual: ManualTransferInput = {}): Promise<RefundRequest> {
+  return api.patch<RefundRequest>(`/admin/refunds/${encodeURIComponent(id)}/approve`, { adminNotes, ...manual });
 }
 
 export function rejectRefund(id: string, adminNotes: string): Promise<RefundRequest> {
   return api.patch<RefundRequest>(`/admin/refunds/${encodeURIComponent(id)}/reject`, { adminNotes });
 }
 
-export function refundDonationDirectly(donationId: string, reason: string): Promise<unknown> {
-  return api.post(`/admin/donations/${encodeURIComponent(donationId)}/refund`, { reason });
+export function refundDonationDirectly(donationId: string, reason: string, manual: ManualTransferInput = {}): Promise<unknown> {
+  return api.post(`/admin/donations/${encodeURIComponent(donationId)}/refund`, { reason, ...manual });
+}
+
+/** Tải CSV yêu cầu hoàn kèm tài khoản nhận (để chuyển khoản trả lại). */
+export async function downloadRefundsCsv(status?: RefundRequestStatus): Promise<void> {
+  const { blob, filename } = await apiDownload(`/admin/refunds/export${status ? `?status=${status}` : ""}`);
+  saveBlob(blob, filename ?? "hoan-tien.csv");
+}
+
+function saveBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function rangeQuery(range: { from?: string; to?: string; campaignId?: string }): string {
@@ -126,12 +176,5 @@ export function fetchReconciliation(range: { from?: string; to?: string; campaig
 /** Tải CSV đối soát và mở hộp lưu file của trình duyệt. */
 export async function downloadReconciliationCsv(range: { from?: string; to?: string; campaignId?: string }): Promise<void> {
   const { blob, filename } = await apiDownload(`/admin/reconciliation/export${rangeQuery(range)}`);
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename ?? "doi-soat.csv";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  saveBlob(blob, filename ?? "doi-soat.csv");
 }

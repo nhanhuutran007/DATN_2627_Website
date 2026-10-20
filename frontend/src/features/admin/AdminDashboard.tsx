@@ -50,7 +50,8 @@ import { logoutRequest } from "@/lib/api";
 import type { ApiCampaignStatus } from "@/lib/api/campaigns";
 import { fetchAdminCategories } from "@/lib/api/categories";
 import { syncSepayDonation } from "@/lib/api/donations";
-import { refundDonationDirectly } from "@/lib/api/finance";
+import { needsManualRefund, refundDonationDirectly } from "@/lib/api/finance";
+import { useManualRefundDialog } from "@/features/admin/ManualRefundDialog";
 import {
   fetchAdminComments,
   hideComment,
@@ -215,6 +216,7 @@ export function AdminDashboard() {
   const user = useAuthUser();
   const isAdmin = user?.role === "admin";
   const dialog = useDialog();
+  const [manualRefundDialog, openManualRefund] = useManualRefundDialog();
   // Mục đang xem lấy từ URL: /admin là tổng quan, /admin/<slug> là từng mục riêng.
   const pathname = usePathname();
   const slug = pathname.replace(/^\/admin\/?/, "").split("/")[0] ?? "";
@@ -702,6 +704,32 @@ export function AdminDashboard() {
   }
 
   async function handleDirectRefund(donation: AdminDonation) {
+    if (needsManualRefund(donation.paymentMethod)) {
+      const manual = await openManualRefund({
+        title: "Hoàn tiền trực tiếp (thủ công)",
+        amount: money(donation.amount),
+        notesLabel: "Lý do hoàn tiền (lưu nhật ký và gửi người ủng hộ)",
+        confirmLabel: "Đã chuyển khoản — ghi nhận hoàn",
+        bank: null,
+        transferCode: donation.transferCode,
+      });
+      if (!manual) return;
+      setBusy(donation.id);
+      setNotice(null);
+      try {
+        await refundDonationDirectly(donation.id, manual.notes, {
+          transferReference: manual.transferReference,
+          proofMediaId: manual.proofMediaId,
+        });
+        await Promise.all([loadDonations(donationFilter, donationPaging.page), reloadOverview()]);
+        setNotice(`Đã ghi nhận hoàn ${money(donation.amount)} qua chuyển khoản (mã ${manual.transferReference}).`);
+      } catch (err) {
+        setNotice(err instanceof Error ? err.message : "Không hoàn được giao dịch");
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
     const result = await dialog.prompt({
       title: "Hoàn tiền trực tiếp",
       message: (
@@ -928,6 +956,7 @@ export function AdminDashboard() {
 
   return (
     <main className="admin-page">
+      {manualRefundDialog}
       <div className={`admin-shell${sidebarRail ? " is-rail" : ""}`}>
         {narrow && sidebarOpen && (
           <div className="admin-sidebar-backdrop" aria-hidden="true" onClick={() => setSidebarOpen(false)} />
