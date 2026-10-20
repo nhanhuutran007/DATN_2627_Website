@@ -16,9 +16,13 @@ const STATUS_LABEL: Record<ApiDonation["status"], { label: string; tone: string 
 
 type Donation = ApiDonation & { rewardTier?: { title: string } | null };
 
-/** Lịch sử ủng hộ của người dùng hiện tại, kèm link biên nhận. */
+/** Số khoản hiện lúc đầu và thêm vào mỗi lần bấm "Xem thêm". */
+const PAGE_STEP = 10;
+
+/** Lịch sử ủng hộ của người dùng hiện tại (mới nhất trước), kèm link biên nhận. */
 export function MyDonations() {
   const [items, setItems] = useState<Donation[]>([]);
+  const [visible, setVisible] = useState(PAGE_STEP);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
@@ -73,7 +77,7 @@ export function MyDonations() {
           <tr><th scope="col">Chiến dịch</th><th scope="col" className="num">Số tiền</th><th scope="col">Ngày</th><th scope="col">Trạng thái</th><th scope="col"><span className="sr-only">Biên nhận</span></th></tr>
         </thead>
         <tbody>
-          {items.map((d) => {
+          {items.slice(0, visible).map((d) => {
             const status = STATUS_LABEL[d.status];
             const hasReceipt = d.status === "completed" || d.status === "refunded";
             return (
@@ -99,6 +103,20 @@ export function MyDonations() {
         </tbody>
       </table>
     </div>
+    {items.length > PAGE_STEP && (
+      <div className="notification-more my-donations-more">
+        <p className="hint" role="status">Đang hiển thị {Math.min(visible, items.length)}/{items.length} khoản ủng hộ</p>
+        {visible < items.length ? (
+          <button className="button button-outline button-sm" type="button" onClick={() => setVisible((n) => n + PAGE_STEP)}>
+            Xem thêm {Math.min(PAGE_STEP, items.length - visible)} khoản
+          </button>
+        ) : (
+          <button className="button button-outline button-sm" type="button" onClick={() => setVisible(PAGE_STEP)}>
+            Thu gọn
+          </button>
+        )}
+      </div>
+    )}
     </>
   );
 }

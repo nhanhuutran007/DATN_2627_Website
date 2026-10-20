@@ -10345,3 +10345,15 @@ html:has(dialog:modal) .admin-sidebar {
     grid-template-columns: 1fr;
   }
 }
+
+/* "Xem thêm" ở mục Khoản ủng hộ của tôi: dòng đếm nằm trên nút. */
+.my-donations-more {
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.my-donations-more .hint {
+  margin: 0;
+}
