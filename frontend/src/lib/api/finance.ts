@@ -85,9 +85,13 @@ export function fetchMyRefundRequests(): Promise<RefundRequest[]> {
 export function fetchAdminRefunds(
   status?: RefundRequestStatus,
   page: { offset?: number; limit?: number } = {},
+  filters: { q?: string; minAmount?: number; maxAmount?: number } = {},
 ): Promise<RefundRequestList> {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
+  if (filters.q) params.set("q", filters.q);
+  if (filters.minAmount !== undefined) params.set("minAmount", String(filters.minAmount));
+  if (filters.maxAmount !== undefined) params.set("maxAmount", String(filters.maxAmount));
   if (page.offset !== undefined) params.set("offset", String(page.offset));
   if (page.limit !== undefined) params.set("limit", String(page.limit));
   const qs = params.toString();

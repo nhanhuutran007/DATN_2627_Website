@@ -1,5 +1,5 @@
 import { Transform, Type } from "class-transformer";
-import { IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
+import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
 
 import { RefundRequestStatus } from "../entities/refund-request.entity";
 
@@ -33,6 +33,24 @@ export class RefundQueryDto {
   @IsOptional()
   @IsEnum(RefundRequestStatus)
   status?: RefundRequestStatus;
+
+  /** Tìm theo tên chiến dịch, tên/email người yêu cầu, lý do yêu cầu. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minAmount?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxAmount?: number;
 
   @IsOptional()
   @Type(() => Number)
