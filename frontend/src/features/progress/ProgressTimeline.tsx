@@ -15,15 +15,21 @@ type State =
   | { status: "error"; message: string }
   | { status: "ready"; items: ApiCampaignUpdate[]; total: number };
 
+type ProgressTimelineProps = {
+  campaignId: string;
+  /** Số cập nhật tải lần đầu (trang chiến dịch dùng 3 cho gọn); "Xem thêm" tải tiếp từng PAGE_SIZE. */
+  initialSize?: number;
+};
+
 /** Nhật ký tiến độ công khai: bài cập nhật theo mốc, khoản chi và chứng từ kèm theo. */
-export function ProgressTimeline({ campaignId }: { campaignId: string }) {
+export function ProgressTimeline({ campaignId, initialSize = PAGE_SIZE }: ProgressTimelineProps) {
   const [state, setState] = useState<State>({ status: "loading" });
   const [loadingMore, setLoadingMore] = useState(false);
   const [requestKey, setRequestKey] = useState(0);
 
   useEffect(() => {
     let active = true;
-    fetchCampaignUpdates(campaignId, 0, PAGE_SIZE)
+    fetchCampaignUpdates(campaignId, 0, initialSize)
       .then((page) => {
         if (active) setState({ status: "ready", items: page.items, total: page.total });
       })
@@ -37,7 +43,7 @@ export function ProgressTimeline({ campaignId }: { campaignId: string }) {
     return () => {
       active = false;
     };
-  }, [campaignId, requestKey]);
+  }, [campaignId, initialSize, requestKey]);
 
   const loadMore = async () => {
     if (state.status !== "ready") return;

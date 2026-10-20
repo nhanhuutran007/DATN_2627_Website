@@ -3,30 +3,26 @@
 import { useEffect, useState } from "react";
 
 import { fetchCampaignLedger, type CampaignLedger as Ledger } from "@/lib/api/donations";
-import { formatDateTime, formatVnd } from "@/lib/format";
+import { formatDateTime, formatVnd, paymentMethodLabel } from "@/lib/format";
 
 type CampaignLedgerProps = {
   campaignId: string;
-};
-
-const METHOD_LABEL: Record<string, string> = {
-  wallet: "Ví demo",
-  wallet_demo: "Ví demo",
-  payos: "PayOS sandbox",
+  /** "recent": mới nhất trước; "top": số tiền lớn nhất trước. */
+  sort?: "recent" | "top";
 };
 
 /** Số dòng hiển thị ban đầu; bấm "Xem tất cả" để tải tối đa FULL_ROWS (giới hạn của API). */
-const PREVIEW_ROWS = 5;
+const PREVIEW_ROWS = 10;
 const FULL_ROWS = 50;
 
-export function CampaignLedger({ campaignId }: CampaignLedgerProps) {
+export function CampaignLedger({ campaignId, sort = "recent" }: CampaignLedgerProps) {
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let active = true;
-    fetchCampaignLedger(campaignId, expanded ? FULL_ROWS : PREVIEW_ROWS)
+    fetchCampaignLedger(campaignId, expanded ? FULL_ROWS : PREVIEW_ROWS, sort)
       .then((result) => {
         if (active) setLedger(result);
       })
@@ -36,7 +32,7 @@ export function CampaignLedger({ campaignId }: CampaignLedgerProps) {
     return () => {
       active = false;
     };
-  }, [campaignId, expanded]);
+  }, [campaignId, expanded, sort]);
 
   if (failed) return <p className="empty-line">Không tải được sổ cái giao dịch.</p>;
   if (!ledger) return <p className="empty-line" aria-live="polite">Đang tải sổ cái…</p>;
@@ -48,7 +44,7 @@ export function CampaignLedger({ campaignId }: CampaignLedgerProps) {
     <>
       <div className="table-wrap">
         <table className="plain-table ledger-table">
-          <caption className="sr-only">Các khoản ủng hộ đã được xác nhận, mới nhất trước</caption>
+          <caption className="sr-only">Các khoản ủng hộ đã được xác nhận, {sort === "top" ? "lớn nhất" : "mới nhất"} trước</caption>
           <thead>
             <tr>
               <th scope="col">Thời điểm xác nhận</th>
@@ -63,7 +59,7 @@ export function CampaignLedger({ campaignId }: CampaignLedgerProps) {
               <tr key={entry.id}>
                 <td className="mono nowrap">{formatDateTime(entry.completedAt)}</td>
                 <td>{entry.donorName ?? <i>Ẩn danh</i>}</td>
-                <td>{METHOD_LABEL[entry.paymentMethod ?? ""] ?? "—"}</td>
+                <td>{paymentMethodLabel(entry.paymentMethod)}</td>
                 <td className="num">{formatVnd(entry.amount)}</td>
                 <td className="mono">{entry.reference}</td>
               </tr>

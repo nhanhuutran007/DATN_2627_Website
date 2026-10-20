@@ -8,6 +8,7 @@ export type IconName =
   | "chevron-down"
   | "chevron-left"
   | "clock"
+  | "copy"
   | "cpu"
   | "database"
   | "document"
@@ -18,6 +19,7 @@ export type IconName =
   | "leaf"
   | "location"
   | "logout"
+  | "mail"
   | "menu"
   | "message"
   | "palette"
@@ -25,6 +27,7 @@ export type IconName =
   | "scale"
   | "rocket"
   | "search"
+  | "send"
   | "share"
   | "shield"
   | "sparkles"
@@ -52,6 +55,7 @@ const paths: Record<IconName, React.ReactNode> = {
   "chevron-down": <path d="m6 9 6 6 6-6" />,
   "chevron-left": <path d="m15 6-6 6 6 6" />,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  copy: <><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></>,
   cpu: <><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M10 10h4v4h-4zM9 2v4m6-4v4M9 18v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4" /></>,
   document: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></>,
   flag: <path d="M5 21V4m0 0h11l-2 4 2 4H5" />,
@@ -61,6 +65,7 @@ const paths: Record<IconName, React.ReactNode> = {
   leaf: <><path d="M20 4c-8 0-14 4-14 10 0 3 2 5 5 5 6 0 9-7 9-15Z" /><path d="M4 21c2-5 6-9 12-12" /></>,
   location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
   logout: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9" />,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   message: <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" />,
   palette: <><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2s-1-1.6-1-2.6c0-1 .8-1.9 2-1.9h2a4 4 0 0 0 4-4C21 6.5 17 3 12 3Z" /><circle cx="7.5" cy="11" r="1" /><circle cx="10" cy="7" r="1" /><circle cx="15" cy="7.5" r="1" /></>,
@@ -68,6 +73,7 @@ const paths: Record<IconName, React.ReactNode> = {
   rocket: <><path d="M14 5c3-3 6-2 6-2s1 3-2 6l-6 6-4-4 6-6Z" /><path d="m9 14-4 1-2 4 6-2m2-8-1-4-4 2 2 3m5 5 1 5 4-4-3-1" /><circle cx="15" cy="8" r="1" /></>,
   scale: <path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0L5 7Zm14 0-3 7a3 3 0 0 0 6 0l-3-7Z" />,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
+  send: <path d="M21 3 10 14M21 3l-7 18-4-7-7-4 18-7Z" />,
   share: <><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 13.5 6.8 4m0-11-6.8 4" /></>,
   shield: <><path d="M12 3 4 6v5c0 5 3 8 8 10 5-2 8-5 8-10V6l-8-3Z" /><path d="m9 12 2 2 4-4" /></>,
   sparkles: <path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3Zm-6 9 .9 2.1L9 15l-2.1.9L6 18l-.9-2.1L3 15l2.1-.9L6 12Zm11 2 1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2Z" />,

@@ -299,6 +299,7 @@ export function apiCampaignToView(api: ApiCampaign): Campaign {
     image: imageByCategory(api.category),
     imageUrl: api.imageUrl ?? null,
     endDate: formatDate(api.endDate),
+    ...(api.createdAt ? { createdDate: formatDate(api.createdAt) } : {}),
     aiReason: "",
     story: toStory(api.description),
     ...(looksLikeHtml(api.description) ? { storyHtml: api.description } : {}),

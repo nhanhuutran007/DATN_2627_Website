@@ -17,3 +17,9 @@ ai_api_key             = "change-me-at-least-32-characters-long"
 # smtp_user = "change-me"
 # smtp_pass = "change-me"
 # mail_from = "Góp Mầm <no-reply@example.com>"
+
+# Cổng thanh toán SePay (production = tiền thật; ví demo tự tắt)
+sepay_env         = "sandbox"
+sepay_merchant_id = ""
+sepay_secret_key  = ""
+sepay_ipn_secret  = ""

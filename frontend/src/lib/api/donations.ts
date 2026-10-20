@@ -11,6 +11,8 @@ export type ApiDonation = {
   status: ApiDonationStatus;
   paymentMethod?: string | null;
   transactionId?: string | null;
+  /** Mã nội dung chuyển khoản VietQR (vd. `GM7K2QX9AB`). */
+  transferCode?: string | null;
   idempotencyKey: string;
   message?: string | null;
   isAnonymous: boolean;
@@ -69,6 +71,55 @@ export async function fetchMyDonations(): Promise<ApiDonation[]> {
 
 export async function fetchDonation(id: string): Promise<ApiDonation> {
   return api.get<ApiDonation>(`/donations/${encodeURIComponent(id)}`);
+}
+
+export type PaymentOptions = {
+  /** Cổng SePay (QR chuyển khoản); null khi máy chủ chưa cấu hình merchant. */
+  sepay: { env: "sandbox" | "production" } | null;
+  /** Ví demo (tự xác nhận, không có tiền thật); tắt khi SePay chạy production. */
+  demoWallet: boolean;
+};
+
+export async function fetchPaymentOptions(): Promise<PaymentOptions> {
+  return api.get<PaymentOptions>("/donations/payment-options");
+}
+
+export type SepayCheckoutForm = {
+  /** URL trang thanh toán SePay. */
+  action: string;
+  /** Trường ẩn đã ký ở server (secret key không bao giờ xuống trình duyệt). */
+  fields: Record<string, string>;
+};
+
+export async function createSepayCheckout(donationId: string): Promise<SepayCheckoutForm> {
+  return api.post<SepayCheckoutForm>(`/donations/${encodeURIComponent(donationId)}/sepay-checkout`);
+}
+
+export type SepaySyncResult = {
+  donation: ApiDonation;
+  sepayStatus: string | null;
+  applied: boolean;
+};
+
+/** Nhờ server hỏi lại SePay trạng thái đơn (khi IPN chưa tới). */
+export async function syncSepayDonation(donationId: string): Promise<SepaySyncResult> {
+  return api.post<SepaySyncResult>(`/donations/${encodeURIComponent(donationId)}/sepay-sync`);
+}
+
+/** POST form đã ký sang SePay (trình duyệt rời trang hiện tại). */
+export function submitSepayCheckout(form: SepayCheckoutForm): void {
+  const element = document.createElement("form");
+  element.method = "POST";
+  element.action = form.action;
+  for (const [name, value] of Object.entries(form.fields)) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    element.appendChild(input);
+  }
+  document.body.appendChild(element);
+  element.submit();
 }
 
 export function generateIdempotencyKey(): string {
