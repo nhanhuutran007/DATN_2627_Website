@@ -10,6 +10,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { DialogProvider } from "@/components/ui/DialogProvider";
 import { AiConsentBanner } from "@/features/ai-consent/AiConsentBanner";
 import { PrivacyNotice } from "@/features/privacy/PrivacyNotice";
+import { FaqChat } from "@/features/support/FaqChat";
 import { siteUrl } from "@/lib/site";
 
 import "./theme.css";
@@ -74,6 +75,7 @@ export default function RootLayout({
           <div id="noi-dung">{children}</div>
           <ChromeGate>
             <SiteFooter />
+            <FaqChat />
           </ChromeGate>
           <PrivacyNotice />
           <RouteTransition />
