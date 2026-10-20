@@ -8,7 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { SepayPaymentStatus, type SepayReturn } from "@/features/donations/SepayPaymentStatus";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ApiError, hasSession } from "@/lib/api";
-import { useIsAdmin } from "@/lib/auth";
+import { useAuthUser, useIsAdmin } from "@/lib/auth";
 import {
   cancelDonation,
   confirmDonation,
@@ -73,6 +73,7 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
   const isAdmin = useIsAdmin();
   const [digits, setDigits] = useState("");
   const [anonymous, setAnonymous] = useState(false);
+  const user = useAuthUser();
   const [payment, setPayment] = useState("wallet");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -290,7 +291,7 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
           <div><dt>Số tiền</dt><dd className="num">{formatVnd(Number(donation.amount) || amount)}</dd></div>
           <div><dt>Mã giao dịch</dt><dd className="mono">{donation.transactionId ?? donation.id}</dd></div>
           <div><dt>Kênh</dt><dd>{paymentMethodLabel(donation.paymentMethod)}</dd></div>
-          <div><dt>Hiển thị</dt><dd>{donation.isAnonymous ? "Ẩn danh" : "Tên của bạn"}</dd></div>
+          <div><dt>Hiển thị trên sổ cái</dt><dd>{donation.isAnonymous ? "Ẩn danh" : user?.name ?? "Tên tài khoản của bạn"}</dd></div>
           {selectedTier && <div><dt>Phần quà</dt><dd>{donation.rewardTierId ? selectedTier.title : "Hết suất — ghi nhận không kèm quà"}</dd></div>}
         </dl>
         <p className="donate-result-share">Chia sẻ dự án để thêm nhiều người biết đến — đó cũng là một cách ủng hộ.</p>
@@ -422,7 +423,7 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
             Khi bấm “Ủng hộ ngay”, bạn đồng ý với <Link href="/chinh-sach-bao-mat">chính sách quyền riêng tư</Link> của Góp Mầm.
             {payment === "sepay"
               ? "Bạn sẽ được chuyển sang trang thanh toán SePay để quét QR. Góp Mầm không lưu thông tin tài khoản hay thẻ của bạn."
-              : "Bản demo dùng thanh toán sandbox, không trừ tiền thật và không lưu dữ liệu thẻ."}
+              : "Ví demo dùng cho môi trường thử nghiệm, không trừ tiền thật và không lưu dữ liệu thẻ."}
           </>
         ) : (
           "Dự án hiện không nhận ủng hộ."
