@@ -56,6 +56,10 @@ export class Donation extends BaseEntity {
   @Column({ name: "transaction_id", length: 255, nullable: true, unique: true })
   transactionId?: string;
 
+  /** Mã nội dung chuyển khoản VietQR (vd. `GM7K2QX9AB`) để đối chiếu với sao kê ngân hàng. */
+  @Column({ name: "transfer_code", type: "varchar", length: 20, nullable: true, unique: true })
+  transferCode?: string | null;
+
   @Column({ name: "idempotency_key", length: 255, unique: true })
   idempotencyKey!: string;
 

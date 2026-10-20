@@ -18,6 +18,8 @@ import { REPORT_REASON_LABEL, submitReport, type ReportReason } from "@/lib/api/
 import { useAuthUser, type AuthUser } from "@/lib/auth";
 import { timeAgo } from "@/lib/time";
 
+/** Trang chiến dịch gọn: ban đầu chỉ 3 luồng mới nhất, "Xem thêm" tải tiếp từng PAGE_SIZE. */
+const INITIAL_SIZE = 3;
 const PAGE_SIZE = 10;
 
 function errorText(err: unknown, fallback: string): string {
@@ -243,7 +245,7 @@ export function CampaignComments({ campaignId }: { campaignId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchComments(campaignId, 0, PAGE_SIZE)
+    fetchComments(campaignId, 0, INITIAL_SIZE)
       .then((page) => {
         if (cancelled) return;
         setItems(page.items);

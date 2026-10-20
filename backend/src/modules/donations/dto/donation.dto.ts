@@ -19,7 +19,7 @@ export class CreateDonationDto {
   @Min(20_000)
   amount!: number;
 
-  @IsIn(["wallet", "payos"])
+  @IsIn(["wallet", "sepay"])
   paymentMethod!: string;
 
   @IsOptional()

@@ -261,7 +261,7 @@ describe("AdminService", () => {
     it("should pass status filter into the query", async () => {
       await service.listDonations({ status: DonationStatus.COMPLETED });
       const call = repos.donationRepo.calls.find((c) => c.method === "findAndCount");
-      equal(call.args[0].where.status, DonationStatus.COMPLETED);
+      equal(call.args[0].where[0].status, DonationStatus.COMPLETED);
     });
 
     it("flagged chỉ lấy giao dịch của chiến dịch/người ủng hộ có cảnh báo đang mở", async () => {

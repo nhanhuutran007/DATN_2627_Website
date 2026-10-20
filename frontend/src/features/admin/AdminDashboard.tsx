@@ -49,6 +49,7 @@ import {
 import { logoutRequest } from "@/lib/api";
 import type { ApiCampaignStatus } from "@/lib/api/campaigns";
 import { fetchAdminCategories } from "@/lib/api/categories";
+import { syncSepayDonation } from "@/lib/api/donations";
 import { refundDonationDirectly } from "@/lib/api/finance";
 import {
   fetchAdminComments,
@@ -70,6 +71,7 @@ import {
 } from "@/lib/api/reports";
 import { useAuthUser } from "@/lib/auth";
 import { formatCurrency } from "@/lib/data/campaigns";
+import { paymentMethodLabel } from "@/lib/format";
 
 const DONATION_STATUS_LABEL: Record<AdminDonation["status"], string> = {
   pending: "Chờ xử lý",
@@ -672,6 +674,28 @@ export function AdminDashboard() {
       );
     } catch (err) {
       setNotice(err instanceof Error ? err.message : "Không cập nhật được báo cáo");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleSepaySync(donation: AdminDonation) {
+    setBusy(donation.id);
+    setNotice(null);
+    try {
+      const result = await syncSepayDonation(donation.id);
+      if (result.applied) {
+        await Promise.all([loadDonations(donationFilter, donationPaging.page), reloadOverview()]);
+        setNotice(`SePay xác nhận đã thu ${money(donation.amount)} — đã ghi nhận khoản ủng hộ.`);
+      } else {
+        setNotice(
+          result.sepayStatus
+            ? `SePay báo trạng thái ${result.sepayStatus}: chưa thu tiền hoặc số tiền không khớp, không thay đổi gì.`
+            : "SePay không có đơn này hoặc giao dịch không cần đối soát.",
+        );
+      }
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Không đối soát được với SePay");
     } finally {
       setBusy(null);
     }
@@ -1572,7 +1596,7 @@ export function AdminDashboard() {
                       <td><b>{donation.isAnonymous ? "Ẩn danh" : (donation.user?.name ?? "Người ủng hộ")}</b></td>
                       <td>{donation.campaign?.title ?? "—"}</td>
                       <td>{money(donation.amount)}</td>
-                      <td>{donation.paymentMethod ?? "—"}</td>
+                      <td>{paymentMethodLabel(donation.paymentMethod)}</td>
                       <td>{donation.transactionId ? donation.transactionId.slice(0, 10).toUpperCase() : "—"}</td>
                       <td>{formatDate(donation.completedAt ?? donation.createdAt)}</td>
                       <td><span className={`table-status ${DONATION_STATUS_TONE[donation.status]}`}>{DONATION_STATUS_LABEL[donation.status]}</span></td>
@@ -1589,6 +1613,11 @@ export function AdminDashboard() {
                         {donation.status === "completed" && (
                           <button type="button" disabled={busy === donation.id} onClick={() => handleDirectRefund(donation)}>
                             Hoàn tiền
+                          </button>
+                        )}
+                        {donation.paymentMethod === "sepay" && ["pending", "expired", "cancelled"].includes(donation.status) && (
+                          <button type="button" disabled={busy === donation.id} onClick={() => handleSepaySync(donation)}>
+                            Đối soát SePay
                           </button>
                         )}
                       </td>

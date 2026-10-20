@@ -34,3 +34,15 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 export function isLiveId(id: string): boolean {
   return UUID_PATTERN.test(id);
 }
+
+/** Nhãn kênh thanh toán; `payos` chỉ còn ở giao dịch cũ (kênh đã thay bằng SePay). */
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  sepay: "Chuyển khoản qua SePay",
+  wallet: "Ví demo Góp Mầm",
+  wallet_demo: "Ví demo Góp Mầm",
+  payos: "PayOS sandbox (cũ)",
+};
+
+export function paymentMethodLabel(method: string | null | undefined): string {
+  return method ? (PAYMENT_METHOD_LABELS[method] ?? method) : "—";
+}
