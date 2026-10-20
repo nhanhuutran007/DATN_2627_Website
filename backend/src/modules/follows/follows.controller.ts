@@ -14,6 +14,7 @@ import {
 import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.module";
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { NonAdminGuard } from "../auth/guards/non-admin.guard";
 import { OptionalJwtAuthGuard } from "../auth/guards/optional-jwt-auth.guard";
 import { User } from "../users/entities/user.entity";
 import { FollowListQueryDto } from "./dto/follow.dto";
@@ -32,7 +33,7 @@ export class FollowsController {
 
   @Post("campaigns/:id/follow")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @UseGuards(JwtAuthGuard, NonAdminGuard, RateLimitGuard)
   @RateLimit({ limit: 30, windowMs: 60_000, keyPrefix: "campaign-follow" })
   follow(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
     return this.followsService.follow(id, user);

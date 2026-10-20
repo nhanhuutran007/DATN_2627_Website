@@ -198,7 +198,7 @@ function CommentItem({ comment, campaignId, user, isReply, onReplyPosted, onDele
         </header>
         <p className="comment-text">{comment.content}</p>
         {error && <p className="form-error" role="alert">{error}</p>}
-        {user && (
+        {user && user.role !== "admin" && (
           <div className="comment-actions">
             {!isReply && <button type="button" className="link-button" onClick={() => setMode(mode === "reply" ? "none" : "reply")}>Trả lời</button>}
             {mine ? (
@@ -282,7 +282,9 @@ export function CampaignComments({ campaignId }: { campaignId: string }) {
 
   return (
     <div className="comments">
-      {user ? (
+      {user?.role === "admin" ? (
+        <p className="comment-login">Tài khoản quản trị chỉ xem bình luận; ẩn/hiện bình luận tại trang quản trị.</p>
+      ) : user ? (
         <Composer
           campaignId={campaignId}
           onPosted={(comment) => {

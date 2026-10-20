@@ -13,6 +13,7 @@ import {
 
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { NonAdminGuard } from "../auth/guards/non-admin.guard";
 import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.module";
 import { User } from "../users/entities/user.entity";
 import {
@@ -27,7 +28,7 @@ export class DonationsController {
   constructor(private readonly donationsService: DonationsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, NonAdminGuard)
   create(@Body() dto: CreateDonationDto, @GetCurrentUser() user: User) {
     return this.donationsService.create(dto, user);
   }

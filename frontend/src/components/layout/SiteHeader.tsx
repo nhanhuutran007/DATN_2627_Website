@@ -99,16 +99,17 @@ export function SiteHeader() {
   const donateLinks: MenuLink[] = [
     { href: "/du-an", label: "Khám phá dự án", hint: "Duyệt dự án theo lĩnh vực" },
   ];
+  // Tài khoản quản trị chỉ dùng để quản trị: không có lối vào tạo chiến dịch hay hoạt động cá nhân.
+  const isAdmin = user?.role === "admin";
   const fundraiseLinks: MenuLink[] = [
-    { href: "/tao-chien-dich", label: "Tạo chiến dịch", hint: "Soạn hồ sơ theo từng bước, gửi duyệt" },
+    ...(isAdmin ? [] : [{ href: "/tao-chien-dich", label: "Tạo chiến dịch", hint: "Soạn hồ sơ theo từng bước, gửi duyệt" }]),
     { href: "/#quy-trinh", label: "Quy trình gây quỹ", hint: "Kiểm duyệt, nhận ủng hộ, báo cáo tiến độ" },
-    ...(user ? [{ href: "/dashboard", label: "Quản lý chiến dịch", hint: "Tiến độ, số liệu, chi tiêu" }] : []),
+    ...(user && !isAdmin ? [{ href: "/dashboard", label: "Quản lý chiến dịch", hint: "Tiến độ, số liệu, chi tiêu" }] : []),
   ];
-  // Theo menu tài khoản GoFundMe (Profile · Your impact · Messages · Account settings · Sign out), admin có thêm trang quản trị.
+  // Theo menu tài khoản GoFundMe (Profile · Your impact · Messages · Account settings · Sign out); admin thay "Hoạt động" bằng trang quản trị.
   const accountLinks: MenuLink[] = user
     ? [
-        ...(user.role === "admin" ? [{ href: "/admin", label: "Trang quản trị" }] : []),
-        { href: "/dashboard", label: "Hoạt động của bạn" },
+        isAdmin ? { href: "/admin", label: "Trang quản trị" } : { href: "/dashboard", label: "Hoạt động của bạn" },
         { href: "/thong-bao", label: "Thông báo" },
         { href: "/ho-so", label: "Cài đặt tài khoản" },
       ]
@@ -172,7 +173,11 @@ export function SiteHeader() {
             )}
           </div>
           {user && <NotificationBell onNavigate={closeAll} />}
-          <Link className="gh-cta" href="/tao-chien-dich" onClick={closeAll}>Tạo chiến dịch</Link>
+          {isAdmin ? (
+            <Link className="gh-cta" href="/admin" onClick={closeAll}>Trang quản trị</Link>
+          ) : (
+            <Link className="gh-cta" href="/tao-chien-dich" onClick={closeAll}>Tạo chiến dịch</Link>
+          )}
           <button
             className="gh-toggle"
             type="button"

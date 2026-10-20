@@ -13,6 +13,7 @@ import {
 
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { NonAdminGuard } from "../auth/guards/non-admin.guard";
 import { CategoriesService } from "../categories/categories.service";
 import { User } from "../users/entities/user.entity";
 import { CampaignsService } from "./campaigns.service";
@@ -53,7 +54,7 @@ export class CampaignsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, NonAdminGuard)
   async create(@Body() dto: CreateCampaignDto, @GetCurrentUser() user: User) {
     await this.categoriesService.assertUsable(dto.category);
     return this.campaignsService.create(dto, user);
@@ -73,7 +74,7 @@ export class CampaignsController {
   }
 
   @Post(":id/submit")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, NonAdminGuard)
   submit(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
     return this.campaignsService.submitForReview(id, user);
   }

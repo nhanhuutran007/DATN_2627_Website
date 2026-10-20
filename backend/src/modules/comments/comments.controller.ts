@@ -16,6 +16,7 @@ import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.mo
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { NonAdminGuard } from "../auth/guards/non-admin.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entity";
 import { CommentsService } from "./comments.service";
@@ -32,7 +33,7 @@ export class CommentsController {
   }
 
   @Post("campaigns/:campaignId/comments")
-  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @UseGuards(JwtAuthGuard, NonAdminGuard, RateLimitGuard)
   @RateLimit({ limit: 10, windowMs: 10 * 60_000, keyPrefix: "comment-create" })
   create(
     @Param("campaignId", ParseUUIDPipe) campaignId: string,

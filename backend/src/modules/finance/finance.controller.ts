@@ -17,6 +17,7 @@ import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.mo
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { NonAdminGuard } from "../auth/guards/non-admin.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entity";
 import {
@@ -35,7 +36,7 @@ export class FinanceController {
 
   /** Người ủng hộ yêu cầu hoàn một khoản của mình (admin duyệt). */
   @Post("donations/:id/refund-request")
-  @UseGuards(RateLimitGuard)
+  @UseGuards(NonAdminGuard, RateLimitGuard)
   @RateLimit({ limit: 5, windowMs: 60 * 60_000, keyPrefix: "refund-request" })
   requestRefund(
     @Param("id", ParseUUIDPipe) id: string,

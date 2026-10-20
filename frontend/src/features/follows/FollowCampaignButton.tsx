@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api";
 import { trackBehaviorEvent } from "@/lib/api/ai";
 import { fetchFollowStatus, followCampaign, unfollowCampaign, type FollowStatus } from "@/lib/api/follows";
-import { useIsAuthenticated } from "@/lib/auth";
+import { useIsAdmin, useIsAuthenticated } from "@/lib/auth";
 
 type FollowCampaignButtonProps = {
   campaignId: string;
@@ -25,6 +25,7 @@ function errorMessage(error: unknown): string {
 /** Theo dõi để nhận thông báo khi chiến dịch có cập nhật, đạt mốc hoặc đổi trạng thái. */
 export function FollowCampaignButton({ campaignId }: FollowCampaignButtonProps) {
   const loggedIn = useIsAuthenticated();
+  const isAdmin = useIsAdmin();
   const [status, setStatus] = useState<FollowStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -60,6 +61,8 @@ export function FollowCampaignButton({ campaignId }: FollowCampaignButtonProps) 
   };
 
   const count = status ? status.followerCount.toLocaleString("vi-VN") : "…";
+
+  if (isAdmin) return null;
 
   return (
     <div className="follow-box">
