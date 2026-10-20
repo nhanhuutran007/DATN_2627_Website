@@ -2626,7 +2626,9 @@ paths:
       description: >-
         Được yêu cầu khi chiến dịch thất bại/bị hủy, hoặc trong 7 ngày sau khi ủng hộ nếu chiến dịch
         còn đang gây quỹ (409 nếu không đủ điều kiện hoặc đã có yêu cầu chờ xử lý). Admin duyệt.
-        Rate limit 5 lần/giờ/IP. Ghi audit `refund.request`.
+        Rate limit 5 lần/giờ/IP. Ghi audit `refund.request` (số tài khoản chỉ lưu 4 số cuối).
+        Khoản qua SePay bắt buộc khai tài khoản nhận hoàn (400 nếu thiếu) vì SePay không có API hoàn tiền —
+        admin chuyển khoản trả lại thủ công. Ba trường tài khoản phải đi cùng nhau.
       security:
         - bearerAuth: []
       parameters:
@@ -2640,9 +2642,14 @@ paths:
               required: [reason]
               properties:
                 reason: { type: string, minLength: 10, maxLength: 1000 }
+                bankName: { type: string, minLength: 2, maxLength: 100 }
+                bankAccountNumber: { type: string, pattern: "^\\d{6,19}$", description: Bỏ khoảng trắng/dấu chấm/gạch ngang trước khi kiểm tra }
+                bankAccountName: { type: string, minLength: 2, maxLength: 100, description: Chuẩn hóa chữ in hoa }
       responses:
         "201":
           description: Đã tạo yêu cầu (pending)
+        "400":
+          description: Khoản qua SePay chưa khai đủ tài khoản nhận hoàn
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -2673,6 +2680,27 @@ paths:
           description: Danh sách yêu cầu kèm giao dịch, chiến dịch, người yêu cầu
         "403":
           $ref: "#/components/responses/Forbidden"
+  /admin/refunds/export:
+    get:
+      operationId: exportAdminRefunds
+      summary: CSV yêu cầu hoàn kèm tài khoản nhận (chỉ admin)
+      description: >-
+        Để chuyển khoản trả lại các khoản qua SePay. Có dữ liệu cá nhân (tên, email, số tài khoản) nên
+        chỉ admin tải được; mỗi lần xuất ghi audit `finance.export_refunds`. Cột `can_chuyen_khoan_tay`
+        đánh dấu khoản phải hoàn thủ công.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, approved, rejected] }
+      responses:
+        "200":
+          description: File CSV (UTF-8 có BOM)
+          content:
+            text/csv: {}
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /admin/refunds/{id}/approve:
     patch:
       operationId: approveRefund
@@ -2681,7 +2709,8 @@ paths:
         Trong 1 transaction: đổi completed → refunded có điều kiện (không hoàn 2 lần, 409), gọi cổng
         thanh toán (lỗi → rollback, 502), trừ `currentAmount`/`backerCount` của chiến dịch và trả lại
         suất quà. Ghi audit `donation.refund` + `refund.approve`; thông báo người ủng hộ (kèm email)
-        và chủ dự án.
+        và chủ dự án. Khoản qua SePay không gọi cổng: admin đã chuyển khoản trả lại và bắt buộc gửi
+        `transferReference` (400 nếu thiếu) — lưu làm `refundReference` với `refundMethod=manual_transfer`.
       security:
         - bearerAuth: []
       parameters:
@@ -2691,10 +2720,24 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AdminNotesRequest"
+              type: object
+              required: [adminNotes]
+              properties:
+                adminNotes: { type: string, minLength: 5, maxLength: 500 }
+                transferReference:
+                  type: string
+                  minLength: 4
+                  maxLength: 100
+                  description: Bắt buộc khi khoản ủng hộ qua SePay — mã giao dịch chuyển khoản hoàn thật.
+                proofMediaId:
+                  type: string
+                  format: uuid
+                  description: Ảnh chứng từ chuyển khoản (`POST /media/images` với `purpose=refund_proof`, chỉ admin), không bắt buộc.
       responses:
         "200":
           description: Yêu cầu đã duyệt
+        "400":
+          description: Khoản qua SePay thiếu mã chuyển khoản hoặc chứng từ không hợp lệ
         "409":
           description: Yêu cầu đã xử lý hoặc khoản đã hoàn
         "502":
@@ -2736,9 +2779,20 @@ paths:
               required: [reason]
               properties:
                 reason: { type: string, minLength: 5, maxLength: 500 }
+                transferReference:
+                  type: string
+                  minLength: 4
+                  maxLength: 100
+                  description: Bắt buộc khi khoản ủng hộ qua SePay — mã giao dịch chuyển khoản hoàn thật.
+                proofMediaId:
+                  type: string
+                  format: uuid
+                  description: Ảnh chứng từ chuyển khoản (`POST /media/images` với `purpose=refund_proof`, chỉ admin), không bắt buộc.
       responses:
         "201":
           description: Đã hoàn
+        "400":
+          description: Khoản qua SePay thiếu mã chuyển khoản hoặc chứng từ không hợp lệ
         "409":
           description: Khoản chưa xác nhận hoặc đã hoàn
         "502":
@@ -3988,8 +4042,10 @@ components:
           type: [object, "null"]
           properties:
             refundedAt: { type: [string, "null"], format: date-time }
-            reference: { type: [string, "null"] }
+            reference: { type: [string, "null"], description: Mã hoàn của cổng, hoặc mã chuyển khoản thật khi hoàn thủ công }
             reason: { type: [string, "null"] }
+            method: { type: [string, "null"], enum: [gateway, manual_transfer, null] }
+            proofUrl: { type: [string, "null"], description: Ảnh chứng từ chuyển khoản hoàn (nếu có) }
     RewardTierRequest:
       type: object
       required: [title, description, minAmount]

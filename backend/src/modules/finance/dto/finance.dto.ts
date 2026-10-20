@@ -1,5 +1,18 @@
 import { Transform, Type } from "class-transformer";
-import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
+import {
+  IsDateString,
+  IsEnum,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from "class-validator";
 
 import { RefundRequestStatus } from "../entities/refund-request.entity";
 
@@ -11,6 +24,30 @@ export class CreateRefundRequestDto {
   @MinLength(10, { message: "Lý do cần ít nhất 10 ký tự." })
   @MaxLength(1000)
   reason!: string;
+
+  /** Ba trường tài khoản nhận hoàn đi cùng nhau; bắt buộc khi khoản ủng hộ qua SePay (kiểm tra ở service). */
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MinLength(2, { message: "Tên ngân hàng cần ít nhất 2 ký tự." })
+  @MaxLength(100)
+  bankName?: string;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (typeof value === "string" ? value.replace(/[\s.-]/g, "") : value))
+  @IsString()
+  @Matches(/^\d{6,19}$/, { message: "Số tài khoản chỉ gồm 6–19 chữ số." })
+  bankAccountNumber?: string;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === "string" ? value.trim().replace(/\s+/g, " ").toUpperCase() : value,
+  )
+  @IsString()
+  @MinLength(2, { message: "Tên chủ tài khoản cần ít nhất 2 ký tự." })
+  @MaxLength(100)
+  @Matches(/^[\p{L} ]+$/u, { message: "Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng." })
+  bankAccountName?: string;
 }
 
 export class ReviewRefundDto {
@@ -19,6 +56,20 @@ export class ReviewRefundDto {
   @MinLength(5, { message: "Ghi chú cần ít nhất 5 ký tự." })
   @MaxLength(500)
   adminNotes!: string;
+
+  /** Bắt buộc khi khoản ủng hộ qua SePay: mã giao dịch chuyển khoản hoàn thật (admin chuyển khoản tay). */
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MinLength(4, { message: "Mã giao dịch chuyển khoản cần ít nhất 4 ký tự." })
+  @MaxLength(100)
+  @Matches(/^[A-Za-z0-9._\/ -]+$/, { message: "Mã giao dịch chỉ gồm chữ, số và . _ / -" })
+  transferReference?: string;
+
+  /** Ảnh chứng từ chuyển khoản: `id` từ `POST /media/images` với `purpose=refund_proof` (không bắt buộc). */
+  @IsOptional()
+  @IsUUID()
+  proofMediaId?: string;
 }
 
 export class DirectRefundDto {
@@ -27,6 +78,20 @@ export class DirectRefundDto {
   @MinLength(5, { message: "Lý do cần ít nhất 5 ký tự." })
   @MaxLength(500)
   reason!: string;
+
+  /** Bắt buộc khi khoản ủng hộ qua SePay: mã giao dịch chuyển khoản hoàn thật (admin chuyển khoản tay). */
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MinLength(4, { message: "Mã giao dịch chuyển khoản cần ít nhất 4 ký tự." })
+  @MaxLength(100)
+  @Matches(/^[A-Za-z0-9._\/ -]+$/, { message: "Mã giao dịch chỉ gồm chữ, số và . _ / -" })
+  transferReference?: string;
+
+  /** Ảnh chứng từ chuyển khoản: `id` từ `POST /media/images` với `purpose=refund_proof` (không bắt buộc). */
+  @IsOptional()
+  @IsUUID()
+  proofMediaId?: string;
 }
 
 export class RefundQueryDto {
@@ -64,6 +129,12 @@ export class RefundQueryDto {
   @Min(1)
   @Max(100)
   limit?: number = 30;
+}
+
+export class RefundExportQueryDto {
+  @IsOptional()
+  @IsEnum(RefundRequestStatus)
+  status?: RefundRequestStatus;
 }
 
 export class ReconciliationQueryDto {

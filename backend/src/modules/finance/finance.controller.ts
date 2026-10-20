@@ -24,6 +24,7 @@ import {
   CreateRefundRequestDto,
   DirectRefundDto,
   ReconciliationQueryDto,
+  RefundExportQueryDto,
   RefundQueryDto,
   ReviewRefundDto,
 } from "./dto/finance.dto";
@@ -43,7 +44,7 @@ export class FinanceController {
     @Body() dto: CreateRefundRequestDto,
     @GetCurrentUser() user: User,
   ) {
-    return this.financeService.requestRefund(id, dto.reason, user);
+    return this.financeService.requestRefund(id, dto, user);
   }
 
   @Get("refund-requests/mine")
@@ -64,9 +65,25 @@ export class AdminFinanceController {
     return this.financeService.adminList(query);
   }
 
+  /** CSV yêu cầu hoàn kèm tài khoản nhận để chuyển khoản trả lại (có dữ liệu cá nhân, ghi audit). */
+  @Get("refunds/export")
+  async exportRefunds(
+    @Query() query: RefundExportQueryDto,
+    @GetCurrentUser() admin: User,
+    @Res() res: Response,
+  ): Promise<void> {
+    const file = await this.financeService.exportRefundsCsv(query, admin);
+    res.set({
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${file.filename}"`,
+      "Cache-Control": "no-store",
+    });
+    res.send(file.content);
+  }
+
   @Patch("refunds/:id/approve")
   approve(@Param("id", ParseUUIDPipe) id: string, @Body() dto: ReviewRefundDto, @GetCurrentUser() admin: User) {
-    return this.financeService.approve(id, dto.adminNotes, admin);
+    return this.financeService.approve(id, dto.adminNotes, admin, dto);
   }
 
   @Patch("refunds/:id/reject")
@@ -77,7 +94,7 @@ export class AdminFinanceController {
   /** Admin hoàn trực tiếp (vd. phát hiện gian lận), bắt buộc lý do. */
   @Post("donations/:id/refund")
   refund(@Param("id", ParseUUIDPipe) id: string, @Body() dto: DirectRefundDto, @GetCurrentUser() admin: User) {
-    return this.financeService.refundDonation(id, dto.reason, admin);
+    return this.financeService.refundDonation(id, dto.reason, admin, { manual: dto });
   }
 
   @Get("reconciliation")

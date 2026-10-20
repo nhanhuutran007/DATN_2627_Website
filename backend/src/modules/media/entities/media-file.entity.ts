@@ -7,6 +7,8 @@ export enum MediaPurpose {
   PROGRESS_IMAGE = "progress_image",
   AVATAR = "avatar",
   EXPENSE_RECEIPT = "expense_receipt",
+  /** Ảnh chứng từ chuyển khoản hoàn tiền thủ công — chỉ admin tải lên. */
+  REFUND_PROOF = "refund_proof",
 }
 
 @Entity("media_files")

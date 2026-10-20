@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -12,7 +13,7 @@ import { Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import { STORAGE_KEY_PATTERN, type StorageGateway } from "../../integrations/storage/storage.gateway";
-import type { User } from "../users/entities/user.entity";
+import { type User, UserRole } from "../users/entities/user.entity";
 import type { UploadedImageResponse } from "./dto/media.dto";
 import { MediaFile, MediaPurpose } from "./entities/media-file.entity";
 import { MAX_IMAGE_BYTES, detectImageType, sanitizeOriginalName } from "./image-type";
@@ -25,6 +26,7 @@ const FOLDER_BY_PURPOSE: Record<MediaPurpose, string> = {
   [MediaPurpose.PROGRESS_IMAGE]: "progress",
   [MediaPurpose.AVATAR]: "avatars",
   [MediaPurpose.EXPENSE_RECEIPT]: "receipts",
+  [MediaPurpose.REFUND_PROOF]: "refunds",
 };
 
 export type IncomingFile = {
@@ -48,6 +50,9 @@ export class MediaService {
     user: User,
     purpose: MediaPurpose = MediaPurpose.CAMPAIGN_IMAGE,
   ): Promise<UploadedImageResponse> {
+    if (purpose === MediaPurpose.REFUND_PROOF && user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException("Chỉ quản trị viên được tải chứng từ hoàn tiền.");
+    }
     if (!file || !file.buffer || file.size === 0) {
       throw new BadRequestException("Vui lòng chọn một file ảnh.");
     }

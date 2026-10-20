@@ -56,8 +56,10 @@ export default function PrivacyPolicyPage() {
               và báo cáo vi phạm bạn gửi.
             </li>
             <li>
-              <strong>Giao dịch ủng hộ:</strong> số tiền, thời gian, trạng thái và lời nhắn. Thanh toán hiện chạy qua ví
-              demo (sandbox); Góp Mầm không lưu thông tin thẻ ngân hàng.
+              <strong>Giao dịch ủng hộ:</strong> số tiền, thời gian, trạng thái và lời nhắn. Thanh toán bằng chuyển khoản
+              qua cổng SePay; Góp Mầm không lưu thông tin thẻ hay tài khoản dùng để thanh toán. Khi bạn yêu cầu hoàn tiền
+              một khoản chuyển khoản, chúng tôi lưu ngân hàng, số tài khoản và tên chủ tài khoản bạn cung cấp để chuyển
+              trả, và chỉ quản trị viên xem được.
             </li>
           </ul>
         </section>

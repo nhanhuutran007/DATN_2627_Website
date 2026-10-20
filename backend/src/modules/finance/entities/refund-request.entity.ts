@@ -29,6 +29,16 @@ export class RefundRequest extends BaseEntity {
   @Column({ type: "text" })
   reason!: string;
 
+  /** Tài khoản nhận hoàn (bắt buộc với khoản qua SePay — admin chuyển khoản trả lại thủ công). */
+  @Column({ name: "bank_name", type: "varchar", length: 100, nullable: true })
+  bankName?: string | null;
+
+  @Column({ name: "bank_account_number", type: "varchar", length: 30, nullable: true })
+  bankAccountNumber?: string | null;
+
+  @Column({ name: "bank_account_name", type: "varchar", length: 100, nullable: true })
+  bankAccountName?: string | null;
+
   @Column({ type: "enum", enum: RefundRequestStatus, default: RefundRequestStatus.PENDING })
   status!: RefundRequestStatus;
 

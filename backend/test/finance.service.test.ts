@@ -1,15 +1,27 @@
 import { equal, match, ok, rejects } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
-import { BadGatewayException, ConflictException, NotFoundException } from "@nestjs/common";
+import {
+  BadGatewayException,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 
 import { DemoWalletGateway } from "../src/integrations/payment/payment.gateway";
 import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import { DonationsService } from "../src/modules/donations/donations.service";
-import { DonationStatus } from "../src/modules/donations/entities/donation.entity";
+import { DonationStatus, RefundMethod } from "../src/modules/donations/entities/donation.entity";
 import { csvCell, toCsv } from "../src/modules/finance/csv";
 import { RefundRequestStatus } from "../src/modules/finance/entities/refund-request.entity";
-import { FinanceService, pseudonym, REFUND_WINDOW_DAYS, resolveRange } from "../src/modules/finance/finance.service";
+import {
+  FinanceService,
+  needsManualRefund,
+  pseudonym,
+  REFUND_WINDOW_DAYS,
+  resolveRange,
+} from "../src/modules/finance/finance.service";
 import { NotificationType } from "../src/modules/notifications/entities/notification.entity";
 import { UserRole } from "../src/modules/users/entities/user.entity";
 import { makeAuditRecorder } from "./helpers/audit";
@@ -125,33 +137,69 @@ describe("FinanceService — hoàn tiền", () => {
     const gateway: any = {
       refundTransaction: async () => (gatewayOk ? { success: true, refundId: "DEMO-RF-1" } : { success: false, refundId: "" }),
     };
-    service = new FinanceService(refundRepo, donationRepo, campaignRepo, dataSource, gateway, audit.service, notifier.service);
+    const mediaRepo: any = {
+      findOne: async ({ where }: any) =>
+        ({
+          "proof-1": { id: "proof-1", purpose: "refund_proof", ownerId: ADMIN.id, storageKey: "refunds/p.png" },
+          "proof-other": { id: "proof-other", purpose: "refund_proof", ownerId: OTHER.id, storageKey: "refunds/o.png" },
+          "avatar-1": { id: "avatar-1", purpose: "avatar", ownerId: ADMIN.id, storageKey: "avatars/a.png" },
+        })[where.id as string] ?? null,
+    };
+    service = new FinanceService(
+      refundRepo, donationRepo, campaignRepo, dataSource, gateway, audit.service, notifier.service, mediaRepo,
+    );
   });
 
   it("yêu cầu hoàn trong thời hạn khi chiến dịch đang gây quỹ", async () => {
-    const r = await service.requestRefund(DONATION_ID, "Tôi chuyển nhầm số tiền.", DONOR);
+    const r = await service.requestRefund(DONATION_ID, { reason: "Tôi chuyển nhầm số tiền." }, DONOR);
     equal(r.status, RefundRequestStatus.PENDING);
     equal(audit.entries.at(-1)?.action, "refund.request");
   });
 
+  it("khoản qua SePay bắt buộc tài khoản nhận hoàn; audit chỉ lưu 4 số cuối", async () => {
+    donation.paymentMethod = "sepay";
+    await rejects(service.requestRefund(DONATION_ID, { reason: "Tôi chuyển nhầm số tiền." }, DONOR), BadRequestException);
+    const r = await service.requestRefund(
+      DONATION_ID,
+      { reason: "Tôi chuyển nhầm số tiền.", bankName: "Vietcombank", bankAccountNumber: "0123456789", bankAccountName: "NGUYEN VAN A" },
+      DONOR,
+    );
+    equal(r.bankAccountNumber, "0123456789");
+    equal(r.bankAccountName, "NGUYEN VAN A");
+    const logged = JSON.stringify(audit.entries.at(-1));
+    ok(logged.includes("***6789"));
+    ok(!logged.includes("0123456789"));
+  });
+
+  it("ví demo không cần tài khoản; khai thiếu một phần thì từ chối", async () => {
+    ok(!needsManualRefund("wallet"));
+    ok(needsManualRefund("sepay"));
+    await rejects(
+      service.requestRefund(DONATION_ID, { reason: "Tôi chuyển nhầm số tiền.", bankName: "Vietcombank" }, DONOR),
+      BadRequestException,
+    );
+    const r = await service.requestRefund(DONATION_ID, { reason: "Tôi chuyển nhầm số tiền." }, DONOR);
+    equal(r.bankAccountNumber, null);
+  });
+
   it(`quá ${REFUND_WINDOW_DAYS} ngày khi chiến dịch còn chạy → từ chối; chiến dịch thất bại → được`, async () => {
     donation.completedAt = new Date(Date.now() - (REFUND_WINDOW_DAYS + 1) * DAY);
-    await rejects(service.requestRefund(DONATION_ID, "Muốn rút lại khoản ủng hộ.", DONOR), ConflictException);
+    await rejects(service.requestRefund(DONATION_ID, { reason: "Muốn rút lại khoản ủng hộ." }, DONOR), ConflictException);
     campaign.status = CampaignStatus.FAILED;
-    const r = await service.requestRefund(DONATION_ID, "Chiến dịch không đạt mục tiêu.", DONOR);
+    const r = await service.requestRefund(DONATION_ID, { reason: "Chiến dịch không đạt mục tiêu." }, DONOR);
     equal(r.status, RefundRequestStatus.PENDING);
   });
 
   it("không yêu cầu được khoản của người khác, khoản chưa xác nhận hoặc trùng yêu cầu", async () => {
-    await rejects(service.requestRefund(DONATION_ID, "Không phải khoản của tôi.", OTHER), NotFoundException);
-    await service.requestRefund(DONATION_ID, "Yêu cầu lần một hợp lệ.", DONOR);
-    await rejects(service.requestRefund(DONATION_ID, "Yêu cầu lần hai bị trùng.", DONOR), ConflictException);
+    await rejects(service.requestRefund(DONATION_ID, { reason: "Không phải khoản của tôi." }, OTHER), NotFoundException);
+    await service.requestRefund(DONATION_ID, { reason: "Yêu cầu lần một hợp lệ." }, DONOR);
+    await rejects(service.requestRefund(DONATION_ID, { reason: "Yêu cầu lần hai bị trùng." }, DONOR), ConflictException);
     donation.status = DonationStatus.PENDING;
-    await rejects(service.requestRefund(DONATION_ID, "Khoản chưa xác nhận.", DONOR), ConflictException);
+    await rejects(service.requestRefund(DONATION_ID, { reason: "Khoản chưa xác nhận." }, DONOR), ConflictException);
   });
 
   it("duyệt → hoàn tiền, trừ số liệu chiến dịch, trả suất quà, audit, báo 2 bên", async () => {
-    const req = await service.requestRefund(DONATION_ID, "Tôi chuyển nhầm số tiền.", DONOR);
+    const req = await service.requestRefund(DONATION_ID, { reason: "Tôi chuyển nhầm số tiền." }, DONOR);
     const approved = await service.approve(req.id, "Xác minh chuyển nhầm", ADMIN);
     equal(approved.status, RefundRequestStatus.APPROVED);
     equal(donation.status, DonationStatus.REFUNDED);
@@ -165,7 +213,7 @@ describe("FinanceService — hoàn tiền", () => {
   });
 
   it("từ chối → báo người ủng hộ kèm lý do, không hoàn tiền", async () => {
-    const req = await service.requestRefund(DONATION_ID, "Tôi đổi ý không ủng hộ.", DONOR);
+    const req = await service.requestRefund(DONATION_ID, { reason: "Tôi đổi ý không ủng hộ." }, DONOR);
     const rejected = await service.reject(req.id, "Quá thời hạn đổi ý", ADMIN);
     equal(rejected.status, RefundRequestStatus.REJECTED);
     equal(donation.status, DonationStatus.COMPLETED);
@@ -185,9 +233,73 @@ describe("FinanceService — hoàn tiền", () => {
     equal(campaignUpdates, 0);
   });
 
+  it("khoản SePay: bắt buộc mã chuyển khoản, không gọi cổng, lưu mã thật + chứng từ", async () => {
+    donation.paymentMethod = "sepay";
+    gatewayOk = false; // cổng không được gọi — nếu gọi sẽ lỗi BadGateway
+    await rejects(service.refundDonation(DONATION_ID, "Hoàn chuyển nhầm", ADMIN), BadRequestException);
+    await rejects(
+      service.refundDonation(DONATION_ID, "Hoàn chuyển nhầm", ADMIN, {
+        manual: { transferReference: "FT2629301234", proofMediaId: "avatar-1" },
+      }),
+      BadRequestException,
+    );
+    await rejects(
+      service.refundDonation(DONATION_ID, "Hoàn chuyển nhầm", ADMIN, {
+        manual: { transferReference: "FT2629301234", proofMediaId: "proof-other" },
+      }),
+      ForbiddenException,
+    );
+    equal(donation.status, DonationStatus.COMPLETED);
+    const refunded = await service.refundDonation(DONATION_ID, "Hoàn chuyển nhầm", ADMIN, {
+      manual: { transferReference: "FT2629301234", proofMediaId: "proof-1" },
+    });
+    equal(refunded.refundReference, "FT2629301234");
+    equal(refunded.refundMethod, RefundMethod.MANUAL_TRANSFER);
+    equal(refunded.refundProofUrl, "/api/v1/media/refunds/p.png");
+    equal(campaignUpdates, 1);
+    ok(notifier.notified.some((n) => n.userId === DONOR.id && n.message.includes("FT2629301234")));
+  });
+
+  it("ví demo vẫn hoàn qua cổng và đánh dấu gateway", async () => {
+    const refunded = await service.refundDonation(DONATION_ID, "Hoàn qua ví demo", ADMIN);
+    equal(refunded.refundReference, "DEMO-RF-1");
+    equal(refunded.refundMethod, RefundMethod.GATEWAY);
+  });
+
   it("khoản đã hoàn không hoàn lại được", async () => {
     donation.status = DonationStatus.REFUNDED;
     await rejects(service.refundDonation(DONATION_ID, "Hoàn lại lần nữa", ADMIN), ConflictException);
+  });
+});
+
+describe("FinanceService — xuất danh sách hoàn tiền", () => {
+  it("CSV có tài khoản nhận hoàn, đánh dấu khoản cần chuyển khoản tay, lọc trạng thái và ghi audit", async () => {
+    let where: any;
+    const refundRepo: any = {
+      find: async (options: any) => {
+        where = options.where;
+        return [
+          {
+            id: "r-1", createdAt: new Date("2026-10-20T03:00:00Z"), status: RefundRequestStatus.PENDING, donationId: DONATION_ID,
+            reason: "Chuyển nhầm", bankName: "Vietcombank", bankAccountNumber: "0123456789", bankAccountName: "NGUYEN VAN A",
+            user: { name: "Donor", email: "donor@example.com" },
+            donation: { amount: "300000.00", paymentMethod: "sepay", transferCode: "GM7K2QX9AB", campaign: { title: "Thư viện" } },
+          },
+        ];
+      },
+    };
+    const audit = makeAuditRecorder();
+    const service = new FinanceService(
+      refundRepo, {} as any, {} as any, {} as any, {} as any, audit.service, {} as any, {} as any,
+    );
+    const file = await service.exportRefundsCsv({ status: RefundRequestStatus.PENDING }, ADMIN, new Date("2026-10-20T05:00:00Z"));
+    equal(where.status, RefundRequestStatus.PENDING);
+    equal(file.rows, 1);
+    equal(file.filename, "hoan-tien_pending_2026-10-20.csv");
+    ok(file.content.includes('"0123456789"'));
+    ok(file.content.includes('"GM7K2QX9AB"'));
+    ok(file.content.includes('"sepay","co","300000"'));
+    equal(audit.entries.at(-1)?.action, "finance.export_refunds");
   });
 });
 
@@ -219,7 +331,7 @@ describe("FinanceService — đối soát", () => {
         { id: "c2", title: "Lệch", currentAmount: "90000.00", backerCount: 2 },
       ],
     };
-    const service = new FinanceService({} as any, donationRepo, campaignRepo, {} as any, {} as any, makeAuditRecorder().service, makeNotifierRecorder().service);
+    const service = new FinanceService({} as any, donationRepo, campaignRepo, {} as any, {} as any, makeAuditRecorder().service, makeNotifierRecorder().service, {} as any);
     const report = await service.reconcile({ from: "2026-10-01", to: "2026-10-01" });
     equal(report.totals.completedAmount, 220000);
     equal(report.totals.refundedAmount, 50000);
