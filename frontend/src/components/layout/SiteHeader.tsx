@@ -37,8 +37,16 @@ const ABOUT_LINKS: MenuLink[] = [
  * Header 3 phần: trái (Tìm kiếm · Ủng hộ · Gây quỹ · Giới thiệu), logo ở giữa, phải (tài khoản ·
  * thông báo · Tạo chiến dịch) — "Giới thiệu" ở bên trái để hai bên logo cân nhau khi đã đăng nhập. Màn hình hẹp: chỉ còn tìm kiếm, logo, chuông và nút trình đơn.
  */
+/** Trang xác thực: đăng nhập từ đây không cần quay lại chính nó. */
+const AUTH_PATHS = ["/dang-nhap", "/dang-ky", "/quen-mat-khau", "/dat-lai-mat-khau", "/xac-minh-email"];
+
 export function SiteHeader() {
   const pathname = usePathname();
+  // Đăng nhập xong quay lại trang đang xem; không có `next` thì về trang chủ.
+  const loginHref =
+    pathname === "/" || AUTH_PATHS.some((path) => pathname.startsWith(path))
+      ? "/dang-nhap"
+      : `/dang-nhap?next=${encodeURIComponent(pathname)}`;
   const router = useRouter();
   const user = useAuthUser();
   const [menu, setMenu] = useState<MenuKey | null>(null);
@@ -169,7 +177,7 @@ export function SiteHeader() {
                 )}
               </div>
             ) : (
-              <Link className="gh-link" href="/dang-nhap" onClick={closeAll}>Đăng nhập</Link>
+              <Link className="gh-link" href={loginHref} onClick={closeAll}>Đăng nhập</Link>
             )}
           </div>
           {user && <NotificationBell onNavigate={closeAll} />}
@@ -208,7 +216,7 @@ export function SiteHeader() {
               </section>
             ) : (
               <div className="gh-drawer-auth">
-                <Link className="button button-outline" href="/dang-nhap" onClick={closeAll}>Đăng nhập</Link>
+                <Link className="button button-outline" href={loginHref} onClick={closeAll}>Đăng nhập</Link>
                 <Link className="button button-primary" href="/dang-ky" onClick={closeAll}>Đăng ký</Link>
               </div>
             )}
