@@ -18,13 +18,28 @@ import {
 import { formatVnd } from "@/lib/format";
 
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
+
+type RefundFilters = { status: RefundRequestStatus | ""; q: string; minAmount: string; maxAmount: string };
+const DEFAULT_REFUND_FILTERS: RefundFilters = { status: "pending", q: "", minAmount: "", maxAmount: "" };
+
+/** Lọc bảng đối soát: tất cả, chỉ lệch sổ, chỉ khớp, hoặc có hoàn tiền trong kỳ. */
+type ReconFilter = "" | "mismatch" | "match" | "refunded";
+
+/** Số tiền nhập trong ô lọc (đồng); trống hoặc không hợp lệ thì bỏ qua. */
+function amountParam(value: string): number | undefined {
+  const amount = Number(value);
+  return value.trim() === "" || !Number.isFinite(amount) || amount < 0 ? undefined : amount;
+}
 const errorText = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
 /** Hoàn tiền (duyệt yêu cầu) hoặc đối soát cho trang quản trị, tùy `view`. */
 export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconciliation"; onChanged?: () => void }) {
   const dialog = useDialog();
   const [refunds, setRefunds] = useState<RefundRequest[]>([]);
-  const [refundFilter, setRefundFilter] = useState<RefundRequestStatus | "">("pending");
+  const [refundFilter, setRefundFilter] = useState<RefundFilters>(DEFAULT_REFUND_FILTERS);
+  const [refundDraft, setRefundDraft] = useState<RefundFilters>(DEFAULT_REFUND_FILTERS);
+  const [reconQuery, setReconQuery] = useState("");
+  const [reconFilter, setReconFilter] = useState<ReconFilter>("");
   const [refundPage, setRefundPage] = useState(0);
   const [refundTotal, setRefundTotal] = useState(0);
   const [reportPage, setReportPage] = useState(0);
@@ -36,9 +51,17 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
   const [report, setReport] = useState<ReconciliationReport | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
 
-  const loadRefunds = useCallback(async (status: RefundRequestStatus | "", page: number) => {
+  const loadRefunds = useCallback(async (filters: RefundFilters, page: number) => {
+    const minAmount = amountParam(filters.minAmount);
+    const maxAmount = amountParam(filters.maxAmount);
+    if (minAmount !== undefined && maxAmount !== undefined && minAmount > maxAmount) {
+      setNotice("Số tiền \"từ\" không được lớn hơn số tiền \"đến\"");
+      return;
+    }
+    const search = { q: filters.q.trim() || undefined, minAmount, maxAmount };
     try {
-      const fetchPage = (p: number) => fetchAdminRefunds(status || undefined, { offset: p * PAGE_SIZE, limit: PAGE_SIZE });
+      const fetchPage = (p: number) =>
+        fetchAdminRefunds(filters.status || undefined, { offset: p * PAGE_SIZE, limit: PAGE_SIZE }, search);
       let result = await fetchPage(page);
       // Trang vừa xử lý hết mục cuối: lùi về trang cuối còn dữ liệu.
       if (result.items.length === 0 && page > 0) {
@@ -48,6 +71,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
       setRefunds(result.items);
       setRefundTotal(result.total);
       setRefundPage(page);
+      setNotice(null);
     } catch (err) {
       setNotice(errorText(err, "Không tải được yêu cầu hoàn tiền"));
     }
@@ -65,6 +89,21 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
       cancelled = true;
     };
   }, []);
+
+  const applyRefundFilters = (filters: RefundFilters) => {
+    setRefundDraft(filters);
+    setRefundFilter(filters);
+    void loadRefunds(filters, 0);
+  };
+
+  const reconKeyword = reconQuery.trim().toLowerCase();
+  const reconRows = (report?.campaigns ?? []).filter((c) => {
+    if (reconKeyword && !c.title.toLowerCase().includes(reconKeyword)) return false;
+    if (reconFilter === "mismatch") return c.mismatch;
+    if (reconFilter === "match") return !c.mismatch;
+    if (reconFilter === "refunded") return c.refundedAmount > 0;
+    return true;
+  });
 
   const decide = async (request: RefundRequest, approve: boolean) => {
     const amount = formatVnd(Number(request.donation?.amount ?? 0));
@@ -130,8 +169,8 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
           <select
             className="filter-button"
             aria-label="Lọc yêu cầu hoàn tiền"
-            value={refundFilter}
-            onChange={(e) => { const v = e.target.value as RefundRequestStatus | ""; setRefundFilter(v); void loadRefunds(v, 0); }}
+            value={refundDraft.status}
+            onChange={(e) => applyRefundFilters({ ...refundDraft, status: e.target.value as RefundRequestStatus | "" })}
           >
             <option value="pending">Chờ xử lý</option>
             <option value="approved">Đã hoàn tiền</option>
@@ -139,10 +178,62 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
             <option value="">Tất cả</option>
           </select>
         </div>
+        <form
+          className="admin-filter-bar"
+          onSubmit={(event) => {
+            event.preventDefault();
+            applyRefundFilters(refundDraft);
+          }}
+        >
+          <input
+            className="filter-button admin-filter-search"
+            type="search"
+            placeholder="Tìm theo chiến dịch, người yêu cầu, lý do…"
+            aria-label="Tìm yêu cầu hoàn tiền"
+            value={refundDraft.q}
+            onChange={(e) => setRefundDraft({ ...refundDraft, q: e.target.value })}
+          />
+          <label className="admin-filter-range">
+            <span>Số tiền (đ)</span>
+            <input
+              className="filter-button"
+              type="number"
+              min={0}
+              step={1000}
+              inputMode="numeric"
+              placeholder="Từ"
+              aria-label="Số tiền từ (đồng)"
+              value={refundDraft.minAmount}
+              onChange={(e) => setRefundDraft({ ...refundDraft, minAmount: e.target.value })}
+            />
+            <span aria-hidden="true">–</span>
+            <input
+              className="filter-button"
+              type="number"
+              min={0}
+              step={1000}
+              inputMode="numeric"
+              placeholder="Đến"
+              aria-label="Số tiền đến (đồng)"
+              value={refundDraft.maxAmount}
+              onChange={(e) => setRefundDraft({ ...refundDraft, maxAmount: e.target.value })}
+            />
+          </label>
+          <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
+          {(refundFilter.q || refundFilter.minAmount || refundFilter.maxAmount) && (
+            <button
+              className="link-inline"
+              type="button"
+              onClick={() => applyRefundFilters({ ...DEFAULT_REFUND_FILTERS, status: refundDraft.status })}
+            >
+              Xóa bộ lọc
+            </button>
+          )}
+        </form>
         {notice && <p className="admin-notice" role="status">{notice}</p>}
         <div className="risk-list">
           {refunds.length === 0 ? (
-            <article><p className="table-muted">Không có yêu cầu nào ở trạng thái này.</p></article>
+            <article><p className="table-muted">Không có yêu cầu nào khớp bộ lọc.</p></article>
           ) : (
             refunds.map((r) => (
               <article key={r.id}>
@@ -187,6 +278,34 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
             {busy === "export" ? "Đang xuất…" : "Xuất CSV"}
           </button>
         </form>
+        {report && (
+          <div className="admin-filter-bar">
+            <input
+              className="filter-button admin-filter-search"
+              type="search"
+              placeholder="Tìm theo tên chiến dịch…"
+              aria-label="Tìm chiến dịch trong bảng đối soát"
+              value={reconQuery}
+              onChange={(e) => { setReconQuery(e.target.value); setReportPage(0); }}
+            />
+            <select
+              className="filter-button"
+              aria-label="Lọc kết quả đối soát"
+              value={reconFilter}
+              onChange={(e) => { setReconFilter(e.target.value as ReconFilter); setReportPage(0); }}
+            >
+              <option value="">Tất cả chiến dịch</option>
+              <option value="mismatch">Chỉ chiến dịch lệch sổ</option>
+              <option value="match">Chỉ chiến dịch khớp</option>
+              <option value="refunded">Có hoàn tiền trong kỳ</option>
+            </select>
+            {(reconQuery || reconFilter) && (
+              <button className="link-inline" type="button" onClick={() => { setReconQuery(""); setReconFilter(""); setReportPage(0); }}>
+                Xóa bộ lọc
+              </button>
+            )}
+          </div>
+        )}
         {reportError && <p className="form-error" role="alert">{reportError}</p>}
         {report && (
           <>
@@ -210,10 +329,10 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
                   </tr>
                 </thead>
                 <tbody>
-                  {report.campaigns.length === 0 ? (
-                    <tr><td colSpan={7} className="table-muted">Không có giao dịch trong kỳ.</td></tr>
+                  {reconRows.length === 0 ? (
+                    <tr><td colSpan={7} className="table-muted">{report.campaigns.length === 0 ? "Không có giao dịch trong kỳ." : "Không có chiến dịch nào khớp bộ lọc."}</td></tr>
                   ) : (
-                    pageSlice(report.campaigns, reportPage).map((c) => (
+                    pageSlice(reconRows, reportPage).map((c) => (
                       <tr key={c.campaignId}>
                         <td><b>{c.title}</b></td>
                         <td className="num">{formatVnd(c.completedAmount)}</td>
@@ -228,7 +347,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
                 </tbody>
               </table>
             </div>
-            <Pagination page={reportPage} total={report.campaigns.length} onChange={setReportPage} />
+            <Pagination page={reportPage} total={reconRows.length} onChange={setReportPage} />
             <p className="risk-footnote"><Icon name="shield" size={15} /> File CSV giả danh người ủng hộ (mã NUH-…), không chứa tên/email; mỗi lần xuất được ghi nhật ký.</p>
           </>
         )}

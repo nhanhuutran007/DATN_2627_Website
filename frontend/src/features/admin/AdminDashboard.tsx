@@ -8,8 +8,17 @@ import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
 import { PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { CategoryManager, StatsExport } from "@/features/admin/AdminContent";
+import { BackupManager } from "@/features/admin/BackupManager";
 import { AdminFinance } from "@/features/admin/AdminFinance";
 import { CampaignReviewDialog } from "@/features/admin/CampaignReviewDialog";
+import { UserDetailDialog } from "@/features/admin/UserDetailDialog";
+import {
+  CAMPAIGN_STATUS_LABEL,
+  CAMPAIGN_STATUS_TONE,
+  RISK_LEVEL_LABEL,
+  USER_ROLE_LABEL,
+  USER_STATUS_LABEL,
+} from "@/features/admin/labels";
 import { ADMIN_SECTIONS, adminHref, findAdminSection } from "@/features/admin/sections";
 import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredictionCard";
 import {
@@ -36,6 +45,7 @@ import {
   type RiskStatus,
 } from "@/lib/api/admin";
 import type { ApiCampaignStatus } from "@/lib/api/campaigns";
+import { fetchAdminCategories } from "@/lib/api/categories";
 import { syncSepayDonation } from "@/lib/api/donations";
 import { refundDonationDirectly } from "@/lib/api/finance";
 import {
@@ -43,6 +53,7 @@ import {
   hideComment,
   unhideComment,
   type AdminComment,
+  type CommentKind,
   type CommentStatus,
 } from "@/lib/api/comments";
 import {
@@ -51,40 +62,13 @@ import {
   REPORT_STATUS_LABEL,
   reviewReport,
   type CampaignReport,
+  type ReportReason,
   type ReportStatus,
   type ReviewStatus,
 } from "@/lib/api/reports";
 import { useAuthUser } from "@/lib/auth";
 import { formatCurrency } from "@/lib/data/campaigns";
 import { paymentMethodLabel } from "@/lib/format";
-
-const CAMPAIGN_STATUS_LABEL: Record<ApiCampaignStatus, string> = {
-  draft: "Bản nháp",
-  pending: "Chờ duyệt",
-  approved: "Đã duyệt",
-  rejected: "Bị từ chối",
-  needs_info: "Cần bổ sung",
-  active: "Đang gây quỹ",
-  paused: "Tạm dừng",
-  success: "Đã đạt mục tiêu",
-  failed: "Thất bại",
-  cancelled: "Đã huỷ",
-  ended: "Kết thúc",
-};
-
-const CAMPAIGN_STATUS_TONE: Record<ApiCampaignStatus, string> = {
-  draft: "draft",
-  pending: "pending",
-  approved: "success",
-  rejected: "failed",
-  needs_info: "changes",
-  active: "success",
-  paused: "draft",
-  success: "success",
-  failed: "failed",
-  cancelled: "failed",
-  ended: "draft",
-};
 
 const DONATION_STATUS_LABEL: Record<AdminDonation["status"], string> = {
   pending: "Chờ xử lý",
@@ -106,24 +90,6 @@ const DONATION_STATUS_TONE: Record<AdminDonation["status"], string> = {
 
 /** Lọc theo trạng thái, hoặc "flagged" = giao dịch có cảnh báo rủi ro đang mở. */
 type DonationFilter = AdminDonation["status"] | "" | "flagged";
-
-const USER_STATUS_LABEL: Record<AdminUserStatus, string> = {
-  active: "Hoạt động",
-  inactive: "Không hoạt động",
-  banned: "Đã khóa",
-};
-
-const USER_ROLE_LABEL: Record<AdminUser["role"], string> = {
-  user: "Người ủng hộ",
-  campaign_owner: "Chủ dự án",
-  admin: "Quản trị",
-};
-
-const RISK_LEVEL_LABEL: Record<AdminRiskAlert["level"], string> = {
-  high: "Cao",
-  medium: "Vừa",
-  low: "Thấp",
-};
 
 const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
   open: "Chưa xử lý",
@@ -185,6 +151,45 @@ function evidenceSummary(evidences: Record<string, number>): string {
 const NARROW_QUERY = "(max-width: 960px)";
 
 type Paging = { page: number; total: number };
+
+/** Bộ lọc danh sách duyệt chiến dịch; mục tiêu nhập theo triệu đồng. */
+type CampaignFilters = { status: ApiCampaignStatus | ""; q: string; category: string; minGoal: string; maxGoal: string };
+const DEFAULT_CAMPAIGN_FILTERS: CampaignFilters = { status: "pending", q: "", category: "", minGoal: "", maxGoal: "" };
+const MILLION = 1_000_000;
+
+/** Bộ lọc danh sách cảnh báo rủi ro. */
+type RiskFilters = {
+  status: RiskStatus | "";
+  q: string;
+  level: AdminRiskAlert["level"] | "";
+  entityType: AdminRiskAlert["entityType"] | "";
+  method: AdminRiskAlert["method"] | "";
+};
+/** Bộ lọc danh sách báo cáo vi phạm. */
+type ReportFilters = { status: ReportStatus | ""; q: string; reason: ReportReason | ""; target: "campaign" | "comment" | "" };
+const DEFAULT_REPORT_FILTERS: ReportFilters = { status: "pending", q: "", reason: "", target: "" };
+
+const DEFAULT_RISK_FILTERS: RiskFilters = { status: "open", q: "", level: "", entityType: "", method: "" };
+
+/** Số tiền nhập trong ô lọc (đồng); trống hoặc không hợp lệ thì bỏ qua. */
+function amountParam(value: string): number | undefined {
+  const amount = Number(value);
+  return value.trim() === "" || !Number.isFinite(amount) || amount < 0 ? undefined : amount;
+}
+
+type DonationFilters = { status: DonationFilter; q: string; minAmount: string; maxAmount: string };
+const DEFAULT_DONATION_FILTERS: DonationFilters = { status: "completed", q: "", minAmount: "", maxAmount: "" };
+
+type CommentFilters = { status: CommentStatus | ""; q: string; kind: CommentKind | ""; level: "root" | "reply" | "" };
+const DEFAULT_COMMENT_FILTERS: CommentFilters = { status: "visible", q: "", kind: "", level: "" };
+
+type UserFilters = { q: string; role: AdminUser["role"] | ""; status: AdminUserStatus | "" };
+const DEFAULT_USER_FILTERS: UserFilters = { q: "", role: "", status: "" };
+
+function goalParam(value: string): number | undefined {
+  const amount = Number(value.replace(",", "."));
+  return value.trim() === "" || !Number.isFinite(amount) || amount < 0 ? undefined : Math.round(amount * MILLION);
+}
 const FIRST_PAGE: Paging = { page: 0, total: 0 };
 
 /** Tải một trang; nếu trang đó đã trống (vd. vừa duyệt mục cuối) thì lùi về trang cuối còn dữ liệu. */
@@ -220,9 +225,11 @@ export function AdminDashboard() {
   const [risks, setRisks] = useState<AdminRiskAlert[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [reports, setReports] = useState<CampaignReport[]>([]);
-  const [reportFilter, setReportFilter] = useState<ReportStatus | "">("pending");
+  const [reportFilter, setReportFilter] = useState<ReportFilters>(DEFAULT_REPORT_FILTERS);
+  const [reportDraft, setReportDraft] = useState<ReportFilters>(DEFAULT_REPORT_FILTERS);
   const [comments, setComments] = useState<AdminComment[]>([]);
-  const [commentFilter, setCommentFilter] = useState<CommentStatus | "">("visible");
+  const [commentFilter, setCommentFilter] = useState<CommentFilters>(DEFAULT_COMMENT_FILTERS);
+  const [commentDraft, setCommentDraft] = useState<CommentFilters>(DEFAULT_COMMENT_FILTERS);
   const [campaignPaging, setCampaignPaging] = useState<Paging>(FIRST_PAGE);
   const [donationPaging, setDonationPaging] = useState<Paging>(FIRST_PAGE);
   const [userPaging, setUserPaging] = useState<Paging>(FIRST_PAGE);
@@ -231,9 +238,12 @@ export function AdminDashboard() {
   const [reportPaging, setReportPaging] = useState<Paging>(FIRST_PAGE);
   const [commentPaging, setCommentPaging] = useState<Paging>(FIRST_PAGE);
 
-  const [campaignFilter, setCampaignFilter] = useState<ApiCampaignStatus | "">("pending");
+  const [campaignFilter, setCampaignFilter] = useState<CampaignFilters>(DEFAULT_CAMPAIGN_FILTERS);
+  const [campaignDraft, setCampaignDraft] = useState<CampaignFilters>(DEFAULT_CAMPAIGN_FILTERS);
+  const [campaignCategories, setCampaignCategories] = useState<string[]>([]);
   // Hồ sơ đang mở: các nút quyết định chỉ nằm trong hồ sơ, buộc admin xem đủ trước khi duyệt.
   const [reviewing, setReviewing] = useState<AdminCampaign | null>(null);
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   // Desktop: thu sidebar về dải icon; màn hẹp: luôn là dải icon, mở rộng đè lên nội dung.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -251,8 +261,12 @@ export function AdminDashboard() {
 
   const sidebarRail = narrow ? !sidebarOpen : sidebarCollapsed;
   const [predictionOpen, setPredictionOpen] = useState<string | null>(null);
-  const [donationFilter, setDonationFilter] = useState<DonationFilter>("completed");
-  const [riskFilter, setRiskFilter] = useState<RiskStatus | "">("open");
+  const [donationFilter, setDonationFilter] = useState<DonationFilters>(DEFAULT_DONATION_FILTERS);
+  const [donationDraft, setDonationDraft] = useState<DonationFilters>(DEFAULT_DONATION_FILTERS);
+  const [userFilter, setUserFilter] = useState<UserFilters>(DEFAULT_USER_FILTERS);
+  const [userDraft, setUserDraft] = useState<UserFilters>(DEFAULT_USER_FILTERS);
+  const [riskFilter, setRiskFilter] = useState<RiskFilters>(DEFAULT_RISK_FILTERS);
+  const [riskDraft, setRiskDraft] = useState<RiskFilters>(DEFAULT_RISK_FILTERS);
   const [auditEntityFilter, setAuditEntityFilter] = useState<string>("");
 
   const [loading, setLoading] = useState(true);
@@ -304,6 +318,20 @@ export function AdminDashboard() {
     };
   }, [isAdmin]);
 
+  // Cả hạng mục đã ngừng nhận dự án mới vẫn có chiến dịch cũ cần lọc được.
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    fetchAdminCategories()
+      .then((items) => {
+        if (!cancelled) setCampaignCategories(items.map((item) => item.name));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
+
   async function reloadOverview() {
     try {
       setOverview(await fetchAdminOverview());
@@ -312,10 +340,24 @@ export function AdminDashboard() {
     }
   }
 
-  async function loadCampaigns(status: ApiCampaignStatus | "", page: number) {
+  async function loadCampaigns(filters: CampaignFilters, page: number) {
+    const minGoal = goalParam(filters.minGoal);
+    const maxGoal = goalParam(filters.maxGoal);
+    if (minGoal !== undefined && maxGoal !== undefined && minGoal > maxGoal) {
+      setError("Mục tiêu \"từ\" không được lớn hơn mục tiêu \"đến\"");
+      return;
+    }
     try {
       await loadPage(
-        (offset) => fetchAdminCampaigns({ status: status || undefined, limit: PAGE_SIZE, offset }),
+        (offset) => fetchAdminCampaigns({
+          status: filters.status || undefined,
+          q: filters.q.trim() || undefined,
+          category: filters.category || undefined,
+          minGoal,
+          maxGoal,
+          limit: PAGE_SIZE,
+          offset,
+        }),
         page, setCampaigns, setCampaignPaging,
       );
       setError(null);
@@ -324,18 +366,26 @@ export function AdminDashboard() {
     }
   }
 
-  async function changeCampaignFilter(status: ApiCampaignStatus | "") {
-    setCampaignFilter(status);
-    await loadCampaigns(status, 0);
+  async function applyCampaignFilters(filters: CampaignFilters) {
+    setCampaignDraft(filters);
+    setCampaignFilter(filters);
+    await loadCampaigns(filters, 0);
   }
 
-  async function loadDonations(filter: DonationFilter, page: number) {
+  async function loadDonations(filters: DonationFilters, page: number) {
+    const minAmount = amountParam(filters.minAmount);
+    const maxAmount = amountParam(filters.maxAmount);
+    if (minAmount !== undefined && maxAmount !== undefined && minAmount > maxAmount) {
+      setError("Số tiền \"từ\" không được lớn hơn số tiền \"đến\"");
+      return;
+    }
+    const search = { q: filters.q.trim() || undefined, minAmount, maxAmount };
     try {
       await loadPage(
         (offset) => fetchAdminDonations(
-          filter === "flagged"
-            ? { flagged: true, limit: PAGE_SIZE, offset }
-            : { status: filter || undefined, limit: PAGE_SIZE, offset },
+          filters.status === "flagged"
+            ? { flagged: true, ...search, limit: PAGE_SIZE, offset }
+            : { status: filters.status || undefined, ...search, limit: PAGE_SIZE, offset },
         ),
         page, setDonations, setDonationPaging,
       );
@@ -345,18 +395,34 @@ export function AdminDashboard() {
     }
   }
 
-  async function changeDonationFilter(filter: DonationFilter) {
-    setDonationFilter(filter);
-    await loadDonations(filter, 0);
+  async function applyDonationFilters(filters: DonationFilters) {
+    setDonationDraft(filters);
+    setDonationFilter(filters);
+    await loadDonations(filters, 0);
   }
 
-  async function loadUsers(page: number) {
+  async function loadUsers(filters: UserFilters, page: number) {
     try {
-      await loadPage((offset) => fetchAdminUsers({ limit: PAGE_SIZE, offset }), page, setUsers, setUserPaging);
+      await loadPage(
+        (offset) => fetchAdminUsers({
+          q: filters.q.trim() || undefined,
+          role: filters.role || undefined,
+          status: filters.status || undefined,
+          limit: PAGE_SIZE,
+          offset,
+        }),
+        page, setUsers, setUserPaging,
+      );
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tải được danh sách người dùng");
     }
+  }
+
+  async function applyUserFilters(filters: UserFilters) {
+    setUserDraft(filters);
+    setUserFilter(filters);
+    await loadUsers(filters, 0);
   }
 
   async function handleFeatured(campaign: AdminCampaign) {
@@ -424,7 +490,7 @@ export function AdminDashboard() {
     setNotice(null);
     try {
       await setUserStatus(adminUser.id, next);
-      await Promise.all([loadUsers(userPaging.page), reloadOverview()]);
+      await Promise.all([loadUsers(userFilter, userPaging.page), reloadOverview()]);
       setNotice(
         next === "banned"
           ? `Đã khóa tài khoản ${adminUser.name}.`
@@ -437,10 +503,18 @@ export function AdminDashboard() {
     }
   }
 
-  async function loadRisks(status: RiskStatus | "", page: number) {
+  async function loadRisks(filters: RiskFilters, page: number) {
     try {
       await loadPage(
-        (offset) => fetchAdminRisks({ status: status || undefined, limit: PAGE_SIZE, offset }),
+        (offset) => fetchAdminRisks({
+          status: filters.status || undefined,
+          level: filters.level || undefined,
+          entityType: filters.entityType || undefined,
+          method: filters.method || undefined,
+          q: filters.q.trim() || undefined,
+          limit: PAGE_SIZE,
+          offset,
+        }),
         page, setRisks, setRiskPaging,
       );
       setError(null);
@@ -449,9 +523,10 @@ export function AdminDashboard() {
     }
   }
 
-  async function changeRiskFilter(status: RiskStatus | "") {
-    setRiskFilter(status);
-    await loadRisks(status, 0);
+  async function applyRiskFilters(filters: RiskFilters) {
+    setRiskDraft(filters);
+    setRiskFilter(filters);
+    await loadRisks(filters, 0);
   }
 
   async function loadAuditLogs(entity: string, page: number) {
@@ -513,10 +588,17 @@ export function AdminDashboard() {
     }
   }
 
-  async function loadReports(status: ReportStatus | "", page: number) {
+  async function loadReports(filters: ReportFilters, page: number) {
     try {
       await loadPage(
-        (offset) => fetchAdminReports({ status: status || undefined, limit: PAGE_SIZE, offset }),
+        (offset) => fetchAdminReports({
+          status: filters.status || undefined,
+          reason: filters.reason || undefined,
+          target: filters.target || undefined,
+          q: filters.q.trim() || undefined,
+          limit: PAGE_SIZE,
+          offset,
+        }),
         page, setReports, setReportPaging,
       );
       setError(null);
@@ -525,9 +607,10 @@ export function AdminDashboard() {
     }
   }
 
-  async function changeReportFilter(status: ReportStatus | "") {
-    setReportFilter(status);
-    await loadReports(status, 0);
+  async function applyReportFilters(filters: ReportFilters) {
+    setReportDraft(filters);
+    setReportFilter(filters);
+    await loadReports(filters, 0);
   }
 
   async function handleReportDecision(report: CampaignReport, status: ReviewStatus) {
@@ -639,10 +722,17 @@ export function AdminDashboard() {
     }
   }
 
-  async function loadComments(status: CommentStatus | "", page: number) {
+  async function loadComments(filters: CommentFilters, page: number) {
     try {
       await loadPage(
-        (offset) => fetchAdminComments({ status: status || undefined, limit: PAGE_SIZE, offset }),
+        (offset) => fetchAdminComments({
+          status: filters.status || undefined,
+          kind: filters.kind || undefined,
+          level: filters.level || undefined,
+          q: filters.q.trim() || undefined,
+          limit: PAGE_SIZE,
+          offset,
+        }),
         page, setComments, setCommentPaging,
       );
     } catch (err) {
@@ -650,9 +740,10 @@ export function AdminDashboard() {
     }
   }
 
-  async function changeCommentFilter(status: CommentStatus | "") {
-    setCommentFilter(status);
-    await loadComments(status, 0);
+  async function applyCommentFilters(filters: CommentFilters) {
+    setCommentDraft(filters);
+    setCommentFilter(filters);
+    await loadComments(filters, 0);
   }
 
   async function handleCommentVisibility(comment: AdminComment) {
@@ -879,9 +970,6 @@ export function AdminDashboard() {
               <h1>{section.title}</h1>
               <span>Dữ liệu cập nhật lúc {formatTimestamp()}</span>
             </div>
-            <div>
-              <Link className="button button-primary" href="/">Xem trang người dùng</Link>
-            </div>
           </header>
 
           {error && (
@@ -961,7 +1049,7 @@ export function AdminDashboard() {
           <section className="admin-card admin-table-card" id="cho-duyet">
             <div className="card-heading">
               <div><p className="eyebrow">Duyệt hồ sơ</p><h2>Chiến dịch</h2></div>
-              <select className="filter-button" aria-label="Lọc theo trạng thái chiến dịch" value={campaignFilter} onChange={(event) => changeCampaignFilter(event.target.value as ApiCampaignStatus | "")}>
+              <select className="filter-button" aria-label="Lọc theo trạng thái chiến dịch" value={campaignDraft.status} onChange={(event) => applyCampaignFilters({ ...campaignDraft, status: event.target.value as ApiCampaignStatus | "" })}>
                 <option value="pending">Chờ duyệt</option>
                 <option value="approved">Đã duyệt</option>
                 <option value="needs_info">Cần bổ sung</option>
@@ -972,6 +1060,67 @@ export function AdminDashboard() {
                 <option value="">Tất cả trạng thái</option>
               </select>
             </div>
+            <form
+              className="admin-filter-bar"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void applyCampaignFilters(campaignDraft);
+              }}
+            >
+              <input
+                className="filter-button admin-filter-search"
+                type="search"
+                placeholder="Tìm theo tên, mô tả, địa điểm…"
+                aria-label="Tìm chiến dịch"
+                value={campaignDraft.q}
+                onChange={(event) => setCampaignDraft({ ...campaignDraft, q: event.target.value })}
+              />
+              <select
+                className="filter-button"
+                aria-label="Lọc theo hạng mục"
+                value={campaignDraft.category}
+                onChange={(event) => applyCampaignFilters({ ...campaignDraft, category: event.target.value })}
+              >
+                <option value="">Tất cả hạng mục</option>
+                {campaignCategories.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+              <label className="admin-filter-range">
+                <span>Mục tiêu (triệu đ)</span>
+                <input
+                  className="filter-button"
+                  type="number"
+                  min={0}
+                  step="any"
+                  inputMode="decimal"
+                  placeholder="Từ"
+                  aria-label="Mục tiêu từ (triệu đồng)"
+                  value={campaignDraft.minGoal}
+                  onChange={(event) => setCampaignDraft({ ...campaignDraft, minGoal: event.target.value })}
+                />
+                <span aria-hidden="true">–</span>
+                <input
+                  className="filter-button"
+                  type="number"
+                  min={0}
+                  step="any"
+                  inputMode="decimal"
+                  placeholder="Đến"
+                  aria-label="Mục tiêu đến (triệu đồng)"
+                  value={campaignDraft.maxGoal}
+                  onChange={(event) => setCampaignDraft({ ...campaignDraft, maxGoal: event.target.value })}
+                />
+              </label>
+              <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
+              {(campaignFilter.q || campaignFilter.category || campaignFilter.minGoal || campaignFilter.maxGoal) && (
+                <button
+                  className="link-inline"
+                  type="button"
+                  onClick={() => applyCampaignFilters({ ...DEFAULT_CAMPAIGN_FILTERS, status: campaignDraft.status })}
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
+            </form>
             <div className="table-scroll">
               <table>
                 <thead><tr><th>Chiến dịch</th><th>Chủ dự án</th><th>Mục tiêu</th><th>Đã huy động</th><th>Hạng mục</th><th>Kết thúc</th><th>Trạng thái</th><th /></tr></thead>
@@ -1002,7 +1151,20 @@ export function AdminDashboard() {
                           {predictionOpen === campaign.id ? "Ẩn ước lượng" : "Ước lượng AI"}
                         </button>
                       </td>
-                      <td>{campaign.owner?.name ?? "Chưa có"}</td>
+                      <td>
+                        {campaign.owner ? (
+                          <button
+                            className="link-inline owner-link"
+                            type="button"
+                            title="Xem thông tin chủ dự án"
+                            onClick={() => setViewingUserId(campaign.owner!.id)}
+                          >
+                            {campaign.owner.name}
+                          </button>
+                        ) : (
+                          "Chưa có"
+                        )}
+                      </td>
                       <td>{money(campaign.goalAmount)}</td>
                       <td>{money(campaign.currentAmount)}</td>
                       <td>{campaign.category}</td>
@@ -1026,13 +1188,17 @@ export function AdminDashboard() {
                     </Fragment>
                   ))}
                   {campaigns.length === 0 && (
-                    <tr><td colSpan={8}><span className="table-muted">Không có chiến dịch nào trong trạng thái này.</span></td></tr>
+                    <tr><td colSpan={8}><span className="table-muted">Không có chiến dịch nào khớp bộ lọc.</span></td></tr>
                   )}
                 </tbody>
               </table>
             </div>
             <Pagination page={campaignPaging.page} total={campaignPaging.total} onChange={(page) => void loadCampaigns(campaignFilter, page)} />
           </section>
+          )}
+
+          {viewingUserId && (
+            <UserDetailDialog userId={viewingUserId} onClose={() => setViewingUserId(null)} />
           )}
 
           {reviewing && (
@@ -1049,7 +1215,7 @@ export function AdminDashboard() {
             <div className="card-heading">
               <div><p className="eyebrow">Human-in-the-loop</p><h2>Cảnh báo rủi ro AI</h2></div>
               <div className="risk-heading-actions">
-                <select className="filter-button" aria-label="Lọc theo trạng thái cảnh báo" value={riskFilter} onChange={(event) => changeRiskFilter(event.target.value as RiskStatus | "")}>
+                <select className="filter-button" aria-label="Lọc theo trạng thái cảnh báo" value={riskDraft.status} onChange={(event) => applyRiskFilters({ ...riskDraft, status: event.target.value as RiskStatus | "" })}>
                   <option value="open">Chưa xử lý</option>
                   <option value="resolved">Đã xác nhận</option>
                   <option value="dismissed">Đã bỏ qua</option>
@@ -1060,10 +1226,67 @@ export function AdminDashboard() {
                 </button>
               </div>
             </div>
+            <form
+              className="admin-filter-bar"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void applyRiskFilters(riskDraft);
+              }}
+            >
+              <input
+                className="filter-button admin-filter-search"
+                type="search"
+                placeholder="Tìm theo tên hoặc mã đối tượng…"
+                aria-label="Tìm cảnh báo rủi ro"
+                value={riskDraft.q}
+                onChange={(event) => setRiskDraft({ ...riskDraft, q: event.target.value })}
+              />
+              <select
+                className="filter-button"
+                aria-label="Lọc theo mức rủi ro"
+                value={riskDraft.level}
+                onChange={(event) => applyRiskFilters({ ...riskDraft, level: event.target.value as RiskFilters["level"] })}
+              >
+                <option value="">Mọi mức rủi ro</option>
+                <option value="high">Rủi ro {RISK_LEVEL_LABEL.high.toLowerCase()}</option>
+                <option value="medium">Rủi ro {RISK_LEVEL_LABEL.medium.toLowerCase()}</option>
+                <option value="low">Rủi ro {RISK_LEVEL_LABEL.low.toLowerCase()}</option>
+              </select>
+              <select
+                className="filter-button"
+                aria-label="Lọc theo đối tượng"
+                value={riskDraft.entityType}
+                onChange={(event) => applyRiskFilters({ ...riskDraft, entityType: event.target.value as RiskFilters["entityType"] })}
+              >
+                <option value="">Mọi đối tượng</option>
+                <option value="campaign">Chiến dịch</option>
+                <option value="user">Người dùng</option>
+              </select>
+              <select
+                className="filter-button"
+                aria-label="Lọc theo phương pháp"
+                value={riskDraft.method}
+                onChange={(event) => applyRiskFilters({ ...riskDraft, method: event.target.value as RiskFilters["method"] })}
+              >
+                <option value="">Mọi phương pháp</option>
+                <option value="ai">Chấm điểm bằng AI</option>
+                <option value="rule">Luật dự phòng</option>
+              </select>
+              <button className="button button-primary admin-filter-submit" type="submit">Tìm</button>
+              {(riskFilter.q || riskFilter.level || riskFilter.entityType || riskFilter.method) && (
+                <button
+                  className="link-inline"
+                  type="button"
+                  onClick={() => applyRiskFilters({ ...DEFAULT_RISK_FILTERS, status: riskDraft.status })}
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
+            </form>
             <div className="risk-list">
               {risks.length === 0 ? (
                 <article>
-                  <p className="table-muted">Không có cảnh báo nào ở trạng thái này. Nhấn Quét lại để chạy AI chấm điểm rủi ro cho các chiến dịch đang hoạt động.</p>
+                  <p className="table-muted">Không có cảnh báo nào khớp bộ lọc. Nhấn Quét lại để chạy AI chấm điểm rủi ro cho các chiến dịch đang hoạt động.</p>
                 </article>
               ) : (
                 risks.map((alert) => (
@@ -1089,7 +1312,7 @@ export function AdminDashboard() {
           <section className="admin-card risk-card" id="bao-cao-vi-pham">
             <div className="card-heading">
               <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>Báo cáo vi phạm</h2></div>
-              <select className="filter-button" aria-label="Lọc theo trạng thái báo cáo" value={reportFilter} onChange={(event) => changeReportFilter(event.target.value as ReportStatus | "")}>
+              <select className="filter-button" aria-label="Lọc theo trạng thái báo cáo" value={reportDraft.status} onChange={(event) => applyReportFilters({ ...reportDraft, status: event.target.value as ReportStatus | "" })}>
                 <option value="pending">Chờ xem xét</option>
                 <option value="reviewing">Đang xem xét</option>
                 <option value="resolved">Đã xử lý vi phạm</option>
@@ -1097,10 +1320,57 @@ export function AdminDashboard() {
                 <option value="">Tất cả trạng thái</option>
               </select>
             </div>
+            <form
+              className="admin-filter-bar"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void applyReportFilters(reportDraft);
+              }}
+            >
+              <input
+                className="filter-button admin-filter-search"
+                type="search"
+                placeholder="Tìm theo nội dung, chiến dịch, người báo cáo…"
+                aria-label="Tìm báo cáo vi phạm"
+                value={reportDraft.q}
+                onChange={(event) => setReportDraft({ ...reportDraft, q: event.target.value })}
+              />
+              <select
+                className="filter-button"
+                aria-label="Lọc theo lý do báo cáo"
+                value={reportDraft.reason}
+                onChange={(event) => applyReportFilters({ ...reportDraft, reason: event.target.value as ReportFilters["reason"] })}
+              >
+                <option value="">Mọi lý do</option>
+                {(Object.keys(REPORT_REASON_LABEL) as ReportReason[]).map((reason) => (
+                  <option key={reason} value={reason}>{REPORT_REASON_LABEL[reason]}</option>
+                ))}
+              </select>
+              <select
+                className="filter-button"
+                aria-label="Lọc theo đối tượng bị báo cáo"
+                value={reportDraft.target}
+                onChange={(event) => applyReportFilters({ ...reportDraft, target: event.target.value as ReportFilters["target"] })}
+              >
+                <option value="">Mọi đối tượng</option>
+                <option value="campaign">Chiến dịch</option>
+                <option value="comment">Bình luận</option>
+              </select>
+              <button className="button button-primary admin-filter-submit" type="submit">Tìm</button>
+              {(reportFilter.q || reportFilter.reason || reportFilter.target) && (
+                <button
+                  className="link-inline"
+                  type="button"
+                  onClick={() => applyReportFilters({ ...DEFAULT_REPORT_FILTERS, status: reportDraft.status })}
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
+            </form>
             <div className="risk-list">
               {reports.length === 0 ? (
                 <article>
-                  <p className="table-muted">Không có báo cáo nào ở trạng thái này.</p>
+                  <p className="table-muted">Không có báo cáo nào khớp bộ lọc.</p>
                 </article>
               ) : (
                 reports.map((report) => (
@@ -1129,16 +1399,62 @@ export function AdminDashboard() {
           <section className="admin-card risk-card" id="binh-luan">
             <div className="card-heading">
               <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>Bình luận &amp; hỏi đáp</h2></div>
-              <select className="filter-button" aria-label="Lọc bình luận theo trạng thái" value={commentFilter} onChange={(event) => changeCommentFilter(event.target.value as CommentStatus | "")}>
+              <select className="filter-button" aria-label="Lọc bình luận theo trạng thái" value={commentDraft.status} onChange={(event) => applyCommentFilters({ ...commentDraft, status: event.target.value as CommentStatus | "" })}>
                 <option value="visible">Đang hiển thị</option>
                 <option value="hidden">Đã ẩn</option>
                 <option value="">Tất cả</option>
               </select>
             </div>
+            <form
+              className="admin-filter-bar"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void applyCommentFilters(commentDraft);
+              }}
+            >
+              <input
+                className="filter-button admin-filter-search"
+                type="search"
+                placeholder="Tìm theo nội dung, người viết, chiến dịch…"
+                aria-label="Tìm bình luận"
+                value={commentDraft.q}
+                onChange={(event) => setCommentDraft({ ...commentDraft, q: event.target.value })}
+              />
+              <select
+                className="filter-button"
+                aria-label="Lọc theo loại bình luận"
+                value={commentDraft.kind}
+                onChange={(event) => applyCommentFilters({ ...commentDraft, kind: event.target.value as CommentFilters["kind"] })}
+              >
+                <option value="">Bình luận &amp; câu hỏi</option>
+                <option value="comment">Chỉ bình luận</option>
+                <option value="question">Chỉ câu hỏi</option>
+              </select>
+              <select
+                className="filter-button"
+                aria-label="Lọc bình luận gốc hay câu trả lời"
+                value={commentDraft.level}
+                onChange={(event) => applyCommentFilters({ ...commentDraft, level: event.target.value as CommentFilters["level"] })}
+              >
+                <option value="">Gốc &amp; trả lời</option>
+                <option value="root">Chỉ bình luận gốc</option>
+                <option value="reply">Chỉ câu trả lời</option>
+              </select>
+              <button className="button button-primary admin-filter-submit" type="submit">Tìm</button>
+              {(commentFilter.q || commentFilter.kind || commentFilter.level) && (
+                <button
+                  className="link-inline"
+                  type="button"
+                  onClick={() => applyCommentFilters({ ...DEFAULT_COMMENT_FILTERS, status: commentDraft.status })}
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
+            </form>
             <div className="risk-list">
               {comments.length === 0 ? (
                 <article>
-                  <p className="table-muted">Không có bình luận nào ở trạng thái này.</p>
+                  <p className="table-muted">Không có bình luận nào khớp bộ lọc.</p>
                 </article>
               ) : (
                 comments.map((comment) => (
@@ -1170,7 +1486,7 @@ export function AdminDashboard() {
           <section className="admin-card admin-table-card" id="giao-dich">
             <div className="card-heading">
               <div><p className="eyebrow">Minh bạch quỹ</p><h2>Giao dịch tài trợ</h2></div>
-              <select className="filter-button" aria-label="Lọc theo trạng thái giao dịch" value={donationFilter} onChange={(event) => changeDonationFilter(event.target.value as DonationFilter)}>
+              <select className="filter-button" aria-label="Lọc theo trạng thái giao dịch" value={donationDraft.status} onChange={(event) => applyDonationFilters({ ...donationDraft, status: event.target.value as DonationFilter })}>
                 <option value="completed">Thành công</option>
                 <option value="pending">Chờ xử lý</option>
                 <option value="failed">Thất bại</option>
@@ -1181,6 +1497,58 @@ export function AdminDashboard() {
                 <option value="">Tất cả trạng thái</option>
               </select>
             </div>
+            <form
+              className="admin-filter-bar"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void applyDonationFilters(donationDraft);
+              }}
+            >
+              <input
+                className="filter-button admin-filter-search"
+                type="search"
+                placeholder="Tìm theo chiến dịch, người ủng hộ, mã giao dịch…"
+                aria-label="Tìm giao dịch"
+                value={donationDraft.q}
+                onChange={(event) => setDonationDraft({ ...donationDraft, q: event.target.value })}
+              />
+              <label className="admin-filter-range">
+                <span>Số tiền (đ)</span>
+                <input
+                  className="filter-button"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  inputMode="numeric"
+                  placeholder="Từ"
+                  aria-label="Số tiền từ (đồng)"
+                  value={donationDraft.minAmount}
+                  onChange={(event) => setDonationDraft({ ...donationDraft, minAmount: event.target.value })}
+                />
+                <span aria-hidden="true">–</span>
+                <input
+                  className="filter-button"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  inputMode="numeric"
+                  placeholder="Đến"
+                  aria-label="Số tiền đến (đồng)"
+                  value={donationDraft.maxAmount}
+                  onChange={(event) => setDonationDraft({ ...donationDraft, maxAmount: event.target.value })}
+                />
+              </label>
+              <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
+              {(donationFilter.q || donationFilter.minAmount || donationFilter.maxAmount) && (
+                <button
+                  className="link-inline"
+                  type="button"
+                  onClick={() => applyDonationFilters({ ...DEFAULT_DONATION_FILTERS, status: donationDraft.status })}
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
+            </form>
             <div className="table-scroll">
               <table>
                 <thead><tr><th>Người ủng hộ</th><th>Chiến dịch</th><th>Số tiền</th><th>Phương thức</th><th>Mã giao dịch</th><th>Thời gian</th><th>Trạng thái</th><th>Rủi ro</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
@@ -1218,7 +1586,7 @@ export function AdminDashboard() {
                     </tr>
                   ))}
                   {donations.length === 0 && (
-                    <tr><td colSpan={9}><span className="table-muted">{donationFilter === "flagged" ? "Không có giao dịch nào liên quan tới cảnh báo rủi ro đang mở." : "Không có giao dịch nào trong trạng thái này."}</span></td></tr>
+                    <tr><td colSpan={9}><span className="table-muted">{donationFilter.status === "flagged" && !donationFilter.q && !donationFilter.minAmount && !donationFilter.maxAmount ? "Không có giao dịch nào liên quan tới cảnh báo rủi ro đang mở." : "Không có giao dịch nào khớp bộ lọc."}</span></td></tr>
                   )}
                 </tbody>
               </table>
@@ -1235,6 +1603,50 @@ export function AdminDashboard() {
             <div className="card-heading">
               <div><p className="eyebrow">Quản lý tài khoản</p><h2>Người dùng</h2></div>
             </div>
+            <form
+              className="admin-filter-bar"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void applyUserFilters(userDraft);
+              }}
+            >
+              <input
+                className="filter-button admin-filter-search"
+                type="search"
+                placeholder="Tìm theo tên hoặc email…"
+                aria-label="Tìm người dùng"
+                value={userDraft.q}
+                onChange={(event) => setUserDraft({ ...userDraft, q: event.target.value })}
+              />
+              <select
+                className="filter-button"
+                aria-label="Lọc theo vai trò"
+                value={userDraft.role}
+                onChange={(event) => applyUserFilters({ ...userDraft, role: event.target.value as UserFilters["role"] })}
+              >
+                <option value="">Mọi vai trò</option>
+                {(Object.keys(USER_ROLE_LABEL) as AdminUser["role"][]).map((role) => (
+                  <option key={role} value={role}>{USER_ROLE_LABEL[role]}</option>
+                ))}
+              </select>
+              <select
+                className="filter-button"
+                aria-label="Lọc theo trạng thái tài khoản"
+                value={userDraft.status}
+                onChange={(event) => applyUserFilters({ ...userDraft, status: event.target.value as UserFilters["status"] })}
+              >
+                <option value="">Mọi trạng thái</option>
+                {(Object.keys(USER_STATUS_LABEL) as AdminUserStatus[]).map((status) => (
+                  <option key={status} value={status}>{USER_STATUS_LABEL[status]}</option>
+                ))}
+              </select>
+              <button className="button button-primary admin-filter-submit" type="submit">Tìm</button>
+              {(userFilter.q || userFilter.role || userFilter.status) && (
+                <button className="link-inline" type="button" onClick={() => applyUserFilters(DEFAULT_USER_FILTERS)}>
+                  Xóa bộ lọc
+                </button>
+              )}
+            </form>
             <div className="table-scroll">
               <table>
                 <thead><tr><th>Tên</th><th>Email</th><th>Vai trò</th><th>Ngày tham gia</th><th>Trạng thái</th><th /></tr></thead>
@@ -1260,15 +1672,19 @@ export function AdminDashboard() {
                       </tr>
                     );
                   })}
+                  {users.length === 0 && (
+                    <tr><td colSpan={6}><span className="table-muted">Không có người dùng nào khớp bộ lọc.</span></td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
-            <Pagination page={userPaging.page} total={userPaging.total} onChange={(page) => void loadUsers(page)} />
+            <Pagination page={userPaging.page} total={userPaging.total} onChange={(page) => void loadUsers(userFilter, page)} />
           </section>
           )}
 
           {view === "danh-muc" && <CategoryManager />}
           {view === "xuat-thong-ke" && <StatsExport />}
+          {view === "sao-luu" && <BackupManager />}
 
           {view === "nhat-ky-kiem-toan" && (
           <section className="admin-card admin-table-card" id="nhat-ky-kiem-toan">

@@ -20,6 +20,7 @@ export const ADMIN_SECTIONS: AdminSection[] = [
   { slug: "nguoi-dung", label: "Người dùng", title: "Người dùng", icon: "users" },
   { slug: "danh-muc", label: "Lĩnh vực", title: "Lĩnh vực", icon: "document" },
   { slug: "xuat-thong-ke", label: "Xuất thống kê", title: "Xuất thống kê", icon: "chart" },
+  { slug: "sao-luu", label: "Sao lưu dữ liệu", title: "Sao lưu & khôi phục dữ liệu", icon: "database" },
   { slug: "nhat-ky-kiem-toan", label: "Nhật ký kiểm toán", title: "Nhật ký kiểm toán", icon: "clock" },
 ];
 

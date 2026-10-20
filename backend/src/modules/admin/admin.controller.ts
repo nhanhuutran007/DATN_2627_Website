@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -9,8 +10,11 @@ import {
   Query,
   Res,
   SerializeOptions,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import type { Response } from "express";
 
 import { AuditLogQueryDto } from "../../common/audit/audit.dto";
@@ -21,6 +25,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entity";
 import { AdminService } from "./admin.service";
+import { BackupService, MAX_BACKUP_BYTES } from "./backup.service";
 import { ContentService } from "./content.service";
 import {
   AdminCampaignQueryDto,
@@ -55,7 +60,34 @@ export class AdminController {
     private readonly auditService: AuditService,
     private readonly contentService: ContentService,
     private readonly exportService: ExportService,
+    private readonly backupService: BackupService,
   ) {}
+
+  /** Tải về bản sao lưu toàn bộ dữ liệu (JSON nén gzip). */
+  @Get("backup/export")
+  async exportBackup(@GetCurrentUser() currentUser: User, @Res() res: Response): Promise<void> {
+    const file = await this.backupService.exportBackup(currentUser);
+    res.set({
+      "Content-Type": "application/gzip",
+      "Content-Disposition": `attachment; filename="${file.filename}"`,
+      "Cache-Control": "no-store",
+    });
+    res.send(file.content);
+  }
+
+  /** Ghi đè toàn bộ dữ liệu bằng file sao lưu; bắt buộc gửi kèm chuỗi xác nhận. */
+  @Post("backup/restore")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_BACKUP_BYTES, files: 1 } }))
+  restoreBackup(
+    @UploadedFile() file: { buffer: Buffer } | undefined,
+    @Body("confirm") confirm: string | undefined,
+    @GetCurrentUser() currentUser: User,
+  ) {
+    if (!file) {
+      throw new BadRequestException("Chưa chọn file sao lưu.");
+    }
+    return this.backupService.restoreBackup(file.buffer, confirm, currentUser);
+  }
 
   @Get("overview")
   overview() {
@@ -75,6 +107,11 @@ export class AdminController {
   @Get("users")
   users(@Query() query: AdminUserQueryDto) {
     return this.adminService.listUsers(query);
+  }
+
+  @Get("users/:id")
+  userDetail(@Param("id", ParseUUIDPipe) id: string) {
+    return this.adminService.getUserDetail(id);
   }
 
   @Get("audit-logs")

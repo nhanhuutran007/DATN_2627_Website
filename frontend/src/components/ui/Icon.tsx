@@ -9,6 +9,7 @@ export type IconName =
   | "clock"
   | "copy"
   | "cpu"
+  | "database"
   | "document"
   | "grid"
   | "heart"
@@ -40,6 +41,7 @@ type IconProps = {
 
 const paths: Record<IconName, React.ReactNode> = {
   "arrow-right": <path d="M5 12h14m-5-5 5 5-5 5" />,
+  database: <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></>,
   bell: <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />,
   book: <><path d="M4 5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2V5Z" /><path d="M4 20a2 2 0 0 0 2 2h14v-4M9 8h7" /></>,
   chart: <path d="M4 19V9m6 10V5m6 14v-7m4 7H2" />,
