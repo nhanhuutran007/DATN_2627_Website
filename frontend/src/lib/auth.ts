@@ -1,6 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useSyncExternalStore } from "react";
 
 import { AUTH_EVENT, AuthUser, getStoredUser, hasSession } from "./api";
 
@@ -37,6 +38,21 @@ const getServerLoggedIn = (): boolean => false;
 
 export function useAuthUser(): AuthUser | null {
   return useSyncExternalStore(subscribe, getUserSnapshot, getServerUser);
+}
+
+/** Tài khoản quản trị chỉ dùng để quản trị: không ủng hộ, tạo chiến dịch, bình luận, theo dõi hay báo cáo. */
+export function useIsAdmin(): boolean {
+  return useAuthUser()?.role === "admin";
+}
+
+/** Đưa tài khoản quản trị về /admin khi mở trang chỉ dành cho người dùng thường; trả về true khi đang chuyển. */
+export function useRedirectAdmin(): boolean {
+  const isAdmin = useIsAdmin();
+  const router = useRouter();
+  useEffect(() => {
+    if (isAdmin) router.replace("/admin");
+  }, [isAdmin, router]);
+  return isAdmin;
 }
 
 export function useIsAuthenticated(): boolean {

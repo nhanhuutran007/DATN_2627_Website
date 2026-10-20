@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
 
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
+import { LogoMark } from "@/components/ui/LogoMark";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { CategoryManager, StatsExport } from "@/features/admin/AdminContent";
 import { BackupManager } from "@/features/admin/BackupManager";
@@ -19,7 +21,7 @@ import {
   USER_ROLE_LABEL,
   USER_STATUS_LABEL,
 } from "@/features/admin/labels";
-import { ADMIN_SECTIONS, adminHref, findAdminSection } from "@/features/admin/sections";
+import { ADMIN_SECTION_GROUPS, ADMIN_SECTIONS, adminHref, findAdminSection } from "@/features/admin/sections";
 import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredictionCard";
 import {
   fetchAdminCampaigns,
@@ -44,6 +46,7 @@ import {
   type ModerateDecision,
   type RiskStatus,
 } from "@/lib/api/admin";
+import { logoutRequest } from "@/lib/api";
 import type { ApiCampaignStatus } from "@/lib/api/campaigns";
 import { fetchAdminCategories } from "@/lib/api/categories";
 import { refundDonationDirectly } from "@/lib/api/finance";
@@ -258,6 +261,12 @@ export function AdminDashboard() {
   }, []);
 
   const sidebarRail = narrow ? !sidebarOpen : sidebarCollapsed;
+
+  const router = useRouter();
+  const logout = async () => {
+    await logoutRequest();
+    router.push("/");
+  };
   const [predictionOpen, setPredictionOpen] = useState<string | null>(null);
   const [donationFilter, setDonationFilter] = useState<DonationFilters>(DEFAULT_DONATION_FILTERS);
   const [donationDraft, setDonationDraft] = useState<DonationFilters>(DEFAULT_DONATION_FILTERS);
@@ -906,6 +915,13 @@ export function AdminDashboard() {
             if ((event.target as HTMLElement).closest("a")) setSidebarOpen(false);
           }}
         >
+          <div className="admin-brand">
+            <Link className="logo" href="/" aria-label="Góp Mầm – Trang chủ">
+              <LogoMark className="logo-mark" />
+              <span className="logo-text">GÓP <b>MẦM</b></span>
+            </Link>
+          </div>
+          {/* Desktop: nút tròn chevron nằm trên mép phải; màn hẹp: nút trình đơn trong dải icon */}
           <button
             className="admin-menu-toggle"
             type="button"
@@ -914,29 +930,32 @@ export function AdminDashboard() {
             aria-label={sidebarRail ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"}
             onClick={() => (narrow ? setSidebarOpen((value) => !value) : setSidebarCollapsed((value) => !value))}
           >
-            <Icon name={narrow && sidebarOpen ? "x" : "menu"} size={22} />
+            <Icon name={narrow ? (sidebarOpen ? "x" : "menu") : "chevron-left"} size={narrow ? 22 : 18} />
           </button>
-          <div className="admin-profile">
-            <span>{user.name.charAt(0).toUpperCase()}</span>
-            <div><b>{user.name}</b><small>{user.email}</small></div>
-          </div>
           <nav aria-label="Điều hướng quản trị">
-            {ADMIN_SECTIONS.map((item) => {
-              const badge = item.slug === "cho-duyet" ? pendingCount : item.slug === "rui-ro" ? (overview?.risks.open ?? 0) : 0;
-              return (
-                <Link
-                  className={item.slug === view ? "active" : undefined}
-                  aria-current={item.slug === view ? "page" : undefined}
-                  href={adminHref(item.slug)}
-                  key={item.slug}
-                  title={item.label}
-                >
-                  <Icon name={item.icon} size={19} /> <span>{item.label}</span> {badge > 0 && <i>{badge}</i>}
-                </Link>
-              );
-            })}
+            {ADMIN_SECTION_GROUPS.map((group) => (
+              <div className="admin-nav-group" key={group.label ?? "chung"}>
+                {group.label && <p className="admin-nav-label">{group.label}</p>}
+                {group.sections.map((item) => {
+                  const badge = item.slug === "cho-duyet" ? pendingCount : item.slug === "rui-ro" ? (overview?.risks.open ?? 0) : 0;
+                  return (
+                    <Link
+                      className={item.slug === view ? "active" : undefined}
+                      aria-current={item.slug === view ? "page" : undefined}
+                      href={adminHref(item.slug)}
+                      key={item.slug}
+                      title={item.label}
+                    >
+                      <Icon name={item.icon} size={19} /> <span>{item.label}</span> {badge > 0 && <i>{badge}</i>}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+            <button className="admin-logout" type="button" title="Đăng xuất" onClick={logout}>
+              <Icon name="logout" size={19} /> <span>Đăng xuất</span>
+            </button>
           </nav>
-          <div className="admin-policy"><Icon name="shield" size={22} /><p><b>AI không tự động xử phạt</b><span>Mọi cảnh báo phải có quản trị viên xem xét và lưu lý do quyết định.</span></p></div>
         </aside>
 
         <div className="admin-content" id="tong-quan">
@@ -945,6 +964,17 @@ export function AdminDashboard() {
               <p className="eyebrow">Bảng điều khiển</p>
               <h1>{section.title}</h1>
               <span>Dữ liệu cập nhật lúc {formatTimestamp()}</span>
+            </div>
+            {/* Khu quản trị không dùng header của site: lối ra trang công khai, thông báo và tài khoản nằm ở đây */}
+            <div className="admin-topbar-actions">
+              <Link className="button button-outline button-sm" href="/" target="_blank" rel="noopener">
+                Xem trang công khai <Icon name="arrow-right" size={15} />
+              </Link>
+              <NotificationBell />
+              <Link className="admin-account" href="/ho-so" title="Cài đặt tài khoản">
+                <span>{user.name.charAt(0).toUpperCase()}</span>
+                <b>{user.name}</b>
+              </Link>
             </div>
           </header>
 
@@ -1018,6 +1048,8 @@ export function AdminDashboard() {
               <div className="review-sla"><Icon name="clock" size={18} /><span><b>Đã duyệt {overview?.campaigns.approved ?? 0} chiến dịch</b><small>Kể từ khi hệ thống vận hành</small></span></div>
             </section>
           </div>
+          {/* Xuất CSV nằm cùng số liệu tổng quan thay vì một mục riêng trên sidebar */}
+          <StatsExport />
             </>
           )}
 
@@ -1202,6 +1234,13 @@ export function AdminDashboard() {
                 </button>
               </div>
             </div>
+            <div className="admin-policy">
+              <Icon name="shield" size={22} />
+              <p>
+                <b>AI không tự động xử phạt</b>
+                <span>Cảnh báo AI chỉ giúp ưu tiên kiểm tra: không tự khóa tài khoản, tạm dừng chiến dịch hay công khai cáo buộc. Quản trị viên xem xét, ghi lý do và quyết định được lưu vào nhật ký kiểm toán.</span>
+              </p>
+            </div>
             <form
               className="admin-filter-bar"
               onSubmit={(event) => {
@@ -1280,7 +1319,6 @@ export function AdminDashboard() {
               )}
             </div>
             <Pagination page={riskPaging.page} total={riskPaging.total} onChange={(page) => void loadRisks(riskFilter, page)} />
-            <p className="risk-footnote"><Icon name="shield" size={15} /> Cảnh báo AI chỉ giúp ưu tiên kiểm tra. Không tự động khóa tài khoản, tạm dừng chiến dịch hay công khai cáo buộc. Quyết định cuối cùng do quản trị viên đưa ra và được ghi vào nhật ký kiểm toán.</p>
           </section>
           )}
 
@@ -1654,7 +1692,6 @@ export function AdminDashboard() {
           )}
 
           {view === "danh-muc" && <CategoryManager />}
-          {view === "xuat-thong-ke" && <StatsExport />}
           {view === "sao-luu" && <BackupManager />}
 
           {view === "nhat-ky-kiem-toan" && (

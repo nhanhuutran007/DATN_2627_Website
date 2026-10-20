@@ -315,7 +315,7 @@ Tài liệu chi tiết: [ERD](docs/database/erd.md) · [Migration](backend/datab
 
 ```powershell
 Copy-Item .env.example .env
-docker compose -f infra/compose.yaml up --build -d
+docker compose --env-file .env -f infra/compose.yaml up --build -d
 ```
 
 Compose khởi động 6 dịch vụ: `nginx`, `frontend`, `backend`, `ai-service`, `mysql`, `redis`.

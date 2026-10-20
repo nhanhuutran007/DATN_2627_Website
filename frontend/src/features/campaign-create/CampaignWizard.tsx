@@ -32,7 +32,7 @@ import {
   type CreateMilestonePayload,
 } from "@/lib/api/progress";
 import { createRewardTier, deleteRewardTier } from "@/lib/api/rewards";
-import { useAuthUser } from "@/lib/auth";
+import { useAuthUser, useRedirectAdmin } from "@/lib/auth";
 
 /** Mỗi bước một chủ đề như GoFundMe: tiêu đề + lời dẫn hiện ở cột trái, câu hỏi ở cột phải. */
 const STEPS = [
@@ -154,6 +154,7 @@ function isHttpUrl(value: string): boolean {
 export function CampaignWizard() {
   const router = useRouter();
   const user = useAuthUser();
+  const redirecting = useRedirectAdmin();
   const [step, setStep] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
   const firstRender = useRef(true);
@@ -378,6 +379,8 @@ export function CampaignWizard() {
   const side = done
     ? { title: "Cảm ơn bạn đã gửi hồ sơ", intro: "Chúng tôi sẽ thông báo cho bạn ngay khi có kết quả xét duyệt." }
     : STEPS[step];
+
+  if (redirecting) return null;
 
   return (
     <div className="create-shell">

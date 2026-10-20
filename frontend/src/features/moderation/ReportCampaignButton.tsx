@@ -10,7 +10,7 @@ import {
   submitReport,
   type ReportReason,
 } from "@/lib/api/reports";
-import { useAuthUser } from "@/lib/auth";
+import { useAuthUser, useIsAdmin } from "@/lib/auth";
 
 const MIN_DESCRIPTION = 10;
 const MAX_DESCRIPTION = 2000;
@@ -42,6 +42,7 @@ function errorMessage(err: unknown): string {
 
 export function ReportCampaignButton({ campaignId, campaignSlug }: ReportCampaignButtonProps) {
   const user = useAuthUser();
+  const isAdmin = useIsAdmin();
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState<ReportReason>("fraud");
@@ -68,6 +69,9 @@ export function ReportCampaignButton({ campaignId, campaignSlug }: ReportCampaig
       setSubmitting(false);
     }
   }
+
+  // Admin xử lý báo cáo ở trang quản trị, không tự gửi báo cáo.
+  if (isAdmin) return null;
 
   return (
     <>

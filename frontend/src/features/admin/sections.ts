@@ -8,21 +8,45 @@ export type AdminSection = {
   icon: IconName;
 };
 
-export const ADMIN_SECTIONS: AdminSection[] = [
-  { slug: "", label: "Tổng quan", title: "Tổng quan hệ thống", icon: "chart" },
-  { slug: "cho-duyet", label: "Duyệt chiến dịch", title: "Duyệt chiến dịch", icon: "document" },
-  { slug: "rui-ro", label: "Cảnh báo rủi ro", title: "Cảnh báo rủi ro", icon: "shield" },
-  { slug: "bao-cao-vi-pham", label: "Báo cáo vi phạm", title: "Báo cáo vi phạm", icon: "bell" },
-  { slug: "binh-luan", label: "Bình luận", title: "Kiểm duyệt bình luận", icon: "message" },
-  { slug: "hoan-tien", label: "Hoàn tiền", title: "Yêu cầu hoàn tiền", icon: "wallet" },
-  { slug: "doi-soat", label: "Đối soát", title: "Đối soát giao dịch", icon: "receipt" },
-  { slug: "giao-dich", label: "Giao dịch", title: "Giao dịch", icon: "receipt" },
-  { slug: "nguoi-dung", label: "Người dùng", title: "Người dùng", icon: "users" },
-  { slug: "danh-muc", label: "Lĩnh vực", title: "Lĩnh vực", icon: "document" },
-  { slug: "xuat-thong-ke", label: "Xuất thống kê", title: "Xuất thống kê", icon: "chart" },
-  { slug: "sao-luu", label: "Sao lưu dữ liệu", title: "Sao lưu & khôi phục dữ liệu", icon: "database" },
-  { slug: "nhat-ky-kiem-toan", label: "Nhật ký kiểm toán", title: "Nhật ký kiểm toán", icon: "clock" },
+/** Nhóm trên sidebar; nhóm không có tiêu đề (Tổng quan) đứng đầu. */
+export type AdminSectionGroup = {
+  label?: string;
+  sections: AdminSection[];
+};
+
+export const ADMIN_SECTION_GROUPS: AdminSectionGroup[] = [
+  {
+    sections: [{ slug: "", label: "Tổng quan", title: "Tổng quan hệ thống", icon: "grid" }],
+  },
+  {
+    label: "Kiểm duyệt",
+    sections: [
+      { slug: "cho-duyet", label: "Duyệt chiến dịch", title: "Duyệt chiến dịch", icon: "clipboard-check" },
+      { slug: "rui-ro", label: "Cảnh báo rủi ro", title: "Cảnh báo rủi ro", icon: "shield" },
+      { slug: "bao-cao-vi-pham", label: "Báo cáo vi phạm", title: "Báo cáo vi phạm", icon: "flag" },
+      { slug: "binh-luan", label: "Bình luận", title: "Kiểm duyệt bình luận", icon: "message" },
+    ],
+  },
+  {
+    label: "Tài chính",
+    sections: [
+      { slug: "giao-dich", label: "Giao dịch", title: "Giao dịch", icon: "receipt" },
+      { slug: "hoan-tien", label: "Hoàn tiền", title: "Yêu cầu hoàn tiền", icon: "wallet" },
+      { slug: "doi-soat", label: "Đối soát", title: "Đối soát giao dịch", icon: "scale" },
+    ],
+  },
+  {
+    label: "Hệ thống",
+    sections: [
+      { slug: "nguoi-dung", label: "Người dùng", title: "Người dùng", icon: "users" },
+      { slug: "danh-muc", label: "Lĩnh vực", title: "Lĩnh vực", icon: "tag" },
+      { slug: "sao-luu", label: "Sao lưu dữ liệu", title: "Sao lưu & khôi phục dữ liệu", icon: "database" },
+      { slug: "nhat-ky-kiem-toan", label: "Nhật ký kiểm toán", title: "Nhật ký kiểm toán", icon: "clock" },
+    ],
+  },
 ];
+
+export const ADMIN_SECTIONS: AdminSection[] = ADMIN_SECTION_GROUPS.flatMap((group) => group.sections);
 
 export function adminHref(slug: string): string {
   return slug ? `/admin/${slug}` : "/admin";

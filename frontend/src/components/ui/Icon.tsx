@@ -4,26 +4,32 @@ export type IconName =
   | "book"
   | "chart"
   | "check"
+  | "clipboard-check"
   | "chevron-down"
+  | "chevron-left"
   | "clock"
   | "cpu"
   | "database"
   | "document"
+  | "flag"
   | "grid"
   | "heart"
   | "image"
   | "leaf"
   | "location"
+  | "logout"
   | "menu"
   | "message"
   | "palette"
   | "receipt"
+  | "scale"
   | "rocket"
   | "search"
   | "share"
   | "shield"
   | "sparkles"
   | "sprout"
+  | "tag"
   | "user"
   | "users"
   | "wallet"
@@ -42,25 +48,31 @@ const paths: Record<IconName, React.ReactNode> = {
   book: <><path d="M4 5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2V5Z" /><path d="M4 20a2 2 0 0 0 2 2h14v-4M9 8h7" /></>,
   chart: <path d="M4 19V9m6 10V5m6 14v-7m4 7H2" />,
   check: <path d="m5 12 4 4L19 6" />,
+  "clipboard-check": <><rect x="5" y="4" width="14" height="18" rx="2" /><path d="M9 2h6v4H9zM9 14l2 2 4-4" /></>,
   "chevron-down": <path d="m6 9 6 6 6-6" />,
+  "chevron-left": <path d="m15 6-6 6 6 6" />,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   cpu: <><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M10 10h4v4h-4zM9 2v4m6-4v4M9 18v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4" /></>,
   document: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></>,
+  flag: <path d="M5 21V4m0 0h11l-2 4 2 4H5" />,
   grid: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
   image: <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m21 16-5-5-9 9" /></>,
   heart: <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />,
   leaf: <><path d="M20 4c-8 0-14 4-14 10 0 3 2 5 5 5 6 0 9-7 9-15Z" /><path d="M4 21c2-5 6-9 12-12" /></>,
   location: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
+  logout: <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9" />,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   message: <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z" />,
   palette: <><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 2-2s-1-1.6-1-2.6c0-1 .8-1.9 2-1.9h2a4 4 0 0 0 4-4C21 6.5 17 3 12 3Z" /><circle cx="7.5" cy="11" r="1" /><circle cx="10" cy="7" r="1" /><circle cx="15" cy="7.5" r="1" /></>,
   receipt: <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Zm3 5h6m-6 4h6" />,
   rocket: <><path d="M14 5c3-3 6-2 6-2s1 3-2 6l-6 6-4-4 6-6Z" /><path d="m9 14-4 1-2 4 6-2m2-8-1-4-4 2 2 3m5 5 1 5 4-4-3-1" /><circle cx="15" cy="8" r="1" /></>,
+  scale: <path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0L5 7Zm14 0-3 7a3 3 0 0 0 6 0l-3-7Z" />,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
   share: <><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 13.5 6.8 4m0-11-6.8 4" /></>,
   shield: <><path d="M12 3 4 6v5c0 5 3 8 8 10 5-2 8-5 8-10V6l-8-3Z" /><path d="m9 12 2 2 4-4" /></>,
   sparkles: <path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2L12 3Zm-6 9 .9 2.1L9 15l-2.1.9L6 18l-.9-2.1L3 15l2.1-.9L6 12Zm11 2 1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2Z" />,
   sprout: <><path d="M12 21v-9" /><path d="M12 12c0-4-3-6-8-6 0 4 3 6 8 6Zm0-2c0-3.5 2.5-6 8-6 0 4-3 6-8 6" /></>,
+  tag: <><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9Z" /><circle cx="7.5" cy="7.5" r="1.5" /></>,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
   users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" /></>,
   wallet: <><path d="M4 6h15a2 2 0 0 1 2 2v11H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h13" /><path d="M16 12h5v4h-5a2 2 0 0 1 0-4Z" /></>,

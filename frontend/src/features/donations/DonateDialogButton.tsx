@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
 import type { RewardTier } from "@/lib/api/rewards";
+import { useIsAdmin } from "@/lib/auth";
 
 import { DonationPanel } from "./DonationPanel";
 
@@ -27,6 +28,7 @@ export function DonateDialogButton({
   label = "Ủng hộ ngay",
 }: DonateDialogButtonProps) {
   const router = useRouter();
+  const isAdmin = useIsAdmin();
   const [open, setOpen] = useState(false);
   const wasOpen = useRef(false);
   const ref = useRef<HTMLDialogElement>(null);
@@ -41,6 +43,14 @@ export function DonateDialogButton({
     if (!open && wasOpen.current) router.refresh();
     wasOpen.current = open;
   }, [open, router]);
+
+  if (isAdmin) {
+    return (
+      <button className={className} type="button" disabled title="Tài khoản quản trị không thể ủng hộ">
+        {label}
+      </button>
+    );
+  }
 
   return (
     <>

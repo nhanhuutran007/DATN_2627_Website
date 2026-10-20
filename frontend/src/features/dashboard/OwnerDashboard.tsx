@@ -20,7 +20,7 @@ import {
   type ApiCampaign,
   type ApiCampaignStatus,
 } from "@/lib/api/campaigns";
-import { useAuthUser } from "@/lib/auth";
+import { useAuthUser, useRedirectAdmin } from "@/lib/auth";
 import { formatVnd } from "@/lib/format";
 
 const STATUS: Record<ApiCampaignStatus, { label: string; tone: string }> = {
@@ -72,6 +72,7 @@ function buildTasks(campaigns: ApiCampaign[]): Task[] {
 
 export function OwnerDashboard() {
   const user = useAuthUser();
+  const redirecting = useRedirectAdmin();
   const dialog = useDialog();
   const [campaigns, setCampaigns] = useState<ApiCampaign[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -143,6 +144,8 @@ export function OwnerDashboard() {
       setBusyId(null);
     }
   };
+
+  if (redirecting) return null;
 
   if (!user) {
     return (
