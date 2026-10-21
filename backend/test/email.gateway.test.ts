@@ -81,6 +81,17 @@ describe("renderPasswordResetEmail", () => {
     ok(!email.html.includes("<script>"));
     ok(email.html.includes("&lt;script&gt;"));
   });
+
+  it("embeds the logo as an inline CID image instead of a web font", () => {
+    const email = renderPasswordResetEmail(message);
+
+    ok(email.html.includes('src="cid:gopmam-logo"'));
+    equal(email.attachments?.length, 1);
+    equal(email.attachments?.[0].cid, "gopmam-logo");
+    equal(email.attachments?.[0].contentType, "image/png");
+    // Chữ ký PNG: ảnh giải mã được từ base64.
+    equal(email.attachments?.[0].content.subarray(1, 4).toString(), "PNG");
+  });
 });
 
 describe("SmtpEmailGateway", () => {
@@ -98,6 +109,7 @@ describe("SmtpEmailGateway", () => {
     equal(sent[0].to, "an@example.com");
     equal(sent[0].subject, renderPasswordResetEmail(message).subject);
     ok(String(sent[0].html).includes("Đặt lại mật khẩu"));
+    equal((sent[0].attachments as { cid: string }[] | undefined)?.[0]?.cid, "gopmam-logo");
   });
 });
 

@@ -1,6 +1,8 @@
 import { Logger } from "@nestjs/common";
 import { createTransport, type Transporter } from "nodemailer";
 
+import { EMAIL_LOGO_CID, EMAIL_LOGO_PNG_BASE64 } from "./email-logo";
+
 export type PasswordResetEmail = {
   to: string;
   name: string;
@@ -51,10 +53,19 @@ export interface EmailGateway {
   sendStepUpCode(message: StepUpCodeEmail): Promise<void>;
 }
 
+/** Ảnh nhúng trong email, tham chiếu bằng `cid:` trong HTML (định dạng của nodemailer). */
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+  cid: string;
+};
+
 export type RenderedEmail = {
   subject: string;
   text: string;
   html: string;
+  attachments?: EmailAttachment[];
 };
 
 function escapeHtml(value: string): string {
@@ -106,38 +117,54 @@ export function renderEmailVerificationEmail(message: EmailVerificationEmail): R
   };
 }
 
+const EMAIL_FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif";
+
+/** Logo đính kèm inline (CID) cho các email dùng `brandedEmailHtml`. */
+export function emailLogoAttachment(): EmailAttachment {
+  return {
+    filename: "gopmam-logo.png",
+    content: Buffer.from(EMAIL_LOGO_PNG_BASE64, "base64"),
+    contentType: "image/png",
+    cid: EMAIL_LOGO_CID,
+  };
+}
+
 /**
- * Khung HTML chung cho email tài khoản (theo phong cách GoFundMe): logo chữ ở đầu trên nền nhạt,
- * nội dung căn trái, nút viên thuốc, chân thư nền xám chữ nhỏ. `body` là HTML đã escape.
+ * Khung HTML chung cho email tài khoản (theo phong cách GoFundMe): nền xám nhạt, thẻ trắng bo góc
+ * có logo ảnh ở đầu, tiêu đề, nội dung căn trái và chân thư ngoài thẻ. `title`/`body` là HTML đã escape.
+ * Font hệ thống (Segoe UI/Roboto/Helvetica) vì Gmail không tải web font; chữ "GÓP MẦM" nằm trong logo ảnh.
  */
-function brandedEmailHtml(body: string): string {
+function brandedEmailHtml(title: string, body: string): string {
   const home = escapeHtml(frontendBaseUrl());
-  const font = "'Be Vietnam Pro',Arial,Helvetica,sans-serif";
   return `<!doctype html>
 <html lang="vi">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>${title}</title>
   </head>
-  <body style="margin:0;padding:0;background:#ffffff;font-family:${font};color:#252525">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff">
+  <body style="margin:0;padding:0;background:#f4f4f4;-webkit-text-size-adjust:100%">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f4f4">
       <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px">
+        <td align="center" style="padding:32px 12px">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:16px">
             <tr>
-              <td align="center" style="padding:20px 24px;background:#fdeeeb">
-                <a href="${home}" style="color:#151d36;font-size:22px;font-weight:800;letter-spacing:1px;text-decoration:none">GÓP <span style="color:#e0402b">MẦM</span></a>
+              <td align="center" style="padding:32px 32px 8px">
+                <a href="${home}" style="text-decoration:none"><img src="cid:${EMAIL_LOGO_CID}" width="198" height="44" alt="Góp Mầm" style="display:block;border:0;width:198px;height:44px;font-family:${EMAIL_FONT};font-size:22px;font-weight:800;color:#151d36"></a>
               </td>
             </tr>
             <tr>
-              <td style="padding:32px 24px 8px;font-size:16px;line-height:1.5;text-align:left">
+              <td style="padding:24px 32px 32px;font-family:${EMAIL_FONT};font-size:16px;line-height:1.6;color:#232323;text-align:left">
+                <h1 style="margin:0 0 20px;font-family:${EMAIL_FONT};font-size:24px;line-height:1.3;font-weight:700;color:#151d36">${title}</h1>
 ${body}
               </td>
             </tr>
+          </table>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px">
             <tr>
-              <td style="padding:32px 24px 24px;background:#f5f5f5;font-size:11px;line-height:1.5;color:#232323;text-align:left">
-                <p style="margin:0 0 8px">Bạn nhận được email này vì nó chứa thông tin quan trọng về tài khoản Góp Mầm của bạn. Có câu hỏi? <a href="${home}" style="color:#232323">Liên hệ với chúng tôi</a>.</p>
-                <p style="margin:0"><strong>Góp Mầm</strong> · Nền tảng gây quỹ cộng đồng minh bạch</p>
+              <td style="padding:20px 32px 0;font-family:${EMAIL_FONT};font-size:12px;line-height:1.6;color:#6b7385;text-align:center">
+                <p style="margin:0 0 6px">Bạn nhận được email này vì nó chứa thông tin quan trọng về tài khoản Góp Mầm của bạn.</p>
+                <p style="margin:0">Có câu hỏi? <a href="${home}" style="color:#4a5268;text-decoration:underline">Liên hệ với chúng tôi</a> · <strong style="color:#4a5268">Góp Mầm</strong>, nền tảng gây quỹ cộng đồng minh bạch</p>
               </td>
             </tr>
           </table>
@@ -148,9 +175,9 @@ ${body}
 </html>`;
 }
 
-/** Nút hành động chính trong email: viên thuốc, căn trái. */
+/** Nút hành động chính trong email: viên thuốc màu thương hiệu, căn trái. */
 function emailButton(href: string, label: string): string {
-  return `<a href="${href}" target="_blank" style="display:inline-block;padding:12px 28px;border-radius:60px;background:#e0402b;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none">${label}</a>`;
+  return `<table role="presentation" cellspacing="0" cellpadding="0"><tr><td style="border-radius:999px;background:#e0402b"><a href="${href}" target="_blank" style="display:inline-block;padding:14px 32px;border-radius:999px;font-family:${EMAIL_FONT};font-size:16px;font-weight:700;line-height:1;color:#ffffff;text-decoration:none">${label}</a></td></tr></table>`;
 }
 
 export function renderPasswordResetEmail(message: PasswordResetEmail): RenderedEmail {
@@ -170,13 +197,16 @@ export function renderPasswordResetEmail(message: PasswordResetEmail): RenderedE
       "",
       "Góp Mầm",
     ].join("\n"),
-    html: brandedEmailHtml(`                <p style="margin:0 0 20px">Xin chào ${name},</p>
-                <p style="margin:0 0 20px">Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản Góp Mầm của bạn.</p>
-                <p style="margin:0 0 28px">Để đặt lại mật khẩu, bạn chỉ cần bấm nút bên dưới.</p>
-                <p style="margin:0 0 28px">${emailButton(url, "Đặt lại mật khẩu")}</p>
-                <p style="margin:0 0 12px;font-size:14px;color:#4a5268">Liên kết hết hạn sau ${message.expiresInMinutes} phút và chỉ dùng được một lần. Nếu nút không bấm được, hãy dán đường dẫn này vào trình duyệt:</p>
-                <p style="margin:0 0 28px;font-size:13px;word-break:break-all"><a href="${url}" style="color:#c2321f">${url}</a></p>
-                <p style="margin:0 0 24px">Nếu bạn không yêu cầu, đừng lo. Mật khẩu của bạn vẫn an toàn và bạn có thể bỏ qua email này.</p>`),
+    html: brandedEmailHtml(
+      "Đặt lại mật khẩu",
+      `                <p style="margin:0 0 16px">Xin chào ${name},</p>
+                <p style="margin:0 0 16px">Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản Góp Mầm của bạn. Để chọn mật khẩu mới, bạn chỉ cần bấm nút bên dưới.</p>
+                <div style="margin:28px 0">${emailButton(url, "Đặt lại mật khẩu")}</div>
+                <p style="margin:0 0 24px;font-size:14px;color:#4a5268">Liên kết hết hạn sau ${message.expiresInMinutes} phút và chỉ dùng được một lần.</p>
+                <p style="margin:0;padding-top:20px;border-top:1px solid #ececec">Nếu bạn không yêu cầu, đừng lo. Mật khẩu của bạn vẫn an toàn và bạn có thể bỏ qua email này.</p>
+                <p style="margin:20px 0 0;font-size:12px;line-height:1.5;color:#6b7385">Nút không bấm được? Dán đường dẫn này vào trình duyệt:<br><a href="${url}" style="color:#6b7385;word-break:break-all">${url}</a></p>`,
+    ),
+    attachments: [emailLogoAttachment()],
   };
 }
 
