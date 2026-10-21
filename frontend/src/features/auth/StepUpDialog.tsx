@@ -1,6 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 
 import {
   ApiError,
@@ -18,6 +27,8 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const RESEND_SECONDS = 60;
+const CODE_LENGTH = 6;
+const EMPTY_CODE: string[] = Array.from({ length: CODE_LENGTH }, () => "");
 
 /** Kết quả gửi mã: còn bao lâu mới được gửi lại, hoặc lỗi để hiện trong hộp. */
 type SendOutcome = { cooldown: number; error: string };
@@ -72,7 +83,8 @@ function StepUpView({ pending, onDone }: { pending: Pending; onDone: () => void 
   const email = getStoredUser()?.email;
   const action = ACTION_LABELS[pending.purpose] ?? "tiếp tục";
 
-  const [code, setCode] = useState("");
+  const [digits, setDigits] = useState<string[]>(EMPTY_CODE);
+  const code = digits.join("");
   const [status, setStatus] = useState<"sending" | "sent" | "verifying">("sent");
   const [error, setError] = useState(pending.firstSend.error);
   const [cooldown, setCooldown] = useState(pending.firstSend.cooldown);
@@ -140,7 +152,7 @@ function StepUpView({ pending, onDone }: { pending: Pending; onDone: () => void 
         if (event.target === event.currentTarget) finish(null);
       }}
     >
-      <form className="app-dialog-body" onSubmit={submit} noValidate>
+      <form className="app-dialog-body step-up-body" onSubmit={submit} noValidate>
         <h2 id={`${id}-title`} className="app-dialog-title">Xác minh để {action}</h2>
         <p id={`${id}-message`} className="app-dialog-message">
           {status === "sending" ? (
@@ -152,24 +164,15 @@ function StepUpView({ pending, onDone }: { pending: Pending; onDone: () => void 
           )}
         </p>
 
-        <label className="field">
-          <span>Mã xác minh</span>
-          <input
-            className="step-up-code"
-            value={code}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            placeholder="••••••"
-            aria-invalid={Boolean(error)}
-            aria-describedby={error ? `${id}-error` : undefined}
-            autoFocus
-            onChange={(event) => {
-              setCode(event.target.value.replace(/\D/g, "").slice(0, 6));
-              if (error) setError("");
-            }}
-          />
-        </label>
+        <CodeInput
+          digits={digits}
+          invalid={Boolean(error)}
+          describedBy={error ? `${id}-error` : undefined}
+          onChange={(next) => {
+            setDigits(next);
+            if (error) setError("");
+          }}
+        />
 
         {error && <p id={`${id}-error`} className="form-error" role="alert">{error}</p>}
 
@@ -186,11 +189,102 @@ function StepUpView({ pending, onDone }: { pending: Pending; onDone: () => void 
           <button className="button button-outline" type="button" onClick={() => finish(null)}>
             Hủy
           </button>
-          <button className="button button-primary" type="submit" disabled={status !== "sent" || code.length !== 6}>
+          <button className="button button-primary" type="submit" disabled={status !== "sent" || code.length !== CODE_LENGTH}>
             {status === "verifying" ? "Đang xác minh…" : "Xác nhận"}
           </button>
         </div>
       </form>
     </dialog>
+  );
+}
+
+type CodeInputProps = {
+  digits: string[];
+  invalid: boolean;
+  describedBy?: string;
+  onChange: (digits: string[]) => void;
+};
+
+/**
+ * Mã OTP dạng 6 ô, mỗi ô một chữ số: gõ tự sang ô kế, Backspace ở ô trống lùi về ô trước,
+ * dán (hoặc trình duyệt tự điền `one-time-code`) cả mã thì rải đều vào các ô.
+ */
+function CodeInput({ digits, invalid, describedBy, onChange }: CodeInputProps) {
+  const inputs = useRef<Array<HTMLInputElement | null>>([]);
+
+  const focusBox = (index: number) => {
+    const box = inputs.current[Math.max(0, Math.min(CODE_LENGTH - 1, index))];
+    box?.focus();
+    box?.select();
+  };
+
+  /** Ghi các chữ số `text` bắt đầu từ ô `start`, rồi đưa con trỏ tới ô kế tiếp. */
+  const fill = (start: number, text: string) => {
+    const incoming = text.replace(/\D/g, "").slice(0, CODE_LENGTH - start);
+    if (!incoming) return;
+    const next = [...digits];
+    [...incoming].forEach((digit, offset) => {
+      next[start + offset] = digit;
+    });
+    onChange(next);
+    focusBox(start + incoming.length);
+  };
+
+  const onKeyDown = (index: number, event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Backspace" && !digits[index] && index > 0) {
+      event.preventDefault();
+      const next = [...digits];
+      next[index - 1] = "";
+      onChange(next);
+      focusBox(index - 1);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      focusBox(index - 1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      focusBox(index + 1);
+    }
+  };
+
+  const onPaste = (index: number, event: ClipboardEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    fill(index, event.clipboardData.getData("text"));
+  };
+
+  return (
+    <div className="step-up-code" role="group" aria-label="Mã xác minh 6 chữ số" aria-describedby={describedBy}>
+      {digits.map((digit, index) => (
+        <input
+          key={index}
+          ref={(element) => {
+            inputs.current[index] = element;
+          }}
+          className="step-up-digit"
+          value={digit}
+          inputMode="numeric"
+          autoComplete={index === 0 ? "one-time-code" : "off"}
+          maxLength={index === 0 ? CODE_LENGTH : 1}
+          aria-label={`Chữ số thứ ${index + 1}`}
+          aria-invalid={invalid}
+          autoFocus={index === 0}
+          onFocus={(event) => event.target.select()}
+          onKeyDown={(event) => onKeyDown(index, event)}
+          onPaste={(event) => onPaste(index, event)}
+          onChange={(event) => {
+            const value = event.target.value.replace(/\D/g, "");
+            if (!value) {
+              const next = [...digits];
+              next[index] = "";
+              onChange(next);
+            } else if (value.length > 1 && index === 0) {
+              // Tự điền mã từ email/SMS rơi cả chuỗi vào ô đầu.
+              fill(0, value);
+            } else {
+              fill(index, value.slice(-1));
+            }
+          }}
+        />
+      ))}
+    </div>
   );
 }

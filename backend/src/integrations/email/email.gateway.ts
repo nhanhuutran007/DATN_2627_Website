@@ -106,43 +106,77 @@ export function renderEmailVerificationEmail(message: EmailVerificationEmail): R
   };
 }
 
+/**
+ * Khung HTML chung cho email tài khoản (theo phong cách GoFundMe): logo chữ ở đầu trên nền nhạt,
+ * nội dung căn trái, nút viên thuốc, chân thư nền xám chữ nhỏ. `body` là HTML đã escape.
+ */
+function brandedEmailHtml(body: string): string {
+  const home = escapeHtml(frontendBaseUrl());
+  const font = "'Be Vietnam Pro',Arial,Helvetica,sans-serif";
+  return `<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+  </head>
+  <body style="margin:0;padding:0;background:#ffffff;font-family:${font};color:#252525">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px">
+            <tr>
+              <td align="center" style="padding:20px 24px;background:#fdeeeb">
+                <a href="${home}" style="color:#151d36;font-size:22px;font-weight:800;letter-spacing:1px;text-decoration:none">GÓP <span style="color:#e0402b">MẦM</span></a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 24px 8px;font-size:16px;line-height:1.5;text-align:left">
+${body}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 24px 24px;background:#f5f5f5;font-size:11px;line-height:1.5;color:#232323;text-align:left">
+                <p style="margin:0 0 8px">Bạn nhận được email này vì nó chứa thông tin quan trọng về tài khoản Góp Mầm của bạn. Có câu hỏi? <a href="${home}" style="color:#232323">Liên hệ với chúng tôi</a>.</p>
+                <p style="margin:0"><strong>Góp Mầm</strong> · Nền tảng gây quỹ cộng đồng minh bạch</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+/** Nút hành động chính trong email: viên thuốc, căn trái. */
+function emailButton(href: string, label: string): string {
+  return `<a href="${href}" target="_blank" style="display:inline-block;padding:12px 28px;border-radius:60px;background:#e0402b;color:#ffffff;font-size:16px;font-weight:700;text-decoration:none">${label}</a>`;
+}
+
 export function renderPasswordResetEmail(message: PasswordResetEmail): RenderedEmail {
   const name = escapeHtml(message.name);
   const url = escapeHtml(message.resetUrl);
 
   return {
-    subject: "Đặt lại mật khẩu tài khoản Góp Mầm",
+    subject: "Yêu cầu đặt lại mật khẩu Góp Mầm",
     text: [
       `Xin chào ${message.name},`,
       "",
       "Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản Góp Mầm của bạn.",
-      `Mở liên kết sau để chọn mật khẩu mới (hết hạn sau ${message.expiresInMinutes} phút, chỉ dùng được một lần):`,
+      `Để đặt lại mật khẩu, hãy mở liên kết sau (hết hạn sau ${message.expiresInMinutes} phút, chỉ dùng được một lần):`,
       message.resetUrl,
       "",
-      "Nếu bạn không yêu cầu, hãy bỏ qua email này. Mật khẩu hiện tại vẫn giữ nguyên.",
+      "Nếu bạn không yêu cầu, đừng lo. Mật khẩu của bạn vẫn an toàn và bạn có thể bỏ qua email này.",
       "",
       "Góp Mầm",
     ].join("\n"),
-    html: `<!doctype html>
-<html lang="vi">
-  <body style="margin:0;padding:24px;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#141c33">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px">
-      <tr>
-        <td style="padding:32px">
-          <p style="margin:0 0 16px;font-size:20px;font-weight:bold">Đặt lại mật khẩu</p>
-          <p style="margin:0 0 12px;line-height:1.6">Xin chào ${name},</p>
-          <p style="margin:0 0 24px;line-height:1.6">Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản Góp Mầm của bạn. Bấm nút dưới đây để chọn mật khẩu mới.</p>
-          <p style="margin:0 0 24px">
-            <a href="${url}" style="display:inline-block;padding:12px 24px;border-radius:8px;background:#16a34a;color:#ffffff;font-weight:bold;text-decoration:none">Đặt lại mật khẩu</a>
-          </p>
-          <p style="margin:0 0 12px;line-height:1.6;font-size:14px;color:#4b5563">Liên kết hết hạn sau ${message.expiresInMinutes} phút và chỉ dùng được một lần. Nếu nút không bấm được, hãy dán đường dẫn này vào trình duyệt:</p>
-          <p style="margin:0 0 24px;font-size:13px;word-break:break-all"><a href="${url}" style="color:#16a34a">${url}</a></p>
-          <p style="margin:0;line-height:1.6;font-size:14px;color:#4b5563">Nếu bạn không yêu cầu, hãy bỏ qua email này. Mật khẩu hiện tại vẫn giữ nguyên.</p>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`,
+    html: brandedEmailHtml(`                <p style="margin:0 0 20px">Xin chào ${name},</p>
+                <p style="margin:0 0 20px">Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản Góp Mầm của bạn.</p>
+                <p style="margin:0 0 28px">Để đặt lại mật khẩu, bạn chỉ cần bấm nút bên dưới.</p>
+                <p style="margin:0 0 28px">${emailButton(url, "Đặt lại mật khẩu")}</p>
+                <p style="margin:0 0 12px;font-size:14px;color:#4a5268">Liên kết hết hạn sau ${message.expiresInMinutes} phút và chỉ dùng được một lần. Nếu nút không bấm được, hãy dán đường dẫn này vào trình duyệt:</p>
+                <p style="margin:0 0 28px;font-size:13px;word-break:break-all"><a href="${url}" style="color:#c2321f">${url}</a></p>
+                <p style="margin:0 0 24px">Nếu bạn không yêu cầu, đừng lo. Mật khẩu của bạn vẫn an toàn và bạn có thể bỏ qua email này.</p>`),
   };
 }
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
-import { AuthShell } from "@/features/auth/AuthShell";
+import { LogoMark } from "@/components/ui/LogoMark";
 import { ChangePasswordForm } from "@/features/auth/ChangePasswordForm";
 
 export const metadata: Metadata = {
@@ -8,14 +9,17 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/** Cùng khung thẻ toàn màn hình với đăng nhập/quên mật khẩu (không header/footer — xem ChromeGate). */
 export default function ChangePasswordPage() {
   return (
-    <AuthShell
-      title="Đổi mật khẩu"
-      lead="Nhập mật khẩu hiện tại và chọn mật khẩu mới cho tài khoản của bạn."
-      image={{ src: "/images/cover-startup.webp", alt: "" }}
-    >
-      <ChangePasswordForm />
-    </AuthShell>
+    <main className="signin-page">
+      <div className="signin-card signin-card-start">
+        <Link className="logo signin-logo" href="/" aria-label="Góp Mầm – Trang chủ">
+          <LogoMark className="logo-mark" />
+          <span className="logo-text">GÓP <b>MẦM</b></span>
+        </Link>
+        <ChangePasswordForm />
+      </div>
+    </main>
   );
 }
