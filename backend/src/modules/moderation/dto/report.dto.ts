@@ -37,10 +37,13 @@ export class CreateReportDto {
   description!: string;
 }
 
+/** `open` = còn cần xử lý (chờ xem xét + đang xem xét). */
+export const REPORT_STATUS_FILTERS = [...Object.values(ReportStatus), "open"] as const;
+
 export class ReportQueryDto {
   @IsOptional()
-  @IsEnum(ReportStatus)
-  status?: ReportStatus;
+  @IsIn(REPORT_STATUS_FILTERS)
+  status?: ReportStatus | "open";
 
   @IsOptional()
   @IsEnum(ReportReason)

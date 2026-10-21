@@ -169,10 +169,12 @@ class FraudDetectorService:
         else:
             level = "LOW"
 
+        # Chỉ luật thực sự kích hoạt (điểm > 0) mới là nguyên nhân
         reasons = sorted(
             (
                 FraudReason(group=result.group, label=result.label, weight=round(result.score, 6))
                 for result in rule_results
+                if result.score > 0
             ),
             key=lambda reason: reason.weight,
             reverse=True,

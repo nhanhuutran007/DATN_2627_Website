@@ -3995,28 +3995,33 @@ button {
   min-width: 0;
 }
 
-/* Desktop: nút tròn màu chủ đạo nằm đè lên mép phải sidebar, cạnh logo */
 .admin-menu-toggle {
-  position: fixed;
-  top: 24px;
-  left: calc(272px - 18px);
-  z-index: 5;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
   padding: 0;
-  color: var(--white);
   border: 0;
-  border-radius: 50%;
-  background: var(--primary);
-  box-shadow: 0 4px 12px rgba(224, 64, 43, 0.35);
   cursor: pointer;
-  transition: left 0.2s, transform 0.2s, background 0.15s;
 }
 
-.admin-menu-toggle:hover {
-  background: var(--primary-dark);
+/* Desktop: cột sidebar luôn là dải icon; rê chuột thì sidebar rộng ra đè lên nội dung, không đẩy bố cục */
+@media (min-width: 961px) {
+  .admin-shell,
+  .admin-shell.is-rail {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .admin-sidebar {
+    z-index: 60;
+    width: 72px;
+    overflow-x: hidden;
+    white-space: nowrap;
+    transition: width 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .admin-shell:not(.is-rail) .admin-sidebar {
+    width: 272px;
+    box-shadow: 8px 0 32px rgba(21, 29, 54, 0.18);
+  }
 }
 
 /* Cột nội dung cố định ở cột 2 để không nhảy sang khi sidebar thành lớp phủ */
@@ -4025,10 +4030,6 @@ button {
 }
 
 /* Dải icon: ẩn chữ, nhãn hiện qua tooltip (title) */
-.admin-shell.is-rail {
-  grid-template-columns: 72px minmax(0, 1fr);
-}
-
 .is-rail .admin-sidebar nav {
   padding: 0 10px;
 }
@@ -4036,11 +4037,6 @@ button {
 .is-rail .admin-brand {
   justify-content: center;
   padding: 0;
-}
-
-.is-rail .admin-menu-toggle {
-  left: calc(72px - 18px);
-  transform: rotate(180deg);
 }
 
 /* Dải icon: thay tiêu đề nhóm bằng một vạch ngăn mảnh */
@@ -4098,6 +4094,25 @@ button {
   color: #b42318;
   border-color: #f7c1ba;
   background: #fdecea;
+}
+
+/* Nút x ở cuối dòng thông báo */
+.admin-notice-close {
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  padding: 4px;
+  color: inherit;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.admin-notice-close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .admin-stat-grid {
@@ -4437,6 +4452,19 @@ button {
   font-size: 0.85rem;
 }
 
+/* Dòng phụ dưới giá trị trong ô bảng: "3 ngày trước", "Còn 5 ngày" */
+.table-cell-note {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.table-cell-note.is-urgent {
+  color: var(--primary);
+  font-weight: 600;
+}
+
 .table-status {
   display: inline-block;
   padding: 3px 10px;
@@ -4485,6 +4513,19 @@ button {
   color: var(--white);
   border-color: var(--success);
   background: var(--success);
+}
+
+/* Hành động gỡ nội dung: viền đỏ, không dùng màu xanh "chấp thuận" */
+.risk-actions button.is-danger {
+  color: var(--primary);
+  border-color: #f3b4aa;
+  background: #fff5f3;
+}
+
+.risk-actions button.is-danger:hover {
+  color: var(--white);
+  border-color: var(--primary);
+  background: var(--primary);
 }
 
 .admin-actions button:disabled,
@@ -4669,6 +4710,19 @@ button {
   font-size: 0.98rem;
 }
 
+/* Tên đối tượng bấm được: mở trang chiến dịch hoặc hồ sơ tài khoản */
+.risk-list h3 a,
+.risk-list h3 .link-inline {
+  color: inherit;
+  font: inherit;
+}
+
+.risk-list h3 a:hover,
+.risk-list h3 .link-inline:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
 /* Thông báo "không có mục nào" chiếm cả hàng */
 .risk-list article > p:only-child {
   grid-column: 1 / -1;
@@ -4715,6 +4769,67 @@ button {
 .risk-level.low,
 .report-status.dismissed { color: var(--text-2); background: var(--soft); }
 .report-status.resolved { color: var(--success); background: var(--success-soft); }
+.report-status.neutral { color: var(--navy); background: var(--soft); }
+
+/* Nhãn ngữ cảnh cạnh tên chiến dịch ở trang kiểm duyệt bình luận */
+.comment-flag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.comment-flag.is-reported { color: var(--white); background: var(--primary); }
+.comment-flag.is-reported:hover { background: var(--primary-dark); }
+.comment-flag.is-unanswered { color: #8a5300; background: #fff3dc; }
+.comment-flag.is-answered { color: var(--success); background: var(--success-soft); }
+
+/* Mã giao dịch hiện đầy đủ, chữ đơn cách, kèm nút sao chép */
+.tx-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.tx-code code {
+  font-size: 0.8rem;
+}
+
+.tx-copy {
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  color: var(--muted);
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tx-copy:hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.admin-table-card td > a.table-link {
+  color: inherit;
+}
+
+.admin-table-card td > a.table-link:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.comment-parent {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
 
 .report-quote {
   padding-left: 10px;

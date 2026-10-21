@@ -35,6 +35,12 @@ export type AdminComment = {
   hiddenReason?: string | null;
   hiddenAt?: string | null;
   createdAt: string;
+  /** Số báo cáo vi phạm chưa xử lý nhắm vào bình luận. */
+  openReportCount: number;
+  /** Bình luận gốc mà câu trả lời này đáp lại. */
+  parent: { id: string; content: string; authorName: string | null } | null;
+  /** Chỉ với câu hỏi gốc: chủ dự án đã trả lời hay chưa. */
+  ownerReplied: boolean | null;
 };
 
 export type AdminCommentList = { items: AdminComment[]; total: number; offset: number; limit: number };
@@ -63,6 +69,8 @@ export function fetchAdminComments(query: {
   kind?: CommentKind;
   /** Bình luận gốc hay câu trả lời. */
   level?: "root" | "reply";
+  /** Chỉ bình luận đang có báo cáo vi phạm chưa xử lý. */
+  reported?: boolean;
   q?: string;
   offset?: number;
   limit?: number;
@@ -71,6 +79,7 @@ export function fetchAdminComments(query: {
   if (query.status) params.set("status", query.status);
   if (query.kind) params.set("kind", query.kind);
   if (query.level) params.set("level", query.level);
+  if (query.reported) params.set("reported", "true");
   if (query.q) params.set("q", query.q);
   if (query.offset !== undefined) params.set("offset", String(query.offset));
   if (query.limit !== undefined) params.set("limit", String(query.limit));

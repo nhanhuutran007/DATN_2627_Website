@@ -19,6 +19,7 @@ export type AdminOverview = {
     pending: number;
     needsInfo: number;
     approved: number;
+    reviewed: number;
     active: number;
     ended: number;
     success: number;
@@ -76,6 +77,8 @@ export type AdminDonation = {
   createdAt: string;
   /** Mức cảnh báo cao nhất đang mở của chiến dịch/người ủng hộ liên quan. */
   riskLevel?: RiskLevel | null;
+  /** Cảnh báo đó thuộc chiến dịch, người ủng hộ, hay cả hai. */
+  riskSource?: "campaign" | "user" | "both" | null;
 };
 
 export type AdminDonationList = {

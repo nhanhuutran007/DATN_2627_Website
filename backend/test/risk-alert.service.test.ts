@@ -271,6 +271,22 @@ describe("RiskAlertService", () => {
       equal(resolvedStale.status, RiskAlertStatus.RESOLVED);
       equal(resolvedStale.resolvedBy, ADMIN_ID);
     });
+
+    it("should resolve every open alert when a rescan flags nothing", async () => {
+      const stale = makeAlert({ id: "stale-1" });
+      const { service, saved } = makeService({
+        aiResult: () => ({
+          available: true,
+          entityType: "CAMPAIGN",
+          entityId: CAMPAIGN_ID,
+          data: { riskScore: 0.1, level: "LOW", method: "RULE", reasons: [], evidences: {}, fallback: true },
+        }),
+        openAlerts: [stale],
+      });
+
+      await service.generateWarnings(user);
+      equal(saved.find((alert) => alert.id === "stale-1")?.status, RiskAlertStatus.RESOLVED);
+    });
   });
 
   describe("list", () => {

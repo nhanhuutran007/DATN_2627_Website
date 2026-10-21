@@ -51,7 +51,7 @@ export class AdminCampaignQueryDto {
   maxGoal?: number;
 
   @IsOptional()
-  @IsIn(["newest", "ending", "raised", "backers"])
+  @IsIn(["newest", "ending", "raised", "backers", "submitted"])
   sort?: string = "newest";
 
   @IsOptional()

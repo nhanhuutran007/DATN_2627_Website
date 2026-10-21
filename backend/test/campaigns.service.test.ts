@@ -89,6 +89,9 @@ function createMockRepo() {
   return { repo, mockCampaign, listState, listQuery };
 }
 
+// Khác ownerId của mockCampaign: admin không được tự duyệt chiến dịch của mình
+const ADMIN_ID = "123e4567-e89b-12d3-a456-426614174999";
+
 function makeUser(role: UserRole = UserRole.USER, id = "123e4567-e89b-12d3-a456-426614174001") {
   return {
     id,
@@ -314,6 +317,7 @@ describe("CampaignsService", () => {
         makeUser(),
       );
       equal(campaign.status, CampaignStatus.PENDING);
+      ok(campaign.submittedAt instanceof Date);
       equal(audit.entries.length, 1);
       equal(audit.entries[0].action, "campaign.submit");
       equal(audit.entries[0].userId, "123e4567-e89b-12d3-a456-426614174001");
@@ -395,12 +399,28 @@ describe("CampaignsService", () => {
   });
 
   describe("moderate", () => {
+    it("should forbid an admin from moderating their own campaign", async () => {
+      repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.PENDING });
+      await campaignsService
+        .moderate(
+          "123e4567-e89b-12d3-a456-426614174000",
+          { status: CampaignStatus.APPROVED } as any,
+          makeUser(UserRole.ADMIN),
+        )
+        .then(() => {
+          throw new Error("should have thrown");
+        })
+        .catch((err) => {
+          equal(err.status, 403);
+        });
+    });
+
     it("should allow an admin to approve a campaign", async () => {
       repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.PENDING });
       const campaign = await campaignsService.moderate(
         "123e4567-e89b-12d3-a456-426614174000",
         { status: CampaignStatus.APPROVED } as any,
-        makeUser(UserRole.ADMIN),
+        makeUser(UserRole.ADMIN, ADMIN_ID),
       );
       equal(campaign.status, CampaignStatus.APPROVED);
     });
@@ -410,7 +430,7 @@ describe("CampaignsService", () => {
       const campaign = await campaignsService.moderate(
         "123e4567-e89b-12d3-a456-426614174000",
         { status: CampaignStatus.NEEDS_INFO, reason: "Cần bổ sung chứng từ" } as any,
-        makeUser(UserRole.ADMIN),
+        makeUser(UserRole.ADMIN, ADMIN_ID),
       );
       equal(campaign.status, CampaignStatus.NEEDS_INFO);
       equal(audit.entries.length, 1);
@@ -426,7 +446,7 @@ describe("CampaignsService", () => {
         .moderate(
           "123e4567-e89b-12d3-a456-426614174000",
           { status: CampaignStatus.NEEDS_INFO } as any,
-          makeUser(UserRole.ADMIN),
+          makeUser(UserRole.ADMIN, ADMIN_ID),
         )
         .then(() => {
           throw new Error("should have thrown");
@@ -457,7 +477,7 @@ describe("CampaignsService", () => {
         .moderate(
           "123e4567-e89b-12d3-a456-426614174000",
           { status: CampaignStatus.ENDED } as any,
-          makeUser(UserRole.ADMIN),
+          makeUser(UserRole.ADMIN, ADMIN_ID),
         )
         .then(() => {
           throw new Error("should have thrown");
@@ -472,7 +492,7 @@ describe("CampaignsService", () => {
       const campaign = await campaignsService.moderate(
         "123e4567-e89b-12d3-a456-426614174000",
         { status: CampaignStatus.PAUSED, reason: "Đang rà soát chứng từ" } as any,
-        makeUser(UserRole.ADMIN),
+        makeUser(UserRole.ADMIN, ADMIN_ID),
       );
       equal(campaign.status, CampaignStatus.PAUSED);
     });
@@ -483,7 +503,7 @@ describe("CampaignsService", () => {
         .moderate(
           "123e4567-e89b-12d3-a456-426614174000",
           { status: CampaignStatus.PAUSED } as any,
-          makeUser(UserRole.ADMIN),
+          makeUser(UserRole.ADMIN, ADMIN_ID),
         )
         .then(() => {
           throw new Error("should have thrown");
@@ -498,7 +518,7 @@ describe("CampaignsService", () => {
       const campaign = await campaignsService.moderate(
         "123e4567-e89b-12d3-a456-426614174000",
         { status: CampaignStatus.ACTIVE } as any,
-        makeUser(UserRole.ADMIN),
+        makeUser(UserRole.ADMIN, ADMIN_ID),
       );
       equal(campaign.status, CampaignStatus.ACTIVE);
     });

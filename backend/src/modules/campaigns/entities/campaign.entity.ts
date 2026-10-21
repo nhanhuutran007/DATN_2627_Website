@@ -60,6 +60,10 @@ export class Campaign extends BaseEntity {
   @Column({ type: "enum", enum: CampaignStatus, default: CampaignStatus.DRAFT })
   status!: CampaignStatus;
 
+  /** Lần gửi duyệt gần nhất; hàng chờ duyệt xếp theo cột này. */
+  @Column({ name: "submitted_at", type: "datetime", nullable: true })
+  submittedAt?: Date | null;
+
   /** Admin chọn hiển thị ở mục "Dự án nổi bật" trang chủ. */
   @Column({ name: "is_featured", default: false })
   isFeatured!: boolean;

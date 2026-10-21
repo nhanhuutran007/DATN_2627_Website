@@ -24,6 +24,18 @@ def test_many_failed_payments_rule_triggered() -> None:
     assert response.level == "HIGH"
 
 
+def test_rules_with_zero_score_are_not_reasons() -> None:
+    service = FraudDetectorService()
+    response = service.score(
+        "CAMPAIGN",
+        "campaign-1",
+        {"contribution_count_1h": 0, "device_shared_accounts": 0, "amount_z_score": 2.0},
+    )
+
+    groups = {reason.group for reason in response.reasons}
+    assert groups == {"RULE_BIG_JUMP"}
+
+
 def test_unknown_entity_and_features_are_harmless() -> None:
     service = FraudDetectorService()
     response = service.score("BOGUS_ENTITY", None, {"made_up_feature": 99})

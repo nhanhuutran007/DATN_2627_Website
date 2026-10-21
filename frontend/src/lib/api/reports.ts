@@ -58,8 +58,11 @@ export async function submitReport(payload: {
   return api.post<CampaignReport>("/reports", payload);
 }
 
+/** `open` = còn cần xử lý (chờ xem xét + đang xem xét). */
+export type ReportStatusFilter = ReportStatus | "open";
+
 export async function fetchAdminReports(query: {
-  status?: ReportStatus;
+  status?: ReportStatusFilter;
   reason?: ReportReason;
   target?: "campaign" | "comment";
   q?: string;

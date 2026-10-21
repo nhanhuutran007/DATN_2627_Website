@@ -22,6 +22,7 @@ import {
   CreateCommentDto,
 } from "./dto/comment.dto";
 import { CampaignComment, CommentKind, CommentStatus } from "./entities/campaign-comment.entity";
+import { Report, ReportStatus } from "../moderation/entities/report.entity";
 
 /** Bình luận được trên chiến dịch đã công khai (người dùng nhìn thấy được). */
 export const COMMENTABLE_STATUSES = [
@@ -49,8 +50,20 @@ function excerpt(content: string): string {
   return content.length > EXCERPT ? `${content.slice(0, EXCERPT)}…` : content;
 }
 
+const OPEN_REPORT_STATUSES = [ReportStatus.PENDING, ReportStatus.REVIEWING];
+
+/** Ngữ cảnh kiểm duyệt gắn thêm vào bình luận (giữ nguyên instance entity để serializer vẫn ẩn trường nhạy cảm của User). */
+export type AdminCommentView = CampaignComment & {
+  /** Số báo cáo vi phạm chưa xử lý nhắm vào bình luận này. */
+  openReportCount: number;
+  /** Bình luận gốc mà câu trả lời này đáp lại. */
+  parent: { id: string; content: string; authorName: string | null } | null;
+  /** Chỉ với câu hỏi gốc: chủ dự án đã trả lời (còn hiển thị) hay chưa. */
+  ownerReplied: boolean | null;
+};
+
 export type AdminCommentList = {
-  items: CampaignComment[];
+  items: AdminCommentView[];
   total: number;
   offset: number;
   limit: number;
@@ -69,6 +82,8 @@ export class CommentsService {
     private readonly campaignsService: CampaignsService,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
+    @InjectRepository(Report)
+    private readonly reportRepo: Repository<Report>,
   ) {}
 
   private async getPublicCampaign(campaignId: string): Promise<Campaign> {
@@ -228,10 +243,20 @@ export class CommentsService {
   async adminList(query: AdminCommentQueryDto): Promise<AdminCommentList> {
     const offset = query.offset ?? 0;
     const limit = query.limit ?? 20;
+    let reportedIds: string[] | undefined;
+    if (query.reported) {
+      const open = await this.reportRepo.find({
+        where: { commentId: Not(IsNull()), status: In(OPEN_REPORT_STATUSES) },
+        select: { commentId: true },
+      });
+      reportedIds = [...new Set(open.map((report) => report.commentId as string))];
+      if (reportedIds.length === 0) return { items: [], total: 0, offset, limit };
+    }
     const base: FindOptionsWhere<CampaignComment> = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.kind ? { kind: query.kind } : {}),
       ...(query.level ? { parentId: query.level === "reply" ? Not(IsNull()) : IsNull() } : {}),
+      ...(reportedIds ? { id: In(reportedIds) } : {}),
     };
     const like = query.q ? Like(`%${query.q}%`) : undefined;
     const where: FindOptionsWhere<CampaignComment> | FindOptionsWhere<CampaignComment>[] = like
@@ -249,7 +274,54 @@ export class CommentsService {
       skip: offset,
       take: limit,
     });
-    return { items, total, offset, limit };
+    return { items: await this.withModerationContext(items), total, offset, limit };
+  }
+
+  /** Gắn số báo cáo đang mở, bình luận gốc (với câu trả lời) và trạng thái đã trả lời (với câu hỏi). */
+  private async withModerationContext(items: CampaignComment[]): Promise<AdminCommentView[]> {
+    if (items.length === 0) return [];
+    const ids = items.map((comment) => comment.id);
+    const parentIds = [...new Set(items.map((comment) => comment.parentId).filter((id): id is string => Boolean(id)))];
+    const questionIds = items
+      .filter((comment) => comment.kind === CommentKind.QUESTION && !comment.parentId)
+      .map((comment) => comment.id);
+
+    const [reports, parents, replies] = await Promise.all([
+      this.reportRepo.find({
+        where: { commentId: In(ids), status: In(OPEN_REPORT_STATUSES) },
+        select: { commentId: true },
+      }),
+      parentIds.length > 0
+        ? this.commentRepo.find({ where: { id: In(parentIds) }, relations: { user: true } })
+        : Promise.resolve([]),
+      questionIds.length > 0
+        ? this.commentRepo.find({
+            where: { parentId: In(questionIds), status: CommentStatus.VISIBLE },
+            select: { parentId: true, userId: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const reportCount = new Map<string, number>();
+    for (const report of reports) {
+      if (report.commentId) reportCount.set(report.commentId, (reportCount.get(report.commentId) ?? 0) + 1);
+    }
+    const parentById = new Map(parents.map((parent) => [parent.id, parent]));
+
+    return items.map((comment) => {
+      const parent = comment.parentId ? parentById.get(comment.parentId) : undefined;
+      const isQuestion = questionIds.includes(comment.id);
+      const ownerId = comment.campaign?.ownerId;
+      return Object.assign(comment, {
+        openReportCount: reportCount.get(comment.id) ?? 0,
+        parent: parent
+          ? { id: parent.id, content: excerpt(parent.content), authorName: parent.user?.name ?? null }
+          : null,
+        ownerReplied: isQuestion
+          ? replies.some((reply) => reply.parentId === comment.id && reply.userId === ownerId)
+          : null,
+      });
+    });
   }
 
   async hide(id: string, reason: string, admin: User): Promise<CampaignComment> {

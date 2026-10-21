@@ -142,7 +142,14 @@ export class ModerationService {
     const limit = query.limit ?? 20;
     const offset = query.offset ?? 0;
     const base: FindOptionsWhere<Report> = {
-      ...(query.status ? { status: query.status } : {}),
+      ...(query.status
+        ? {
+            status:
+              query.status === "open"
+                ? In([ReportStatus.PENDING, ReportStatus.REVIEWING])
+                : query.status,
+          }
+        : {}),
       ...(query.reason ? { reason: query.reason } : {}),
       ...(query.campaignId ? { campaignId: query.campaignId } : {}),
       ...(query.target ? { commentId: query.target === "comment" ? Not(IsNull()) : IsNull() } : {}),

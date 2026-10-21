@@ -106,7 +106,8 @@ export class RiskAlertService {
       keptIds.push(alert.id);
     }
 
-    await this.resolveStaleOpenAlerts(admin, keptIds);
+    // Chỉ đóng cảnh báo cũ khi lần quét thực sự chấm lại được chiến dịch nào đó
+    if (campaigns.length > 0) await this.resolveStaleOpenAlerts(admin, keptIds);
 
     const summary = {
       aiAvailable,
@@ -212,8 +213,6 @@ export class RiskAlertService {
   }
 
   private async resolveStaleOpenAlerts(admin: User, keptIds: string[]): Promise<void> {
-    if (keptIds.length === 0) return;
-
     const stale = await this.riskAlertRepo.findBy({
       status: RiskAlertStatus.OPEN,
     });
