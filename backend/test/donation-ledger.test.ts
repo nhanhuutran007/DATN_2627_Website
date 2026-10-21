@@ -95,3 +95,39 @@ describe("DonationsService.listPublicLedger", () => {
     await rejects(missing.service.listPublicLedger(CAMPAIGN_ID), NotFoundException);
   });
 });
+
+describe("DonationsService.listSupportMessages", () => {
+  it("should only query completed donations that carry a message, newest first", async () => {
+    const { service, findCalls } = setup(CampaignStatus.ACTIVE, []);
+    await service.listSupportMessages(CAMPAIGN_ID, 10, 500);
+    const where = findCalls[0]?.where as Record<string, unknown>;
+    equal(where.campaignId, CAMPAIGN_ID);
+    equal(where.status, DonationStatus.COMPLETED);
+    ok(where.message, "phải lọc theo lời nhắn khác rỗng");
+    deepEqual(findCalls[0]?.order, { completedAt: "DESC", createdAt: "DESC" });
+    equal(findCalls[0]?.skip, 10);
+    equal(findCalls[0]?.take, 50);
+  });
+
+  it("should hide anonymous names and never expose email or transaction id", async () => {
+    const { service } = setup(CampaignStatus.SUCCESS, [
+      makeDonation({ message: "  Chúc dự án thành công!  " }),
+      makeDonation({ id: "123e4567-e89b-12d3-a456-4266141740bb", isAnonymous: true, message: "Cố lên" }),
+    ]);
+    const page = await service.listSupportMessages(CAMPAIGN_ID);
+
+    equal(page.total, 2);
+    equal(page.items[0]?.donorName, "Le Van C");
+    equal(page.items[0]?.message, "Chúc dự án thành công!");
+    equal(page.items[0]?.amount, 50000);
+    equal(page.items[1]?.donorName, null);
+    const json = JSON.stringify(page);
+    ok(!json.includes("c@example.com"));
+    ok(!json.includes("demo_tx_9f8e7d6c5b"));
+  });
+
+  it("should not expose messages of campaigns that are not public", async () => {
+    const { service } = setup(CampaignStatus.PENDING, [makeDonation({ message: "Hi" })]);
+    await rejects(service.listSupportMessages(CAMPAIGN_ID), NotFoundException);
+  });
+});

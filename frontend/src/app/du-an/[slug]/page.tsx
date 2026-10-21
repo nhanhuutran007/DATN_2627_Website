@@ -10,10 +10,12 @@ import { Icon } from "@/components/ui/Icon";
 import { CampaignComments } from "@/features/comments/CampaignComments";
 import { DonateLink } from "@/features/donations/DonateLink";
 import { DonorHighlights } from "@/features/donations/DonorHighlights";
+import { WordsOfSupport } from "@/features/donations/WordsOfSupport";
 import { FollowCampaignButton } from "@/features/follows/FollowCampaignButton";
 import { MilestoneRevisions } from "@/features/progress/MilestoneRevisions";
 import { ProgressTimeline } from "@/features/progress/ProgressTimeline";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
+import { ShareSpread } from "@/features/follows/ShareSpread";
 import { CampaignViewTracker } from "@/features/campaign-stats/CampaignViewTracker";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
 import {
@@ -192,10 +194,44 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                 <ShareCampaignButton campaignId={campaign.slug} title={campaign.title} />
               </div>
             )}
-
           </section>
 
-          <section className="detail-organizer-block" id="nguoi-to-chuc" aria-labelledby="nguoi-to-chuc-title">
+          <section className="detail-section" id="nhat-ky" aria-labelledby="nhat-ky-title">
+            {live ? (
+              <ProgressTimeline
+                campaignId={campaign.slug}
+                initialSize={1}
+                heading={{ id: "nhat-ky-title", title: "Cập nhật" }}
+                organizer={campaign.owner}
+              />
+            ) : (
+              <>
+                <h2 id="nhat-ky-title">Cập nhật</h2>
+                <p className="hint">Dữ liệu mẫu không có nhật ký tiến độ.</p>
+              </>
+            )}
+            <p className="section-note">Mỗi khoản chi kèm ảnh chứng từ; tổng chi không vượt số tiền đã được xác nhận.</p>
+          </section>
+
+          {published && (
+            <section className="detail-section" aria-labelledby="chia-se-title">
+              <h2 id="chia-se-title">Chia sẻ giúp nhiều hơn bạn nghĩ</h2>
+              <p className="section-lead">
+                Mỗi lượt chia sẻ đưa dự án <b>đến với nhiều người hơn</b> — kể cả khi bạn chưa thể ủng hộ.
+              </p>
+              <ShareSpread
+                campaignId={campaign.slug}
+                title={campaign.title}
+                owner={campaign.owner}
+                raised={campaign.raised}
+                percent={percent}
+                cover={cover}
+                open={open}
+              />
+            </section>
+          )}
+
+          <section className="detail-section" id="nguoi-to-chuc" aria-labelledby="nguoi-to-chuc-title">
             <h2 id="nguoi-to-chuc-title">Người tổ chức</h2>
             <div className="organizer-card">
               <span className="organizer-avatar organizer-avatar-lg" aria-hidden="true">{ownerInitial}</span>
@@ -205,20 +241,15 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                 <span className="organizer-location"><Icon name="location" size={14} /> {campaign.location}</span>
               </div>
             </div>
-            <p className="detail-meta">
-              {campaign.createdDate && <span>Tạo ngày {campaign.createdDate}</span>}
-              <span><Link href={`/du-an?category=${encodeURIComponent(campaign.category)}`}>{campaign.category}</Link></span>
-              {campaign.endDate && <span>Hạn gây quỹ {campaign.endDate}</span>}
-            </p>
-            {published && (
-              <div className="detail-report">
-                <FollowCampaignButton campaignId={campaign.slug} compact />
-                <ReportCampaignButton campaignId={campaign.slug} campaignSlug={campaign.slug} />
-              </div>
-            )}
           </section>
 
-          <section className="panel" aria-labelledby="ke-hoach">
+          {published && (
+            <section className="detail-section" id="loi-dong-vien" aria-labelledby="loi-dong-vien-title">
+              <WordsOfSupport campaignId={campaign.slug} titleId="loi-dong-vien-title" open={open} />
+            </section>
+          )}
+
+          <section className="detail-section" aria-labelledby="ke-hoach">
             <h2 id="ke-hoach">Kế hoạch và ngân sách</h2>
             <ul className="plan-facts">
               <li>
@@ -292,19 +323,13 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             )}
             {progress && progress.overdueMilestones > 0 && (
               <p className="hint">
-                &quot;Chậm tiến độ&quot;: mốc đã quá hạn mà chưa hoàn thành. &quot;Đã giải trình&quot;: chủ dự án đã đăng cập nhật sau hạn — xem Nhật ký tiến độ bên dưới.
+                &quot;Chậm tiến độ&quot;: mốc đã quá hạn mà chưa hoàn thành. &quot;Đã giải trình&quot;: chủ dự án đã đăng cập nhật sau hạn — xem mục Cập nhật ở trên.
               </p>
             )}
             {live && progress && progress.revisionCount > 0 && <MilestoneRevisions campaignId={campaign.slug} />}
           </section>
 
-          <section className="panel" id="nhat-ky" aria-labelledby="nhat-ky-title">
-            <h2 id="nhat-ky-title">Nhật ký tiến độ &amp; chi tiêu</h2>
-            <p className="hint">Mỗi khoản chi kèm ảnh chứng từ; tổng chi không vượt số tiền đã được xác nhận.</p>
-            {live ? <ProgressTimeline campaignId={campaign.slug} initialSize={3} /> : <p className="hint">Dữ liệu mẫu không có nhật ký tiến độ.</p>}
-          </section>
-
-          <section className="panel" id="hoi-dap" aria-labelledby="hoi-dap-title">
+          <section className="detail-section" id="hoi-dap" aria-labelledby="hoi-dap-title">
             <h2 id="hoi-dap-title">Hỏi đáp &amp; bình luận</h2>
             {published ? (
               <CampaignComments campaignId={campaign.slug} />
@@ -312,6 +337,18 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               <p className="hint">{live ? "Hỏi đáp mở khi hồ sơ được duyệt và công khai." : "Dữ liệu mẫu không có bình luận."}</p>
             )}
           </section>
+
+          <p className="detail-meta">
+            {campaign.createdDate && <span>Tạo ngày {campaign.createdDate}</span>}
+            <span><Link href={`/du-an?category=${encodeURIComponent(campaign.category)}`}>{campaign.category}</Link></span>
+            {campaign.endDate && <span>Hạn gây quỹ {campaign.endDate}</span>}
+          </p>
+          {published && (
+            <div className="detail-report">
+              <ReportCampaignButton campaignId={campaign.slug} campaignSlug={campaign.slug} />
+              <FollowCampaignButton campaignId={campaign.slug} compact />
+            </div>
+          )}
         </div>
 
         <aside className="detail-side">

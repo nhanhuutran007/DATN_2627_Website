@@ -151,3 +151,22 @@ export async function fetchCampaignLedger(
     `/campaigns/${encodeURIComponent(campaignId)}/donations?limit=${limit}&sort=${sort}`,
   );
 }
+export type SupportMessage = {
+  id: string;
+  donorName: string | null;
+  amount: number;
+  message: string;
+  createdAt: string;
+};
+
+export type SupportMessagePage = {
+  items: SupportMessage[];
+  total: number;
+};
+
+/** "Lời động viên": lời nhắn công khai kèm khoản ủng hộ đã xác nhận, mới nhất trước. */
+export async function fetchSupportMessages(campaignId: string, offset = 0, limit = 10): Promise<SupportMessagePage> {
+  return api.get<SupportMessagePage>(
+    `/campaigns/${encodeURIComponent(campaignId)}/support-messages?offset=${offset}&limit=${limit}`,
+  );
+}

@@ -11,7 +11,7 @@ type ShareCampaignButtonProps = {
   label?: string;
 };
 
-type Channel = {
+export type ShareChannel = {
   key: string;
   label: string;
   /** Biểu tượng: chữ viết tắt thương hiệu hoặc icon nét chung. */
@@ -19,7 +19,7 @@ type Channel = {
   href: (url: string, text: string) => string;
 };
 
-const CHANNELS: Channel[] = [
+export const SHARE_CHANNELS: ShareChannel[] = [
   { key: "facebook", label: "Facebook", glyph: { text: "f" }, href: (url) => `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` },
   { key: "x", label: "X", glyph: { text: "X" }, href: (url, text) => `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}` },
   { key: "linkedin", label: "LinkedIn", glyph: { text: "in" }, href: (url) => `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}` },
@@ -111,7 +111,7 @@ export function ShareCampaignButton({
           <h3>Tiếp cận thêm người ủng hộ</h3>
           <p>Mỗi lượt chia sẻ giúp dự án đến gần mục tiêu hơn — kể cả khi bạn chưa thể ủng hộ.</p>
           <ul className="share-channels">
-            {CHANNELS.map((channel) => (
+            {SHARE_CHANNELS.map((channel) => (
               <li key={channel.key}>
                 <a
                   className="share-channel"
