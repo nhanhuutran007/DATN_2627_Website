@@ -145,9 +145,28 @@ async function parseBody(response: Response): Promise<unknown> {
   }
 }
 
-async function refreshAccessToken(): Promise<boolean> {
+/**
+ * Refresh token chỉ dùng được một lần (server xoay vòng), nên các request cùng gặp 401
+ * phải chờ chung một lượt đổi token thay vì mỗi request tự gửi token cũ lên.
+ */
+let refreshInFlight: Promise<boolean> | null = null;
+
+function refreshAccessToken(): Promise<boolean> {
+  refreshInFlight ??= requestNewTokens().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+async function requestNewTokens(): Promise<boolean> {
   const refreshToken = readStorage(REFRESH_TOKEN_KEY);
   if (!refreshToken) return false;
+  const ok = await postRefresh(refreshToken);
+  // Tab khác vừa đổi token xong (cùng localStorage) → dùng luôn cặp mới của tab đó.
+  return ok || readStorage(REFRESH_TOKEN_KEY) !== refreshToken;
+}
+
+async function postRefresh(refreshToken: string): Promise<boolean> {
   try {
     const response = await fetch(`${apiBaseUrl()}/auth/refresh`, {
       method: "POST",
