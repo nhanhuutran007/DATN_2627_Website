@@ -403,19 +403,6 @@ export async function resetPasswordRequest(token: string, newPassword: string): 
   return response.message;
 }
 
-/**
- * Đổi mật khẩu khi đã đăng nhập. Server vô hiệu mọi token cũ và trả cặp token
- * mới, nên lưu lại ngay để phiên hiện tại tiếp tục.
- */
-export async function changePasswordRequest(
-  currentPassword: string,
-  newPassword: string,
-): Promise<AuthSession> {
-  const session = await api.post<AuthSession>("/auth/change-password", { currentPassword, newPassword });
-  saveSession(session);
-  return session;
-}
-
 /** Xác minh email bằng token trong link; cập nhật phiên hiện tại nếu đúng tài khoản. */
 export async function verifyEmailRequest(token: string): Promise<{ message: string; email: string }> {
   const result = await apiFetch<{ message: string; email: string }>(

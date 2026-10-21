@@ -1,92 +1,71 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
-import { PasswordRules } from "@/components/ui/PasswordRules";
-import { ApiError, AUTH_EVENT, changePasswordRequest, hasSession } from "@/lib/api";
+import { ApiError, forgotPasswordRequest } from "@/lib/api";
 import { useAuthUser } from "@/lib/auth";
-import { passwordPolicyError } from "@/lib/password-policy";
 
-import { RevealButton } from "./RevealButton";
+/** Server không gửi thư mới nếu vừa gửi trong 1 phút (RESET_RESEND_COOLDOWN_MS). */
+const RESEND_SECONDS = 60;
 
-function subscribe(onChange: () => void): () => void {
-  window.addEventListener(AUTH_EVENT, onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    window.removeEventListener(AUTH_EVENT, onChange);
-    window.removeEventListener("storage", onChange);
-  };
-}
+const noopSubscribe = () => () => {};
 
 function messageFor(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 401) return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
-    if (error.status === 429) return "Bạn thử quá nhiều lần. Vui lòng đợi ít phút rồi thử lại.";
+    if (error.status === 429) return "Bạn gửi yêu cầu quá nhiều lần. Vui lòng đợi ít phút rồi thử lại.";
     return error.message;
   }
   return "Không kết nối được máy chủ. Vui lòng thử lại sau.";
 }
 
+/**
+ * Đổi mật khẩu khi đã đăng nhập theo cùng luồng email với "Quên mật khẩu" (như GoFundMe):
+ * gửi liên kết tới email của tài khoản → bấm nút trong thư → /dat-lai-mat-khau đặt mật khẩu mới.
+ * Dùng được cả cho tài khoản đăng nhập bằng Google (không có mật khẩu hiện tại).
+ */
 export function ChangePasswordForm() {
-  // `null` khi render trên server: chưa biết trạng thái đăng nhập (localStorage).
-  const loggedIn = useSyncExternalStore(subscribe, hasSession, () => null);
-  const isAdmin = useAuthUser()?.role === "admin";
-
-  const [current, setCurrent] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
+  const user = useAuthUser();
+  // Phiên nằm ở localStorage: lúc render trên server chưa biết đã đăng nhập hay chưa.
+  const hydrated = useSyncExternalStore(noopSubscribe, () => true, () => false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
-  const backHref = isAdmin ? "/admin" : "/ho-so";
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
 
-  if (loggedIn === null) {
+  if (!hydrated) {
     return <p className="signin-lead">Đang tải…</p>;
   }
 
-  if (done) {
-    return (
-      <>
-        <h1>Đã đổi mật khẩu</h1>
-        <p className="signin-lead" role="status">
-          Mật khẩu mới đã được lưu. Các thiết bị khác đang đăng nhập đã được đăng xuất.
-        </p>
-        <div className="signin-form">
-          <Link className="signin-submit signin-submit-link" href={isAdmin ? "/admin" : "/dashboard"}>Về trang quản lý</Link>
-        </div>
-      </>
-    );
-  }
-
-  if (!loggedIn) {
+  if (!user) {
     return (
       <>
         <h1>Đổi mật khẩu</h1>
-        <p className="signin-error" role="alert">Bạn cần đăng nhập để đổi mật khẩu.</p>
+        <p className="signin-lead">Đăng nhập để đổi mật khẩu, hoặc đặt lại mật khẩu qua email nếu bạn đã quên.</p>
         <div className="signin-form">
           <Link className="signin-submit signin-submit-link" href="/dang-nhap?next=/doi-mat-khau">Đăng nhập</Link>
         </div>
-        <p className="signin-back"><Link href="/quen-mat-khau">Quên mật khẩu hiện tại?</Link></p>
+        <p className="signin-back"><Link href="/quen-mat-khau">Quên mật khẩu?</Link></p>
       </>
     );
   }
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError("");
-    if (!current) return setError("Vui lòng nhập mật khẩu hiện tại.");
-    const policyError = passwordPolicyError(password);
-    if (policyError) return setError(policyError);
-    if (password === current) return setError("Mật khẩu mới phải khác mật khẩu hiện tại.");
-    if (password !== confirm) return setError("Mật khẩu xác nhận không khớp.");
+  const backHref = user.role === "admin" ? "/admin" : "/ho-so";
+  const backLabel = user.role === "admin" ? "Quay lại trang quản trị" : "Quay lại cài đặt tài khoản";
 
+  const send = async () => {
+    setError("");
     setBusy(true);
     try {
-      await changePasswordRequest(current, password);
-      setDone(true);
+      await forgotPasswordRequest(user.email);
+      setSent(true);
+      setCooldown(RESEND_SECONDS);
     } catch (err) {
       setError(messageFor(err));
     } finally {
@@ -94,68 +73,49 @@ export function ChangePasswordForm() {
     }
   };
 
-  const inputType = showPassword ? "text" : "password";
+  if (sent) {
+    return (
+      <>
+        <h1>Kiểm tra email của bạn</h1>
+        <p className="signin-lead" role="status">
+          Chúng tôi đã gửi liên kết đặt mật khẩu mới tới <b>{user.email}</b>. Bấm nút trong thư để chọn mật khẩu mới.
+        </p>
+        <p className="signin-lead signin-muted">
+          Liên kết có hiệu lực trong 30 phút và chỉ dùng được một lần. Sau khi đổi, mọi thiết bị đang đăng nhập sẽ được
+          đăng xuất. Không thấy email? Hãy kiểm tra thư mục spam.
+        </p>
+        {error && <p className="signin-error" role="alert">{error}</p>}
+        <div className="signin-form">
+          <button
+            className="signin-submit signin-submit-outline"
+            type="button"
+            disabled={busy || cooldown > 0}
+            onClick={() => void send()}
+          >
+            {busy ? "Đang gửi…" : cooldown > 0 ? `Gửi lại sau ${cooldown} giây` : "Gửi lại email"}
+          </button>
+        </div>
+        <p className="signin-back"><Link href={backHref}>{backLabel}</Link></p>
+      </>
+    );
+  }
 
   return (
     <>
       <h1>Đổi mật khẩu</h1>
-      <p className="signin-lead">Nhập mật khẩu hiện tại và chọn mật khẩu mới. Các thiết bị khác sẽ được đăng xuất.</p>
-      {error && <p id="change-error" className="signin-error" role="alert">{error}</p>}
-
-      <form className="signin-form" onSubmit={submit} noValidate>
-        <label className="signin-field">
-          <input
-            type={inputType}
-            name="current-password"
-            autoComplete="current-password"
-            placeholder=" "
-            value={current}
-            autoFocus
-            aria-describedby={error ? "change-error" : undefined}
-            onChange={(event) => {
-              setCurrent(event.target.value);
-              if (error) setError("");
-            }}
-          />
-          <span className="signin-label">Mật khẩu hiện tại</span>
-          <RevealButton shown={showPassword} onToggle={() => setShowPassword((value) => !value)} />
-        </label>
-        <p className="signin-aside signin-aside-tight"><Link href="/quen-mat-khau">Quên mật khẩu hiện tại?</Link></p>
-        <label className="signin-field">
-          <input
-            type={inputType}
-            name="new-password"
-            autoComplete="new-password"
-            placeholder=" "
-            value={password}
-            aria-describedby="change-password-rules"
-            onChange={(event) => {
-              setPassword(event.target.value);
-              if (error) setError("");
-            }}
-          />
-          <span className="signin-label">Mật khẩu mới</span>
-        </label>
-        <PasswordRules value={password} id="change-password-rules" />
-        <label className="signin-field">
-          <input
-            type={inputType}
-            name="confirm-password"
-            autoComplete="new-password"
-            placeholder=" "
-            value={confirm}
-            onChange={(event) => {
-              setConfirm(event.target.value);
-              if (error) setError("");
-            }}
-          />
-          <span className="signin-label">Nhập lại mật khẩu mới</span>
-        </label>
-        <button className="signin-submit" type="submit" disabled={busy}>
-          {busy ? "Đang lưu…" : "Đổi mật khẩu"}
+      <p className="signin-lead">
+        Chúng tôi sẽ gửi liên kết đặt mật khẩu mới tới email của bạn.
+      </p>
+      {error && <p className="signin-error" role="alert">{error}</p>}
+      <div className="signin-form">
+        <div className="signin-account">
+          <span className="signin-account-email">{user.email}</span>
+        </div>
+        <button className="signin-submit" type="button" disabled={busy} onClick={() => void send()}>
+          {busy ? "Đang gửi…" : "Gửi liên kết đổi mật khẩu"}
         </button>
-      </form>
-      <p className="signin-back"><Link href={backHref}>{isAdmin ? "Quay lại trang quản trị" : "Quay lại cài đặt tài khoản"}</Link></p>
+      </div>
+      <p className="signin-back"><Link href={backHref}>{backLabel}</Link></p>
     </>
   );
 }
