@@ -41,6 +41,8 @@ type DonationPanelProps = {
 const PRESETS = [50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000];
 const SUGGESTED = 200_000;
 const MIN_AMOUNT = 20_000;
+/** Khớp `@MaxLength(500)` của `CreateDonationDto.message`. */
+const MESSAGE_MAX = 500;
 const MAX_DIGITS = 12;
 
 type PaymentMethod = { value: string; label: string; note: string };
@@ -73,6 +75,7 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
   const isAdmin = useIsAdmin();
   const [digits, setDigits] = useState("");
   const [anonymous, setAnonymous] = useState(false);
+  const [message, setMessage] = useState("");
   const user = useAuthUser();
   const [payment, setPayment] = useState("wallet");
   const [error, setError] = useState("");
@@ -170,6 +173,7 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
         amount,
         paymentMethod: payment,
         isAnonymous: anonymous,
+        ...(message.trim() ? { message: message.trim() } : {}),
         idempotencyKey: generateIdempotencyKey(),
         ...(selectedTier ? { rewardTierId: selectedTier.id } : {}),
       });
@@ -391,6 +395,25 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
           </label>
         ))}
       </fieldset>
+
+      <div className="donate-section donate-message">
+        <label className="donate-message-label" htmlFor={`${amountId}-message`}>
+          Lời động viên <small>(không bắt buộc)</small>
+        </label>
+        <textarea
+          id={`${amountId}-message`}
+          rows={3}
+          maxLength={MESSAGE_MAX}
+          placeholder="Gửi vài lời tới người tổ chức và dự án…"
+          value={message}
+          aria-describedby={`${amountId}-message-hint`}
+          onChange={(event) => setMessage(event.target.value)}
+        />
+        <small id={`${amountId}-message-hint`}>
+          Hiển thị công khai ở mục “Lời động viên” của dự án{anonymous ? " dưới tên “Người ủng hộ ẩn danh”" : " kèm tên của bạn"} khi khoản ủng hộ được xác nhận.
+          <span className="num"> {message.length}/{MESSAGE_MAX}</span>
+        </small>
+      </div>
 
       <label className="donate-check">
         <input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} />

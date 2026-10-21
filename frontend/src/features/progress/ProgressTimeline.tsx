@@ -1,12 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
 import { ApiError, resolveMediaUrl } from "@/lib/api";
 import { fetchCampaignUpdates, type ApiCampaignUpdate } from "@/lib/api/progress";
-import { formatDateTime, formatVnd } from "@/lib/format";
+import { formatDateTime, formatDay, formatVnd } from "@/lib/format";
 
 const PAGE_SIZE = 5;
 
@@ -19,10 +19,14 @@ type ProgressTimelineProps = {
   campaignId: string;
   /** Số cập nhật tải lần đầu (trang chiến dịch dùng 3 cho gọn); "Xem thêm" tải tiếp từng PAGE_SIZE. */
   initialSize?: number;
+  /** Trang chiến dịch: tiêu đề mục kèm số bài (kiểu "Updates" của GoFundMe). */
+  heading?: { id: string; title: string };
+  /** Có tên người tổ chức → mỗi bài hiện như bài đăng: avatar, ngày, "Tên · Người tổ chức". */
+  organizer?: string;
 };
 
 /** Nhật ký tiến độ công khai: bài cập nhật theo mốc, khoản chi và chứng từ kèm theo. */
-export function ProgressTimeline({ campaignId, initialSize = PAGE_SIZE }: ProgressTimelineProps) {
+export function ProgressTimeline({ campaignId, initialSize = PAGE_SIZE, heading, organizer }: ProgressTimelineProps) {
   const [state, setState] = useState<State>({ status: "loading" });
   const [loadingMore, setLoadingMore] = useState(false);
   const [requestKey, setRequestKey] = useState(0);
@@ -58,9 +62,19 @@ export function ProgressTimeline({ campaignId, initialSize = PAGE_SIZE }: Progre
     }
   };
 
-  if (state.status === "loading") return <p className="hint" role="status">Đang tải nhật ký…</p>;
-  if (state.status === "error") {
-    return (
+  const total = state.status === "ready" ? state.total : 0;
+  const title = heading && (
+    <h2 id={heading.id}>
+      {heading.title}
+      {total > 0 && <span className="section-count">{total}</span>}
+    </h2>
+  );
+
+  let body: ReactNode;
+  if (state.status === "loading") {
+    body = <p className="hint" role="status">Đang tải nhật ký…</p>;
+  } else if (state.status === "error") {
+    body = (
       <p className="form-error" role="alert">
         {state.message}{" "}
         <button className="link-inline" type="button" onClick={() => { setState({ status: "loading" }); setRequestKey((key) => key + 1); }}>
@@ -68,34 +82,56 @@ export function ProgressTimeline({ campaignId, initialSize = PAGE_SIZE }: Progre
         </button>
       </p>
     );
-  }
-  if (state.items.length === 0) {
-    return <p className="hint">Chủ dự án chưa đăng cập nhật tiến độ nào.</p>;
+  } else if (state.items.length === 0) {
+    body = <p className="hint">Chủ dự án chưa đăng cập nhật tiến độ nào.</p>;
+  } else {
+    const remaining = state.total - state.items.length;
+    body = (
+      <>
+        <ol className={organizer ? "timeline timeline-posts" : "timeline"}>
+          {state.items.map((update) => <TimelineItem key={update.id} update={update} organizer={organizer} />)}
+        </ol>
+        {remaining > 0 && (
+          <button
+            className={organizer ? "button button-outline section-more" : "button button-outline button-sm timeline-more"}
+            type="button"
+            disabled={loadingMore}
+            onClick={loadMore}
+          >
+            {loadingMore ? "Đang tải…" : organizer ? `Xem thêm ${remaining} cập nhật` : `Xem thêm (${remaining})`}
+          </button>
+        )}
+      </>
+    );
   }
 
   return (
     <>
-      <ol className="timeline">
-        {state.items.map((update) => <TimelineItem key={update.id} update={update} />)}
-      </ol>
-      {state.items.length < state.total && (
-        <button className="button button-outline button-sm timeline-more" type="button" disabled={loadingMore} onClick={loadMore}>
-          {loadingMore ? "Đang tải…" : `Xem thêm (${state.total - state.items.length})`}
-        </button>
-      )}
+      {title}
+      {body}
     </>
   );
 }
 
-function TimelineItem({ update }: { update: ApiCampaignUpdate }) {
+function TimelineItem({ update, organizer }: { update: ApiCampaignUpdate; organizer?: string }) {
   const expense = Number(update.expenseAmount ?? 0);
   const receipts = update.attachments ?? [];
   return (
     <li className="timeline-item">
-      <div className="timeline-meta">
-        <span className="tag">{update.milestoneTitle || "Mốc công việc"}</span>
-        {update.createdAt && <time dateTime={update.createdAt}>{formatDateTime(update.createdAt)}</time>}
-      </div>
+      {organizer ? (
+        <div className="post-head">
+          <span className="organizer-avatar" aria-hidden="true">{organizer.charAt(0).toUpperCase()}</span>
+          <div>
+            {update.createdAt && <time dateTime={update.createdAt} title={formatDateTime(update.createdAt)}>{formatDay(update.createdAt)}</time>}
+            <span>{organizer} · Người tổ chức · {update.milestoneTitle || "Mốc công việc"}</span>
+          </div>
+        </div>
+      ) : (
+        <div className="timeline-meta">
+          <span className="tag">{update.milestoneTitle || "Mốc công việc"}</span>
+          {update.createdAt && <time dateTime={update.createdAt}>{formatDateTime(update.createdAt)}</time>}
+        </div>
+      )}
       <p className="timeline-content">{update.content}</p>
       {update.imageUrl && (
         <div className="timeline-photo">

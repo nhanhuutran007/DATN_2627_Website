@@ -21,7 +21,7 @@ const COLUMNS: Array<{ id: string; title: string; links: FooterLink[] }> = [
     title: "Gây quỹ",
     links: [
       { href: "/tao-chien-dich", label: "Tạo chiến dịch" },
-      { href: "/#quy-trinh", label: "Quy trình gây quỹ" },
+      { href: "/bat-dau-gay-quy", label: "Cách bắt đầu gây quỹ" },
       { href: "/dashboard", label: "Quản lý chiến dịch" },
     ],
   },

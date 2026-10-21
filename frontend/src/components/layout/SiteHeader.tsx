@@ -111,7 +111,7 @@ export function SiteHeader() {
   const isAdmin = user?.role === "admin";
   const fundraiseLinks: MenuLink[] = [
     ...(isAdmin ? [] : [{ href: "/tao-chien-dich", label: "Tạo chiến dịch", hint: "Soạn hồ sơ theo từng bước, gửi duyệt" }]),
-    { href: "/#quy-trinh", label: "Quy trình gây quỹ", hint: "Kiểm duyệt, nhận ủng hộ, báo cáo tiến độ" },
+    { href: "/bat-dau-gay-quy", label: "Cách bắt đầu gây quỹ", hint: "Các bước, lĩnh vực và câu hỏi thường gặp" },
     ...(user && !isAdmin ? [{ href: "/dashboard", label: "Quản lý chiến dịch", hint: "Tiến độ, số liệu, chi tiêu" }] : []),
   ];
   // Theo menu tài khoản GoFundMe (Profile · Your impact · Messages · Account settings · Sign out); admin thay "Hoạt động" bằng trang quản trị.

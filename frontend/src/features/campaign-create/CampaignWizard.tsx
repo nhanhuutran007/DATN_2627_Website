@@ -151,7 +151,12 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-export function CampaignWizard() {
+type CampaignWizardProps = {
+  /** Lĩnh vực chọn sẵn (từ trang "Bắt đầu gây quỹ"), server đã kiểm tra là lĩnh vực đang nhận dự án. */
+  initialCategory?: string;
+};
+
+export function CampaignWizard({ initialCategory }: CampaignWizardProps) {
   const router = useRouter();
   const user = useAuthUser();
   const redirecting = useRedirectAdmin();
@@ -168,7 +173,7 @@ export function CampaignWizard() {
     window.scrollTo({ top: 0, behavior: "instant" });
     formRef.current?.focus({ preventScroll: true });
   }, [step]);
-  const [draft, setDraft] = useState(initialDraft);
+  const [draft, setDraft] = useState<Draft>({ ...initialDraft, category: initialCategory ?? "" });
   const categories = useCategories();
   const [milestones, setMilestones] = useState<DraftMilestone[]>([
     { ...emptyMilestone, title: "Chuẩn bị và khảo sát" },

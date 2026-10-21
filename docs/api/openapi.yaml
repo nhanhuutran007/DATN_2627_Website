@@ -2043,6 +2043,39 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /campaigns/{id}/support-messages:
+    get:
+      operationId: getCampaignSupportMessages
+      summary: Lời động viên công khai của một chiến dịch
+      description: >-
+        Lời nhắn người ủng hộ để lại cùng khoản ủng hộ `completed` (form ủng hộ báo trước lời nhắn hiển thị công khai),
+        mới nhất trước. Chỉ trả tên (null nếu ẩn danh), số tiền, lời nhắn, thời điểm; không email, không mã giao dịch.
+        Chiến dịch chưa công khai trả 404.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Danh sách lời động viên
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportMessagePage"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /media/images:
     post:
       operationId: uploadImage
@@ -4324,6 +4357,30 @@ components:
           type: integer
         successfulCampaigns:
           type: integer
+    SupportMessagePage:
+      type: object
+      properties:
+        total:
+          type: integer
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              donorName:
+                type: string
+                nullable: true
+              amount:
+                type: number
+              message:
+                type: string
+                maxLength: 500
+              createdAt:
+                type: string
+                format: date-time
     CampaignLedger:
       type: object
       properties:

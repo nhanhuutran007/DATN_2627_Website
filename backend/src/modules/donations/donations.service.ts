@@ -10,7 +10,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, Raw, Repository } from "typeorm";
 
 import {
   PaymentGateway,
@@ -322,7 +322,8 @@ export class DonationsService {
       transactionId: paymentResult.transactionId,
       transferCode: generateTransferCode(),
       idempotencyKey: dto.idempotencyKey,
-      message: dto.message,
+      // Lời động viên hiển thị công khai: bỏ khoảng trắng thừa, chuỗi rỗng coi như không có.
+      message: dto.message?.trim() || undefined,
       isAnonymous: dto.isAnonymous ?? false,
       rewardTierId: dto.rewardTierId ?? null,
     });
@@ -725,6 +726,41 @@ export class DonationsService {
       })),
     };
   }
+
+  /**
+   * "Lời động viên" công khai: lời nhắn người ủng hộ để lại cùng khoản đã xác nhận
+   * (form ủng hộ ghi rõ lời nhắn sẽ hiển thị công khai). Chỉ trả tên (hoặc null nếu
+   * ẩn danh), số tiền, lời nhắn và thời điểm — không email, không mã giao dịch.
+   */
+  async listSupportMessages(campaignId: string, offset = 0, limit = 10): Promise<SupportMessagePage> {
+    const campaign = await this.campaignRepo.findOneBy({ id: campaignId });
+    if (!campaign || !LEDGER_VISIBLE_STATUSES.includes(campaign.status)) {
+      throw new NotFoundException("Campaign not found");
+    }
+
+    const [donations, total] = await this.donationRepo.findAndCount({
+      where: {
+        campaignId,
+        status: DonationStatus.COMPLETED,
+        message: Raw((column) => `${column} IS NOT NULL AND TRIM(${column}) <> ''`),
+      },
+      relations: { user: true },
+      order: { completedAt: "DESC", createdAt: "DESC" },
+      skip: Math.max(0, offset),
+      take: Math.min(Math.max(1, limit), 50),
+    });
+
+    return {
+      total,
+      items: donations.map((donation) => ({
+        id: donation.id,
+        donorName: donation.isAnonymous ? null : (donation.user?.name ?? null),
+        amount: Number(donation.amount),
+        message: (donation.message ?? "").trim(),
+        createdAt: donation.completedAt ?? donation.createdAt,
+      })),
+    };
+  }
 }
 
 export const LEDGER_SORTS = ["recent", "top"] as const;
@@ -751,6 +787,19 @@ export type PublicLedgerEntry = {
 
 export type PublicLedger = {
   items: PublicLedgerEntry[];
+  total: number;
+};
+
+export type SupportMessage = {
+  id: string;
+  donorName: string | null;
+  amount: number;
+  message: string;
+  createdAt: Date;
+};
+
+export type SupportMessagePage = {
+  items: SupportMessage[];
   total: number;
 };
 

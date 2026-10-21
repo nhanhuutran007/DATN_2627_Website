@@ -24,4 +24,14 @@ export class CampaignLedgerController {
   ) {
     return this.donationsService.listPublicLedger(id, limit, sort);
   }
+
+  /** Lời động viên công khai (lời nhắn kèm khoản ủng hộ đã xác nhận), mới nhất trước. */
+  @Get(":id/support-messages")
+  supportMessages(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Query("offset", new DefaultValuePipe(0), ParseIntPipe) offset: number,
+    @Query("limit", new DefaultValuePipe(10), ParseIntPipe) limit: number,
+  ) {
+    return this.donationsService.listSupportMessages(id, offset, limit);
+  }
 }

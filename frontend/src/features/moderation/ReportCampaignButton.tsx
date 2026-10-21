@@ -82,7 +82,7 @@ export function ReportCampaignButton({ campaignId, campaignSlug }: ReportCampaig
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
       >
-        <Icon name="shield" size={17} /> Báo cáo vi phạm
+        <Icon name="flag" size={17} /> Báo cáo chiến dịch
       </button>
 
       {open && (
