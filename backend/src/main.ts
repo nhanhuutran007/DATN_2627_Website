@@ -25,7 +25,7 @@ async function bootstrap(): Promise<void> {
     credentials: true,
     origin: config.corsOrigins,
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Signature"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Signature", "X-Step-Up-Token"],
   });
   app.useGlobalPipes(
     new ValidationPipe({

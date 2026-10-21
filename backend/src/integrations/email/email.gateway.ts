@@ -21,6 +21,16 @@ export type EmailVerificationEmail = {
   expiresInHours: number;
 };
 
+/** Mã OTP xác minh bổ sung trước thao tác nhạy cảm (đổi mật khẩu, hoàn tiền...). */
+export type StepUpCodeEmail = {
+  to: string;
+  name: string;
+  code: string;
+  /** Mô tả thao tác cần xác minh, vd. "đổi mật khẩu". */
+  actionLabel: string;
+  expiresInMinutes: number;
+};
+
 /** Email kèm thông báo trong ứng dụng (vd. kết quả xét duyệt chiến dịch). */
 export type NotificationEmail = {
   to: string;
@@ -38,6 +48,7 @@ export interface EmailGateway {
   sendPasswordChanged(message: PasswordChangedEmail): Promise<void>;
   sendEmailVerification(message: EmailVerificationEmail): Promise<void>;
   sendNotification(message: NotificationEmail): Promise<void>;
+  sendStepUpCode(message: StepUpCodeEmail): Promise<void>;
 }
 
 export type RenderedEmail = {
@@ -183,6 +194,44 @@ export function renderPasswordChangedEmail(message: PasswordChangedEmail): Rende
   };
 }
 
+export function renderStepUpCodeEmail(message: StepUpCodeEmail): RenderedEmail {
+  const name = escapeHtml(message.name);
+  const action = escapeHtml(message.actionLabel);
+  const code = escapeHtml(message.code);
+
+  return {
+    subject: `Mã xác minh Góp Mầm: ${message.code}`,
+    text: [
+      `Xin chào ${message.name},`,
+      "",
+      `Mã xác minh để ${message.actionLabel} là: ${message.code}`,
+      `Mã hết hạn sau ${message.expiresInMinutes} phút và chỉ dùng được một lần.`,
+      "",
+      "Không chia sẻ mã này cho bất kỳ ai, kể cả người tự xưng là nhân viên Góp Mầm.",
+      "Nếu không phải bạn yêu cầu, hãy đổi mật khẩu ngay.",
+      "",
+      "Góp Mầm",
+    ].join("\n"),
+    html: `<!doctype html>
+<html lang="vi">
+  <body style="margin:0;padding:24px;background:#f4f6fb;font-family:Arial,Helvetica,sans-serif;color:#141c33">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px">
+      <tr>
+        <td style="padding:32px">
+          <p style="margin:0 0 16px;font-size:20px;font-weight:bold">Mã xác minh</p>
+          <p style="margin:0 0 12px;line-height:1.6">Xin chào ${name},</p>
+          <p style="margin:0 0 16px;line-height:1.6">Mã xác minh để ${action} là:</p>
+          <p style="margin:0 0 16px;font-size:32px;font-weight:bold;letter-spacing:8px">${code}</p>
+          <p style="margin:0 0 12px;line-height:1.6">Mã hết hạn sau ${message.expiresInMinutes} phút và chỉ dùng được một lần.</p>
+          <p style="margin:0;line-height:1.6;font-size:14px;color:#4b5563">Không chia sẻ mã này cho bất kỳ ai. Nếu không phải bạn yêu cầu, hãy đổi mật khẩu ngay.</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`,
+  };
+}
+
 export function renderNotificationEmail(message: NotificationEmail): RenderedEmail {
   const name = escapeHtml(message.name);
   const url = message.link ? `${frontendBaseUrl()}${message.link}` : null;
@@ -268,6 +317,18 @@ export class LogEmailGateway implements EmailGateway {
   async sendNotification(message: NotificationEmail): Promise<void> {
     this.logger.log(`[demo email] Thông báo "${message.subject}" cho ${message.to}`);
   }
+
+  async sendStepUpCode(message: StepUpCodeEmail): Promise<void> {
+    if (!this.revealLinks) {
+      this.logger.warn(`Chưa cấu hình SMTP: không gửi được mã xác minh cho ${message.to}`);
+      return;
+    }
+
+    this.logger.log(
+      `[demo email] Mã xác minh để ${message.actionLabel} cho ${message.to}: ${message.code} ` +
+        `(hết hạn sau ${message.expiresInMinutes} phút)`,
+    );
+  }
 }
 
 /** Gửi email thật qua SMTP (vd. Gmail + App Password). */
@@ -306,6 +367,14 @@ export class SmtpEmailGateway implements EmailGateway {
       from: this.from,
       to: message.to,
       ...renderNotificationEmail(message),
+    });
+  }
+
+  async sendStepUpCode(message: StepUpCodeEmail): Promise<void> {
+    await this.transporter.sendMail({
+      from: this.from,
+      to: message.to,
+      ...renderStepUpCodeEmail(message),
     });
   }
 }

@@ -15,12 +15,17 @@ import {
   LogoutDto,
   RefreshTokenDto,
   RegisterDto,
+  RequestStepUpDto,
   ResetPasswordDto,
   VerifyEmailDto,
+  VerifyStepUpDto,
 } from "./dto/auth.dto";
 import { EmailVerificationService } from "./email-verification.service";
+import { StepUpPurpose } from "./entities/step-up-code.entity";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import { RequireStepUp, StepUpGuard } from "./guards/step-up.guard";
 import { PasswordResetService } from "./password-reset.service";
+import { StepUpService } from "./step-up.service";
 
 @Controller("auth")
 export class AuthController {
@@ -28,6 +33,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly passwordResetService: PasswordResetService,
     private readonly emailVerificationService: EmailVerificationService,
+    private readonly stepUpService: StepUpService,
   ) {}
 
   @Post("register")
@@ -131,10 +137,29 @@ export class AuthController {
     return this.passwordResetService.resetPassword(dto.token, dto.newPassword);
   }
 
+  /** Gửi mã OTP qua email trước một thao tác nhạy cảm. */
+  @Post("step-up/request")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 5, windowMs: 15 * 60_000, keyPrefix: "auth-step-up-request" })
+  requestStepUp(@GetCurrentUser() user: User, @Body() dto: RequestStepUpDto) {
+    return this.stepUpService.requestCode(user, dto.purpose);
+  }
+
+  /** Đổi mã OTP đúng lấy step-up token ngắn hạn (gửi lại ở header `X-Step-Up-Token`). */
+  @Post("step-up/verify")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 10, windowMs: 15 * 60_000, keyPrefix: "auth-step-up-verify" })
+  verifyStepUp(@GetCurrentUser() user: User, @Body() dto: VerifyStepUpDto) {
+    return this.stepUpService.verifyCode(user, dto.purpose, dto.code);
+  }
+
   /** Đổi mật khẩu khi đã đăng nhập; trả cặp token mới vì token cũ bị vô hiệu. */
   @Post("change-password")
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @UseGuards(JwtAuthGuard, RateLimitGuard, StepUpGuard)
+  @RequireStepUp(StepUpPurpose.CHANGE_PASSWORD)
   @RateLimit({ limit: 5, windowMs: 15 * 60_000, keyPrefix: "auth-change-password" })
   async changePassword(@GetCurrentUser() user: User, @Body() dto: ChangePasswordDto) {
     await this.passwordResetService.changePassword(user, dto.currentPassword, dto.newPassword);

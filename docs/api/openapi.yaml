@@ -227,9 +227,93 @@ paths:
           description: Token không hợp lệ, đã dùng hoặc đã hết hạn; hoặc mật khẩu không đạt yêu cầu
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /auth/step-up/request:
+    post:
+      operationId: requestStepUpCode
+      summary: Gửi mã OTP qua email trước thao tác nhạy cảm
+      description: >-
+        Mã 6 số, hết hạn sau 10 phút, chỉ lưu HMAC; gửi mã mới làm mã cũ hết hiệu lực. Chặn gửi lại
+        trong 60 giây (429). Rate limit 5 lần/15 phút. Các thao tác cần mã được đánh dấu
+        `x-step-up-purpose` trong tài liệu này; gọi thiếu/sai step-up token trả 403 với
+        `code: step_up_required` và `purpose`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purpose]
+              properties:
+                purpose:
+                  type: string
+                  enum: [change_password, refund_request, admin_refund]
+      responses:
+        "200":
+          description: Đã gửi mã
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  expiresInMinutes:
+                    type: integer
+                    example: 10
+        "400":
+          description: Mục đích không hợp lệ
+        "401":
+          description: Chưa đăng nhập hoặc token hết hạn
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/step-up/verify:
+    post:
+      operationId: verifyStepUpCode
+      summary: Đổi mã OTP lấy step-up token
+      description: >-
+        Mã đúng → step-up token (JWT ký bằng khóa riêng, không dùng thay access token được) có hạn
+        10 phút, gắn với đúng người và đúng mục đích; gửi ở header `X-Step-Up-Token` khi gọi thao tác
+        nhạy cảm. Sai 5 lần thì mã bị hủy. Ghi audit `auth.step_up.verified` / `auth.step_up.failed`.
+        Rate limit 10 lần/15 phút.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purpose, code]
+              properties:
+                purpose:
+                  type: string
+                  enum: [change_password, refund_request, admin_refund]
+                code:
+                  type: string
+                  pattern: "^[0-9]{6}$"
+      responses:
+        "200":
+          description: Mã đúng
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stepUpToken:
+                    type: string
+                  expiresInSeconds:
+                    type: integer
+                    example: 600
+        "400":
+          description: Mã sai (kèm số lần thử còn lại), hết hạn hoặc đã hủy do sai quá nhiều lần
+        "401":
+          description: Chưa đăng nhập hoặc token hết hạn
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /auth/change-password:
     post:
       operationId: changePassword
+      x-step-up-purpose: change_password  # cần header X-Step-Up-Token, xem /auth/step-up/verify
       summary: Đổi mật khẩu khi đã đăng nhập
       description: |
         Kiểm tra mật khẩu hiện tại. Thành công sẽ vô hiệu mọi access/refresh token
@@ -2626,6 +2710,7 @@ paths:
   /donations/{id}/refund-request:
     post:
       operationId: requestRefund
+      x-step-up-purpose: refund_request  # cần header X-Step-Up-Token, xem /auth/step-up/verify
       summary: Người ủng hộ yêu cầu hoàn một khoản của mình
       description: >-
         Được yêu cầu khi chiến dịch thất bại/bị hủy, hoặc trong 7 ngày sau khi ủng hộ nếu chiến dịch
@@ -2687,6 +2772,7 @@ paths:
   /admin/refunds/export:
     get:
       operationId: exportAdminRefunds
+      x-step-up-purpose: admin_refund  # cần header X-Step-Up-Token, xem /auth/step-up/verify
       summary: CSV yêu cầu hoàn kèm tài khoản nhận (chỉ admin)
       description: >-
         Để chuyển khoản trả lại các khoản qua SePay. Có dữ liệu cá nhân (tên, email, số tài khoản) nên
@@ -2708,6 +2794,7 @@ paths:
   /admin/refunds/{id}/approve:
     patch:
       operationId: approveRefund
+      x-step-up-purpose: admin_refund  # cần header X-Step-Up-Token, xem /auth/step-up/verify
       summary: Duyệt và hoàn tiền (chỉ admin)
       description: >-
         Trong 1 transaction: đổi completed → refunded có điều kiện (không hoàn 2 lần, 409), gọi cổng
@@ -2769,6 +2856,7 @@ paths:
   /admin/donations/{id}/refund:
     post:
       operationId: refundDonationDirectly
+      x-step-up-purpose: admin_refund  # cần header X-Step-Up-Token, xem /auth/step-up/verify
       summary: Admin hoàn trực tiếp một khoản đã xác nhận (vd. gian lận)
       security:
         - bearerAuth: []

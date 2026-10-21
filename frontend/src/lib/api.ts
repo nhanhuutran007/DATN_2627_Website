@@ -116,6 +116,7 @@ export function updateStoredUser(user: AuthUser): void {
 }
 
 export function clearSession(): void {
+  stepUpTokens.clear();
   clearStorage(ACCESS_TOKEN_KEY);
   clearStorage(REFRESH_TOKEN_KEY);
   clearStorage(USER_KEY);
@@ -125,7 +126,77 @@ export function clearSession(): void {
 type ErrorPayload = {
   message?: string | string[];
   code?: string;
+  /** Với `step_up_required`: thao tác cần mã OTP (vd. `change_password`). */
+  purpose?: string;
 };
+
+/* ---------- Xác minh bổ sung (mã OTP qua email) cho thao tác nhạy cảm ---------- */
+
+const STEP_UP_REQUIRED = "step_up_required";
+const STEP_UP_HEADER = "X-Step-Up-Token";
+
+export type StepUpResult = { stepUpToken: string; expiresInSeconds: number };
+/** Mở hộp nhập mã cho `purpose`; trả `null` khi người dùng hủy. */
+export type StepUpHandler = (purpose: string) => Promise<StepUpResult | null>;
+
+let stepUpHandler: StepUpHandler | null = null;
+/** Step-up token theo mục đích, chỉ giữ trong bộ nhớ tab (không lưu localStorage). */
+const stepUpTokens = new Map<string, { token: string; expiresAt: number }>();
+const stepUpInFlight = new Map<string, Promise<string | null>>();
+
+/** `StepUpDialog` đăng ký hộp nhập mã; trả hàm hủy đăng ký. */
+export function setStepUpHandler(handler: StepUpHandler): () => void {
+  stepUpHandler = handler;
+  return () => {
+    if (stepUpHandler === handler) stepUpHandler = null;
+  };
+}
+
+export function requestStepUpCode(purpose: string): Promise<{ expiresInMinutes: number }> {
+  return api.post<{ expiresInMinutes: number }>("/auth/step-up/request", { purpose });
+}
+
+export function verifyStepUpCode(purpose: string, code: string): Promise<StepUpResult> {
+  return api.post<StepUpResult>("/auth/step-up/verify", { purpose, code });
+}
+
+/**
+ * Lấy step-up token cho `purpose`: dùng lại token còn hạn (trừ token vừa bị từ chối),
+ * nếu không thì hỏi mã OTP. Các request cùng cần một mục đích chờ chung một hộp thoại.
+ */
+function obtainStepUpToken(purpose: string, rejectedToken: string | null): Promise<string | null> {
+  const cached = stepUpTokens.get(purpose);
+  if (cached && cached.token !== rejectedToken && cached.expiresAt > Date.now() + 5_000) {
+    return Promise.resolve(cached.token);
+  }
+  stepUpTokens.delete(purpose);
+  const handler = stepUpHandler;
+  if (!handler) return Promise.resolve(null);
+
+  let pending = stepUpInFlight.get(purpose);
+  if (!pending) {
+    pending = handler(purpose)
+      .then((result) => {
+        if (!result) return null;
+        stepUpTokens.set(purpose, {
+          token: result.stepUpToken,
+          expiresAt: Date.now() + result.expiresInSeconds * 1000,
+        });
+        return result.stepUpToken;
+      })
+      .finally(() => stepUpInFlight.delete(purpose));
+    stepUpInFlight.set(purpose, pending);
+  }
+  return pending;
+}
+
+/** Token để gửi lại request nếu server đòi xác minh bổ sung; `null` = không áp dụng/người dùng hủy. */
+function stepUpRetryToken(response: Response, payload: ErrorPayload | null, sent: Headers): Promise<string | null> {
+  if (response.status !== 403 || payload?.code !== STEP_UP_REQUIRED || !payload.purpose) {
+    return Promise.resolve(null);
+  }
+  return obtainStepUpToken(payload.purpose, sent.get(STEP_UP_HEADER));
+}
 
 function getErrorMessage(payload: ErrorPayload | null, fallback: string): string {
   if (!payload) return fallback;
@@ -217,6 +288,12 @@ export async function apiFetch<T>(
   const payload = await parseBody(response);
   if (!response.ok) {
     const errorPayload = (payload ?? null) as ErrorPayload | null;
+    const stepUpToken = withAuth ? await stepUpRetryToken(response, errorPayload, headers) : null;
+    if (stepUpToken) {
+      const retryHeaders = new Headers(options.headers);
+      retryHeaders.set(STEP_UP_HEADER, stepUpToken);
+      return apiFetch<T>(path, { ...options, headers: retryHeaders }, withAuth, retry);
+    }
     throw new ApiError(
       response.status,
       getErrorMessage(errorPayload, `Yêu cầu thất bại (HTTP ${response.status})`),
@@ -228,16 +305,23 @@ export async function apiFetch<T>(
 }
 
 /** Tải file (vd. CSV) có xác thực; trả nội dung + tên file từ Content-Disposition. */
-export async function apiDownload(path: string, retry = true): Promise<{ blob: Blob; filename: string | null }> {
+export async function apiDownload(
+  path: string,
+  retry = true,
+  stepUpToken?: string,
+): Promise<{ blob: Blob; filename: string | null }> {
   const headers = new Headers();
   const accessToken = readStorage(ACCESS_TOKEN_KEY);
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  if (stepUpToken) headers.set(STEP_UP_HEADER, stepUpToken);
   const response = await fetch(`${apiBaseUrl()}${path}`, { headers });
   if (response.status === 401 && retry && (await refreshAccessToken())) {
-    return apiDownload(path, false);
+    return apiDownload(path, false, stepUpToken);
   }
   if (!response.ok) {
     const payload = (await parseBody(response)) as ErrorPayload | null;
+    const retryToken = await stepUpRetryToken(response, payload, headers);
+    if (retryToken) return apiDownload(path, retry, retryToken);
     throw new ApiError(response.status, getErrorMessage(payload, `Tải file thất bại (HTTP ${response.status})`));
   }
   const disposition = response.headers.get("Content-Disposition") ?? "";

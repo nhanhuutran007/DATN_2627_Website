@@ -78,6 +78,7 @@ describe("PasswordResetService", () => {
       },
       sendNotification: async () => {},
       sendEmailVerification: async () => {},
+      sendStepUpCode: async () => {},
     };
 
     service = new PasswordResetService(
