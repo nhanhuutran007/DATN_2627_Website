@@ -156,7 +156,11 @@ paths:
     post:
       operationId: refreshToken
       summary: Làm mới access token
-      description: Rate limit 10 lần/phút theo IP.
+      description: >-
+        Rate limit 10 lần/phút theo IP. Xoay vòng refresh token: mỗi refresh token chỉ dùng
+        được một lần (bị thu hồi ngay khi cấp cặp mới). Gửi lại token đã dùng → 401; nếu đã quá
+        30 giây kể từ khi bị thu hồi thì coi là token bị lộ: mọi phiên của tài khoản bị vô hiệu
+        và ghi audit `auth.refresh.reuse_detected`.
       requestBody:
         required: true
         content:

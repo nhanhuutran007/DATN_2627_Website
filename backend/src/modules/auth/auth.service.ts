@@ -22,6 +22,9 @@ import { RevokedToken } from "./entities/revoked-token.entity";
 /** Phần payload JWT dùng để thu hồi token (`jti`) và biết lúc nó tự hết hạn (`exp`). */
 type TokenClaims = { sub?: string; jti?: string; iat?: number; exp?: number };
 
+/** Khoảng cho phép hai request đổi cùng một refresh token mà không bị coi là token bị lộ. */
+const REFRESH_REUSE_GRACE_MS = 30_000;
+
 /**
  * JWT phát hành trước lần đổi/đặt lại mật khẩu gần nhất không còn hợp lệ.
  * `iat` tính bằng giây nên so với mốc đổi mật khẩu đã làm tròn xuống giây.
@@ -223,7 +226,7 @@ export class AuthService {
   }
 
   async refreshTokens(refreshToken: string): Promise<TokenResponseDto> {
-    let payload: { sub: string; iat?: number; jti?: string };
+    let payload: TokenClaims & { sub: string };
     try {
       payload = this.jwtService.verify(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET,
@@ -241,11 +244,59 @@ export class AuthService {
       throw new ForbiddenException("Account has been banned");
     }
 
-    if (issuedBeforeSessionCutoff(user, payload.iat) || (await this.isRevoked(payload.jti))) {
+    // Token không có `jti` không xoay vòng được → buộc đăng nhập lại.
+    if (issuedBeforeSessionCutoff(user, payload.iat) || !payload.jti || !payload.exp) {
+      throw new UnauthorizedException("Invalid refresh token");
+    }
+
+    // Xoay vòng: refresh token chỉ dùng được một lần, thu hồi ngay khi đổi sang cặp mới.
+    const claimed = await this.claimRefreshToken(user, payload);
+    if (!claimed) {
+      await this.handleRefreshReuse(user, payload.jti);
       throw new UnauthorizedException("Invalid refresh token");
     }
 
     return this.generateTokens(user);
+  }
+
+  /**
+   * Ghi `jti` của refresh token vào danh sách thu hồi. Khóa chính `jti` bảo đảm hai
+   * request cùng lúc chỉ một bên thắng; trả `false` nếu token đã bị thu hồi trước đó.
+   */
+  private async claimRefreshToken(user: User, claims: TokenClaims): Promise<boolean> {
+    const entry = this.toRevokedEntry(user, claims);
+    if (!entry || (await this.isRevoked(entry.jti))) {
+      return false;
+    }
+    try {
+      await this.revokedTokenRepo.insert(entry);
+      return true;
+    } catch (error) {
+      if (await this.isRevoked(entry.jti)) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Refresh token đã dùng rồi mà vẫn bị gửi lại. Trong vài giây đầu thường là hai tab/
+   * request đổi token cùng lúc → chỉ từ chối. Muộn hơn thì coi như token bị lộ: vô hiệu
+   * mọi phiên của tài khoản (cả kẻ gian lẫn chủ tài khoản phải đăng nhập lại).
+   */
+  private async handleRefreshReuse(user: User, jti: string): Promise<void> {
+    const row = await this.revokedTokenRepo.findOneBy({ jti });
+    if (row && Date.now() - new Date(row.createdAt).getTime() <= REFRESH_REUSE_GRACE_MS) {
+      return;
+    }
+    const revokedAt = await this.usersService.revokeAllSessions(user);
+    await this.auditService.record({
+      userId: user.id,
+      action: "auth.refresh.reuse_detected",
+      entity: "user",
+      entityId: user.id,
+      newValues: { jti, sessionsRevokedAt: revokedAt.toISOString() },
+    });
   }
 
   async validateUser(userId: string, issuedAt?: number, jti?: string): Promise<User> {

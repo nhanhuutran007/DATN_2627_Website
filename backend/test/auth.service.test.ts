@@ -35,6 +35,7 @@ function createMockDependencies() {
     findById: async () => mockUser,
     recordLoginFailure,
     recordLoginSuccess,
+    revokeAllSessions: async () => new Date(),
   } as unknown as UsersService;
 
   const jwtService = {
@@ -68,8 +69,14 @@ function makeRevokedTokenRepo() {
   const rows = new Map<string, RevokedToken>();
   const repo = {
     existsBy: async ({ jti }: { jti: string }) => rows.has(jti),
+    findOneBy: async ({ jti }: { jti: string }) => rows.get(jti) ?? null,
+    insert: async (entry: RevokedToken) => {
+      if (rows.has(entry.jti)) throw new Error("ER_DUP_ENTRY");
+      rows.set(entry.jti, { ...entry, createdAt: new Date() });
+      return {};
+    },
     save: async (entries: RevokedToken[]) => {
-      for (const entry of entries) rows.set(entry.jti, entry);
+      for (const entry of entries) rows.set(entry.jti, { ...entry, createdAt: new Date() });
       return entries;
     },
     delete: async () => {
@@ -251,22 +258,73 @@ describe("AuthService", () => {
   });
 
   describe("refreshTokens", () => {
+    const NOW_SECONDS = Math.floor(Date.now() / 1000);
+    const refreshClaims = (jti = "refresh-jti") => ({
+      sub: mockUser.id,
+      email: mockUser.email,
+      jti,
+      iat: NOW_SECONDS,
+      exp: NOW_SECONDS + 7 * 86_400,
+    });
+
     it("should return new tokens when valid refresh token", async () => {
-      (jwtService as any).verify = () => ({
-        sub: mockUser.id,
-        email: mockUser.email,
-      });
+      (jwtService as any).verify = () => refreshClaims();
 
       const result = await authService.refreshTokens("valid-refresh-token");
       ok(result.accessToken);
       equal(result.user.email, mockUser.email);
     });
 
+    it("xoay vòng: refresh token vừa dùng bị thu hồi tới lúc tự hết hạn", async () => {
+      (jwtService as any).verify = () => refreshClaims();
+
+      await authService.refreshTokens("valid-refresh-token");
+
+      equal(revoked.rows.get("refresh-jti")?.expiresAt.getTime(), (NOW_SECONDS + 7 * 86_400) * 1000);
+      await rejects(authService.refreshTokens("valid-refresh-token"), { status: 401 });
+    });
+
+    it("dùng lại ngay (request song song) chỉ bị từ chối, không thu hồi mọi phiên", async () => {
+      let revokeAllCalled = false;
+      (usersService as any).revokeAllSessions = async () => {
+        revokeAllCalled = true;
+        return new Date();
+      };
+      (jwtService as any).verify = () => refreshClaims();
+
+      await authService.refreshTokens("valid-refresh-token");
+      await rejects(authService.refreshTokens("valid-refresh-token"), { status: 401 });
+
+      equal(revokeAllCalled, false);
+      ok(!audit.entries.some((entry) => entry.action === "auth.refresh.reuse_detected"));
+    });
+
+    it("dùng lại token đã thu hồi từ lâu → coi là bị lộ, thu hồi mọi phiên và ghi audit", async () => {
+      let revokeAllCalled = false;
+      (usersService as any).revokeAllSessions = async () => {
+        revokeAllCalled = true;
+        return new Date("2026-10-21T03:00:00Z");
+      };
+      (jwtService as any).verify = () => refreshClaims("stolen-jti");
+      await authService.refreshTokens("stolen-refresh-token");
+      revoked.rows.get("stolen-jti")!.createdAt = new Date(Date.now() - 60_000);
+
+      await rejects(authService.refreshTokens("stolen-refresh-token"), { status: 401 });
+
+      equal(revokeAllCalled, true);
+      const entry = audit.entries.at(-1);
+      equal(entry?.action, "auth.refresh.reuse_detected");
+      deepEqual(entry?.newValues, { jti: "stolen-jti", sessionsRevokedAt: "2026-10-21T03:00:00.000Z" });
+    });
+
+    it("từ chối refresh token cũ không có jti", async () => {
+      (jwtService as any).verify = () => ({ sub: mockUser.id, email: mockUser.email });
+
+      await rejects(authService.refreshTokens("legacy-refresh-token"), { status: 401 });
+    });
+
     it("should throw ForbiddenException when account is banned", async () => {
-      (jwtService as any).verify = () => ({
-        sub: mockUser.id,
-        email: mockUser.email,
-      });
+      (jwtService as any).verify = () => refreshClaims();
       (usersService as any).findById = async () => ({
         ...mockUser,
         status: UserStatus.BANNED,
@@ -350,6 +408,7 @@ describe("AuthService", () => {
         return "token";
       };
 
+      jwtService.verify = () => claims({ jti: "refresh-jti", exp: NOW_SECONDS + 7 * 86_400 });
       await authService.refreshTokens("valid-refresh-token");
 
       equal(signed.length, 2);
