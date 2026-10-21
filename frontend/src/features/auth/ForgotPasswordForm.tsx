@@ -5,6 +5,8 @@ import { FormEvent, useState } from "react";
 
 import { ApiError, forgotPasswordRequest } from "@/lib/api";
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function messageFor(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 429) return "Bạn gửi yêu cầu quá nhiều lần. Vui lòng đợi ít phút rồi thử lại.";
@@ -18,14 +20,20 @@ export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [sentMessage, setSentMessage] = useState("");
+  const [sentTo, setSentTo] = useState("");
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const address = email.trim();
+    if (!EMAIL_PATTERN.test(address)) {
+      setError("Vui lòng nhập địa chỉ email hợp lệ.");
+      return;
+    }
     setError("");
     setBusy(true);
     try {
-      setSentMessage(await forgotPasswordRequest(email.trim()));
+      await forgotPasswordRequest(address);
+      setSentTo(address);
     } catch (err) {
       setError(messageFor(err));
     } finally {
@@ -33,42 +41,56 @@ export function ForgotPasswordForm() {
     }
   };
 
-  if (sentMessage) {
+  if (sentTo) {
     return (
-      <div className="form">
-        <p className="form-notice" role="status">{sentMessage}</p>
-        <p className="hint">
-          Liên kết có hiệu lực trong 30 phút và chỉ dùng được một lần. Không thấy email? Hãy kiểm tra thư mục spam
-          hoặc gửi lại sau một phút.
+      <>
+        <h1>Kiểm tra email của bạn</h1>
+        <p className="signin-lead" role="status">
+          Nếu <b>{sentTo}</b> đã đăng ký Góp Mầm, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu tới địa chỉ này.
         </p>
-        <button className="button button-outline button-block" type="button" onClick={() => setSentMessage("")}>
-          Gửi lại
-        </button>
-        <p className="form-switch"><Link href="/dang-nhap">Quay lại đăng nhập</Link></p>
-      </div>
+        <p className="signin-lead signin-muted">
+          Liên kết có hiệu lực trong 30 phút và chỉ dùng được một lần. Không thấy email? Hãy kiểm tra thư mục spam.
+        </p>
+        <div className="signin-form">
+          <button className="signin-submit signin-submit-outline" type="button" onClick={() => setSentTo("")}>
+            Dùng email khác
+          </button>
+        </div>
+        <p className="signin-back"><Link href="/dang-nhap">Quay lại đăng nhập</Link></p>
+      </>
     );
   }
 
   return (
-    <form className="form" onSubmit={submit}>
-      <label className="field">
-        <span>Email đã đăng ký</span>
-        <input
-          type="email"
-          required
-          value={email}
-          placeholder="ban@email.com"
-          autoComplete="email"
-          onChange={(event) => setEmail(event.target.value)}
-        />
-      </label>
+    <>
+      <h1>Đặt lại mật khẩu</h1>
+      <p className="signin-lead">Chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu tới email của bạn.</p>
+      {error && <p id="forgot-error" className="signin-error" role="alert">{error}</p>}
 
-      {error && <p className="form-error" role="alert">{error}</p>}
-
-      <button className="button button-primary button-block" type="submit" disabled={busy}>
-        {busy ? "Đang gửi…" : "Gửi liên kết đặt lại mật khẩu"}
-      </button>
-      <p className="form-switch">Nhớ mật khẩu rồi? <Link href="/dang-nhap">Đăng nhập</Link></p>
-    </form>
+      <form className="signin-form" onSubmit={submit} noValidate>
+        <label className="signin-field">
+          <input
+            type="email"
+            name="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder=" "
+            value={email}
+            autoFocus
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "forgot-error" : undefined}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              if (error) setError("");
+            }}
+          />
+          <span className="signin-label">Địa chỉ email</span>
+        </label>
+        <button className="signin-submit" type="submit" disabled={busy}>
+          {busy ? "Đang gửi…" : "Đặt lại mật khẩu"}
+        </button>
+      </form>
+      <p className="signin-back"><Link href="/dang-nhap">Quay lại đăng nhập</Link></p>
+    </>
   );
 }

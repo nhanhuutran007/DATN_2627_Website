@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
-import { AuthShell } from "@/features/auth/AuthShell";
+import { LogoMark } from "@/components/ui/LogoMark";
 import { ForgotPasswordForm } from "@/features/auth/ForgotPasswordForm";
 
 export const metadata: Metadata = {
@@ -10,14 +11,17 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+/** Cùng khung toàn màn hình với trang đăng nhập (không header/footer — xem ChromeGate). */
 export default function ForgotPasswordPage() {
   return (
-    <AuthShell
-      title="Quên mật khẩu"
-      lead="Nhập email bạn đã dùng để đăng ký, chúng tôi sẽ gửi liên kết đặt lại mật khẩu."
-      image={{ src: "/images/cover-mangrove.webp", alt: "" }}
-    >
-      <ForgotPasswordForm />
-    </AuthShell>
+    <main className="signin-page">
+      <div className="signin-card signin-card-start">
+        <Link className="logo signin-logo" href="/" aria-label="Góp Mầm – Trang chủ">
+          <LogoMark className="logo-mark" />
+          <span className="logo-text">GÓP <b>MẦM</b></span>
+        </Link>
+        <ForgotPasswordForm />
+      </div>
+    </main>
   );
 }
