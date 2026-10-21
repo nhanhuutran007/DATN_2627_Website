@@ -329,6 +329,14 @@ export class AiService {
     });
     const amounts = completed.map((donation) => Number(donation.amount) || 0);
 
+    // Tuổi tài khoản chủ dự án; không biết thì bỏ hẳn đặc trưng (gửi 0 sẽ bị luật coi là
+    // "tài khoản mới tạo" và gắn cờ oan mọi chiến dịch).
+    const campaign = await this.campaignRepo.findOne({
+      where: { id: campaignId },
+      relations: { owner: true },
+    });
+    const ownerCreatedAt = campaign?.owner?.createdAt;
+
     return {
       contribution_count_1h: recent,
       failed_payment_count: failed,
@@ -336,7 +344,14 @@ export class AiService {
       device_shared_accounts: 0,
       amount_z_score: this.amountZScore(amounts),
       ip_country_changes: 0,
-      new_account_days: 0,
+      ...(ownerCreatedAt
+        ? {
+            new_account_days: Math.max(
+              0,
+              Math.floor((Date.now() - new Date(ownerCreatedAt).getTime()) / DAY_MS),
+            ),
+          }
+        : {}),
       profile_change_frequency: 0,
     };
   }

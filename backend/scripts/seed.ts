@@ -10,6 +10,8 @@ import {
   DonationStatus,
 } from "../src/modules/donations/entities/donation.entity";
 import { CampaignFollow } from "../src/modules/follows/entities/campaign-follow.entity";
+import { CampaignComment, CommentStatus } from "../src/modules/comments/entities/campaign-comment.entity";
+import { Report, ReportReason, ReportStatus } from "../src/modules/moderation/entities/report.entity";
 import { Milestone } from "../src/modules/progress/entities/milestone.entity";
 
 config({ path: ".env" });
@@ -154,6 +156,8 @@ async function seed() {
       endDate: at(seedRow.startedDaysAgo - seedRow.durationDays, 23),
       status: seedRow.status,
       rejectionReason: seedRow.rejectionReason,
+      // Mọi chiến dịch ngoài bản nháp đều đã qua bước gửi duyệt
+      submittedAt: seedRow.status === CampaignStatus.DRAFT ? null : at(seedRow.startedDaysAgo + 2, 9),
       createdAt: at(seedRow.startedDaysAgo + 3, 8),
     })),
   );
@@ -282,11 +286,47 @@ async function seed() {
   }
   await dataSource.getRepository(CampaignFollow).save(followRows);
 
+  // Kiểm duyệt nội dung: vài bình luận (có một bình luận rác) và báo cáo vi phạm đủ trạng thái.
+  const activeCampaigns = campaigns.filter((campaign) => campaign.status === CampaignStatus.ACTIVE);
+  const commentRepo = dataSource.getRepository(CampaignComment);
+  const [spamComment] = await commentRepo.save([
+    commentRepo.create({
+      campaignId: activeCampaigns[0].id,
+      userId: donors[5].id,
+      content: "Kiếm tiền online 500k/ngày tại nhà, không cần vốn. Liên hệ Zalo 0987 xxx xxx để được hướng dẫn!",
+      status: CommentStatus.VISIBLE,
+      createdAt: at(2, 20),
+    }),
+    commentRepo.create({
+      campaignId: activeCampaigns[0].id,
+      userId: donors[0].id,
+      content: "Mong dự án sớm đạt mục tiêu, mình sẽ chia sẻ cho bạn bè cùng ủng hộ.",
+      status: CommentStatus.VISIBLE,
+      createdAt: at(4, 10),
+    }),
+  ]);
+  const reportRepo = dataSource.getRepository(Report);
+  const reportRows = [
+    { campaignId: activeCampaigns[1].id, reporterId: donors[1].id, reason: ReportReason.FRAUD, status: ReportStatus.PENDING, createdAt: at(1, 15),
+      description: "Ảnh minh họa của chiến dịch trùng với ảnh trong một bài báo năm 2023, nghi lấy ảnh trên mạng chứ không phải ảnh thật của dự án." },
+    { campaignId: activeCampaigns[0].id, commentId: spamComment.id, reporterId: donors[2].id, reason: ReportReason.SPAM, status: ReportStatus.PENDING, createdAt: at(1, 21),
+      description: "Bình luận quảng cáo kiếm tiền online, kèm số điện thoại lạ, không liên quan tới dự án." },
+    { campaignId: activeCampaigns[2].id, reporterId: donors[3].id, reason: ReportReason.MISINFORMATION, status: ReportStatus.REVIEWING, createdAt: at(3, 9),
+      description: "Số học sinh hưởng lợi nêu trong mô tả không khớp với số liệu trường đã công bố trên trang thông tin của xã." },
+    { campaignId: activeCampaigns[3].id, reporterId: donors[4].id, reason: ReportReason.INAPPROPRIATE, status: ReportStatus.DISMISSED, createdAt: at(9, 14),
+      adminNotes: "Đã đối chiếu: hình ảnh do chủ dự án tự chụp tại địa phương, không có nội dung phản cảm. Không vi phạm.",
+      resolvedBy: admin.id, resolvedAt: at(8, 10) },
+    { campaignId: activeCampaigns[1].id, reporterId: donors[6].id, reason: ReportReason.OTHER, status: ReportStatus.RESOLVED, createdAt: at(15, 11),
+      adminNotes: "Chủ dự án chưa đăng chứng từ chi cho mốc 1. Đã yêu cầu bổ sung; chủ dự án đã cập nhật hóa đơn sau 2 ngày.",
+      resolvedBy: admin.id, resolvedAt: at(13, 16) },
+  ];
+  await reportRepo.save(reportRows.map((row) => reportRepo.create(row)));
+
   const completedCount = donationRows.filter((row) => row.status === DonationStatus.COMPLETED).length;
   console.log(
     `Seeded: ${1 + owners.length + donors.length} users, ${campaigns.length} campaigns, ` +
       `${donationRows.length} donations (${completedCount} completed), ${viewRows.length} daily view rows, ` +
-      `${milestoneRows.length} milestones, ${followRows.length} follows. Password: ${SEED_PASSWORD}`,
+      `${milestoneRows.length} milestones, ${followRows.length} follows, ${reportRows.length} reports. Password: ${SEED_PASSWORD}`,
   );
   await dataSource.destroy();
   console.log("Done!");

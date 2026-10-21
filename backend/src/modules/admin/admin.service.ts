@@ -40,7 +40,10 @@ export type AdminListResult<T> = {
 type StatusTotals = Record<string, number>;
 
 /** Giao dịch kèm mức cảnh báo cao nhất đang mở của chiến dịch/người ủng hộ liên quan. */
-export type FlaggedDonation = Donation & { riskLevel: RiskAlertLevel | null };
+export type FlaggedDonation = Donation & {
+  riskLevel: RiskAlertLevel | null;
+  riskSource: "campaign" | "user" | "both" | null;
+};
 
 const RISK_RANK: Record<RiskAlertLevel, number> = {
   [RiskAlertLevel.LOW]: 1,
@@ -119,6 +122,16 @@ export class AdminService {
     const failedCampaigns = campaignTotals[CampaignStatus.FAILED] ?? 0;
     const closed = successCount + failedCampaigns;
     const successRate = closed > 0 ? Math.round((successCount / closed) * 10_000) / 10_000 : 0;
+    // Chiến dịch đã qua kiểm duyệt: "approved" chỉ là trạng thái tạm trước khi gây quỹ,
+    // nên phải cộng cả các trạng thái phía sau nó.
+    const reviewed = [
+      CampaignStatus.APPROVED,
+      CampaignStatus.ACTIVE,
+      CampaignStatus.PAUSED,
+      CampaignStatus.SUCCESS,
+      CampaignStatus.FAILED,
+      CampaignStatus.ENDED,
+    ].reduce((sum, status) => sum + (campaignTotals[status] ?? 0), 0);
 
     const openRisks = await this.riskAlertRepo.find({
       where: { status: RiskAlertStatus.OPEN },
@@ -191,6 +204,7 @@ export class AdminService {
         pending: campaignTotals[CampaignStatus.PENDING] ?? 0,
         needsInfo: campaignTotals[CampaignStatus.NEEDS_INFO] ?? 0,
         approved: campaignTotals[CampaignStatus.APPROVED] ?? 0,
+        reviewed,
         active: campaignTotals[CampaignStatus.ACTIVE] ?? 0,
         ended: campaignTotals[CampaignStatus.ENDED] ?? 0,
         success: successCount,
@@ -316,7 +330,10 @@ export class AdminService {
       const riskLevel = fromCampaign && fromUser
         ? higherRisk(fromCampaign, fromUser)
         : fromCampaign ?? fromUser ?? null;
-      return Object.assign(donation, { riskLevel });
+      // Nguồn cảnh báo để admin biết rủi ro thuộc chiến dịch hay người ủng hộ, không phải riêng giao dịch
+      const riskSource: FlaggedDonation["riskSource"] =
+        fromCampaign && fromUser ? "both" : fromCampaign ? "campaign" : fromUser ? "user" : null;
+      return Object.assign(donation, { riskLevel, riskSource });
     });
     return { items, total, limit, offset };
   }
@@ -457,6 +474,9 @@ export class AdminService {
         return { currentAmount: "DESC" };
       case "backers":
         return { backerCount: "DESC" };
+      // Hàng chờ duyệt: ai gửi trước được xét trước
+      case "submitted":
+        return { submittedAt: "ASC", createdAt: "ASC" };
       case "newest":
       default:
         return { createdAt: "DESC" };

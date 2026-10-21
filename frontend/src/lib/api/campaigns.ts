@@ -74,6 +74,7 @@ export type ApiCampaign = {
   startDate: string;
   endDate: string;
   status: ApiCampaignStatus;
+  submittedAt?: string | null;
   isFeatured?: boolean;
   imageUrl?: string | null;
   videoUrl?: string | null;

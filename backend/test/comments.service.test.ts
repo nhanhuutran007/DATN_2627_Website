@@ -8,6 +8,7 @@ import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entit
 import { CommentsService, sanitizeCommentContent } from "../src/modules/comments/comments.service";
 import { CommentKind, CommentStatus } from "../src/modules/comments/entities/campaign-comment.entity";
 import { NotificationType } from "../src/modules/notifications/entities/notification.entity";
+import { ReportStatus } from "../src/modules/moderation/entities/report.entity";
 import { UserRole } from "../src/modules/users/entities/user.entity";
 import { makeAuditRecorder } from "./helpers/audit";
 import { makeNotifierRecorder } from "./helpers/notifications";
@@ -65,6 +66,7 @@ describe("CommentsService", () => {
   let notifier: ReturnType<typeof makeNotifierRecorder>;
   let status: CampaignStatus;
   let service: CommentsService;
+  let reportRepo: ReturnType<typeof makeRepo>;
 
   beforeEach(() => {
     repo = makeRepo();
@@ -77,7 +79,8 @@ describe("CommentsService", () => {
         return { id: CAMPAIGN_ID, title: "Thư viện vùng cao", ownerId: OWNER.id, status };
       },
     } as unknown as CampaignsService;
-    service = new CommentsService(repo as any, campaignsService, audit.service, notifier.service);
+    reportRepo = makeRepo();
+    service = new CommentsService(repo as any, campaignsService, audit.service, notifier.service, reportRepo as any);
   });
 
   it("đặt câu hỏi: lưu nội dung đã làm sạch, báo chủ dự án", async () => {
@@ -165,5 +168,25 @@ describe("CommentsService", () => {
     equal(page.items[0].id, a.id);
     equal(page.items[0].replies.length, 1);
     equal(page.items[0].replies[0].isOwner, true);
+  });
+  it("adminList: gắn số báo cáo đang mở, bình luận gốc và trạng thái chủ dự án đã trả lời", async () => {
+    const campaign = { id: CAMPAIGN_ID, ownerId: OWNER.id };
+    repo.rows.push(
+      { id: "q1", campaignId: CAMPAIGN_ID, campaign, userId: "u1", kind: CommentKind.QUESTION, content: "Bao giờ giải ngân?", status: CommentStatus.VISIBLE, parentId: null, user: { name: "Lan" } },
+      { id: "r1", campaignId: CAMPAIGN_ID, campaign, userId: OWNER.id, kind: CommentKind.COMMENT, content: "Tháng sau ạ.", status: CommentStatus.VISIBLE, parentId: "q1" },
+    );
+    reportRepo.rows.push(
+      { id: "rp1", commentId: "r1", status: ReportStatus.PENDING },
+      { id: "rp2", commentId: "r1", status: ReportStatus.DISMISSED },
+    );
+
+    const { items } = await service.adminList({});
+    const question = items.find((item) => item.id === "q1")!;
+    const reply = items.find((item) => item.id === "r1")!;
+    equal(question.ownerReplied, true);
+    equal(question.openReportCount, 0);
+    equal(reply.openReportCount, 1);
+    equal(reply.ownerReplied, null);
+    deepEqual(reply.parent, { id: "q1", content: "Bao giờ giải ngân?", authorName: "Lan" });
   });
 });

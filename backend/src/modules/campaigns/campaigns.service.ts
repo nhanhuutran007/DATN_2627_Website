@@ -336,6 +336,7 @@ export class CampaignsService {
 
     const previousStatus = campaign.status;
     campaign.status = CampaignStatus.PENDING;
+    campaign.submittedAt = new Date();
     campaign.rejectionReason = undefined;
     const saved = await this.campaignRepo.save(campaign);
     await this.auditService.record({
@@ -359,6 +360,11 @@ export class CampaignsService {
     }
 
     const campaign = await this.findById(id);
+
+    // Xung đột lợi ích: admin không được tự duyệt/điều chỉnh chiến dịch của chính mình.
+    if (campaign.ownerId === currentUser.id) {
+      throw new ForbiddenException("Admins cannot moderate their own campaigns");
+    }
 
     if (!MODERATE_TRANSITIONS[campaign.status].includes(dto.status)) {
       throw new ConflictException(

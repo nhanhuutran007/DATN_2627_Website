@@ -1,5 +1,5 @@
 import { Transform, Type } from "class-transformer";
-import { IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
+import { IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from "class-validator";
 
 import { CommentKind, CommentStatus } from "../entities/campaign-comment.entity";
 
@@ -50,6 +50,12 @@ export class AdminCommentQueryDto extends CommentListQueryDto {
   @IsOptional()
   @IsIn(["root", "reply"])
   level?: "root" | "reply";
+
+  /** Chỉ bình luận đang có báo cáo vi phạm chưa xử lý. */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  reported?: boolean;
 
   /** Tìm trong nội dung, tên/email người viết, tên chiến dịch. */
   @IsOptional()

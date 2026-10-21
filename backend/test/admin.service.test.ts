@@ -179,6 +179,7 @@ describe("AdminService", () => {
       equal(overview.campaigns.total, 2);
       equal(overview.campaigns.pending, 1);
       equal(overview.campaigns.success, 1);
+      equal(overview.campaigns.reviewed, 1);
 
       equal(overview.donations.total, 5);
       equal(overview.donations.completed, 2);
@@ -293,6 +294,7 @@ describe("AdminService", () => {
       ok(where.every((clause) => clause.status === DonationStatus.COMPLETED));
       // Mức cao nhất của chiến dịch là "high"; người ủng hộ là "low".
       deepEqual(result.items.map((item) => item.riskLevel), ["high", "low"]);
+      deepEqual(result.items.map((item) => item.riskSource), ["campaign", "user"]);
     });
 
     it("flagged khi không có cảnh báo nào đang mở trả danh sách rỗng, không truy vấn", async () => {

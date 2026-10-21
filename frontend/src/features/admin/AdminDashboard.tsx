@@ -13,6 +13,7 @@ import { CategoryManager, StatsExport } from "@/features/admin/AdminContent";
 import { BackupManager } from "@/features/admin/BackupManager";
 import { AdminFinance } from "@/features/admin/AdminFinance";
 import { CampaignReviewDialog } from "@/features/admin/CampaignReviewDialog";
+import { CopyableCode, DonationDetailDialog } from "@/features/admin/DonationDetailDialog";
 import { UserDetailDialog } from "@/features/admin/UserDetailDialog";
 import {
   CAMPAIGN_STATUS_LABEL,
@@ -67,7 +68,7 @@ import {
   reviewReport,
   type CampaignReport,
   type ReportReason,
-  type ReportStatus,
+  type ReportStatusFilter,
   type ReviewStatus,
 } from "@/lib/api/reports";
 import { useAuthUser } from "@/lib/auth";
@@ -118,6 +119,36 @@ function money(value: number | string): string {
   return formatCurrency(Number(value) || 0);
 }
 
+const DAY_MS = 86_400_000;
+
+/** "hôm nay" / "N ngày trước": hồ sơ đã nằm trong hàng chờ bao lâu. */
+function waitingLabel(value: string): string {
+  const days = Math.floor((Date.now() - new Date(value).getTime()) / DAY_MS);
+  return days <= 0 ? "hôm nay" : `${days} ngày trước`;
+}
+
+/** Chiến dịch chưa gây quỹ mà sắp tới (≤ 7 ngày) hoặc đã qua ngày kết thúc: cần duyệt gấp. */
+function endDateWarning(campaign: AdminCampaign): string | null {
+  if (!["pending", "needs_info", "approved"].includes(campaign.status)) return null;
+  const days = Math.ceil((new Date(campaign.endDate).getTime() - Date.now()) / DAY_MS);
+  if (days <= 0) return "Đã quá ngày kết thúc";
+  return days <= 7 ? `Còn ${days} ngày` : null;
+}
+
+/** Ngày kèm giờ:phút, dùng cho giao dịch (đối soát, phát hiện giao dịch dồn dập). */
+function formatDateTime(value: string | number | Date): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  const time = `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  return `${formatDate(date)} ${time}`;
+}
+
+const RISK_SOURCE_TITLE: Record<NonNullable<AdminDonation["riskSource"]>, string> = {
+  campaign: "Rủi ro của chiến dịch (cảnh báo đang mở), không phải riêng giao dịch này",
+  user: "Rủi ro của người ủng hộ (cảnh báo đang mở), không phải riêng giao dịch này",
+  both: "Cả chiến dịch và người ủng hộ đang có cảnh báo mở",
+};
+
 function formatDate(value: string | number | Date): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
@@ -153,6 +184,7 @@ function evidenceSummary(evidences: Record<string, number>): string {
 }
 
 const NARROW_QUERY = "(max-width: 960px)";
+const NOTICE_TIMEOUT_MS = 6000;
 
 type Paging = { page: number; total: number };
 
@@ -170,8 +202,9 @@ type RiskFilters = {
   method: AdminRiskAlert["method"] | "";
 };
 /** Bộ lọc danh sách báo cáo vi phạm. */
-type ReportFilters = { status: ReportStatus | ""; q: string; reason: ReportReason | ""; target: "campaign" | "comment" | "" };
-const DEFAULT_REPORT_FILTERS: ReportFilters = { status: "pending", q: "", reason: "", target: "" };
+type ReportFilters = { status: ReportStatusFilter | ""; q: string; reason: ReportReason | ""; target: "campaign" | "comment" | "" };
+// Mặc định gồm cả báo cáo đang xem xét: nhận xem xét xong không bị "biến mất" khỏi danh sách
+const DEFAULT_REPORT_FILTERS: ReportFilters = { status: "open", q: "", reason: "", target: "" };
 
 const DEFAULT_RISK_FILTERS: RiskFilters = { status: "open", q: "", level: "", entityType: "", method: "" };
 
@@ -184,8 +217,8 @@ function amountParam(value: string): number | undefined {
 type DonationFilters = { status: DonationFilter; q: string; minAmount: string; maxAmount: string };
 const DEFAULT_DONATION_FILTERS: DonationFilters = { status: "completed", q: "", minAmount: "", maxAmount: "" };
 
-type CommentFilters = { status: CommentStatus | ""; q: string; kind: CommentKind | ""; level: "root" | "reply" | "" };
-const DEFAULT_COMMENT_FILTERS: CommentFilters = { status: "visible", q: "", kind: "", level: "" };
+type CommentFilters = { status: CommentStatus | ""; q: string; kind: CommentKind | ""; level: "root" | "reply" | ""; reported: boolean };
+const DEFAULT_COMMENT_FILTERS: CommentFilters = { status: "visible", q: "", kind: "", level: "", reported: false };
 
 type UserFilters = { q: string; role: AdminUser["role"] | ""; status: AdminUserStatus | "" };
 const DEFAULT_USER_FILTERS: UserFilters = { q: "", role: "", status: "" };
@@ -232,6 +265,8 @@ export function AdminDashboard() {
   const [reports, setReports] = useState<CampaignReport[]>([]);
   const [reportFilter, setReportFilter] = useState<ReportFilters>(DEFAULT_REPORT_FILTERS);
   const [reportDraft, setReportDraft] = useState<ReportFilters>(DEFAULT_REPORT_FILTERS);
+  // Số báo cáo cần xử lý cho badge ở menu, độc lập với bộ lọc đang chọn
+  const [openReportCount, setOpenReportCount] = useState(0);
   const [comments, setComments] = useState<AdminComment[]>([]);
   const [commentFilter, setCommentFilter] = useState<CommentFilters>(DEFAULT_COMMENT_FILTERS);
   const [commentDraft, setCommentDraft] = useState<CommentFilters>(DEFAULT_COMMENT_FILTERS);
@@ -249,8 +284,9 @@ export function AdminDashboard() {
   // Hồ sơ đang mở: các nút quyết định chỉ nằm trong hồ sơ, buộc admin xem đủ trước khi duyệt.
   const [reviewing, setReviewing] = useState<AdminCampaign | null>(null);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
-  // Desktop: thu sidebar về dải icon; màn hẹp: luôn là dải icon, mở rộng đè lên nội dung.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [viewingDonation, setViewingDonation] = useState<AdminDonation | null>(null);
+  // Desktop: dải icon, rê chuột (hoặc focus bàn phím) thì mở rộng đè lên nội dung; màn hẹp: nút trình đơn mở rộng.
+  const [sidebarHovered, setSidebarHovered] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia(NARROW_QUERY).matches);
 
@@ -264,7 +300,7 @@ export function AdminDashboard() {
     return () => media.removeEventListener("change", onChange);
   }, []);
 
-  const sidebarRail = narrow ? !sidebarOpen : sidebarCollapsed;
+  const sidebarRail = narrow ? !sidebarOpen : !sidebarHovered;
 
   const router = useRouter();
   const logout = async () => {
@@ -285,6 +321,19 @@ export function AdminDashboard() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Thông báo kết quả thao tác tự tắt sau vài giây và không mang sang mục khác
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), NOTICE_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  const [noticeView, setNoticeView] = useState(view);
+  if (noticeView !== view) {
+    setNoticeView(view);
+    setNotice(null);
+  }
+
   useEffect(() => {
     if (!isAdmin) return;
     let cancelled = false;
@@ -297,7 +346,7 @@ export function AdminDashboard() {
           fetchAdminUsers({ limit: PAGE_SIZE }),
           fetchAdminRisks({ status: "open", limit: PAGE_SIZE }),
           fetchAuditLogs({ limit: PAGE_SIZE }),
-          fetchAdminReports({ status: "pending", limit: PAGE_SIZE }),
+          fetchAdminReports({ status: "open", limit: PAGE_SIZE }),
           fetchAdminComments({ status: "visible", limit: PAGE_SIZE }),
         ]);
         if (cancelled) return;
@@ -315,6 +364,7 @@ export function AdminDashboard() {
         setRiskPaging({ page: 0, total: riskList.total });
         setAuditPaging({ page: 0, total: audit.total });
         setReportPaging({ page: 0, total: reportList.total });
+        setOpenReportCount(reportList.total);
         setCommentPaging({ page: 0, total: commentList.total });
         setError(null);
       } catch (err) {
@@ -366,6 +416,8 @@ export function AdminDashboard() {
           category: filters.category || undefined,
           minGoal,
           maxGoal,
+          // Hàng chờ duyệt: ai gửi trước được xét trước
+          sort: filters.status === "pending" ? "submitted" : undefined,
           limit: PAGE_SIZE,
           offset,
         }),
@@ -663,7 +715,10 @@ export function AdminDashboard() {
     setNotice(null);
     try {
       await reviewReport(report.id, { status, adminNotes, pauseCampaign, hideComment: hideReportedComment });
-      const reloads: Array<Promise<unknown>> = [loadReports(reportFilter, reportPaging.page)];
+      const reloads: Array<Promise<unknown>> = [
+        loadReports(reportFilter, reportPaging.page),
+        fetchAdminReports({ status: "open", limit: 1 }).then((list) => setOpenReportCount(list.total)),
+      ];
       if (hideReportedComment) reloads.push(loadComments(commentFilter, commentPaging.page));
       if (pauseCampaign) reloads.push(loadCampaigns(campaignFilter, campaignPaging.page), reloadOverview());
       await Promise.all(reloads);
@@ -766,6 +821,7 @@ export function AdminDashboard() {
           status: filters.status || undefined,
           kind: filters.kind || undefined,
           level: filters.level || undefined,
+          reported: filters.reported || undefined,
           q: filters.q.trim() || undefined,
           limit: PAGE_SIZE,
           offset,
@@ -842,6 +898,12 @@ export function AdminDashboard() {
     );
   };
 
+  // Cảnh báo cũ còn lưu cả luật điểm 0: chỉ hiện luật thực sự kích hoạt, nặng nhất trước
+  const riskReasonSummary = (alert: AdminRiskAlert) => {
+    const active = alert.reasons.filter((reason) => reason.weight > 0).sort((a, b) => b.weight - a.weight);
+    return active.length > 0 ? active.map((reason) => reason.label).join(" · ") : "không có luật nào vượt ngưỡng";
+  };
+
   const riskEntityLabel = (alert: AdminRiskAlert) =>
     alert.entityType === "campaign" ? "chiến dịch" : "tài khoản";
 
@@ -862,8 +924,33 @@ export function AdminDashboard() {
     );
   };
 
+  // Backend chặn admin tự duyệt chiến dịch của mình; ẩn nút thay vì để bấm rồi báo lỗi
+  const isOwnCampaign = (campaign: AdminCampaign) => (campaign.owner?.id ?? campaign.ownerId) === user?.id;
+
+  // Thao tác tài chính chỉ trong hộp thoại chi tiết; đóng hộp thoại trước khi mở bước xác nhận
+  const donationActions = (donation: AdminDonation) => {
+    const run = (action: (target: AdminDonation) => Promise<void>) => () => {
+      setViewingDonation(null);
+      void action(donation);
+    };
+    const refundable = donation.status === "completed";
+    const syncable = donation.paymentMethod === "sepay" && ["pending", "expired", "cancelled"].includes(donation.status);
+    if (!refundable && !syncable) return <span className="table-muted">Không cần thao tác</span>;
+    return (
+      <div className="admin-actions">
+        {syncable && <button type="button" disabled={busy === donation.id} onClick={run(handleSepaySync)}>Đối soát SePay</button>}
+        {refundable && <button type="button" disabled={busy === donation.id} onClick={run(handleDirectRefund)}>Hoàn tiền</button>}
+      </div>
+    );
+  };
+
   const tableActions = (campaign: AdminCampaign) => {
     const disabled = busy === campaign.id;
+    if (isOwnCampaign(campaign)) {
+      return ["pending", "approved", "needs_info", "paused"].includes(campaign.status)
+        ? <span className="table-muted">Chiến dịch của bạn: cần quản trị viên khác duyệt</span>
+        : null;
+    }
     if (campaign.status === "pending") {
       return (
         <div className="admin-actions">
@@ -952,7 +1039,11 @@ export function AdminDashboard() {
 
   const campaignsStats = overview?.campaigns;
   const pendingCount = campaignsStats?.pending ?? 0;
+  // Hàng chờ duyệt thì cột "Đã huy động" luôn 0 đ: thay bằng ngày gửi duyệt
+  const awaitingReview = campaignFilter.status === "pending";
   const maxMonthly = Math.max(1, ...(overview?.monthly ?? []).map((entry) => entry.raised));
+  // Tổng của biểu đồ chỉ cộng 6 tháng đang hiển thị, không lấy tổng toàn thời gian
+  const monthlyTotal = (overview?.monthly ?? []).reduce((sum, entry) => sum + entry.raised, 0);
 
   return (
     <main className="admin-page">
@@ -964,6 +1055,16 @@ export function AdminDashboard() {
         <aside
           className={`admin-sidebar${narrow && sidebarOpen ? " is-open" : ""}`}
           id="admin-sidebar"
+          onMouseEnter={() => setSidebarHovered(true)}
+          onMouseLeave={() => setSidebarHovered(false)}
+          // Chỉ mở rộng khi focus đến từ bàn phím: quay lại tab hay chụp màn hình xong, trình duyệt
+          // trả focus về liên kết vừa bấm chuột trong sidebar và không được tự bung sidebar ra.
+          onFocus={(event) => {
+            if ((event.target as HTMLElement).matches(":focus-visible")) setSidebarHovered(true);
+          }}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setSidebarHovered(false);
+          }}
           onClick={(event) => {
             if ((event.target as HTMLElement).closest("a")) setSidebarOpen(false);
           }}
@@ -974,23 +1075,31 @@ export function AdminDashboard() {
               <span className="logo-text">GÓP <b>MẦM</b></span>
             </Link>
           </div>
-          {/* Desktop: nút tròn chevron nằm trên mép phải; màn hẹp: nút trình đơn trong dải icon */}
-          <button
-            className="admin-menu-toggle"
-            type="button"
-            aria-controls="admin-sidebar"
-            aria-expanded={!sidebarRail}
-            aria-label={sidebarRail ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"}
-            onClick={() => (narrow ? setSidebarOpen((value) => !value) : setSidebarCollapsed((value) => !value))}
-          >
-            <Icon name={narrow ? (sidebarOpen ? "x" : "menu") : "chevron-left"} size={narrow ? 22 : 18} />
-          </button>
+          {/* Chỉ màn hẹp (không rê chuột được) mới cần nút trình đơn trong dải icon */}
+          {narrow && (
+            <button
+              className="admin-menu-toggle"
+              type="button"
+              aria-controls="admin-sidebar"
+              aria-expanded={sidebarOpen}
+              aria-label={sidebarOpen ? "Thu gọn thanh điều hướng" : "Mở rộng thanh điều hướng"}
+              onClick={() => setSidebarOpen((value) => !value)}
+            >
+              <Icon name={sidebarOpen ? "x" : "menu"} size={22} />
+            </button>
+          )}
           <nav aria-label="Điều hướng quản trị">
             {ADMIN_SECTION_GROUPS.map((group) => (
               <div className="admin-nav-group" key={group.label ?? "chung"}>
                 {group.label && <p className="admin-nav-label">{group.label}</p>}
                 {group.sections.map((item) => {
-                  const badge = item.slug === "cho-duyet" ? pendingCount : item.slug === "rui-ro" ? (overview?.risks.open ?? 0) : 0;
+                  const badge = item.slug === "cho-duyet"
+                    ? pendingCount
+                    : item.slug === "rui-ro"
+                      ? (overview?.risks.open ?? 0)
+                      : item.slug === "bao-cao-vi-pham"
+                        ? openReportCount
+                        : 0;
                   return (
                     <Link
                       className={item.slug === view ? "active" : undefined}
@@ -1033,12 +1142,18 @@ export function AdminDashboard() {
 
           {error && (
             <div className="admin-notice error" role="alert">
-              <Icon name="bell" size={16} /> {error} — dữ liệu hiển thị có thể chưa đầy đủ.
+              <Icon name="bell" size={16} /> <span>{error} — dữ liệu hiển thị có thể chưa đầy đủ.</span>
+              <button className="admin-notice-close" type="button" aria-label="Đóng thông báo" onClick={() => setError(null)}>
+                <Icon name="x" size={16} />
+              </button>
             </div>
           )}
           {notice && !error && (
             <div className="admin-notice" role="status">
-              <Icon name="check" size={16} /> {notice}
+              <Icon name="check" size={16} /> <span>{notice}</span>
+              <button className="admin-notice-close" type="button" aria-label="Đóng thông báo" onClick={() => setNotice(null)}>
+                <Icon name="x" size={16} />
+              </button>
             </div>
           )}
 
@@ -1073,7 +1188,7 @@ export function AdminDashboard() {
                 <div><p className="eyebrow">Dòng tiền đã xác minh</p><h2>Tài trợ theo tháng (6 tháng)</h2></div>
               </div>
               <div className="admin-chart-summary">
-                <strong>{overview ? money(overview.donations.completedAmount) : "—"}</strong>
+                <strong>{overview ? money(monthlyTotal) : "—"}</strong>
                 <span><i /> Tài trợ thành công</span>
               </div>
               <div className="admin-month-bars" aria-label="Biểu đồ tài trợ theo tháng">
@@ -1098,7 +1213,7 @@ export function AdminDashboard() {
                   <li><i className="green" /><span>Đang gây quỹ</span><b>{overview?.campaigns.active ?? 0}</b></li>
                 </ul>
               </div>
-              <div className="review-sla"><Icon name="clock" size={18} /><span><b>Đã duyệt {overview?.campaigns.approved ?? 0} chiến dịch</b><small>Kể từ khi hệ thống vận hành</small></span></div>
+              <div className="review-sla"><Icon name="clock" size={18} /><span><b>Đã duyệt {overview?.campaigns.reviewed ?? 0} chiến dịch</b><small>Kể từ khi hệ thống vận hành</small></span></div>
             </section>
           </div>
           {/* Xuất CSV nằm cùng số liệu tổng quan thay vì một mục riêng trên sidebar */}
@@ -1110,16 +1225,6 @@ export function AdminDashboard() {
           <section className="admin-card admin-table-card" id="cho-duyet">
             <div className="card-heading">
               <div><p className="eyebrow">Duyệt hồ sơ</p><h2>Chiến dịch</h2></div>
-              <select className="filter-button" aria-label="Lọc theo trạng thái chiến dịch" value={campaignDraft.status} onChange={(event) => applyCampaignFilters({ ...campaignDraft, status: event.target.value as ApiCampaignStatus | "" })}>
-                <option value="pending">Chờ duyệt</option>
-                <option value="approved">Đã duyệt</option>
-                <option value="needs_info">Cần bổ sung</option>
-                <option value="rejected">Bị từ chối</option>
-                <option value="draft">Bản nháp</option>
-                <option value="active">Đang gây quỹ</option>
-                <option value="paused">Tạm dừng</option>
-                <option value="">Tất cả trạng thái</option>
-              </select>
             </div>
             <form
               className="admin-filter-bar"
@@ -1136,6 +1241,16 @@ export function AdminDashboard() {
                 value={campaignDraft.q}
                 onChange={(event) => setCampaignDraft({ ...campaignDraft, q: event.target.value })}
               />
+              <select className="filter-button" aria-label="Lọc theo trạng thái chiến dịch" value={campaignDraft.status} onChange={(event) => applyCampaignFilters({ ...campaignDraft, status: event.target.value as ApiCampaignStatus | "" })}>
+                <option value="pending">Chờ duyệt</option>
+                <option value="approved">Đã duyệt</option>
+                <option value="needs_info">Cần bổ sung</option>
+                <option value="rejected">Bị từ chối</option>
+                <option value="draft">Bản nháp</option>
+                <option value="active">Đang gây quỹ</option>
+                <option value="paused">Tạm dừng</option>
+                <option value="">Tất cả trạng thái</option>
+              </select>
               <select
                 className="filter-button"
                 aria-label="Lọc theo hạng mục"
@@ -1184,7 +1299,7 @@ export function AdminDashboard() {
             </form>
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Chiến dịch</th><th>Chủ dự án</th><th>Mục tiêu</th><th>Đã huy động</th><th>Hạng mục</th><th>Kết thúc</th><th>Trạng thái</th><th /></tr></thead>
+                <thead><tr><th>Chiến dịch</th><th>Chủ dự án</th><th>Hạng mục</th><th>Mục tiêu</th><th>{awaitingReview ? "Gửi duyệt" : "Đã huy động"}</th><th>Kết thúc</th><th>Trạng thái</th><th /></tr></thead>
                 <tbody>
                   {campaigns.map((campaign) => (
                     <Fragment key={campaign.id}>
@@ -1226,18 +1341,30 @@ export function AdminDashboard() {
                           "Chưa có"
                         )}
                       </td>
-                      <td>{money(campaign.goalAmount)}</td>
-                      <td>{money(campaign.currentAmount)}</td>
                       <td>{campaign.category}</td>
-                      <td>{formatDate(campaign.endDate)}</td>
+                      <td>{money(campaign.goalAmount)}</td>
+                      <td>
+                        {awaitingReview ? (
+                          <>
+                            {formatDate(campaign.submittedAt ?? campaign.createdAt ?? campaign.startDate)}
+                            <small className="table-cell-note">{waitingLabel(campaign.submittedAt ?? campaign.createdAt ?? campaign.startDate)}</small>
+                          </>
+                        ) : (
+                          money(campaign.currentAmount)
+                        )}
+                      </td>
+                      <td>
+                        {formatDate(campaign.endDate)}
+                        {endDateWarning(campaign) && <small className="table-cell-note is-urgent">{endDateWarning(campaign)}</small>}
+                      </td>
                       <td><span className={`table-status ${CAMPAIGN_STATUS_TONE[campaign.status]}`}>{CAMPAIGN_STATUS_LABEL[campaign.status]}</span></td>
                       <td>
                         <button
-                          className={`review-open ${tableActions(campaign) ? "is-primary" : ""}`}
+                          className={`review-open ${tableActions(campaign) && !isOwnCampaign(campaign) ? "is-primary" : ""}`}
                           type="button"
                           onClick={() => setReviewing(campaign)}
                         >
-                          {campaign.status === "pending" ? "Xem hồ sơ & duyệt" : "Xem hồ sơ"}
+                          {campaign.status === "pending" && !isOwnCampaign(campaign) ? "Xem hồ sơ & duyệt" : "Xem hồ sơ"}
                         </button>
                       </td>
                     </tr>
@@ -1276,12 +1403,6 @@ export function AdminDashboard() {
             <div className="card-heading">
               <div><p className="eyebrow">Human-in-the-loop</p><h2>Cảnh báo rủi ro AI</h2></div>
               <div className="risk-heading-actions">
-                <select className="filter-button" aria-label="Lọc theo trạng thái cảnh báo" value={riskDraft.status} onChange={(event) => applyRiskFilters({ ...riskDraft, status: event.target.value as RiskStatus | "" })}>
-                  <option value="open">Chưa xử lý</option>
-                  <option value="resolved">Đã xác nhận</option>
-                  <option value="dismissed">Đã bỏ qua</option>
-                  <option value="">Tất cả trạng thái</option>
-                </select>
                 <button className="model-version" type="button" disabled={busy === "risks"} onClick={handleGenerateRisks}>
                   <Icon name="sparkles" size={15} /> Quét lại
                 </button>
@@ -1309,6 +1430,12 @@ export function AdminDashboard() {
                 value={riskDraft.q}
                 onChange={(event) => setRiskDraft({ ...riskDraft, q: event.target.value })}
               />
+              <select className="filter-button" aria-label="Lọc theo trạng thái cảnh báo" value={riskDraft.status} onChange={(event) => applyRiskFilters({ ...riskDraft, status: event.target.value as RiskStatus | "" })}>
+                <option value="open">Chưa xử lý</option>
+                <option value="resolved">Đã xác nhận</option>
+                <option value="dismissed">Đã bỏ qua</option>
+                <option value="">Tất cả trạng thái</option>
+              </select>
               <select
                 className="filter-button"
                 aria-label="Lọc theo mức rủi ro"
@@ -1340,7 +1467,7 @@ export function AdminDashboard() {
                 <option value="ai">Chấm điểm bằng AI</option>
                 <option value="rule">Luật dự phòng</option>
               </select>
-              <button className="button button-primary admin-filter-submit" type="submit">Tìm</button>
+              <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
               {(riskFilter.q || riskFilter.level || riskFilter.entityType || riskFilter.method) && (
                 <button
                   className="link-inline"
@@ -1361,9 +1488,15 @@ export function AdminDashboard() {
                   <article key={alert.id}>
                     <span className={`risk-level ${alert.level}`}>{RISK_LEVEL_LABEL[alert.level]}</span>
                     <div>
-                      <h3>{alert.entityName}</h3>
-                      <p>{alert.entityId.slice(0, 8).toUpperCase()} · {riskEntityLabel(alert)} · {alert.method === "ai" ? "Chấm điểm bằng AI" : "Cảnh báo bằng luật dự phòng"}</p>
-                      <small><b>Nguyên nhân:</b> {alert.reasons.map((reason) => reason.label).join(" · ")}</small>
+                      <h3>
+                        {alert.entityType === "campaign" ? (
+                          <a href={`/du-an/${alert.entityId}`} target="_blank" rel="noreferrer" title="Mở trang chiến dịch">{alert.entityName}</a>
+                        ) : (
+                          <button className="link-inline" type="button" title="Xem thông tin tài khoản" onClick={() => setViewingUserId(alert.entityId)}>{alert.entityName}</button>
+                        )}
+                      </h3>
+                      <p>{alert.entityId.slice(0, 8).toUpperCase()} · {riskEntityLabel(alert)} · Điểm rủi ro <b>{alert.score.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> · {alert.method === "ai" ? "Chấm điểm bằng AI" : "Cảnh báo bằng luật dự phòng"}</p>
+                      <small><b>Nguyên nhân:</b> {riskReasonSummary(alert)}</small>
                       <small><b>Bằng chứng:</b> {evidenceSummary(alert.evidences)}</small>
                     </div>
                     <div>{riskActions(alert)}</div>
@@ -1379,13 +1512,6 @@ export function AdminDashboard() {
           <section className="admin-card risk-card" id="bao-cao-vi-pham">
             <div className="card-heading">
               <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>Báo cáo vi phạm</h2></div>
-              <select className="filter-button" aria-label="Lọc theo trạng thái báo cáo" value={reportDraft.status} onChange={(event) => applyReportFilters({ ...reportDraft, status: event.target.value as ReportStatus | "" })}>
-                <option value="pending">Chờ xem xét</option>
-                <option value="reviewing">Đang xem xét</option>
-                <option value="resolved">Đã xử lý vi phạm</option>
-                <option value="dismissed">Không vi phạm</option>
-                <option value="">Tất cả trạng thái</option>
-              </select>
             </div>
             <form
               className="admin-filter-bar"
@@ -1402,6 +1528,14 @@ export function AdminDashboard() {
                 value={reportDraft.q}
                 onChange={(event) => setReportDraft({ ...reportDraft, q: event.target.value })}
               />
+              <select className="filter-button" aria-label="Lọc theo trạng thái báo cáo" value={reportDraft.status} onChange={(event) => applyReportFilters({ ...reportDraft, status: event.target.value as ReportStatusFilter | "" })}>
+                <option value="open">Cần xử lý</option>
+                <option value="pending">Chờ xem xét</option>
+                <option value="reviewing">Đang xem xét</option>
+                <option value="resolved">Đã xử lý vi phạm</option>
+                <option value="dismissed">Không vi phạm</option>
+                <option value="">Tất cả trạng thái</option>
+              </select>
               <select
                 className="filter-button"
                 aria-label="Lọc theo lý do báo cáo"
@@ -1423,7 +1557,7 @@ export function AdminDashboard() {
                 <option value="campaign">Chiến dịch</option>
                 <option value="comment">Bình luận</option>
               </select>
-              <button className="button button-primary admin-filter-submit" type="submit">Tìm</button>
+              <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
               {(reportFilter.q || reportFilter.reason || reportFilter.target) && (
                 <button
                   className="link-inline"
@@ -1444,8 +1578,23 @@ export function AdminDashboard() {
                   <article key={report.id}>
                     <span className={`report-status ${report.status}`}>{REPORT_STATUS_LABEL[report.status]}</span>
                     <div>
-                      <h3>{report.campaign?.title ?? "Chiến dịch đã bị xoá"}</h3>
-                      <p>{REPORT_REASON_LABEL[report.reason]} · {formatDate(report.createdAt)} · bởi {report.reporter ? `${report.reporter.name}${report.reporter.email ? ` (${report.reporter.email})` : ""}` : "người dùng"}</p>
+                      <h3>
+                        {report.campaign ? (
+                          <a href={`/du-an/${report.campaign.id}`} target="_blank" rel="noreferrer" title="Mở trang chiến dịch">{report.campaign.title}</a>
+                        ) : (
+                          "Chiến dịch đã bị xoá"
+                        )}
+                      </h3>
+                      <p>
+                        {REPORT_REASON_LABEL[report.reason]} · {formatDate(report.createdAt)} · bởi{" "}
+                        {report.reporter ? (
+                          <button className="link-inline" type="button" title="Xem thông tin người báo cáo" onClick={() => setViewingUserId(report.reporter!.id)}>
+                            {report.reporter.name}{report.reporter.email ? ` (${report.reporter.email})` : ""}
+                          </button>
+                        ) : (
+                          "người dùng"
+                        )}
+                      </p>
                       {report.comment && (
                         <p className="report-quote report-comment"><b>Bình luận bị báo cáo{report.comment.status === "hidden" ? " (đã ẩn)" : ""}:</b> {report.comment.content}</p>
                       )}
@@ -1466,11 +1615,6 @@ export function AdminDashboard() {
           <section className="admin-card risk-card" id="binh-luan">
             <div className="card-heading">
               <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>Bình luận &amp; hỏi đáp</h2></div>
-              <select className="filter-button" aria-label="Lọc bình luận theo trạng thái" value={commentDraft.status} onChange={(event) => applyCommentFilters({ ...commentDraft, status: event.target.value as CommentStatus | "" })}>
-                <option value="visible">Đang hiển thị</option>
-                <option value="hidden">Đã ẩn</option>
-                <option value="">Tất cả</option>
-              </select>
             </div>
             <form
               className="admin-filter-bar"
@@ -1487,6 +1631,11 @@ export function AdminDashboard() {
                 value={commentDraft.q}
                 onChange={(event) => setCommentDraft({ ...commentDraft, q: event.target.value })}
               />
+            <select className="filter-button" aria-label="Lọc bình luận theo trạng thái" value={commentDraft.status} onChange={(event) => applyCommentFilters({ ...commentDraft, status: event.target.value as CommentStatus | "" })}>
+              <option value="visible">Đang hiển thị</option>
+              <option value="hidden">Đã ẩn</option>
+              <option value="">Tất cả</option>
+            </select>
               <select
                 className="filter-button"
                 aria-label="Lọc theo loại bình luận"
@@ -1507,8 +1656,17 @@ export function AdminDashboard() {
                 <option value="root">Chỉ bình luận gốc</option>
                 <option value="reply">Chỉ câu trả lời</option>
               </select>
-              <button className="button button-primary admin-filter-submit" type="submit">Tìm</button>
-              {(commentFilter.q || commentFilter.kind || commentFilter.level) && (
+              <select
+                className="filter-button"
+                aria-label="Lọc bình luận bị báo cáo"
+                value={commentDraft.reported ? "reported" : ""}
+                onChange={(event) => applyCommentFilters({ ...commentDraft, reported: event.target.value === "reported" })}
+              >
+                <option value="">Mọi bình luận</option>
+                <option value="reported">Đang bị báo cáo</option>
+              </select>
+              <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
+              {(commentFilter.q || commentFilter.kind || commentFilter.level || commentFilter.reported) && (
                 <button
                   className="link-inline"
                   type="button"
@@ -1526,17 +1684,46 @@ export function AdminDashboard() {
               ) : (
                 comments.map((comment) => (
                   <article key={comment.id}>
-                    <span className={`report-status ${comment.status === "hidden" ? "dismissed" : "reviewing"}`}>
+                    {/* Nhãn loại dùng màu trung tính; chỉ bình luận đã ẩn mới đổi màu */}
+                    <span className={`report-status ${comment.status === "hidden" ? "dismissed" : "neutral"}`}>
                       {comment.kind === "question" ? "Câu hỏi" : comment.parentId ? "Trả lời" : "Bình luận"}
                     </span>
                     <div>
-                      <h3>{comment.campaign?.title ?? "Chiến dịch"}</h3>
-                      <p>{formatDate(comment.createdAt)} · bởi {comment.user ? `${comment.user.name}${comment.user.email ? ` (${comment.user.email})` : ""}` : "người dùng"}</p>
+                      <h3>
+                        {comment.campaign ? (
+                          <a href={`/du-an/${comment.campaign.id}`} target="_blank" rel="noreferrer" title="Mở trang chiến dịch">{comment.campaign.title}</a>
+                        ) : (
+                          "Chiến dịch"
+                        )}
+                        {comment.openReportCount > 0 && (
+                          <Link className="comment-flag is-reported" href={adminHref("bao-cao-vi-pham")} title="Xem báo cáo vi phạm">
+                            Bị báo cáo{comment.openReportCount > 1 ? ` (${comment.openReportCount})` : ""}
+                          </Link>
+                        )}
+                        {comment.ownerReplied !== null && comment.status === "visible" && (
+                          <span className={`comment-flag ${comment.ownerReplied ? "is-answered" : "is-unanswered"}`}>
+                            {comment.ownerReplied ? "Chủ dự án đã trả lời" : "Chưa trả lời"}
+                          </span>
+                        )}
+                      </h3>
+                      <p>
+                        {formatDate(comment.createdAt)} · bởi{" "}
+                        {comment.user ? (
+                          <button className="link-inline" type="button" title="Xem thông tin người viết" onClick={() => setViewingUserId(comment.user!.id)}>
+                            {comment.user.name}{comment.user.email ? ` (${comment.user.email})` : ""}
+                          </button>
+                        ) : (
+                          "người dùng"
+                        )}
+                      </p>
+                      {comment.parent && (
+                        <p className="comment-parent">↳ Trả lời {comment.parent.authorName ?? "người dùng"}: “{comment.parent.content}”</p>
+                      )}
                       <p className="report-quote">{comment.content}</p>
                       {comment.status === "hidden" && comment.hiddenReason && <small><b>Lý do ẩn:</b> {comment.hiddenReason}</small>}
                     </div>
                     <div className="risk-actions">
-                      <button className={comment.status === "visible" ? "resolve" : undefined} type="button" disabled={busy === comment.id} onClick={() => handleCommentVisibility(comment)}>
+                      <button className={comment.status === "visible" ? "is-danger" : undefined} type="button" disabled={busy === comment.id} onClick={() => handleCommentVisibility(comment)}>
                         {comment.status === "visible" ? "Ẩn bình luận" : "Hiện lại"}
                       </button>
                     </div>
@@ -1553,16 +1740,6 @@ export function AdminDashboard() {
           <section className="admin-card admin-table-card" id="giao-dich">
             <div className="card-heading">
               <div><p className="eyebrow">Minh bạch quỹ</p><h2>Giao dịch tài trợ</h2></div>
-              <select className="filter-button" aria-label="Lọc theo trạng thái giao dịch" value={donationDraft.status} onChange={(event) => applyDonationFilters({ ...donationDraft, status: event.target.value as DonationFilter })}>
-                <option value="completed">Thành công</option>
-                <option value="pending">Chờ xử lý</option>
-                <option value="failed">Thất bại</option>
-                <option value="refunded">Hoàn tiền</option>
-                <option value="expired">Hết hạn</option>
-                <option value="cancelled">Đã hủy</option>
-                <option value="flagged">Có cảnh báo rủi ro</option>
-                <option value="">Tất cả trạng thái</option>
-              </select>
             </div>
             <form
               className="admin-filter-bar"
@@ -1579,6 +1756,16 @@ export function AdminDashboard() {
                 value={donationDraft.q}
                 onChange={(event) => setDonationDraft({ ...donationDraft, q: event.target.value })}
               />
+            <select className="filter-button" aria-label="Lọc theo trạng thái giao dịch" value={donationDraft.status} onChange={(event) => applyDonationFilters({ ...donationDraft, status: event.target.value as DonationFilter })}>
+              <option value="completed">Thành công</option>
+              <option value="pending">Chờ xử lý</option>
+              <option value="failed">Thất bại</option>
+              <option value="refunded">Hoàn tiền</option>
+              <option value="expired">Hết hạn</option>
+              <option value="cancelled">Đã hủy</option>
+              <option value="flagged">Có cảnh báo rủi ro</option>
+              <option value="">Tất cả trạng thái</option>
+            </select>
               <label className="admin-filter-range">
                 <span>Số tiền (đ)</span>
                 <input
@@ -1622,16 +1809,30 @@ export function AdminDashboard() {
                 <tbody>
                   {donations.map((donation) => (
                     <tr key={donation.id}>
-                      <td><b>{donation.isAnonymous ? "Ẩn danh" : (donation.user?.name ?? "Người ủng hộ")}</b></td>
-                      <td>{donation.campaign?.title ?? "—"}</td>
+                      <td>
+                        {donation.isAnonymous || !donation.user ? (
+                          <b>{donation.isAnonymous ? "Ẩn danh" : "Người ủng hộ"}</b>
+                        ) : (
+                          <button className="link-inline owner-link" type="button" title="Xem thông tin người ủng hộ" onClick={() => setViewingUserId(donation.user!.id)}>
+                            {donation.user.name}
+                          </button>
+                        )}
+                      </td>
+                      <td>
+                        {donation.campaign ? (
+                          <a className="table-link" href={`/du-an/${donation.campaign.id}`} target="_blank" rel="noreferrer" title="Mở trang chiến dịch">{donation.campaign.title}</a>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td>{money(donation.amount)}</td>
                       <td>{paymentMethodLabel(donation.paymentMethod)}</td>
-                      <td>{donation.transactionId ? donation.transactionId.slice(0, 10).toUpperCase() : "—"}</td>
-                      <td>{formatDate(donation.completedAt ?? donation.createdAt)}</td>
+                      <td>{donation.transactionId ? <CopyableCode value={donation.transactionId} /> : "—"}</td>
+                      <td className="nowrap">{formatDateTime(donation.completedAt ?? donation.createdAt)}</td>
                       <td><span className={`table-status ${DONATION_STATUS_TONE[donation.status]}`}>{DONATION_STATUS_LABEL[donation.status]}</span></td>
                       <td>
                         {donation.riskLevel ? (
-                          <Link className={`risk-level ${donation.riskLevel}`} href={adminHref("rui-ro")} title="Chiến dịch hoặc người ủng hộ có cảnh báo đang mở">
+                          <Link className={`risk-level ${donation.riskLevel}`} href={adminHref("rui-ro")} title={RISK_SOURCE_TITLE[donation.riskSource ?? "campaign"]}>
                             {RISK_LEVEL_LABEL[donation.riskLevel]}
                           </Link>
                         ) : (
@@ -1639,16 +1840,7 @@ export function AdminDashboard() {
                         )}
                       </td>
                       <td>
-                        {donation.status === "completed" && (
-                          <button type="button" disabled={busy === donation.id} onClick={() => handleDirectRefund(donation)}>
-                            Hoàn tiền
-                          </button>
-                        )}
-                        {donation.paymentMethod === "sepay" && ["pending", "expired", "cancelled"].includes(donation.status) && (
-                          <button type="button" disabled={busy === donation.id} onClick={() => handleSepaySync(donation)}>
-                            Đối soát SePay
-                          </button>
-                        )}
+                        <button type="button" onClick={() => setViewingDonation(donation)}>Chi tiết</button>
                       </td>
                     </tr>
                   ))}
@@ -1660,6 +1852,15 @@ export function AdminDashboard() {
             </div>
             <Pagination page={donationPaging.page} total={donationPaging.total} onChange={(page) => void loadDonations(donationFilter, page)} />
           </section>
+          )}
+
+          {viewingDonation && (
+            <DonationDetailDialog
+              donation={viewingDonation}
+              statusLabel={DONATION_STATUS_LABEL[viewingDonation.status]}
+              actions={donationActions(viewingDonation)}
+              onClose={() => setViewingDonation(null)}
+            />
           )}
 
           {view === "hoan-tien" && <AdminFinance view="refunds" onChanged={() => { void loadDonations(donationFilter, donationPaging.page); void reloadOverview(); }} />}
@@ -1707,7 +1908,7 @@ export function AdminDashboard() {
                   <option key={status} value={status}>{USER_STATUS_LABEL[status]}</option>
                 ))}
               </select>
-              <button className="button button-primary admin-filter-submit" type="submit">Tìm</button>
+              <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
               {(userFilter.q || userFilter.role || userFilter.status) && (
                 <button className="link-inline" type="button" onClick={() => applyUserFilters(DEFAULT_USER_FILTERS)}>
                   Xóa bộ lọc

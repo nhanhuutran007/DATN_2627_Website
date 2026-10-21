@@ -85,6 +85,10 @@ function setup(opts: Setup = {}) {
       saved.push(withId);
       return withId;
     },
+    findAndCount: async (options: { where: unknown }) => {
+      lookups.push(options.where as Record<string, unknown>);
+      return [[], 0];
+    },
     findOneBy: async (where: Record<string, unknown>) => {
       lookups.push(where);
       if ("id" in where) return opts.report ?? null;
@@ -128,6 +132,16 @@ const validReport = {
 };
 
 describe("ModerationService", () => {
+  describe("list", () => {
+    it("should treat status \"open\" as pending or reviewing", async () => {
+      const { service, lookups } = setup();
+      await service.list({ status: "open" });
+      const status = (lookups[0] as { status: { _type: string; _value: unknown } }).status;
+      equal(status._type, "in");
+      deepEqual(status._value, [ReportStatus.PENDING, ReportStatus.REVIEWING]);
+    });
+  });
+
   describe("createReport", () => {
     it("should create a pending report and audit it", async () => {
       const { service, saved, audit } = setup();
