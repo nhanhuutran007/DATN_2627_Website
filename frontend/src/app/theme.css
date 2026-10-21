@@ -10357,3 +10357,21 @@ html:has(dialog:modal) .admin-sidebar {
 .my-donations-more .hint {
   margin: 0;
 }
+
+/* Hộp nhập mã OTP xác minh bổ sung (StepUpDialog) */
+.app-dialog .field .step-up-code {
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+
+.step-up-resend {
+  justify-self: start;
+}
+
+.step-up-resend:disabled {
+  color: var(--text-2);
+  cursor: default;
+  text-decoration: none;
+}

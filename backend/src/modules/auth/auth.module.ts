@@ -12,14 +12,17 @@ import { EmailVerificationService } from "./email-verification.service";
 import { EmailVerificationToken } from "./entities/email-verification-token.entity";
 import { PasswordResetToken } from "./entities/password-reset-token.entity";
 import { RevokedToken } from "./entities/revoked-token.entity";
+import { StepUpCode } from "./entities/step-up-code.entity";
+import { StepUpGuard } from "./guards/step-up.guard";
 import { PasswordResetService } from "./password-reset.service";
+import { StepUpService } from "./step-up.service";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 
 @Global()
 @Module({
   imports: [
     UsersModule,
-    TypeOrmModule.forFeature([PasswordResetToken, EmailVerificationToken, RevokedToken]),
+    TypeOrmModule.forFeature([PasswordResetToken, EmailVerificationToken, RevokedToken, StepUpCode]),
     PassportModule.register({ defaultStrategy: "jwt" }),
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,
@@ -31,6 +34,8 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
     AuthService,
     PasswordResetService,
     EmailVerificationService,
+    StepUpService,
+    StepUpGuard,
     JwtStrategy,
     {
       provide: "EmailGateway",
@@ -42,6 +47,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
     },
   ],
   // EmailGateway dùng chung (vd. NotificationsService gửi email thông báo)
-  exports: [AuthService, PassportModule, "EmailGateway"],
+  // StepUpService/StepUpGuard dùng ở module khác (vd. hoàn tiền) cho thao tác nhạy cảm.
+  exports: [AuthService, PassportModule, "EmailGateway", StepUpService, StepUpGuard],
 })
 export class AuthModule {}

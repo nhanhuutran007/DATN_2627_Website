@@ -1,16 +1,19 @@
 import { Transform } from "class-transformer";
 import {
   IsEmail,
+  IsEnum,
   IsIn,
   IsOptional,
   IsString,
   Length,
+  Matches,
   MaxLength,
   MinLength,
 } from "class-validator";
 
 import { IsStrongPassword } from "../../../common/validators/is-strong-password";
 import { UserRole } from "../../users/entities/user.entity";
+import { StepUpPurpose } from "../entities/step-up-code.entity";
 
 export class RegisterDto {
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
@@ -112,6 +115,17 @@ export class ChangePasswordDto {
   @IsString()
   @IsStrongPassword()
   newPassword!: string;
+}
+
+export class RequestStepUpDto {
+  @IsEnum(StepUpPurpose, { message: "Thao tác cần xác minh không hợp lệ." })
+  purpose!: StepUpPurpose;
+}
+
+export class VerifyStepUpDto extends RequestStepUpDto {
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "Mã xác minh gồm 6 chữ số." })
+  code!: string;
 }
 
 export class MessageResponseDto {

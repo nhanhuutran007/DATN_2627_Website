@@ -19,6 +19,8 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { NonAdminGuard } from "../auth/guards/non-admin.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
+import { RequireStepUp, StepUpGuard } from "../auth/guards/step-up.guard";
+import { StepUpPurpose } from "../auth/entities/step-up-code.entity";
 import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entity";
 import {
   CreateRefundRequestDto,
@@ -35,9 +37,10 @@ import { FinanceService } from "./finance.service";
 export class FinanceController {
   constructor(private readonly financeService: FinanceService) {}
 
-  /** Người ủng hộ yêu cầu hoàn một khoản của mình (admin duyệt). */
+  /** Người ủng hộ yêu cầu hoàn một khoản của mình (admin duyệt); kèm tài khoản nhận nên cần mã OTP. */
   @Post("donations/:id/refund-request")
-  @UseGuards(NonAdminGuard, RateLimitGuard)
+  @UseGuards(NonAdminGuard, RateLimitGuard, StepUpGuard)
+  @RequireStepUp(StepUpPurpose.REFUND_REQUEST)
   @RateLimit({ limit: 5, windowMs: 60 * 60_000, keyPrefix: "refund-request" })
   requestRefund(
     @Param("id", ParseUUIDPipe) id: string,
@@ -67,6 +70,8 @@ export class AdminFinanceController {
 
   /** CSV yêu cầu hoàn kèm tài khoản nhận để chuyển khoản trả lại (có dữ liệu cá nhân, ghi audit). */
   @Get("refunds/export")
+  @UseGuards(StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ADMIN_REFUND)
   async exportRefunds(
     @Query() query: RefundExportQueryDto,
     @GetCurrentUser() admin: User,
@@ -82,6 +87,8 @@ export class AdminFinanceController {
   }
 
   @Patch("refunds/:id/approve")
+  @UseGuards(StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ADMIN_REFUND)
   approve(@Param("id", ParseUUIDPipe) id: string, @Body() dto: ReviewRefundDto, @GetCurrentUser() admin: User) {
     return this.financeService.approve(id, dto.adminNotes, admin, dto);
   }
@@ -93,6 +100,8 @@ export class AdminFinanceController {
 
   /** Admin hoàn trực tiếp (vd. phát hiện gian lận), bắt buộc lý do. */
   @Post("donations/:id/refund")
+  @UseGuards(StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ADMIN_REFUND)
   refund(@Param("id", ParseUUIDPipe) id: string, @Body() dto: DirectRefundDto, @GetCurrentUser() admin: User) {
     return this.financeService.refundDonation(id, dto.reason, admin, { manual: dto });
   }

@@ -9,6 +9,7 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { DialogProvider } from "@/components/ui/DialogProvider";
 import { AiConsentBanner } from "@/features/ai-consent/AiConsentBanner";
+import { StepUpDialog } from "@/features/auth/StepUpDialog";
 import { PrivacyNotice } from "@/features/privacy/PrivacyNotice";
 import { FaqChat } from "@/features/support/FaqChat";
 import { siteUrl } from "@/lib/site";
@@ -77,6 +78,7 @@ export default function RootLayout({
             <SiteFooter />
             <FaqChat />
           </ChromeGate>
+          <StepUpDialog />
           <PrivacyNotice />
           <RouteTransition />
           <Suspense fallback={null}>
