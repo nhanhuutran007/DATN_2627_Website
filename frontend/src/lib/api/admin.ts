@@ -147,6 +147,10 @@ export type AuditLogEntry = {
   ipAddress?: string | null;
   userAgent?: string | null;
   createdAt: string;
+  /** Tên/email người thực hiện (null nếu hệ thống hoặc tài khoản đã xóa). */
+  actor?: { name: string; email: string } | null;
+  /** Tên đối tượng (chiến dịch, người dùng, lĩnh vực, mốc) nếu còn tồn tại. */
+  entityLabel?: string | null;
 };
 
 export type AuditLogList = {
@@ -161,6 +165,11 @@ export type AuditLogQuery = {
   entity?: string;
   entityId?: string;
   userId?: string;
+  group?: "auth" | "account" | "finance" | "content" | "system";
+  hideSessions?: "true";
+  /** yyyy-mm-dd theo giờ Việt Nam */
+  from?: string;
+  to?: string;
   limit?: number;
   offset?: number;
 };
@@ -227,8 +236,24 @@ export async function generateRiskWarnings(): Promise<{
   return api.post("/admin/risks/generate");
 }
 
-export async function setRiskStatus(id: string, status: RiskStatus): Promise<AdminRiskAlert> {
-  return api.patch<AdminRiskAlert>(`/admin/risks/${encodeURIComponent(id)}/status`, { status });
+export async function setRiskStatus(id: string, status: RiskStatus, notes?: string): Promise<AdminRiskAlert> {
+  return api.patch<AdminRiskAlert>(`/admin/risks/${encodeURIComponent(id)}/status`, { status, notes });
+}
+
+/** Số việc cần xử lý cho badge trên sidebar quản trị. */
+export type AdminNavCounts = {
+  pendingCampaigns: number;
+  openRisks: number;
+  openReports: number;
+  reportedComments: number;
+  stalePendingSepay: number;
+  pendingRefunds: number;
+  ledgerMismatches: number;
+  daysSinceBackup: number | null;
+};
+
+export function fetchAdminNavCounts(): Promise<AdminNavCounts> {
+  return api.get<AdminNavCounts>("/admin/nav-counts");
 }
 
 export async function fetchAdminOverview(): Promise<AdminOverview> {
@@ -279,8 +304,9 @@ export async function fetchAdminUsers(query: {
 export async function setUserStatus(
   id: string,
   status: AdminUserStatus,
+  reason?: string,
 ): Promise<AdminUser> {
-  return api.patch<AdminUser>(`/admin/users/${encodeURIComponent(id)}/status`, { status });
+  return api.patch<AdminUser>(`/admin/users/${encodeURIComponent(id)}/status`, { status, reason });
 }
 
 export async function fetchAuditLogs(query: AuditLogQuery = {}): Promise<AuditLogList> {
@@ -337,6 +363,17 @@ export function downloadBackup(): Promise<void> {
 }
 
 export type RestoreBackupResult = { tables: number; rows: number; createdAt: string };
+
+export type BackupStatus = {
+  /** Phiên bản cấu trúc CSDL hiện tại; file sao lưu phải trùng mới khôi phục được. */
+  schemaVersion: string | null;
+  maxBytes: number;
+  lastBackup: { createdAt: string; by: string | null; rows: number | null; bytes: number | null } | null;
+};
+
+export function fetchBackupStatus(): Promise<BackupStatus> {
+  return api.get<BackupStatus>("/admin/backup/status");
+}
 
 /** Ghi đè toàn bộ dữ liệu bằng file sao lưu; `confirm` phải là chuỗi xác nhận. */
 export function restoreBackup(file: File, confirm: string): Promise<RestoreBackupResult> {

@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type DragEvent, type FormEvent } from "react";
 
 import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api";
-import { downloadBackup, restoreBackup, type RestoreBackupResult } from "@/lib/api/admin";
+import { downloadBackup, fetchBackupStatus, restoreBackup, type BackupStatus, type RestoreBackupResult } from "@/lib/api/admin";
 
 /** Phải khớp `RESTORE_CONFIRMATION` ở backend. */
 const RESTORE_CONFIRMATION = "KHÔI PHỤC";
+/** Quá số ngày này chưa sao lưu thì nhắc. */
+const STALE_DAYS = 7;
 
 type BackupPreview = {
   createdAt: string;
@@ -18,6 +20,12 @@ type BackupPreview = {
 
 const errorText = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 const dateTime = (value: string) => new Date(value).toLocaleString("vi-VN");
+
+function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} KB`;
+  return `${(bytes / 1024 / 1024).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} MB`;
+}
 
 /** Đọc file sao lưu ngay trên trình duyệt để admin xem trước nội dung trước khi ghi đè. */
 async function readPreview(file: File): Promise<BackupPreview> {
@@ -43,9 +51,13 @@ async function readPreview(file: File): Promise<BackupPreview> {
 
 /** Sao lưu toàn bộ dữ liệu ra file và khôi phục (ghi đè) từ file sao lưu. */
 export function BackupManager() {
+  const [status, setStatus] = useState<BackupStatus | null>(null);
+  /** Thời điểm tải trạng thái, dùng tính số ngày chưa sao lưu (không gọi Date.now() khi render). */
+  const [checkedAt, setCheckedAt] = useState(0);
   const [busy, setBusy] = useState<"export" | "restore" | null>(null);
   const [exportNotice, setExportNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<BackupPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [backupFirst, setBackupFirst] = useState(true);
@@ -53,12 +65,32 @@ export function BackupManager() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [restored, setRestored] = useState<RestoreBackupResult | null>(null);
 
+  const loadStatus = useCallback(() => {
+    fetchBackupStatus()
+      .then((result) => {
+        setStatus(result);
+        setCheckedAt(Date.now());
+      })
+      .catch(() => setStatus(null));
+  }, []);
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+
+  const last = status?.lastBackup ?? null;
+  const daysSinceLast = last ? Math.floor((checkedAt - new Date(last.createdAt).getTime()) / 86_400_000) : null;
+  const stale = status !== null && (daysSinceLast === null || daysSinceLast >= STALE_DAYS);
+  // Chỉ chặn khi biết chắc cả hai phiên bản; thiếu thông tin thì để backend kiểm tra.
+  const schemaMismatch = Boolean(preview && status?.schemaVersion && preview.schemaVersion !== status.schemaVersion);
+
   const exportNow = async () => {
     setBusy("export");
     setExportNotice(null);
     try {
       await downloadBackup();
       setExportNotice({ tone: "ok", text: "Đã tạo và tải bản sao lưu về máy." });
+      loadStatus();
     } catch (err) {
       setExportNotice({ tone: "error", text: errorText(err, "Không tạo được bản sao lưu.") });
     } finally {
@@ -66,8 +98,7 @@ export function BackupManager() {
     }
   };
 
-  const chooseFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const chosen = event.target.files?.[0] ?? null;
+  const chooseFile = async (chosen: File | null) => {
     setFile(chosen);
     setPreview(null);
     setPreviewError(null);
@@ -75,6 +106,10 @@ export function BackupManager() {
     setRestored(null);
     setConfirm("");
     if (!chosen) return;
+    if (status && chosen.size > status.maxBytes) {
+      setPreviewError(`File quá lớn (${fileSize(chosen.size)}); tối đa ${fileSize(status.maxBytes)}.`);
+      return;
+    }
     try {
       setPreview(await readPreview(chosen));
     } catch (err) {
@@ -82,9 +117,15 @@ export function BackupManager() {
     }
   };
 
+  const drop = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setDragging(false);
+    if (busy === null) void chooseFile(event.dataTransfer.files?.[0] ?? null);
+  };
+
   const restore = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!file || confirm.trim() !== RESTORE_CONFIRMATION) return;
+    if (!file || schemaMismatch || confirm.trim() !== RESTORE_CONFIRMATION) return;
     setBusy("restore");
     setRestoreError(null);
     try {
@@ -97,14 +138,40 @@ export function BackupManager() {
       setRestoreError(errorText(err, "Khôi phục thất bại, dữ liệu hiện tại được giữ nguyên."));
     } finally {
       setBusy(null);
+      loadStatus();
     }
   };
 
   return (
     <section className="admin-card admin-table-card" id="sao-luu">
       <div className="card-heading">
-        <div><p className="eyebrow">Hệ thống</p><h2>Sao lưu &amp; khôi phục dữ liệu</h2></div>
+        <div>
+          <p className="eyebrow">Hệ thống</p>
+          <h2>
+            {status === null
+              ? "Sao lưu & khôi phục dữ liệu"
+              : last
+                ? `Sao lưu gần nhất: ${dateTime(last.createdAt)}`
+                : "Chưa có bản sao lưu nào"}
+          </h2>
+          {last && (
+            <p className="backup-last">
+              {last.by && <>bởi {last.by}</>}
+              {last.rows !== null && <> · {last.rows.toLocaleString("vi-VN")} dòng</>}
+              {last.bytes !== null && <> · {fileSize(last.bytes)}</>}
+            </p>
+          )}
+        </div>
       </div>
+
+      {stale && (
+        <p className="backup-stale" role="status">
+          <Icon name="shield" size={15} />
+          {last
+            ? `Đã ${daysSinceLast} ngày chưa sao lưu. Nên tạo bản sao lưu mới.`
+            : "Hệ thống chưa từng được sao lưu. Nên tạo bản sao lưu đầu tiên."}
+        </p>
+      )}
 
       <div className="export-grid">
         <article>
@@ -112,8 +179,9 @@ export function BackupManager() {
           <p>
             Tải về toàn bộ dữ liệu hiện tại (tài khoản, chiến dịch, giao dịch, bình luận, nhật ký…) dưới dạng một file
             <code> .json.gz</code>. Ảnh tải lên không nằm trong file, chỉ có đường dẫn tới ảnh.
+            Cần nhập mã xác minh gửi qua email.
           </p>
-          <button className="button button-primary button-sm" type="button" disabled={busy !== null} onClick={exportNow}>
+          <button className="button button-primary button-sm backup-export" type="button" disabled={busy !== null} onClick={exportNow}>
             {busy === "export" ? "Đang sao lưu…" : "Tải bản sao lưu"}
           </button>
           {exportNotice && (
@@ -121,15 +189,37 @@ export function BackupManager() {
           )}
         </article>
 
-        <article>
+        <article className="backup-restore-card">
           <h3>Khôi phục từ bản sao lưu</h3>
           <p>
             <b>Ghi đè toàn bộ dữ liệu hiện tại</b> bằng dữ liệu trong file. Dữ liệu phát sinh sau thời điểm sao lưu sẽ mất.
-            Nếu có lỗi giữa chừng, hệ thống giữ nguyên dữ liệu cũ.
+            Nếu có lỗi giữa chừng, hệ thống giữ nguyên dữ liệu cũ. Cần nhập mã xác minh gửi qua email.
           </p>
-          <label className="field">
-            <span>Chọn file sao lưu</span>
-            <input type="file" accept=".gz,.json,application/gzip,application/json" disabled={busy !== null} onChange={chooseFile} />
+          <label
+            className={`backup-drop${dragging ? " is-dragging" : ""}${busy !== null ? " is-disabled" : ""}`}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={drop}
+          >
+            <input
+              className="sr-only"
+              type="file"
+              accept=".gz,.json,application/gzip,application/json"
+              disabled={busy !== null}
+              onChange={(event) => void chooseFile(event.target.files?.[0] ?? null)}
+            />
+            <Icon name="database" size={20} />
+            {file ? (
+              <span><b>{file.name}</b><small>{fileSize(file.size)} · bấm để chọn file khác</small></span>
+            ) : (
+              <span>
+                <b>Kéo thả file sao lưu vào đây hoặc bấm để chọn</b>
+                <small>.json.gz hoặc .json{status ? ` · tối đa ${fileSize(status.maxBytes)}` : ""}</small>
+              </span>
+            )}
           </label>
           {previewError && <p className="form-error" role="alert">{previewError}</p>}
         </article>
@@ -153,28 +243,38 @@ export function BackupManager() {
             <div><dt>Tổng số dòng</dt><dd>{preview.rows.toLocaleString("vi-VN")}<small>{preview.tables.length} bảng</small></dd></div>
             <div><dt>Phiên bản cấu trúc</dt><dd className="backup-schema">{preview.schemaVersion ?? "—"}</dd></div>
           </dl>
+          {schemaMismatch && (
+            <p className="form-error" role="alert">
+              File thuộc cấu trúc CSDL khác ({preview.schemaVersion ?? "không rõ"}, hiện tại {status?.schemaVersion}) nên không thể
+              khôi phục. Hãy dùng bản sao lưu tạo từ phiên bản hệ thống hiện tại.
+            </p>
+          )}
           <ul className="backup-tables">
             {preview.tables.map((table) => (
               <li key={table.name}><code>{table.name}</code><span>{table.rows.toLocaleString("vi-VN")}</span></li>
             ))}
           </ul>
 
-          <label className="backup-check">
-            <input type="checkbox" checked={backupFirst} onChange={(event) => setBackupFirst(event.target.checked)} />
-            Tải bản sao lưu dữ liệu hiện tại về máy trước khi khôi phục (khuyên dùng)
-          </label>
-          <label className="field">
-            <span>Gõ <b>{RESTORE_CONFIRMATION}</b> để xác nhận ghi đè toàn bộ dữ liệu</span>
-            <input value={confirm} autoComplete="off" disabled={busy !== null} onChange={(event) => setConfirm(event.target.value)} />
-          </label>
-          {restoreError && <p className="form-error" role="alert">{restoreError}</p>}
-          <button
-            className="button button-primary backup-danger"
-            type="submit"
-            disabled={busy !== null || confirm.trim() !== RESTORE_CONFIRMATION}
-          >
-            {busy === "restore" ? "Đang khôi phục…" : "Khôi phục dữ liệu"}
-          </button>
+          {!schemaMismatch && (
+            <>
+              <label className="backup-check">
+                <input type="checkbox" checked={backupFirst} onChange={(event) => setBackupFirst(event.target.checked)} />
+                Tải bản sao lưu dữ liệu hiện tại về máy trước khi khôi phục (khuyên dùng)
+              </label>
+              <label className="field">
+                <span>Gõ <b>{RESTORE_CONFIRMATION}</b> để xác nhận ghi đè toàn bộ dữ liệu</span>
+                <input value={confirm} autoComplete="off" disabled={busy !== null} onChange={(event) => setConfirm(event.target.value)} />
+              </label>
+              {restoreError && <p className="form-error" role="alert">{restoreError}</p>}
+              <button
+                className="button button-primary backup-danger"
+                type="submit"
+                disabled={busy !== null || confirm.trim() !== RESTORE_CONFIRMATION}
+              >
+                {busy === "restore" ? "Đang khôi phục…" : "Khôi phục dữ liệu"}
+              </button>
+            </>
+          )}
         </form>
       )}
 

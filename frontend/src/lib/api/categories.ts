@@ -52,3 +52,8 @@ export function updateCategory(
 ): Promise<ApiCategory> {
   return api.patch<ApiCategory>(`/admin/categories/${encodeURIComponent(id)}`, payload);
 }
+
+/** Sắp xếp lại toàn bộ lĩnh vực trong một lần (thứ tự = vị trí trong `ids`). */
+export function reorderCategories(ids: string[]): Promise<ApiCategory[]> {
+  return api.patch<ApiCategory[]>("/admin/categories/order", { ids });
+}

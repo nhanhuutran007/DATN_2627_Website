@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { FindOptionsWhere, In, Like, MoreThan, Repository } from "typeorm";
 
@@ -159,6 +159,11 @@ export class RiskAlertService {
       throw new NotFoundException("Risk alert not found");
     }
 
+    const notes = dto.notes?.trim() ?? "";
+    if (dto.status !== RiskAlertStatus.OPEN && notes.length < 5) {
+      throw new BadRequestException("Cần ghi lý do (ít nhất 5 ký tự) khi xác nhận hoặc bỏ qua cảnh báo.");
+    }
+
     const previousStatus = alert.status;
     alert.status = dto.status;
     alert.resolvedBy = admin.id;
@@ -170,7 +175,7 @@ export class RiskAlertService {
       entity: "risk_alert",
       entityId: saved.id,
       oldValues: { status: previousStatus },
-      newValues: { status: saved.status },
+      newValues: { status: saved.status, notes: notes || null },
     });
     return saved;
   }

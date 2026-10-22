@@ -133,6 +133,34 @@ export class CategoriesService {
     return saved;
   }
 
+  /**
+   * Sắp xếp lại toàn bộ lĩnh vực theo danh sách id (vị trí = sortOrder 0..n-1) trong một giao dịch,
+   * ghi một dòng nhật ký. Danh sách phải đủ và không trùng để không để sót/trùng thứ tự.
+   */
+  async reorder(ids: string[], admin: User): Promise<Category[]> {
+    const categories = await this.categoryRepo.find({ order: { sortOrder: "ASC", name: "ASC" } });
+    const byId = new Map(categories.map((category) => [category.id, category]));
+    if (new Set(ids).size !== ids.length || ids.length !== categories.length || ids.some((id) => !byId.has(id))) {
+      throw new BadRequestException("Danh sách lĩnh vực không khớp, vui lòng tải lại trang.");
+    }
+    const before = categories.map((category) => category.id);
+    if (before.every((id, index) => id === ids[index])) {
+      return categories;
+    }
+    const ordered = ids.map((id, index) => Object.assign(byId.get(id) as Category, { sortOrder: index }));
+    await this.categoryRepo.manager.transaction(async (manager) => {
+      await manager.save(Category, ordered);
+    });
+    await this.auditService.record({
+      userId: admin.id,
+      action: "category.reorder",
+      entity: "category",
+      oldValues: { order: before.map((id) => byId.get(id)?.name) },
+      newValues: { order: ordered.map((category) => category.name) },
+    });
+    return ordered;
+  }
+
   private async assertUniqueName(name: string): Promise<void> {
     const all = await this.categoryRepo.find({ select: { id: true, name: true } });
     if (all.some((category) => nameKey(category.name) === nameKey(name))) {

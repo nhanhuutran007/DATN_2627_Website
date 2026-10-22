@@ -7,6 +7,7 @@ export enum StepUpPurpose {
   CHANGE_PASSWORD = "change_password",
   REFUND_REQUEST = "refund_request",
   ADMIN_REFUND = "admin_refund",
+  ADMIN_BACKUP = "admin_backup",
 }
 
 @Entity("step_up_codes")

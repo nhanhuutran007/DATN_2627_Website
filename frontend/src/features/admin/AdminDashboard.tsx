@@ -14,6 +14,7 @@ import { BackupManager } from "@/features/admin/BackupManager";
 import { AdminFinance } from "@/features/admin/AdminFinance";
 import { CampaignReviewDialog } from "@/features/admin/CampaignReviewDialog";
 import { CopyableCode, DonationDetailDialog } from "@/features/admin/DonationDetailDialog";
+import { AuditLogViewer } from "@/features/admin/AuditLogViewer";
 import { UserDetailDialog } from "@/features/admin/UserDetailDialog";
 import {
   CAMPAIGN_STATUS_LABEL,
@@ -27,10 +28,10 @@ import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredic
 import {
   fetchAdminCampaigns,
   fetchAdminDonations,
+  fetchAdminNavCounts,
   fetchAdminOverview,
   fetchAdminRisks,
   fetchAdminUsers,
-  fetchAuditLogs,
   generateRiskWarnings,
   MAX_FEATURED,
   moderateCampaign,
@@ -39,11 +40,11 @@ import {
   setUserStatus,
   type AdminCampaign,
   type AdminDonation,
+  type AdminNavCounts,
   type AdminOverview,
   type AdminRiskAlert,
   type AdminUser,
   type AdminUserStatus,
-  type AuditLogEntry,
   type ModerateDecision,
   type RiskStatus,
 } from "@/lib/api/admin";
@@ -102,18 +103,77 @@ const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
   dismissed: "Đã bỏ qua",
 };
 
-const AUDIT_ENTITY_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "", label: "Tất cả đối tượng" },
-  { value: "campaign", label: "Chiến dịch" },
-  { value: "donation", label: "Giao dịch" },
-  { value: "user", label: "Người dùng (gồm đăng nhập/đăng ký)" },
-  { value: "milestone", label: "Mốc tiến độ" },
-  { value: "milestone_update", label: "Bài cập nhật" },
-  { value: "risk_alert", label: "Cảnh báo rủi ro" },
-  { value: "report", label: "Báo cáo vi phạm" },
-];
-
 const MIN_REPORT_NOTES = 5;
+
+const NAV_REFRESH_MS = 60_000;
+/** Quá số ngày này chưa sao lưu thì nhắc trên sidebar (khớp trang Sao lưu). */
+const BACKUP_STALE_DAYS = 7;
+
+type NavBadge = { text: string; title: string; tone?: "warn" };
+
+/** Badge cho từng mục sidebar; null = không có việc cần xử lý. */
+function navBadge(slug: string, counts: AdminNavCounts | null): NavBadge | null {
+  if (!counts) return null;
+  const numeric = (value: number, title: string): NavBadge | null =>
+    value > 0 ? { text: value > 99 ? "99+" : String(value), title: `${value} ${title}` } : null;
+  switch (slug) {
+    case "cho-duyet":
+      return numeric(counts.pendingCampaigns, "chiến dịch chờ duyệt");
+    case "rui-ro":
+      return numeric(counts.openRisks, "cảnh báo rủi ro chưa xử lý");
+    case "bao-cao-vi-pham":
+      return numeric(counts.openReports, "báo cáo vi phạm cần xử lý");
+    case "binh-luan":
+      return numeric(counts.reportedComments, "bình luận đang bị báo cáo");
+    case "giao-dich":
+      return numeric(counts.stalePendingSepay, "giao dịch SePay chờ quá 30 phút, nên đối soát");
+    case "hoan-tien":
+      return numeric(counts.pendingRefunds, "yêu cầu hoàn tiền chờ xử lý");
+    case "doi-soat":
+      return numeric(counts.ledgerMismatches, "chiến dịch lệch sổ (lũy kế)");
+    case "sao-luu":
+      if (counts.daysSinceBackup === null) return { text: "!", title: "Chưa từng sao lưu dữ liệu", tone: "warn" };
+      return counts.daysSinceBackup >= BACKUP_STALE_DAYS
+        ? { text: "!", title: `Đã ${counts.daysSinceBackup} ngày chưa sao lưu`, tone: "warn" }
+        : null;
+    default:
+      return null;
+  }
+}
+
+/** Tiêu đề thẻ: "{số} {danh từ} {trạng thái đang lọc}", thay cho tên trang lặp lại. */
+const CAMPAIGN_COUNT_LABEL: Record<string, string> = {
+  pending: "chờ duyệt",
+  approved: "đã duyệt",
+  needs_info: "cần bổ sung",
+  rejected: "bị từ chối",
+  draft: "bản nháp",
+  active: "đang gây quỹ",
+  paused: "tạm dừng",
+};
+const RISK_COUNT_LABEL: Record<string, string> = { open: "chưa xử lý", resolved: "đã xác nhận", dismissed: "đã bỏ qua" };
+const REPORT_COUNT_LABEL: Record<string, string> = {
+  open: "cần xử lý",
+  pending: "chờ xem xét",
+  reviewing: "đang xem xét",
+  resolved: "đã xử lý vi phạm",
+  dismissed: "không vi phạm",
+};
+const COMMENT_COUNT_LABEL: Record<string, string> = { visible: "đang hiển thị", hidden: "đã ẩn" };
+const DONATION_COUNT_LABEL: Record<string, string> = {
+  completed: "thành công",
+  pending: "chờ xử lý",
+  failed: "thất bại",
+  refunded: "đã hoàn tiền",
+  expired: "hết hạn",
+  cancelled: "đã hủy",
+  flagged: "có cảnh báo rủi ro",
+};
+
+function countTitle(total: number, noun: string, status: string, labels: Record<string, string>): string {
+  const suffix = labels[status];
+  return `${total.toLocaleString("vi-VN")} ${noun}${suffix ? ` ${suffix}` : ""}`;
+}
 
 function money(value: number | string): string {
   return formatCurrency(Number(value) || 0);
@@ -261,12 +321,11 @@ export function AdminDashboard() {
   const [donations, setDonations] = useState<AdminDonation[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [risks, setRisks] = useState<AdminRiskAlert[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [reports, setReports] = useState<CampaignReport[]>([]);
   const [reportFilter, setReportFilter] = useState<ReportFilters>(DEFAULT_REPORT_FILTERS);
   const [reportDraft, setReportDraft] = useState<ReportFilters>(DEFAULT_REPORT_FILTERS);
-  // Số báo cáo cần xử lý cho badge ở menu, độc lập với bộ lọc đang chọn
-  const [openReportCount, setOpenReportCount] = useState(0);
+  // Badge trên sidebar: đếm riêng, độc lập với bộ lọc đang chọn ở từng trang
+  const [navCounts, setNavCounts] = useState<AdminNavCounts | null>(null);
   const [comments, setComments] = useState<AdminComment[]>([]);
   const [commentFilter, setCommentFilter] = useState<CommentFilters>(DEFAULT_COMMENT_FILTERS);
   const [commentDraft, setCommentDraft] = useState<CommentFilters>(DEFAULT_COMMENT_FILTERS);
@@ -274,7 +333,6 @@ export function AdminDashboard() {
   const [donationPaging, setDonationPaging] = useState<Paging>(FIRST_PAGE);
   const [userPaging, setUserPaging] = useState<Paging>(FIRST_PAGE);
   const [riskPaging, setRiskPaging] = useState<Paging>(FIRST_PAGE);
-  const [auditPaging, setAuditPaging] = useState<Paging>(FIRST_PAGE);
   const [reportPaging, setReportPaging] = useState<Paging>(FIRST_PAGE);
   const [commentPaging, setCommentPaging] = useState<Paging>(FIRST_PAGE);
 
@@ -314,7 +372,6 @@ export function AdminDashboard() {
   const [userDraft, setUserDraft] = useState<UserFilters>(DEFAULT_USER_FILTERS);
   const [riskFilter, setRiskFilter] = useState<RiskFilters>(DEFAULT_RISK_FILTERS);
   const [riskDraft, setRiskDraft] = useState<RiskFilters>(DEFAULT_RISK_FILTERS);
-  const [auditEntityFilter, setAuditEntityFilter] = useState<string>("");
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -339,13 +396,12 @@ export function AdminDashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const [ov, camps, dons, usrs, riskList, audit, reportList, commentList] = await Promise.all([
+        const [ov, camps, dons, usrs, riskList, reportList, commentList] = await Promise.all([
           fetchAdminOverview(),
           fetchAdminCampaigns({ status: "pending", limit: PAGE_SIZE }),
           fetchAdminDonations({ status: "completed", limit: PAGE_SIZE }),
           fetchAdminUsers({ limit: PAGE_SIZE }),
           fetchAdminRisks({ status: "open", limit: PAGE_SIZE }),
-          fetchAuditLogs({ limit: PAGE_SIZE }),
           fetchAdminReports({ status: "open", limit: PAGE_SIZE }),
           fetchAdminComments({ status: "visible", limit: PAGE_SIZE }),
         ]);
@@ -355,16 +411,13 @@ export function AdminDashboard() {
         setDonations(dons.items);
         setUsers(usrs.items);
         setRisks(riskList.items);
-        setAuditLogs(audit.items);
         setReports(reportList.items);
         setComments(commentList.items);
         setCampaignPaging({ page: 0, total: camps.total });
         setDonationPaging({ page: 0, total: dons.total });
         setUserPaging({ page: 0, total: usrs.total });
         setRiskPaging({ page: 0, total: riskList.total });
-        setAuditPaging({ page: 0, total: audit.total });
         setReportPaging({ page: 0, total: reportList.total });
-        setOpenReportCount(reportList.total);
         setCommentPaging({ page: 0, total: commentList.total });
         setError(null);
       } catch (err) {
@@ -394,12 +447,37 @@ export function AdminDashboard() {
   }, [isAdmin]);
 
   async function reloadOverview() {
+    void refreshNavCounts();
     try {
       setOverview(await fetchAdminOverview());
     } catch {
       // dữ liệu tổng quan có thể cũ hơn một nhịp; không làm gián đoạn thao tác
     }
   }
+
+  function refreshNavCounts() {
+    return fetchAdminNavCounts()
+      .then(setNavCounts)
+      .catch(() => undefined); // badge cũ hơn một nhịp không ảnh hưởng thao tác
+  }
+
+  // Làm mới badge khi đổi trang và định kỳ mỗi phút (việc mới có thể do người khác tạo).
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    const load = () =>
+      fetchAdminNavCounts()
+        .then((counts) => {
+          if (!cancelled) setNavCounts(counts);
+        })
+        .catch(() => undefined);
+    void load();
+    const timer = window.setInterval(load, NAV_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [isAdmin, view]);
 
   async function loadCampaigns(filters: CampaignFilters, page: number) {
     const minGoal = goalParam(filters.minGoal);
@@ -490,6 +568,19 @@ export function AdminDashboard() {
 
   async function handleFeatured(campaign: AdminCampaign) {
     const next = !campaign.isFeatured;
+    if (next) {
+      const confirmed = await dialog.confirm({
+        title: "Đặt dự án nổi bật",
+        message: (
+          <>
+            Đưa <b>{campaign.title}</b> lên mục Dự án nổi bật ở trang chủ. Trang chủ chỉ hiện 3 dự án được chọn gần nhất, nên một dự án
+            nổi bật khác có thể bị đẩy khỏi trang chủ.
+          </>
+        ),
+        confirmLabel: "Đặt nổi bật",
+      });
+      if (!confirmed) return;
+    }
     setBusy(campaign.id);
     setNotice(null);
     try {
@@ -528,6 +619,23 @@ export function AdminDashboard() {
       });
       if (!result) return;
       reason = result.value;
+    } else {
+      // Duyệt = hiện công khai; kích hoạt/cho tiếp tục = bắt đầu nhận tiền: hỏi lại trước khi áp dụng.
+      const resuming = status === "active" && campaign.status === "paused";
+      const confirmed = await dialog.confirm(
+        status === "approved"
+          ? {
+            title: campaign.status === "needs_info" ? "Duyệt lại chiến dịch" : "Duyệt chiến dịch",
+            message: <>Chiến dịch <b>{campaign.title}</b> sẽ hiển thị công khai trên trang khám phá. Chiến dịch chỉ nhận ủng hộ sau khi được kích hoạt.</>,
+            confirmLabel: "Duyệt",
+          }
+          : {
+            title: resuming ? "Cho chiến dịch tiếp tục" : "Kích hoạt chiến dịch",
+            message: <>Chiến dịch <b>{campaign.title}</b> sẽ {resuming ? "nhận ủng hộ trở lại" : "bắt đầu nhận ủng hộ"} ngay sau khi xác nhận.</>,
+            confirmLabel: resuming ? "Cho tiếp tục" : "Kích hoạt",
+          },
+      );
+      if (!confirmed) return;
     }
     setBusy(campaign.id);
     setNotice(null);
@@ -549,10 +657,36 @@ export function AdminDashboard() {
   async function handleToggleUserStatus(adminUser: AdminUser) {
     if (user && adminUser.id === user.id) return;
     const next: AdminUserStatus = adminUser.status === "active" ? "banned" : "active";
+    let reason: string | undefined;
+    if (next === "banned") {
+      const result = await dialog.prompt({
+        title: "Khóa tài khoản",
+        message: (
+          <>
+            Tài khoản <b>{adminUser.name}</b> ({adminUser.email}) sẽ bị đăng xuất ngay trên mọi thiết bị và không đăng nhập được cho tới khi mở khóa.
+          </>
+        ),
+        label: "Lý do khóa (lưu nhật ký kiểm toán)",
+        placeholder: "VD: Đăng nhiều bình luận spam, mạo danh tổ chức từ thiện…",
+        minLength: 5,
+        maxLength: 500,
+        confirmLabel: "Khóa tài khoản",
+        tone: "danger",
+      });
+      if (!result) return;
+      reason = result.value;
+    } else {
+      const confirmed = await dialog.confirm({
+        title: "Mở khóa tài khoản",
+        message: <>Tài khoản <b>{adminUser.name}</b> sẽ hoạt động trở lại bình thường.</>,
+        confirmLabel: "Mở khóa",
+      });
+      if (!confirmed) return;
+    }
     setBusy(adminUser.id);
     setNotice(null);
     try {
-      await setUserStatus(adminUser.id, next);
+      await setUserStatus(adminUser.id, next, reason);
       await Promise.all([loadUsers(userFilter, userPaging.page), reloadOverview()]);
       setNotice(
         next === "banned"
@@ -592,29 +726,6 @@ export function AdminDashboard() {
     await loadRisks(filters, 0);
   }
 
-  async function loadAuditLogs(entity: string, page: number) {
-    try {
-      await loadPage(
-        (offset) => fetchAuditLogs({ entity: entity || undefined, limit: PAGE_SIZE, offset }),
-        page, setAuditLogs, setAuditPaging,
-      );
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không tải được nhật ký kiểm toán");
-    }
-  }
-
-  async function changeAuditFilter(entity: string) {
-    setAuditEntityFilter(entity);
-    await loadAuditLogs(entity, 0);
-  }
-
-  function auditActorLabel(entry: AuditLogEntry): string {
-    if (!entry.userId) return "Hệ thống";
-    const match = users.find((candidate) => candidate.id === entry.userId);
-    return match ? `${match.name} (${match.email})` : entry.userId.slice(0, 8).toUpperCase();
-  }
-
   async function handleGenerateRisks() {
     setBusy("risks");
     setNotice(null);
@@ -634,10 +745,28 @@ export function AdminDashboard() {
   }
 
   async function handleRiskDecision(alert: AdminRiskAlert, status: RiskStatus) {
+    const resolving = status === "resolved";
+    const result = await dialog.prompt({
+      title: resolving ? "Xác nhận đã xử lý cảnh báo" : "Bỏ qua cảnh báo",
+      message: (
+        <>
+          Cảnh báo về {riskEntityLabel(alert)} <b>{alert.entityName}</b>.{" "}
+          {resolving
+            ? "Ghi rõ đã kiểm tra gì và xử lý ra sao (vd. tạm dừng chiến dịch, yêu cầu bổ sung giấy tờ)."
+            : "Ghi rõ vì sao cảnh báo này không đáng lo (vd. đã xác minh danh tính, số liệu bất thường có lý do)."}
+        </>
+      ),
+      label: "Lý do (lưu nhật ký kiểm toán)",
+      placeholder: resolving ? "VD: Đã gọi xác minh chủ dự án, yêu cầu bổ sung hóa đơn…" : "VD: Lượt ủng hộ tăng đột biến do được báo chí đưa tin…",
+      minLength: 5,
+      maxLength: 1000,
+      confirmLabel: resolving ? "Xác nhận đã xử lý" : "Bỏ qua cảnh báo",
+    });
+    if (!result) return;
     setBusy(alert.id);
     setNotice(null);
     try {
-      await setRiskStatus(alert.id, status);
+      await setRiskStatus(alert.id, status, result.value);
       await Promise.all([loadRisks(riskFilter, riskPaging.page), reloadOverview()]);
       setNotice(
         status === "resolved"
@@ -717,7 +846,7 @@ export function AdminDashboard() {
       await reviewReport(report.id, { status, adminNotes, pauseCampaign, hideComment: hideReportedComment });
       const reloads: Array<Promise<unknown>> = [
         loadReports(reportFilter, reportPaging.page),
-        fetchAdminReports({ status: "open", limit: 1 }).then((list) => setOpenReportCount(list.total)),
+        refreshNavCounts(),
       ];
       if (hideReportedComment) reloads.push(loadComments(commentFilter, commentPaging.page));
       if (pauseCampaign) reloads.push(loadCampaigns(campaignFilter, campaignPaging.page), reloadOverview());
@@ -1093,13 +1222,7 @@ export function AdminDashboard() {
               <div className="admin-nav-group" key={group.label ?? "chung"}>
                 {group.label && <p className="admin-nav-label">{group.label}</p>}
                 {group.sections.map((item) => {
-                  const badge = item.slug === "cho-duyet"
-                    ? pendingCount
-                    : item.slug === "rui-ro"
-                      ? (overview?.risks.open ?? 0)
-                      : item.slug === "bao-cao-vi-pham"
-                        ? openReportCount
-                        : 0;
+                  const badge = navBadge(item.slug, navCounts);
                   return (
                     <Link
                       className={item.slug === view ? "active" : undefined}
@@ -1108,7 +1231,8 @@ export function AdminDashboard() {
                       key={item.slug}
                       title={item.label}
                     >
-                      <Icon name={item.icon} size={19} /> <span>{item.label}</span> {badge > 0 && <i>{badge}</i>}
+                      <Icon name={item.icon} size={19} /> <span>{item.label}</span>
+                      {badge && <i className={badge.tone === "warn" ? "is-warn" : undefined} title={badge.title}>{badge.text}</i>}
                     </Link>
                   );
                 })}
@@ -1224,7 +1348,7 @@ export function AdminDashboard() {
           {view === "cho-duyet" && (
           <section className="admin-card admin-table-card" id="cho-duyet">
             <div className="card-heading">
-              <div><p className="eyebrow">Duyệt hồ sơ</p><h2>Chiến dịch</h2></div>
+              <div><p className="eyebrow">Duyệt hồ sơ</p><h2>{countTitle(campaignPaging.total, "chiến dịch", campaignFilter.status, CAMPAIGN_COUNT_LABEL)}</h2></div>
             </div>
             <form
               className="admin-filter-bar"
@@ -1253,11 +1377,11 @@ export function AdminDashboard() {
               </select>
               <select
                 className="filter-button"
-                aria-label="Lọc theo hạng mục"
+                aria-label="Lọc theo lĩnh vực"
                 value={campaignDraft.category}
                 onChange={(event) => applyCampaignFilters({ ...campaignDraft, category: event.target.value })}
               >
-                <option value="">Tất cả hạng mục</option>
+                <option value="">Tất cả lĩnh vực</option>
                 {campaignCategories.map((name) => <option key={name} value={name}>{name}</option>)}
               </select>
               <label className="admin-filter-range">
@@ -1401,7 +1525,7 @@ export function AdminDashboard() {
           {view === "rui-ro" && (
           <section className="admin-card risk-card" id="rui-ro">
             <div className="card-heading">
-              <div><p className="eyebrow">Human-in-the-loop</p><h2>Cảnh báo rủi ro AI</h2></div>
+              <div><p className="eyebrow">Human-in-the-loop · AI</p><h2>{countTitle(riskPaging.total, "cảnh báo", riskFilter.status, RISK_COUNT_LABEL)}</h2></div>
               <div className="risk-heading-actions">
                 <button className="model-version" type="button" disabled={busy === "risks"} onClick={handleGenerateRisks}>
                   <Icon name="sparkles" size={15} /> Quét lại
@@ -1511,7 +1635,7 @@ export function AdminDashboard() {
           {view === "bao-cao-vi-pham" && (
           <section className="admin-card risk-card" id="bao-cao-vi-pham">
             <div className="card-heading">
-              <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>Báo cáo vi phạm</h2></div>
+              <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>{countTitle(reportPaging.total, "báo cáo", reportFilter.status, REPORT_COUNT_LABEL)}</h2></div>
             </div>
             <form
               className="admin-filter-bar"
@@ -1614,7 +1738,7 @@ export function AdminDashboard() {
           {view === "binh-luan" && (
           <section className="admin-card risk-card" id="binh-luan">
             <div className="card-heading">
-              <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>Bình luận &amp; hỏi đáp</h2></div>
+              <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>{countTitle(commentPaging.total, "bình luận & câu hỏi", commentFilter.status, COMMENT_COUNT_LABEL)}</h2></div>
             </div>
             <form
               className="admin-filter-bar"
@@ -1631,11 +1755,11 @@ export function AdminDashboard() {
                 value={commentDraft.q}
                 onChange={(event) => setCommentDraft({ ...commentDraft, q: event.target.value })}
               />
-            <select className="filter-button" aria-label="Lọc bình luận theo trạng thái" value={commentDraft.status} onChange={(event) => applyCommentFilters({ ...commentDraft, status: event.target.value as CommentStatus | "" })}>
-              <option value="visible">Đang hiển thị</option>
-              <option value="hidden">Đã ẩn</option>
-              <option value="">Tất cả</option>
-            </select>
+              <select className="filter-button" aria-label="Lọc bình luận theo trạng thái" value={commentDraft.status} onChange={(event) => applyCommentFilters({ ...commentDraft, status: event.target.value as CommentStatus | "" })}>
+                <option value="visible">Đang hiển thị</option>
+                <option value="hidden">Đã ẩn</option>
+                <option value="">Tất cả trạng thái</option>
+              </select>
               <select
                 className="filter-button"
                 aria-label="Lọc theo loại bình luận"
@@ -1739,7 +1863,7 @@ export function AdminDashboard() {
           {view === "giao-dich" && (
           <section className="admin-card admin-table-card" id="giao-dich">
             <div className="card-heading">
-              <div><p className="eyebrow">Minh bạch quỹ</p><h2>Giao dịch tài trợ</h2></div>
+              <div><p className="eyebrow">Minh bạch quỹ</p><h2>{countTitle(donationPaging.total, "giao dịch", donationFilter.status, DONATION_COUNT_LABEL)}</h2></div>
             </div>
             <form
               className="admin-filter-bar"
@@ -1756,16 +1880,16 @@ export function AdminDashboard() {
                 value={donationDraft.q}
                 onChange={(event) => setDonationDraft({ ...donationDraft, q: event.target.value })}
               />
-            <select className="filter-button" aria-label="Lọc theo trạng thái giao dịch" value={donationDraft.status} onChange={(event) => applyDonationFilters({ ...donationDraft, status: event.target.value as DonationFilter })}>
-              <option value="completed">Thành công</option>
-              <option value="pending">Chờ xử lý</option>
-              <option value="failed">Thất bại</option>
-              <option value="refunded">Hoàn tiền</option>
-              <option value="expired">Hết hạn</option>
-              <option value="cancelled">Đã hủy</option>
-              <option value="flagged">Có cảnh báo rủi ro</option>
-              <option value="">Tất cả trạng thái</option>
-            </select>
+              <select className="filter-button" aria-label="Lọc theo trạng thái giao dịch" value={donationDraft.status} onChange={(event) => applyDonationFilters({ ...donationDraft, status: event.target.value as DonationFilter })}>
+                <option value="completed">Thành công</option>
+                <option value="pending">Chờ xử lý</option>
+                <option value="failed">Thất bại</option>
+                <option value="refunded">Đã hoàn tiền</option>
+                <option value="expired">Hết hạn</option>
+                <option value="cancelled">Đã hủy</option>
+                <option value="flagged">Có cảnh báo rủi ro</option>
+                <option value="">Tất cả trạng thái</option>
+              </select>
               <label className="admin-filter-range">
                 <span>Số tiền (đ)</span>
                 <input
@@ -1869,8 +1993,32 @@ export function AdminDashboard() {
           {view === "nguoi-dung" && (
           <section className="admin-card admin-table-card" id="nguoi-dung">
             <div className="card-heading">
-              <div><p className="eyebrow">Quản lý tài khoản</p><h2>Người dùng</h2></div>
+              <div><p className="eyebrow">Quản lý tài khoản</p><h2>{userPaging.total} người dùng</h2></div>
             </div>
+            {overview && (
+              <div className="user-summary" role="group" aria-label="Lọc nhanh người dùng">
+                {([
+                  ["Tổng", overview.users.total, DEFAULT_USER_FILTERS],
+                  ["Hoạt động", overview.users.active, { ...DEFAULT_USER_FILTERS, status: "active" }],
+                  ["Bị khóa", overview.users.banned, { ...DEFAULT_USER_FILTERS, status: "banned" }],
+                  ["Chủ dự án", overview.users.owners, { ...DEFAULT_USER_FILTERS, role: "campaign_owner" }],
+                ] as [string, number, UserFilters][]).map(([label, count, filters]) => {
+                  const active = filters.role === userFilter.role && filters.status === userFilter.status && !userFilter.q;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      className={active ? "is-active" : undefined}
+                      aria-pressed={active}
+                      onClick={() => void applyUserFilters(filters)}
+                    >
+                      <b>{count}</b> {label}
+                    </button>
+                  );
+                })}
+                <span className="table-muted">+{overview.users.newThisMonth} mới trong tháng</span>
+              </div>
+            )}
             <form
               className="admin-filter-bar"
               onSubmit={(event) => {
@@ -1923,16 +2071,33 @@ export function AdminDashboard() {
                     const isSelf = user.id === adminUser.id;
                     return (
                       <tr key={adminUser.id}>
-                        <td><b>{adminUser.name}{isSelf && " (bạn)"}</b></td>
-                        <td>{adminUser.email}</td>
+                        <td>
+                          <b>
+                            <button className="link-inline" type="button" title="Xem thông tin tài khoản" onClick={() => setViewingUserId(adminUser.id)}>
+                              {adminUser.name}
+                            </button>
+                            {isSelf && " (bạn)"}
+                          </b>
+                        </td>
+                        <td>
+                          {adminUser.email}
+                          {!adminUser.emailVerified && <span className="user-unverified" title="Người dùng chưa bấm link xác thực email">Chưa xác thực</span>}
+                        </td>
                         <td>{USER_ROLE_LABEL[adminUser.role]}</td>
                         <td>{formatDate(adminUser.createdAt)}</td>
                         <td><span className={`table-status ${adminUser.status === "active" ? "success" : adminUser.status === "banned" ? "failed" : "changes"}`}>{USER_STATUS_LABEL[adminUser.status]}</span></td>
                         <td>
                           {isSelf ? (
                             <span className="table-muted">Tài khoản của bạn</span>
+                          ) : adminUser.role === "admin" && adminUser.status === "active" ? (
+                            <span className="table-muted" title="Không thể khóa tài khoản quản trị viên">Quản trị viên</span>
                           ) : (
-                            <button type="button" disabled={busy === adminUser.id} onClick={() => handleToggleUserStatus(adminUser)}>
+                            <button
+                              className={adminUser.status === "active" ? "table-danger-action" : undefined}
+                              type="button"
+                              disabled={busy === adminUser.id}
+                              onClick={() => handleToggleUserStatus(adminUser)}
+                            >
                               {adminUser.status === "active" ? "Khóa tài khoản" : "Mở khóa"}
                             </button>
                           )}
@@ -1950,56 +2115,18 @@ export function AdminDashboard() {
           </section>
           )}
 
-          {view === "danh-muc" && <CategoryManager />}
+          {view === "danh-muc" && (
+            <CategoryManager
+              onShowCampaigns={(category) => {
+                void applyCampaignFilters({ ...DEFAULT_CAMPAIGN_FILTERS, status: "", category });
+                router.push(adminHref("cho-duyet"));
+              }}
+            />
+          )}
           {view === "sao-luu" && <BackupManager />}
 
           {view === "nhat-ky-kiem-toan" && (
-          <section className="admin-card admin-table-card" id="nhat-ky-kiem-toan">
-            <div className="card-heading">
-              <div><p className="eyebrow">Truy vết thay đổi</p><h2>Nhật ký kiểm toán</h2></div>
-              <select
-                className="filter-button"
-                aria-label="Lọc theo đối tượng"
-                value={auditEntityFilter}
-                onChange={(event) => changeAuditFilter(event.target.value)}
-              >
-                {AUDIT_ENTITY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="table-scroll">
-              <table>
-                <thead><tr><th>Thời gian</th><th>Hành động</th><th>Đối tượng</th><th>Người thực hiện</th><th>IP</th><th /></tr></thead>
-                <tbody>
-                  {auditLogs.map((entry) => (
-                    <tr key={entry.id}>
-                      <td>{formatDate(entry.createdAt)}</td>
-                      <td><code>{entry.action}</code></td>
-                      <td>{entry.entity}{entry.entityId ? ` · ${entry.entityId.slice(0, 8).toUpperCase()}` : ""}</td>
-                      <td>{auditActorLabel(entry)}</td>
-                      <td>{entry.ipAddress ?? "—"}</td>
-                      <td>
-                        {(entry.oldValues || entry.newValues) && (
-                          <details>
-                            <summary>Chi tiết</summary>
-                            <pre className="audit-detail">
-                              {JSON.stringify({ old: entry.oldValues, new: entry.newValues }, null, 2)}
-                            </pre>
-                          </details>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {auditLogs.length === 0 && (
-                    <tr><td colSpan={6}><span className="table-muted">Không có bản ghi audit nào khớp bộ lọc.</span></td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <Pagination page={auditPaging.page} total={auditPaging.total} onChange={(page) => void loadAuditLogs(auditEntityFilter, page)} />
-            <p className="risk-footnote"><Icon name="shield" size={15} /> Nhật ký chỉ ghi thêm, không thể sửa/xóa — dùng để truy vết duyệt hồ sơ, thanh toán, đăng nhập và hành động quản trị.</p>
-          </section>
+          <AuditLogViewer onShowUser={setViewingUserId} />
           )}
         </div>
       </div>

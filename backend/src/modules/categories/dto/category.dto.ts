@@ -1,5 +1,18 @@
 import { Transform } from "class-transformer";
-import { IsBoolean, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from "class-validator";
 
 const trim = ({ value }: { value: unknown }) => (typeof value === "string" ? value.trim() : value);
 
@@ -46,4 +59,13 @@ export class UpdateCategoryDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+}
+
+/** Thứ tự mới: toàn bộ id lĩnh vực theo thứ tự hiển thị. */
+export class ReorderCategoriesDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
+  @IsUUID("all", { each: true })
+  ids!: string[];
 }

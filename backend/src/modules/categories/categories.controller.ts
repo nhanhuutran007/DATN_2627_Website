@@ -6,7 +6,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { User, UserRole } from "../users/entities/user.entity";
 import { CategoriesService } from "./categories.service";
-import { CreateCategoryDto, UpdateCategoryDto } from "./dto/category.dto";
+import { CreateCategoryDto, ReorderCategoriesDto, UpdateCategoryDto } from "./dto/category.dto";
 
 /** Danh mục đang nhận chiến dịch (công khai). */
 @Controller("categories")
@@ -34,6 +34,11 @@ export class AdminCategoriesController {
   @Post()
   create(@Body() dto: CreateCategoryDto, @GetCurrentUser() admin: User) {
     return this.categoriesService.create(dto, admin);
+  }
+
+  @Patch("order")
+  reorder(@Body() dto: ReorderCategoriesDto, @GetCurrentUser() admin: User) {
+    return this.categoriesService.reorder(dto.ids, admin);
   }
 
   @Patch(":id")
