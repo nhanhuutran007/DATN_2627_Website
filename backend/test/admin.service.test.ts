@@ -326,12 +326,50 @@ describe("AdminService", () => {
     });
   });
 
+  describe("navCounts", () => {
+    it("maps each COUNT query to its badge and computes days since the last backup", async () => {
+      const now = new Date("2026-10-22T15:00:00Z");
+      const params: unknown[][] = [];
+      repos.userRepo.manager = {
+        query: async (sql: string, args: unknown[] = []) => {
+          params.push(args);
+          if (sql.includes("`audit_logs`")) return [{ createdAt: "2026-10-15T15:16:19Z" }];
+          if (sql.includes("`refund_requests`")) return [{ n: "4" }];
+          if (sql.includes("COUNT(DISTINCT")) return [{ n: 2 }];
+          if (sql.includes("`risk_alerts`")) return [{ n: 16 }];
+          if (sql.includes("LEFT JOIN")) return [{ n: 1 }];
+          if (sql.includes("`payment_method` = 'sepay'")) return [{ n: 3 }];
+          if (sql.includes("`reports`")) return [{ n: 1 }];
+          return [{ n: 5 }];
+        },
+      };
+      deepEqual(await service.navCounts(now), {
+        pendingCampaigns: 5,
+        openRisks: 16,
+        openReports: 1,
+        reportedComments: 2,
+        stalePendingSepay: 3,
+        pendingRefunds: 4,
+        ledgerMismatches: 1,
+        daysSinceBackup: 6,
+      });
+      // SePay "chờ" chỉ tính khi tạo trước mốc 30 phút
+      const cutoff = params.find((args) => args.length === 1)?.[0] as Date;
+      equal(cutoff.toISOString(), "2026-10-22T14:30:00.000Z");
+    });
+
+    it("returns null days when the system was never backed up", async () => {
+      repos.userRepo.manager = { query: async (sql: string) => (sql.includes("`audit_logs`") ? [] : [{ n: 0 }]) };
+      equal((await service.navCounts()).daysSinceBackup, null);
+    });
+  });
+
   describe("updateUserStatus", () => {
     it("should ban another user", async () => {
-      repos.userRepo.findOneBy = async () => makeUser({ id: OTHER_ID });
+      repos.userRepo.findOneBy = async () => makeUser({ id: OTHER_ID, role: UserRole.USER });
       const user = await service.updateUserStatus(
         OTHER_ID,
-        { status: UserStatus.BANNED },
+        { status: UserStatus.BANNED, reason: "  Spam bình luận  " },
         makeUser(),
       );
       equal(user.status, UserStatus.BANNED);
@@ -341,6 +379,28 @@ describe("AdminService", () => {
       equal(audit.entries[0].entityId, OTHER_ID);
       equal(audit.entries[0].oldValues?.status, UserStatus.ACTIVE);
       equal(audit.entries[0].newValues?.status, UserStatus.BANNED);
+      equal(audit.entries[0].newValues?.reason, "Spam bình luận");
+      ok(user.sessionsRevokedAt instanceof Date, "khóa tài khoản phải thu hồi mọi phiên");
+    });
+
+    it("should not touch sessions when unbanning", async () => {
+      repos.userRepo.findOneBy = async () => makeUser({ id: OTHER_ID, role: UserRole.USER, status: UserStatus.BANNED, sessionsRevokedAt: null });
+      const user = await service.updateUserStatus(OTHER_ID, { status: UserStatus.ACTIVE }, makeUser());
+      equal(user.status, UserStatus.ACTIVE);
+      equal(user.sessionsRevokedAt, null);
+    });
+
+    it("should prevent banning another admin", async () => {
+      repos.userRepo.findOneBy = async () => makeUser({ id: OTHER_ID });
+      await service
+        .updateUserStatus(OTHER_ID, { status: UserStatus.BANNED }, makeUser())
+        .then(() => {
+          throw new Error("should have thrown");
+        })
+        .catch((err) => {
+          equal(err.status, 400);
+        });
+      equal(audit.entries.length, 0);
     });
 
     it("should prevent an admin from banning themselves", async () => {

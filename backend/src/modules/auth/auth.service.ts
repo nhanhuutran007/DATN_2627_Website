@@ -304,6 +304,10 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException("User not found");
     }
+    // Kiểm tra mỗi request: tài khoản bị khóa mất quyền ngay, không chờ access token (15 phút) hết hạn.
+    if (user.status === UserStatus.BANNED) {
+      throw new UnauthorizedException("Account has been banned");
+    }
     if (issuedBeforeSessionCutoff(user, issuedAt)) {
       throw new UnauthorizedException("Session has been revoked");
     }

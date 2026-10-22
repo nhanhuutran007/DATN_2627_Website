@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { PAGE_SIZE, Pagination, pageSlice } from "@/components/ui/Pagination";
 import { ApiError } from "@/lib/api";
 import { downloadCampaignStatsCsv, downloadDailyDonationsCsv } from "@/lib/api/admin";
-import { createCategory, fetchAdminCategories, updateCategory, type AdminCategory } from "@/lib/api/categories";
+import { createCategory, fetchAdminCategories, reorderCategories, updateCategory, type AdminCategory } from "@/lib/api/categories";
 
 function errorText(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
@@ -16,7 +16,7 @@ function errorText(err: unknown, fallback: string): string {
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 
 /** Quản trị nội dung: danh mục lĩnh vực và xuất thống kê ẩn danh. */
-export function CategoryManager() {
+export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (category: string) => void }) {
   const dialog = useDialog();
   const [categories, setCategories] = useState<AdminCategory[] | null>(null);
   const [page, setPage] = useState(0);
@@ -80,7 +80,27 @@ export function CategoryManager() {
     void run(category.id, () => updateCategory(category.id, { name: value }), `Đã đổi “${category.name}” thành “${value}”.`);
   };
 
-  const toggle = (category: AdminCategory) =>
+  const toggle = async (category: AdminCategory) => {
+    const confirmed = await dialog.confirm(
+      category.isActive
+        ? {
+          title: "Ngừng nhận chiến dịch mới",
+          message: (
+            <>
+              Không cho tạo chiến dịch mới trong lĩnh vực <b>{category.name}</b>.
+              {category.campaignCount > 0 && <> {category.campaignCount} chiến dịch hiện có vẫn giữ nguyên.</>} Có thể mở lại bất cứ lúc nào.
+            </>
+          ),
+          confirmLabel: "Ngừng nhận",
+          tone: "danger",
+        }
+        : {
+          title: "Mở lại lĩnh vực",
+          message: <>Lĩnh vực <b>{category.name}</b> sẽ xuất hiện lại trong form tạo chiến dịch và bộ lọc.</>,
+          confirmLabel: "Mở lại",
+        },
+    );
+    if (!confirmed) return;
     void run(
       category.id,
       () => updateCategory(category.id, { isActive: !category.isActive }),
@@ -88,23 +108,25 @@ export function CategoryManager() {
         ? `Đã ngừng nhận chiến dịch mới cho “${category.name}”; chiến dịch cũ giữ nguyên.`
         : `Đã mở lại lĩnh vực “${category.name}”.`,
     );
+  };
 
   const move = (index: number, delta: -1 | 1) => {
-    if (!categories) return;
-    const other = categories[index + delta];
-    const current = categories[index];
-    if (!other) return;
-    void run(current.id, async () => {
-      // Đổi chỗ bằng thứ tự hiển thị; dùng vị trí trong danh sách để tránh trùng sortOrder.
-      await updateCategory(current.id, { sortOrder: index + delta });
-      await updateCategory(other.id, { sortOrder: index });
-    }, "Đã cập nhật thứ tự hiển thị.");
+    if (!categories || !categories[index + delta]) return;
+    const ids = categories.map((category) => category.id);
+    [ids[index], ids[index + delta]] = [ids[index + delta], ids[index]];
+    // Gửi cả danh sách để backend đổi thứ tự trong một giao dịch, không để lệch/trùng thứ tự.
+    void run(categories[index].id, () => reorderCategories(ids), "Đã cập nhật thứ tự hiển thị.");
   };
+
+  const activeCount = categories?.filter((category) => category.isActive).length ?? 0;
 
   return (
     <section className="admin-card admin-table-card" id="danh-muc">
       <div className="card-heading">
-        <div><p className="eyebrow">Nội dung</p><h2>Lĩnh vực chiến dịch</h2></div>
+        <div>
+          <p className="eyebrow">Nội dung</p>
+          <h2>{categories ? `${categories.length} lĩnh vực · ${activeCount} đang nhận` : "Lĩnh vực chiến dịch"}</h2>
+        </div>
         <form className="category-create" onSubmit={create}>
           <label className="sr-only" htmlFor="new-category">Tên lĩnh vực mới</label>
           <input id="new-category" placeholder="Tên lĩnh vực mới" maxLength={100} value={name} onChange={(event) => setName(event.target.value)} />
@@ -116,7 +138,7 @@ export function CategoryManager() {
       )}
       <div className="table-scroll">
         <table>
-          <thead><tr><th>Lĩnh vực</th><th>Chiến dịch</th><th>Trạng thái</th><th>Thứ tự</th><th /></tr></thead>
+          <thead><tr><th title="Thứ tự hiển thị">#</th><th>Lĩnh vực</th><th>Chiến dịch</th><th>Trạng thái</th><th /></tr></thead>
           <tbody>
             {categories === null ? (
               <tr><td colSpan={5}><span className="table-muted">Đang tải…</span></td></tr>
@@ -125,24 +147,41 @@ export function CategoryManager() {
                 // Vị trí trong toàn danh sách (dùng cho sắp xếp), không phải trong trang.
                 const index = page * PAGE_SIZE + pageIndex;
                 return (
-                <tr key={category.id}>
+                <tr key={category.id} className={category.isActive ? undefined : "category-inactive"}>
+                  <td className="table-muted">{index + 1}</td>
                   <td><b>{category.name}</b></td>
-                  <td>{category.campaignCount.toLocaleString("vi-VN")}</td>
+                  <td>
+                    {category.campaignCount > 0 && onShowCampaigns ? (
+                      <button
+                        className="link-inline"
+                        type="button"
+                        title={`Xem các chiến dịch thuộc ${category.name}`}
+                        onClick={() => onShowCampaigns(category.name)}
+                      >
+                        {category.campaignCount.toLocaleString("vi-VN")} chiến dịch
+                      </button>
+                    ) : (
+                      <span className="table-muted">{category.campaignCount.toLocaleString("vi-VN")} chiến dịch</span>
+                    )}
+                  </td>
                   <td>
                     <span className={`table-status ${category.isActive ? "success" : "failed"}`}>
                       {category.isActive ? "Đang nhận" : "Ngừng nhận"}
                     </span>
                   </td>
                   <td>
-                    <div className="admin-actions">
-                      <button type="button" aria-label={`Đưa ${category.name} lên`} disabled={index === 0 || busy !== null} onClick={() => move(index, -1)}>↑</button>
-                      <button type="button" aria-label={`Đưa ${category.name} xuống`} disabled={index === categories.length - 1 || busy !== null} onClick={() => move(index, 1)}>↓</button>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="admin-actions">
+                    <div className="admin-actions category-actions">
+                      <span className="category-move">
+                        <button type="button" aria-label={`Đưa ${category.name} lên`} title="Đưa lên" disabled={index === 0 || busy !== null} onClick={() => move(index, -1)}>↑</button>
+                        <button type="button" aria-label={`Đưa ${category.name} xuống`} title="Đưa xuống" disabled={index === categories.length - 1 || busy !== null} onClick={() => move(index, 1)}>↓</button>
+                      </span>
                       <button type="button" disabled={busy === category.id} onClick={() => rename(category)}>Đổi tên</button>
-                      <button type="button" disabled={busy === category.id} onClick={() => toggle(category)}>
+                      <button
+                        className={category.isActive ? "table-danger-action" : undefined}
+                        type="button"
+                        disabled={busy === category.id}
+                        onClick={() => void toggle(category)}
+                      >
                         {category.isActive ? "Ngừng nhận" : "Mở lại"}
                       </button>
                     </div>
@@ -156,7 +195,7 @@ export function CategoryManager() {
       </div>
       {categories && <Pagination page={page} total={categories.length} onChange={setPage} />}
       <p className="risk-footnote">
-        <Icon name="shield" size={15} /> Ngừng nhận: không cho tạo chiến dịch mới trong lĩnh vực, chiến dịch cũ giữ nguyên. Đổi tên cập nhật luôn các chiến dịch. Mọi thay đổi được ghi nhật ký kiểm toán.
+        <Icon name="shield" size={15} /> Thứ tự (#) là thứ tự lĩnh vực trong bộ lọc trang khám phá và form tạo chiến dịch. Ngừng nhận: không cho tạo chiến dịch mới trong lĩnh vực, chiến dịch cũ giữ nguyên. Đổi tên cập nhật luôn các chiến dịch. Mọi thay đổi được ghi nhật ký kiểm toán.
       </p>
     </section>
   );

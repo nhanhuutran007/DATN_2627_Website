@@ -31,6 +31,13 @@ export type BackupFile = {
   tables: Record<string, Record<string, unknown>[]>;
 };
 
+export type BackupStatus = {
+  /** Migration mới nhất của CSDL hiện tại; file sao lưu phải cùng giá trị mới khôi phục được. */
+  schemaVersion: string | null;
+  maxBytes: number;
+  lastBackup: { createdAt: string; by: string | null; rows: number | null; bytes: number | null } | null;
+};
+
 export type RestoreResult = {
   tables: number;
   rows: number;
@@ -51,6 +58,31 @@ export class BackupService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly auditService: AuditService,
   ) {}
+
+  async status(): Promise<BackupStatus> {
+    const [schemaVersion, [last]] = await Promise.all([
+      this.readSchemaVersion(),
+      this.dataSource.query(
+        "SELECT a.`created_at` AS createdAt, a.`new_values` AS newValues, u.`email` AS email " +
+          "FROM `audit_logs` a LEFT JOIN `users` u ON u.`id` = a.`user_id` " +
+          "WHERE a.`action` = 'backup.export' ORDER BY a.`created_at` DESC LIMIT 1",
+      ) as Promise<Array<{ createdAt: Date | string; newValues: unknown; email: string | null }>>,
+    ]);
+    let lastBackup: BackupStatus["lastBackup"] = null;
+    if (last) {
+      // mysql2 trả cột JSON đã parse; phòng trường hợp driver trả chuỗi.
+      const values = (typeof last.newValues === "string" ? JSON.parse(last.newValues) : last.newValues) as
+        | { rows?: number; bytes?: number }
+        | null;
+      lastBackup = {
+        createdAt: new Date(last.createdAt).toISOString(),
+        by: last.email ?? null,
+        rows: typeof values?.rows === "number" ? values.rows : null,
+        bytes: typeof values?.bytes === "number" ? values.bytes : null,
+      };
+    }
+    return { schemaVersion, maxBytes: MAX_BACKUP_BYTES, lastBackup };
+  }
 
   async exportBackup(admin: User): Promise<{ filename: string; content: Buffer; rows: number }> {
     const schema = await this.readSchema();

@@ -142,6 +142,12 @@ export class AdminUserQueryDto {
 export class UpdateUserStatusDto {
   @IsEnum(UserStatus)
   status!: UserStatus;
+
+  /** Lý do khóa/mở khóa, lưu vào nhật ký kiểm toán. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 export class RiskQueryDto {
@@ -184,6 +190,12 @@ export class RiskQueryDto {
 export class UpdateRiskStatusDto {
   @IsEnum(RiskAlertStatus)
   status!: RiskAlertStatus;
+
+  /** Lý do xác nhận/bỏ qua (bắt buộc khi đóng cảnh báo), lưu vào nhật ký kiểm toán. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  notes?: string;
 }
 
 export class SetFeaturedDto {

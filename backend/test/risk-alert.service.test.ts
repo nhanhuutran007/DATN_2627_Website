@@ -310,14 +310,41 @@ describe("RiskAlertService", () => {
       const audit = makeAuditRecorder();
       const service = new RiskAlertService({} as any, {} as any, riskAlertRepo, makeAiService(async () => ({ available: false })), audit.service);
 
-      const updated = await service.updateStatus(alert.id, { status: RiskAlertStatus.RESOLVED }, user);
+      const updated = await service.updateStatus(
+        alert.id,
+        { status: RiskAlertStatus.RESOLVED, notes: "  Đã xác minh chủ dự án qua điện thoại  " },
+        user,
+      );
       equal(updated.status, RiskAlertStatus.RESOLVED);
+      equal(audit.entries[0].newValues?.notes, "Đã xác minh chủ dự án qua điện thoại");
       equal(audit.entries.length, 1);
       equal(audit.entries[0].action, "risk_alert.status.update");
       equal(audit.entries[0].userId, ADMIN_ID);
       equal(audit.entries[0].newValues?.status, RiskAlertStatus.RESOLVED);
       equal(updated.resolvedBy, ADMIN_ID);
       ok(updated.resolvedAt instanceof Date);
+    });
+
+    it("should require a reason before closing an alert", async () => {
+      const alert = makeAlert();
+      const riskAlertRepo: any = {
+        findOneBy: async () => alert,
+        save: async (value: RiskAlert) => value,
+      };
+      const audit = makeAuditRecorder();
+      const service = new RiskAlertService({} as any, {} as any, riskAlertRepo, makeAiService(async () => ({ available: false })), audit.service);
+
+      for (const notes of [undefined, "   ", "ok"]) {
+        await service
+          .updateStatus(alert.id, { status: RiskAlertStatus.DISMISSED, notes }, user)
+          .then(() => {
+            throw new Error("should have thrown");
+          })
+          .catch((err) => {
+            equal(err.status, 400);
+          });
+      }
+      equal(audit.entries.length, 0);
     });
 
     it("should throw NotFoundException for a missing alert", async () => {
@@ -327,7 +354,7 @@ describe("RiskAlertService", () => {
       const service = new RiskAlertService({} as any, {} as any, riskAlertRepo, makeAiService(async () => ({ available: false })), makeAuditRecorder().service);
 
       await service
-        .updateStatus("missing", { status: RiskAlertStatus.DISMISSED }, user)
+        .updateStatus("missing", { status: RiskAlertStatus.DISMISSED, notes: "Trùng cảnh báo cũ" }, user)
         .then(() => {
           throw new Error("should have thrown");
         })

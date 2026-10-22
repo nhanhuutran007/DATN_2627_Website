@@ -21,8 +21,10 @@ import { AuditLogQueryDto } from "../../common/audit/audit.dto";
 import { AuditService } from "../../common/audit/audit.service";
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { StepUpPurpose } from "../auth/entities/step-up-code.entity";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
+import { RequireStepUp, StepUpGuard } from "../auth/guards/step-up.guard";
 import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entity";
 import { AdminService } from "./admin.service";
 import { BackupService, MAX_BACKUP_BYTES } from "./backup.service";
@@ -63,8 +65,16 @@ export class AdminController {
     private readonly backupService: BackupService,
   ) {}
 
-  /** Tải về bản sao lưu toàn bộ dữ liệu (JSON nén gzip). */
+  /** Lần sao lưu gần nhất và phiên bản cấu trúc CSDL hiện tại (để kiểm tra file trước khi khôi phục). */
+  @Get("backup/status")
+  backupStatus() {
+    return this.backupService.status();
+  }
+
+  /** Tải về bản sao lưu toàn bộ dữ liệu (JSON nén gzip); chứa dữ liệu cá nhân nên cần OTP. */
   @Get("backup/export")
+  @UseGuards(StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ADMIN_BACKUP)
   async exportBackup(@GetCurrentUser() currentUser: User, @Res() res: Response): Promise<void> {
     const file = await this.backupService.exportBackup(currentUser);
     res.set({
@@ -77,6 +87,8 @@ export class AdminController {
 
   /** Ghi đè toàn bộ dữ liệu bằng file sao lưu; bắt buộc gửi kèm chuỗi xác nhận. */
   @Post("backup/restore")
+  @UseGuards(StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ADMIN_BACKUP)
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_BACKUP_BYTES, files: 1 } }))
   restoreBackup(
     @UploadedFile() file: { buffer: Buffer } | undefined,
@@ -92,6 +104,12 @@ export class AdminController {
   @Get("overview")
   overview() {
     return this.adminService.getOverview();
+  }
+
+  /** Số việc cần xử lý cho badge trên sidebar. */
+  @Get("nav-counts")
+  navCounts() {
+    return this.adminService.navCounts();
   }
 
   @Get("campaigns")

@@ -111,6 +111,60 @@ describe("AuditService", () => {
     equal(result.limit, 10);
   });
 
+  it("should OR the prefixes of a group, hide sessions and bound dates in Vietnam time", async () => {
+    let options: any;
+    const repo: any = {
+      findAndCount: async (opts: unknown) => {
+        options = opts;
+        return [[], 0];
+      },
+    };
+    await new AuditService(repo).list({ group: "finance", hideSessions: true, from: "2026-10-01", to: "2026-10-22" });
+
+    equal(options.where.length, 3);
+    const range = options.where[0].createdAt.value;
+    equal(range[0].toISOString(), "2026-09-30T17:00:00.000Z");
+    equal(range[1].toISOString(), "2026-10-22T16:59:59.999Z");
+    // And(Like("donation.%"), Not(In(sessions)))
+    const [like, notIn] = options.where[0].action.value;
+    equal(like.value, "donation.%");
+    equal(notIn.type, "not");
+    deepEqual(notIn.value, ["auth.login.success", "auth.google.login", "auth.logout", "auth.logout_all"]);
+  });
+
+  it("should attach actor and entity names, leaving unknown ids empty", async () => {
+    const items = [
+      { id: "1", userId: "u1", action: "user.status.update", entity: "user", entityId: "u2" },
+      { id: "2", userId: null, action: "campaign.expire", entity: "campaign", entityId: "c1" },
+      { id: "3", userId: "gone", action: "backup.export", entity: "system", entityId: null },
+    ];
+    const queries: string[] = [];
+    const repo: any = {
+      findAndCount: async () => [items, 3],
+      manager: {
+        query: async (sql: string) => {
+          queries.push(sql);
+          if (sql.includes("`users`")) {
+            return [
+              { id: "u1", label: "Administrator", email: "admin@gopmam.com" },
+              { id: "u2", label: "Bui Anh H", email: "user5@gopmam.com" },
+            ];
+          }
+          return [{ id: "c1", label: "Giếng nước sạch" }];
+        },
+      },
+    };
+    const result = await new AuditService(repo).list({});
+
+    equal(queries.length, 2);
+    deepEqual((result.items[0] as any).actor, { name: "Administrator", email: "admin@gopmam.com" });
+    equal((result.items[0] as any).entityLabel, "Bui Anh H");
+    equal((result.items[1] as any).actor, null);
+    equal((result.items[1] as any).entityLabel, "Giếng nước sạch");
+    equal((result.items[2] as any).actor, null);
+    equal((result.items[2] as any).entityLabel, null);
+  });
+
   it("should truncate very long strings for the audit trail", () => {
     equal((truncateForAudit("a".repeat(600)) as string).length, 501);
     equal(truncateForAudit("short"), "short");

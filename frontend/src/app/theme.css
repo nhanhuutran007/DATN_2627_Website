@@ -305,6 +305,70 @@ h3 {
   min-width: 220px;
 }
 
+/* Chọn nhanh kỳ: nhóm nút liền nhau, nút đang chọn tô màu chính */
+.recon-presets {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+}
+
+.recon-presets button {
+  height: 36px;
+  padding: 0 12px;
+  color: var(--text-2);
+  border: 0;
+  background: none;
+  font-size: 0.84rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.recon-presets button + button {
+  border-left: 1px solid var(--line);
+}
+
+.recon-presets button:hover {
+  color: var(--primary);
+}
+
+.recon-presets button.is-active {
+  color: var(--white);
+  background: var(--primary);
+}
+
+.recon-dates input {
+  width: 150px;
+}
+
+/* Tiêu đề nhóm cột: "Trong kỳ" và "Lũy kế" */
+#doi-soat .recon-groups th[colspan] {
+  padding-block: 8px 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+#doi-soat .recon-groups th[rowspan] {
+  vertical-align: bottom;
+}
+
+/* Vạch ngăn giữa nhóm "Trong kỳ" và nhóm "Lũy kế" */
+#doi-soat th.recon-ledger,
+#doi-soat td.recon-ledger {
+  border-left: 2px solid var(--line);
+}
+
+#doi-soat .recon-diff {
+  display: block;
+  margin-top: 4px;
+  color: #b42318;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .recon-bad {
   color: #b42318;
 }
@@ -2736,7 +2800,7 @@ h3 {
   color: var(--navy);
   font-weight: 600;
   text-align: right;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .report-panel {
@@ -4060,6 +4124,12 @@ button {
   padding: 12px 0;
 }
 
+/* Nhắc nhở (vd. lâu chưa sao lưu): vàng, khác badge đỏ "có việc cần xử lý" */
+.admin-sidebar nav a i.is-warn {
+  color: #93370d;
+  background: #fec84b;
+}
+
 .is-rail .admin-sidebar nav a i {
   position: absolute;
   top: 2px;
@@ -4572,6 +4642,62 @@ button {
   font-size: 0.88rem;
 }
 
+/* Nút "Thêm" khi chưa nhập tên: xám trung tính thay vì đỏ nhạt trông như lỗi */
+.category-create .button-primary:disabled {
+  color: var(--muted);
+  border-color: var(--line);
+  background: var(--soft);
+  opacity: 1;
+}
+
+#danh-muc th:first-child,
+#danh-muc td:first-child {
+  width: 48px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lĩnh vực ngừng nhận: làm mờ cả dòng, trừ cột thao tác để vẫn bấm "Mở lại" rõ ràng */
+#danh-muc tr.category-inactive td:not(:last-child) {
+  opacity: 0.55;
+}
+
+#danh-muc .category-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+/* Cặp mũi tên sắp xếp dính liền nhau, tách khỏi các nút chữ */
+#danh-muc .category-move {
+  display: inline-flex;
+  margin-right: 6px;
+}
+
+#danh-muc .category-move button {
+  min-width: 32px;
+  padding-inline: 8px;
+}
+
+#danh-muc .category-move button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+#danh-muc .category-move button + button {
+  margin-left: -1px;
+  border-radius: 0 6px 6px 0;
+}
+
+.admin-actions button.table-danger-action {
+  color: #b42318;
+  border-color: #f4c7c3;
+}
+
+.admin-actions button.table-danger-action:hover {
+  color: var(--white);
+  border-color: #b42318;
+  background: #b42318;
+}
+
 .category-create input:focus {
   border-color: var(--primary);
   outline: 0;
@@ -4610,9 +4736,91 @@ button {
   font-size: 0.98rem;
 }
 
+.backup-last {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.backup-stale {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  color: #93370d;
+  border: 1px solid #fedf89;
+  border-radius: 10px;
+  background: #fffaeb;
+  font-size: 0.86rem;
+}
+
+/* Thẻ khôi phục: tông đỏ nhạt để không lẫn với thẻ "Tạo bản sao lưu" vô hại */
+.export-grid article.backup-restore-card {
+  border-color: #f3c7c0;
+  background: #fff8f6;
+}
+
+/* Nút sao lưu nằm ở đáy thẻ, không bóng đổ để hai thẻ cân nhau */
+.export-grid article:has(> .backup-export) {
+  grid-template-rows: auto 1fr auto;
+}
+
+.export-grid article > .backup-export {
+  align-self: end;
+  box-shadow: none;
+}
+
+.backup-drop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  color: var(--text-2);
+  border: 1.5px dashed #e8a89e;
+  border-radius: 10px;
+  background: var(--white);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.backup-drop svg {
+  flex: none;
+  color: var(--primary);
+}
+
+.backup-drop span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.backup-drop b {
+  color: var(--navy);
+  font-size: 0.9rem;
+}
+
+.backup-drop small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.backup-drop:hover,
+.backup-drop.is-dragging,
+.backup-drop:focus-within {
+  border-color: var(--primary);
+  background: #fff3f0;
+}
+
+.backup-drop.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .backup-schema {
   font-size: 0.8rem;
-  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 
 .backup-tables {
@@ -4861,6 +5069,144 @@ button {
   border-radius: 8px;
   background: var(--navy);
   font-size: 0.75rem;
+}
+
+/* ---------- Nhật ký kiểm toán ---------- */
+#nhat-ky-kiem-toan .audit-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Nhãn hành động tô màu theo nhóm */
+.audit-action {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-2);
+  background: var(--soft);
+}
+
+.audit-auth { color: #3538cd; background: #eef4ff; }
+.audit-account { color: #6941c6; background: #f4f3ff; }
+.audit-finance { color: #b54708; background: #fffaeb; }
+.audit-content { color: #067647; background: #ecfdf3; }
+.audit-system { color: #b42318; background: #fef3f2; }
+
+#nhat-ky-kiem-toan .audit-entity-name {
+  color: var(--navy);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+}
+
+#nhat-ky-kiem-toan button.audit-entity-name:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+#nhat-ky-kiem-toan .audit-sub {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+#nhat-ky-kiem-toan td.mono {
+  color: var(--text-2);
+  font-size: 0.8rem;
+}
+
+.admin-table-card td > button.audit-expand {
+  color: var(--primary);
+}
+
+.audit-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.audit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 4px 0 12px;
+  color: var(--text-2);
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  background: #fff3f0;
+  font-size: 0.84rem;
+}
+
+.audit-chip button {
+  width: 24px;
+  height: 24px;
+  color: var(--primary);
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.audit-chip button:hover {
+  background: var(--white);
+}
+
+/* Bảng so sánh trước/sau trong dòng mở rộng */
+.audit-changes {
+  display: grid;
+  gap: 8px;
+  max-width: 860px;
+}
+
+.admin-table-card .audit-changes table {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  font-size: 0.82rem;
+}
+
+.admin-table-card .audit-changes th {
+  padding: 6px 10px;
+  font-size: 0.7rem;
+}
+
+.admin-table-card .audit-changes td {
+  padding: 6px 10px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.admin-table-card .audit-changes td:first-child {
+  width: 180px;
+  min-width: 0;
+  color: var(--muted);
+}
+
+.audit-changes .audit-old {
+  color: #b42318;
+  text-decoration: line-through;
+  text-decoration-color: rgba(180, 35, 24, 0.4);
+}
+
+.audit-changes .audit-new {
+  color: #067647;
+  font-weight: 600;
+}
+
+.audit-changes p {
+  margin: 0;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
 }
 
 .admin-table-card details summary {
@@ -7551,9 +7897,12 @@ html:has(dialog:modal) .admin-sidebar {
   width: 96px;
 }
 
-.admin-filter-submit {
+.admin-filter-submit,
+.admin-filter-submit:hover {
   height: 38px;
+  min-height: 38px;
   padding: 0 18px;
+  box-shadow: none;
 }
 
 @media (max-width: 480px) {
@@ -11428,4 +11777,86 @@ html:has(dialog:modal) .admin-sidebar {
   .start-faq summary svg {
     transition: none;
   }
+}
+
+/* ---------- Người dùng (admin) ---------- */
+/* Dòng tóm tắt bấm được để lọc nhanh */
+.user-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 0.86rem;
+}
+
+.user-summary button {
+  height: 34px;
+  padding: 0 12px;
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  font-size: inherit;
+}
+
+.user-summary button b {
+  color: var(--navy);
+}
+
+.user-summary button:hover,
+.user-summary button.is-active {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.user-summary button.is-active b {
+  color: var(--primary);
+}
+
+.user-unverified {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  color: #b54708;
+  border-radius: 999px;
+  background: #fef0c7;
+  font-size: 0.72rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+/* Tỉ lệ cột cố định: email không chiếm hết chỗ, cột thao tác không bị đẩy sát lề */
+#nguoi-dung th:nth-child(1) { width: 22%; }
+#nguoi-dung th:nth-child(2) { width: 30%; }
+#nguoi-dung th:nth-child(3),
+#nguoi-dung th:nth-child(4),
+#nguoi-dung th:nth-child(5) { width: 12%; }
+
+#nguoi-dung td:nth-child(2) {
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
+#nguoi-dung td b .link-inline {
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+}
+
+#nguoi-dung td b .link-inline:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+/* Thao tác nặng (khóa tài khoản): chữ đỏ để không lẫn với nút thường */
+.admin-table-card td > button.table-danger-action {
+  color: #b42318;
+  border-color: #f4c7c3;
+}
+
+.admin-table-card td > button.table-danger-action:hover {
+  color: var(--white);
+  border-color: #b42318;
+  background: #b42318;
 }

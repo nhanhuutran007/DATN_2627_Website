@@ -443,6 +443,13 @@ describe("AuthService", () => {
       equal(user.id, mockUser.id);
     });
   });
+
+  describe("validateUser", () => {
+    it("từ chối ngay tài khoản bị khóa dù access token còn hạn", async () => {
+      (usersService as any).findById = async () => ({ ...mockUser, status: UserStatus.BANNED });
+      await rejects(authService.validateUser(mockUser.id!, Math.floor(Date.now() / 1000), "fresh-jti"), { status: 401 });
+    });
+  });
 });
 
 describe("issuedBeforeSessionCutoff", () => {

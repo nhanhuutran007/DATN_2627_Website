@@ -205,4 +205,24 @@ describe("CategoriesService", () => {
     await expectStatus(service.assertUsable("Không tồn tại"), 400);
     await service.assertUsable("Giáo dục");
   });
+
+  it("should reorder all categories in one transaction and one audit entry", async () => {
+    const saved = await service.reorder(["c2", "c1"], ADMIN);
+    deepEqual(saved.map((c) => [c.id, c.sortOrder]), [["c2", 0], ["c1", 1]]);
+    equal(audit.entries.length, 1);
+    equal(audit.entries[0].action, "category.reorder");
+    deepEqual(audit.entries[0].newValues?.order, ["Y tế", "Giáo dục"]);
+  });
+
+  it("should reject an incomplete or duplicated order", async () => {
+    await expectStatus(service.reorder(["c1"], ADMIN), 400);
+    await expectStatus(service.reorder(["c1", "c1"], ADMIN), 400);
+    await expectStatus(service.reorder(["c1", "zz"], ADMIN), 400);
+    equal(audit.entries.length, 0);
+  });
+
+  it("should skip saving when the order is unchanged", async () => {
+    await service.reorder(["c1", "c2"], ADMIN);
+    equal(audit.entries.length, 0);
+  });
 });

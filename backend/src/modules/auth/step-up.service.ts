@@ -31,6 +31,7 @@ const ACTION_LABELS: Record<StepUpPurpose, string> = {
   [StepUpPurpose.CHANGE_PASSWORD]: "đổi mật khẩu",
   [StepUpPurpose.REFUND_REQUEST]: "gửi yêu cầu hoàn tiền",
   [StepUpPurpose.ADMIN_REFUND]: "xử lý hoàn tiền",
+  [StepUpPurpose.ADMIN_BACKUP]: "sao lưu hoặc khôi phục dữ liệu",
 };
 
 type StepUpClaims = { sub: string; typ: "step_up"; purpose: StepUpPurpose };

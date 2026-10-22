@@ -64,6 +64,25 @@ function monthLabel(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** Số việc cần xử lý cho badge trên sidebar quản trị. */
+export type AdminNavCounts = {
+  pendingCampaigns: number;
+  openRisks: number;
+  openReports: number;
+  /** Bình luận đang hiển thị nhưng có báo cáo chưa xử lý. */
+  reportedComments: number;
+  /** Giao dịch SePay chờ thanh toán quá lâu, có thể cần đối soát tay. */
+  stalePendingSepay: number;
+  pendingRefunds: number;
+  /** Chiến dịch có số ghi trên chiến dịch lệch với tổng giao dịch thành công (lũy kế). */
+  ledgerMismatches: number;
+  /** Ngày từ lần sao lưu gần nhất; null nếu chưa từng sao lưu. */
+  daysSinceBackup: number | null;
+};
+
+/** Giao dịch SePay "chờ" quá mốc này thì đáng để admin đối soát tay. */
+const STALE_SEPAY_MINUTES = 30;
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -77,6 +96,59 @@ export class AdminService {
     private readonly riskAlertRepo: Repository<RiskAlert>,
     private readonly auditService: AuditService,
   ) {}
+
+  /** Đếm nhanh bằng SQL (mỗi mục một COUNT) để sidebar làm mới thường xuyên mà không tải danh sách. */
+  async navCounts(now = new Date()): Promise<AdminNavCounts> {
+    const count = async (sql: string, params: unknown[] = []) => {
+      const [row] = await this.userRepo.manager.query(sql, params);
+      return toMoney(row?.n);
+    };
+    const [
+      pendingCampaigns,
+      openRisks,
+      openReports,
+      reportedComments,
+      stalePendingSepay,
+      pendingRefunds,
+      ledgerMismatches,
+      lastBackupRows,
+    ] = await Promise.all([
+      count("SELECT COUNT(*) AS n FROM `campaigns` WHERE `status` = 'pending'"),
+      count("SELECT COUNT(*) AS n FROM `risk_alerts` WHERE `status` = 'open'"),
+      count("SELECT COUNT(*) AS n FROM `reports` WHERE `status` IN ('pending', 'reviewing')"),
+      count(
+        "SELECT COUNT(DISTINCT r.`comment_id`) AS n FROM `reports` r " +
+          "JOIN `campaign_comments` c ON c.`id` = r.`comment_id` " +
+          "WHERE r.`status` IN ('pending', 'reviewing') AND c.`status` = 'visible'",
+      ),
+      count(
+        "SELECT COUNT(*) AS n FROM `donations` WHERE `status` = 'pending' AND `payment_method` = 'sepay' AND `created_at` < ?",
+        [new Date(now.getTime() - STALE_SEPAY_MINUTES * 60_000)],
+      ),
+      count("SELECT COUNT(*) AS n FROM `refund_requests` WHERE `status` = 'pending'"),
+      // Cùng tiêu chí "lệch" với trang Đối soát (chênh > 0,5đ hoặc khác số lượt), nhưng xét mọi chiến dịch.
+      count(
+        "SELECT COUNT(*) AS n FROM `campaigns` c LEFT JOIN (" +
+          "SELECT `campaign_id`, SUM(`amount`) AS s, COUNT(*) AS k FROM `donations` WHERE `status` = 'completed' GROUP BY `campaign_id`" +
+          ") d ON d.`campaign_id` = c.`id` " +
+          "WHERE ABS(c.`current_amount` - COALESCE(d.s, 0)) > 0.5 OR c.`backer_count` <> COALESCE(d.k, 0)",
+      ),
+      this.userRepo.manager.query(
+        "SELECT `created_at` AS createdAt FROM `audit_logs` WHERE `action` = 'backup.export' ORDER BY `created_at` DESC LIMIT 1",
+      ) as Promise<Array<{ createdAt: Date | string }>>,
+    ]);
+    const lastBackup = lastBackupRows[0]?.createdAt;
+    return {
+      pendingCampaigns,
+      openRisks,
+      openReports,
+      reportedComments,
+      stalePendingSepay,
+      pendingRefunds,
+      ledgerMismatches,
+      daysSinceBackup: lastBackup ? Math.floor((now.getTime() - new Date(lastBackup).getTime()) / 86_400_000) : null,
+    };
+  }
 
   async getOverview(): Promise<Record<string, unknown>> {
     const now = new Date();
@@ -449,9 +521,16 @@ export class AdminService {
     if (!user) {
       throw new NotFoundException("User not found");
     }
+    if (user.role === UserRole.ADMIN && dto.status === UserStatus.BANNED) {
+      throw new BadRequestException("Không thể khóa tài khoản quản trị viên");
+    }
 
     const previousStatus = user.status;
     user.status = dto.status;
+    if (dto.status === UserStatus.BANNED && previousStatus !== UserStatus.BANNED) {
+      // Thu hồi mọi phiên đang có: kể cả khi mở khóa sau này, token cũ không dùng lại được.
+      user.sessionsRevokedAt = new Date();
+    }
     const saved = await this.userRepo.save(user);
     await this.auditService.record({
       userId: currentUser.id,
@@ -459,7 +538,7 @@ export class AdminService {
       entity: "user",
       entityId: saved.id,
       oldValues: { status: previousStatus },
-      newValues: { status: saved.status },
+      newValues: { status: saved.status, reason: dto.reason?.trim() || null },
     });
     return saved;
   }
