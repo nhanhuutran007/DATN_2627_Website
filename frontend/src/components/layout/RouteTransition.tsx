@@ -7,6 +7,8 @@ import { useEffect, useRef, useState } from "react";
 const MIN_VISIBLE_MS = 1000;
 /** Bấm link nhưng trang không đổi (link bị chặn, lỗi mạng) thì tự tắt sau chừng này. */
 const MAX_WAIT_MS = 10000;
+/** Thời gian lớp phủ mờ dần để lộ trang mới (khớp transition trong theme.css). */
+const FADE_OUT_MS = 250;
 
 /** Link nội bộ dẫn sang trang khác (khác pathname) và mở trong cùng tab. */
 function isPageLink(event: MouseEvent): boolean {
@@ -25,13 +27,16 @@ export function RouteTransition() {
   const [seenPath, setSeenPath] = useState(pathname);
   const [visible, setVisible] = useState(false);
   const [arrived, setArrived] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const startedAt = useRef<number | null>(null);
 
   // Trang đã đổi (kể cả router.push sau đăng nhập): bật lớp phủ nếu chưa bật và đánh dấu đã tới nơi.
+  // Đặt state ngay trong lúc render để lớp phủ được commit cùng lần với trang mới, không để trang mới lộ ra trước.
   if (seenPath !== pathname) {
     setSeenPath(pathname);
     setVisible(true);
     setArrived(true);
+    setLeaving(false);
   }
 
   useEffect(() => {
@@ -39,6 +44,7 @@ export function RouteTransition() {
       if (!isPageLink(event)) return;
       startedAt.current = performance.now();
       setArrived(false);
+      setLeaving(false);
       setVisible(true);
     }
     document.addEventListener("click", onClick, true);
@@ -46,21 +52,28 @@ export function RouteTransition() {
   }, []);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || leaving) return;
     startedAt.current ??= performance.now();
     const elapsed = performance.now() - startedAt.current;
     const delay = arrived ? Math.max(0, MIN_VISIBLE_MS - elapsed) : Math.max(0, MAX_WAIT_MS - elapsed);
+    const timer = window.setTimeout(() => setLeaving(true), delay);
+    return () => window.clearTimeout(timer);
+  }, [visible, arrived, leaving]);
+
+  useEffect(() => {
+    if (!leaving) return;
     const timer = window.setTimeout(() => {
       startedAt.current = null;
       setVisible(false);
       setArrived(false);
-    }, delay);
+      setLeaving(false);
+    }, FADE_OUT_MS);
     return () => window.clearTimeout(timer);
-  }, [visible, arrived]);
+  }, [leaving]);
 
   if (!visible) return null;
   return (
-    <div className="route-transition" role="status" aria-live="polite">
+    <div className={leaving ? "route-transition is-leaving" : "route-transition"} role="status" aria-live="polite">
       <span className="loading-dots" aria-hidden="true">
         <i />
         <i />
