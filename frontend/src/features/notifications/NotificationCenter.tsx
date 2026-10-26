@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { AccountShell } from "@/features/profile/AccountShell";
@@ -42,6 +42,8 @@ const ICONS: Partial<Record<NotificationType, IconName>> = {
 };
 
 type LoadState = "loading" | "ready" | "error";
+type FilterKey = "all" | "unread";
+type ListSnapshot = { items: AppNotification[]; total: number; page: number };
 
 export function NotificationCenter() {
   const user = useAuthUser();
@@ -54,24 +56,35 @@ export function NotificationCenter() {
   const [state, setState] = useState<LoadState>("loading");
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Danh sách đã tải của từng bộ lọc: đổi tab hiện ngay dữ liệu cũ thay vì xóa trắng chờ API (gây nháy).
+  const cache = useRef<Partial<Record<FilterKey, ListSnapshot>>>({});
 
-  const apply = useCallback((nextPage: number, result: NotificationPage) => {
-    setItems((prev) => (nextPage === 1 ? result.items : [...prev, ...result.items]));
-    setTotal(result.total);
-    setUnread(result.unread);
-    setPage(nextPage);
-    setState("ready");
+  const show = useCallback((snapshot: ListSnapshot) => {
+    setItems(snapshot.items);
+    setTotal(snapshot.total);
+    setPage(snapshot.page);
   }, []);
+
+  const apply = useCallback((filter: FilterKey, nextPage: number, result: NotificationPage) => {
+    const previous = cache.current[filter]?.items ?? [];
+    const snapshot = { items: nextPage === 1 ? result.items : [...previous, ...result.items], total: result.total, page: nextPage };
+    cache.current[filter] = snapshot;
+    show(snapshot);
+    setUnread(result.unread);
+    setState("ready");
+  }, [show]);
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    const filter: FilterKey = unreadOnly ? "unread" : "all";
     listNotifications({ page: 1, limit: PAGE_SIZE, unread: unreadOnly })
       .then((result) => {
-        if (!cancelled) apply(1, result);
+        if (!cancelled) apply(filter, 1, result);
       })
       .catch(() => {
-        if (!cancelled) setState("error");
+        // Đang hiện dữ liệu (tạm) thì giữ nguyên, chỉ báo lỗi khi màn hình đang chờ.
+        if (!cancelled) setState((current) => (current === "loading" ? "error" : current));
       });
     return () => {
       cancelled = true;
@@ -81,7 +94,7 @@ export function NotificationCenter() {
   /** Tải trang tiếp theo (nút "Xem thêm"). */
   const loadMore = async () => {
     try {
-      apply(page + 1, await listNotifications({ page: page + 1, limit: PAGE_SIZE, unread: unreadOnly }));
+      apply(unreadOnly ? "unread" : "all", page + 1, await listNotifications({ page: page + 1, limit: PAGE_SIZE, unread: unreadOnly }));
     } catch {
       setState("error");
     }
@@ -89,8 +102,29 @@ export function NotificationCenter() {
 
   const changeFilter = (onlyUnread: boolean) => {
     if (onlyUnread === unreadOnly) return;
-    setState("loading");
+    const cached = cache.current[onlyUnread ? "unread" : "all"];
+    if (cached) {
+      show(cached);
+    } else if (onlyUnread) {
+      // "Chưa đọc" là tập con của "Tất cả": lọc ngay trên dữ liệu đang có, API trả về sẽ thay bằng bản đầy đủ.
+      const provisional = { items: items.filter((n) => !n.isRead), total: unread, page: 1 };
+      show(provisional);
+      cache.current.unread = provisional;
+      // Thông báo chưa đọc nằm ngoài trang đã tải: chưa có gì để hiện, chờ API như trước.
+      if (provisional.items.length === 0 && unread > 0) setState("loading");
+    } else {
+      setState("loading");
+    }
     setUnreadOnly(onlyUnread);
+  };
+
+  /** Cập nhật cả danh sách đang nhớ của hai bộ lọc sau khi đánh dấu đã đọc. */
+  const markReadInCache = (ids: string[] | "all") => {
+    const isTarget = (n: AppNotification) => ids === "all" || ids.includes(n.id);
+    const all = cache.current.all;
+    if (all) cache.current.all = { ...all, items: all.items.map((n) => (isTarget(n) ? { ...n, isRead: true } : n)) };
+    if (ids === "all") cache.current.unread = { items: [], total: 0, page: 1 };
+    else delete cache.current.unread;
   };
 
   const retry = () => {
@@ -116,6 +150,7 @@ export function NotificationCenter() {
     if (!item.isRead) {
       setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n)));
       setUnread((u) => Math.max(0, u - 1));
+      markReadInCache([item.id]);
       await markNotificationRead(item.id).catch(() => undefined);
     }
     if (item.link) router.push(item.link);
@@ -128,6 +163,7 @@ export function NotificationCenter() {
       setItems((prev) => (unreadOnly ? [] : prev.map((n) => ({ ...n, isRead: true }))));
       setUnread(0);
       if (unreadOnly) setTotal(0);
+      markReadInCache("all");
     } catch {
       setState("error");
     } finally {
