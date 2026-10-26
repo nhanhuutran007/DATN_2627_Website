@@ -6,6 +6,8 @@ export enum BehaviorEventType {
   VIEW = "view",
   FOLLOW = "follow",
   CONTRIBUTE = "contribute",
+  /** Bấm vào một dự án trong kết quả tìm kiếm. */
+  SEARCH = "search",
 }
 
 @Entity("behavior_events")

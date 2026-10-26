@@ -90,7 +90,8 @@ export function fetchCampaignPrediction(campaignId: string): Promise<AiPredictRe
   return api.get<AiPredictResult>(`/campaigns/${encodeURIComponent(campaignId)}/prediction`);
 }
 
-export type BehaviorEventType = "view" | "follow" | "contribute";
+/** "search" = bấm vào một dự án trong kết quả tìm kiếm. */
+export type BehaviorEventType = "view" | "follow" | "contribute" | "search";
 
 const trackedCampaigns = new Set<string>();
 
@@ -101,8 +102,11 @@ export async function trackBehaviorEvent(
   // POST /ai/events yêu cầu đăng nhập và chỉ ghi khi người dùng đã đồng ý
   // (server cũng tự bỏ qua nếu chưa đồng ý).
   if (!hasSession() || !getStoredUser()?.aiTrackingConsent) return;
-  if (eventType === "view" && trackedCampaigns.has(campaignId)) return;
-  trackedCampaigns.add(campaignId);
+  // Chỉ chống trùng lượt xem: đánh dấu cả loại khác thì lượt xem ngay sau đó (vd. bấm từ kết quả tìm kiếm) bị bỏ sót
+  if (eventType === "view") {
+    if (trackedCampaigns.has(campaignId)) return;
+    trackedCampaigns.add(campaignId);
+  }
   try {
     await api.post("/ai/events", { campaignId, eventType });
   } catch {

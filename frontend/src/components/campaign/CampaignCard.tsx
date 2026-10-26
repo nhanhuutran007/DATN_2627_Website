@@ -11,10 +11,12 @@ type CampaignCardProps = {
   campaign: Campaign;
   /** Hiện lý do gợi ý từ AI (chỉ khi có). */
   showAiReason?: boolean;
+  /** Gọi khi người dùng bấm mở dự án (vd. ghi hành vi "search" ở trang tìm kiếm). */
+  onOpen?: () => void;
 };
 
 /** Thẻ dự án: ảnh lớn kèm số lượt ủng hộ, tiêu đề, thanh tiến độ và số tiền đã nhận. */
-export function CampaignCard({ campaign, showAiReason = false }: CampaignCardProps) {
+export function CampaignCard({ campaign, showAiReason = false, onOpen }: CampaignCardProps) {
   const progress = campaignProgress(campaign);
   const cover = coverFor(campaign);
   const open = campaign.status === "Đang gây quỹ";
@@ -22,7 +24,7 @@ export function CampaignCard({ campaign, showAiReason = false }: CampaignCardPro
 
   return (
     <article className="c-card">
-      <Link className="c-card-media" href={href} tabIndex={-1} aria-hidden="true">
+      <Link className="c-card-media" href={href} tabIndex={-1} aria-hidden="true" onClick={onOpen}>
         <Image src={cover.src} alt="" fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 380px" unoptimized={!cover.illustrative} />
         {!open && <span className="c-card-status">{campaign.status}</span>}
         <span className="c-card-backers">
@@ -31,7 +33,7 @@ export function CampaignCard({ campaign, showAiReason = false }: CampaignCardPro
       </Link>
       <div className="c-card-body">
         <p className="c-card-cat">{campaign.category} · {campaign.location}</p>
-        <h3 className="c-card-title"><Link href={href}>{campaign.title}</Link></h3>
+        <h3 className="c-card-title"><Link href={href} onClick={onOpen}>{campaign.title}</Link></h3>
         {showAiReason && campaign.aiReason && (
           <p className="c-card-reason"><Icon name="sparkles" size={14} /> {campaign.aiReason}</p>
         )}

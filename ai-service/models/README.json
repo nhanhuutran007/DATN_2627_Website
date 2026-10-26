@@ -1,6 +1,6 @@
 {
   "model_version": "2026.09.1",
-  "trained_at": "2026-09-11T04:57:03+00:00",
+  "trained_at": "2026-10-26T15:17:57+00:00",
   "artifacts": {
     "success_model": "models/success_model.pkl",
     "success_metrics": "models/success_metrics.json",
@@ -26,9 +26,9 @@
   ],
   "dataset": {
     "rows": 1000,
-    "file": "data\\synthetic_campaigns.csv",
-    "sha256": "cebbf34a13c78381bfacdd0961f7c474a95db8d37aecc826eb5256b239fac69e",
-    "size_bytes": 96612
+    "file": "data/synthetic_campaigns.csv",
+    "sha256": "f6f35e8dd7e6f8691c607e518cf22855450d72d221c3656d35113bc4cd45933f",
+    "size_bytes": 95611
   },
   "success_metrics": {
     "best_model": "random_forest",
@@ -73,7 +73,7 @@
   },
   "fraud_metrics": {
     "contamination": 0.02,
-    "detection_rate": 0.975,
-    "false_positive_rate": 0.001
+    "detection_rate": 0.75,
+    "false_positive_rate": 0.0055
   }
 }

@@ -195,8 +195,17 @@ class FraudDetectorService:
         if model is None:
             return None
         try:
+            # Đặc trưng thiếu lấy trung bình tập huấn luyện (trung tính sau chuẩn hóa); điền 0
+            # sẽ khiến vd. new_account_days thiếu bị coi là "tài khoản 0 ngày tuổi" -> bất thường.
+            means = getattr(scaler, "mean_", None)
             vector = np.asarray(
-                [[float(features.get(name, 0.0)) for name in FRAUD_FEATURES]], dtype=float
+                [[
+                    value
+                    if (value := _as_finite(features.get(name))) is not None
+                    else (float(means[index]) if means is not None else 0.0)
+                    for index, name in enumerate(FRAUD_FEATURES)
+                ]],
+                dtype=float,
             )
             scaled = scaler.transform(vector)
             decision = float(np.asarray(model.decision_function(scaled))[0])

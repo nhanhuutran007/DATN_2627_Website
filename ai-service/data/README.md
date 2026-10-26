@@ -56,6 +56,10 @@ Cột: `contribution_count_1h, failed_payment_count, total_payment_count,
 device_shared_accounts, amount_z_score, ip_country_changes, new_account_days,
 profile_change_frequency, is_anomaly`.
 
+Mô hình chỉ huấn luyện trên 5 cột trong `FRAUD_FEATURES` (`app/services/catalog.py`):
+`device_shared_accounts`, `ip_country_changes`, `profile_change_frequency` giữ lại trong
+dataset để dùng sau, khi nền tảng thật sự thu thập được các tín hiệu này.
+
 Dữ liệu thật phải **anonymized**: không chứa tên, email, số thẻ, IP thô (che hoặc
 thay bằng giá trị gom cụm/quốc gia), chỉ giữ đặc trưng giao dịch.
 
