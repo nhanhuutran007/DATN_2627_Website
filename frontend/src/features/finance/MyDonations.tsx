@@ -1,9 +1,12 @@
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { ApiError, api } from "@/lib/api";
+import { ApiError } from "@/lib/api";
+import { imageByCategory } from "@/lib/api/campaigns";
 import { cancelDonation, type ApiDonation } from "@/lib/api/donations";
-import { formatVnd } from "@/lib/format";
+import { coverFor } from "@/lib/covers";
+import { formatVnd, paymentMethodLabel } from "@/lib/format";
 
 const STATUS_LABEL: Record<ApiDonation["status"], { label: string; tone: string }> = {
   completed: { label: "Đã xác nhận", tone: "tag-green" },
@@ -14,25 +17,29 @@ const STATUS_LABEL: Record<ApiDonation["status"], { label: string; tone: string 
   cancelled: { label: "Đã hủy", tone: "" },
 };
 
-type Donation = ApiDonation & { rewardTier?: { title: string } | null };
+export type MyDonation = ApiDonation & { rewardTier?: { title: string } | null };
 
 /** Số khoản hiện lúc đầu và thêm vào mỗi lần bấm "Xem thêm". */
 const PAGE_STEP = 10;
 
-/** Lịch sử ủng hộ của người dùng hiện tại (mới nhất trước), kèm link biên nhận. */
-export function MyDonations() {
-  const [items, setItems] = useState<Donation[]>([]);
+type MyDonationsProps = {
+  items: MyDonation[];
+  /** Gọi khi một khoản đổi trạng thái tại chỗ (vd. vừa hủy giao dịch chờ). */
+  onChange: (updated: MyDonation) => void;
+};
+
+/** Lịch sử ủng hộ của người dùng hiện tại (mới nhất trước), kèm ảnh dự án và link biên nhận. */
+export function MyDonations({ items, onChange }: MyDonationsProps) {
   const [visible, setVisible] = useState(PAGE_STEP);
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
 
-  const cancel = async (id: string) => {
-    setBusyId(id);
+  const cancel = async (donation: MyDonation) => {
+    setBusyId(donation.id);
     setActionError("");
     try {
-      const updated = await cancelDonation(id);
-      setItems((current) => current.map((item) => (item.id === id ? { ...item, status: updated.status } : item)));
+      const updated = await cancelDonation(donation.id);
+      onChange({ ...donation, status: updated.status });
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Không hủy được giao dịch, vui lòng thử lại.");
     } finally {
@@ -40,29 +47,10 @@ export function MyDonations() {
     }
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .get<Donation[]>("/donations/mine")
-      .then((list) => {
-        if (cancelled) return;
-        setItems(list);
-        setState("ready");
-      })
-      .catch(() => {
-        if (!cancelled) setState("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (state === "loading") return <p className="hint" role="status">Đang tải…</p>;
-  if (state === "error") return <p className="form-error" role="alert">Không tải được lịch sử ủng hộ.</p>;
   if (items.length === 0) {
     return (
-      <div className="empty-box">
-        <p>Bạn chưa ủng hộ chiến dịch nào.</p>
+      <div className="activity-empty">
+        <p>Các khoản bạn ủng hộ sẽ hiện ở đây, kèm biên nhận để lưu hoặc in.</p>
         <Link className="button button-outline" href="/du-an">Khám phá dự án</Link>
       </div>
     );
@@ -70,53 +58,60 @@ export function MyDonations() {
 
   return (
     <>
-    {actionError && <p className="form-error" role="alert">{actionError}</p>}
-    <div className="table-wrap">
-      <table className="data-table">
-        <thead>
-          <tr><th scope="col">Chiến dịch</th><th scope="col" className="num">Số tiền</th><th scope="col">Ngày</th><th scope="col">Trạng thái</th><th scope="col"><span className="sr-only">Biên nhận</span></th></tr>
-        </thead>
-        <tbody>
-          {items.slice(0, visible).map((d) => {
-            const status = STATUS_LABEL[d.status];
-            const hasReceipt = d.status === "completed" || d.status === "refunded";
-            return (
-              <tr key={d.id}>
-                <td>
-                  {d.campaign ? <Link href={`/du-an/${d.campaign.id}`}>{d.campaign.title}</Link> : "—"}
-                  {d.rewardTier && <small className="hint"> · Quà: {d.rewardTier.title}</small>}
-                </td>
-                <td className="num">{formatVnd(Number(d.amount))}</td>
-                <td className="nowrap">{(d.completedAt ?? d.createdAt) ? new Date((d.completedAt ?? d.createdAt) as string).toLocaleDateString("vi-VN") : "—"}</td>
-                <td><span className={`tag ${status.tone}`}>{status.label}</span></td>
-                <td>
+      {actionError && <p className="form-error" role="alert">{actionError}</p>}
+      <ul className="activity-list">
+        {items.slice(0, visible).map((d) => {
+          const status = STATUS_LABEL[d.status];
+          const hasReceipt = d.status === "completed" || d.status === "refunded";
+          const date = d.completedAt ?? d.createdAt;
+          const cover = d.campaign
+            ? coverFor({ image: imageByCategory(d.campaign.category ?? ""), imageUrl: d.campaign.imageUrl ?? undefined, title: d.campaign.title })
+            : null;
+          return (
+            <li className="activity-item" key={d.id}>
+              <span className="activity-thumb" aria-hidden="true">
+                {cover && <Image src={cover.src} alt="" fill sizes="72px" unoptimized={!cover.illustrative} />}
+              </span>
+              <div className="activity-body">
+                <p className="activity-title">
+                  {d.campaign ? <Link href={`/du-an/${d.campaign.id}`}>{d.campaign.title}</Link> : "Chiến dịch không còn tồn tại"}
+                </p>
+                <p className="activity-meta">
+                  {date ? new Date(date).toLocaleDateString("vi-VN") : "—"}
+                  {d.paymentMethod && <> · {paymentMethodLabel(d.paymentMethod)}</>}
+                  {d.rewardTier && <> · Quà: {d.rewardTier.title}</>}
+                </p>
+                <div className="activity-links">
                   {hasReceipt && <Link href={`/bien-nhan/${d.id}`}>Biên nhận</Link>}
                   {d.status === "pending" && (
-                    <button className="link-button" type="button" disabled={busyId === d.id} onClick={() => cancel(d.id)}>
-                      Hủy<span className="sr-only"> giao dịch {formatVnd(Number(d.amount))}</span>
+                    <button className="link-button" type="button" disabled={busyId === d.id} onClick={() => cancel(d)}>
+                      Hủy giao dịch<span className="sr-only"> {formatVnd(Number(d.amount))}</span>
                     </button>
                   )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-    {items.length > PAGE_STEP && (
-      <div className="notification-more my-donations-more">
-        <p className="hint" role="status">Đang hiển thị {Math.min(visible, items.length)}/{items.length} khoản ủng hộ</p>
-        {visible < items.length ? (
-          <button className="button button-outline button-sm" type="button" onClick={() => setVisible((n) => n + PAGE_STEP)}>
-            Xem thêm {Math.min(PAGE_STEP, items.length - visible)} khoản
-          </button>
-        ) : (
-          <button className="button button-outline button-sm" type="button" onClick={() => setVisible(PAGE_STEP)}>
-            Thu gọn
-          </button>
-        )}
-      </div>
-    )}
+                </div>
+              </div>
+              <div className="activity-side">
+                <strong className="num">{formatVnd(Number(d.amount))}</strong>
+                <span className={`tag ${status.tone}`}>{status.label}</span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      {items.length > PAGE_STEP && (
+        <div className="activity-more">
+          <p className="hint" role="status">Đang hiển thị {Math.min(visible, items.length)}/{items.length} khoản ủng hộ</p>
+          {visible < items.length ? (
+            <button className="button button-outline button-sm" type="button" onClick={() => setVisible((n) => n + PAGE_STEP)}>
+              Xem thêm {Math.min(PAGE_STEP, items.length - visible)} khoản
+            </button>
+          ) : (
+            <button className="button button-outline button-sm" type="button" onClick={() => setVisible(PAGE_STEP)}>
+              Thu gọn
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 }

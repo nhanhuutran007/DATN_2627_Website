@@ -22,7 +22,7 @@ const COLUMNS: Array<{ id: string; title: string; links: FooterLink[] }> = [
     links: [
       { href: "/tao-chien-dich", label: "Tạo chiến dịch" },
       { href: "/bat-dau-gay-quy", label: "Cách bắt đầu gây quỹ" },
-      { href: "/dashboard", label: "Quản lý chiến dịch" },
+      { href: "/dashboard", label: "Trang của tôi" },
     ],
   },
   {

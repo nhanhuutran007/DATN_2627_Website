@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
-import { OwnerDashboard } from "@/features/dashboard/OwnerDashboard";
+import { AccountDashboard } from "@/features/dashboard/AccountDashboard";
 
 export const metadata: Metadata = {
-  title: "Quản lý chiến dịch",
+  title: "Trang của tôi",
   robots: { index: false },
 };
 
 export default function DashboardPage() {
-  return <OwnerDashboard />;
+  return <AccountDashboard />;
 }
