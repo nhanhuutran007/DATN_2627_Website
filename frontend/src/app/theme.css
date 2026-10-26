@@ -7976,7 +7976,14 @@ html:has(dialog:modal) .admin-sidebar {
   display: grid;
   place-items: center;
   background: var(--white);
-  animation: route-transition-in 0.15s ease-out;
+  /* Hiện đặc ngay (không fade-in) để trang mới không lộ ra trước lớp phủ; chỉ mờ dần lúc ẩn đi. */
+  opacity: 1;
+  transition: opacity 0.25s ease-out;
+}
+
+.route-transition.is-leaving {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .loading-dots {
@@ -8011,14 +8018,11 @@ html:has(dialog:modal) .admin-sidebar {
   }
 }
 
-@keyframes route-transition-in {
-  from {
-    opacity: 0;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .route-transition,
+  .route-transition {
+    transition: none;
+  }
+
   .loading-dots i {
     animation: none;
   }
