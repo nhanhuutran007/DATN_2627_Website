@@ -22,6 +22,9 @@ export type ApiDonation = {
   campaign?: {
     id: string;
     title: string;
+    /** Có khi API trả kèm chiến dịch đầy đủ (vd. `/donations/mine`) để hiện ảnh bìa. */
+    category?: string;
+    imageUrl?: string | null;
   } | null;
   user?: {
     id: string;
