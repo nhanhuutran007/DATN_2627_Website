@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, MoreThan, Repository } from "typeorm";
+import { Between, In, MoreThan, Repository } from "typeorm";
 
 import { AiGateway } from "../../integrations/ai/ai.gateway";
 import type {
@@ -18,6 +18,7 @@ import type {
   CampaignFeature,
 } from "../../integrations/ai/ai.types";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
+import { CampaignViewDaily } from "../campaigns/entities/campaign-view-daily.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import {
@@ -48,9 +49,16 @@ const EVENT_TYPE_MAP: Record<BehaviorEventType, AiUserEvent["eventType"]> = {
   [BehaviorEventType.VIEW]: "VIEW",
   [BehaviorEventType.FOLLOW]: "FOLLOW",
   [BehaviorEventType.CONTRIBUTE]: "CONTRIBUTE",
+  [BehaviorEventType.SEARCH]: "SEARCH",
 };
 
 const DAY_MS = 86_400_000;
+/** "Ban đầu" trong đặc trưng dự đoán = 7 ngày đầu gây quỹ (tổng hiện tại sẽ làm mô hình tự trả lời). */
+const EARLY_WINDOW_DAYS = 7;
+
+function utcDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
 
 export type RecommendResult = {
   available: boolean;
@@ -86,6 +94,8 @@ export class AiService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(BehaviorEvent)
     private readonly eventRepo: Repository<BehaviorEvent>,
+    @InjectRepository(CampaignViewDaily)
+    private readonly viewDailyRepo: Repository<CampaignViewDaily>,
     @Inject("AiGateway")
     private readonly aiGateway: AiGateway,
   ) {}
@@ -293,27 +303,43 @@ export class AiService {
 
   private async buildPredictFeatures(campaign: Campaign): Promise<AiPredictFeatures> {
     const milestones = campaign.milestones ?? [];
-    const ownerCampaignCount = await this.campaignRepo.count({
-      where: { ownerId: campaign.ownerId },
-    });
+    const start = new Date(campaign.startDate);
+    const earlyEnd = new Date(start.getTime() + EARLY_WINDOW_DAYS * DAY_MS);
+    const [ownerCampaignCount, earlyBackers, earlyViewDays] = await Promise.all([
+      this.campaignRepo.count({ where: { ownerId: campaign.ownerId } }),
+      this.donationRepo.count({
+        where: { campaignId: campaign.id, status: DonationStatus.COMPLETED, createdAt: Between(start, earlyEnd) },
+      }),
+      this.viewDailyRepo.find({
+        select: { views: true },
+        where: { campaignId: campaign.id, viewDate: Between(utcDay(start), utcDay(new Date(earlyEnd.getTime() - 1))) },
+      }),
+    ]);
+
+    // Mô tả là HTML từ trình soạn thảo: đếm chữ trên văn bản thuần, ảnh = ảnh bìa + ảnh chèn trong mô tả
+    const html = campaign.description ?? "";
+    const text = html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+    const inlineImages = html.match(/<img\b/gi)?.length ?? 0;
 
     return {
       categoryId: CATEGORY_IDS[campaign.category] ?? 0,
       goalAmount: Number(campaign.goalAmount) || 0,
       durationDays: this.daysBetween(campaign.startDate, campaign.endDate),
       profileScore: this.profileScore(campaign),
-      contentLength: campaign.description?.length ?? 0,
-      imageCount: campaign.imageUrl ? 1 : 0,
+      contentLength: text.length,
+      imageCount: (campaign.imageUrl ? 1 : 0) + inlineImages,
       hasVideo: Boolean(campaign.videoUrl),
-      storyWordCount: (campaign.description ?? "").split(/\s+/).filter(Boolean).length,
+      storyWordCount: text ? text.split(" ").length : 0,
       ownerCampaignCount,
       ownerCredentialApproved: Boolean(campaign.owner?.emailVerified),
       hasBudgetReport: milestones.some((milestone) => milestone.budget != null),
-      earlyViews: campaign.viewCount,
-      earlyBackers: campaign.backerCount,
+      earlyViews: earlyViewDays.reduce((sum, day) => sum + day.views, 0),
+      earlyBackers,
     };
   }
 
+  // Chỉ gửi đặc trưng hệ thống thực sự đo được; thiết bị dùng chung, đổi quốc gia IP và đổi hồ sơ
+  // chưa được thu thập nên không gửi (gửi 0 sẽ khiến mô hình chấm trên dữ liệu giả).
   private async buildCampaignFraudFeatures(campaignId: string): Promise<Record<string, number>> {
     const lastHour = new Date(Date.now() - 60 * 60 * 1000);
 
@@ -341,9 +367,7 @@ export class AiService {
       contribution_count_1h: recent,
       failed_payment_count: failed,
       total_payment_count: total,
-      device_shared_accounts: 0,
       amount_z_score: this.amountZScore(amounts),
-      ip_country_changes: 0,
       ...(ownerCreatedAt
         ? {
             new_account_days: Math.max(
@@ -352,7 +376,6 @@ export class AiService {
             ),
           }
         : {}),
-      profile_change_frequency: 0,
     };
   }
 
@@ -374,14 +397,11 @@ export class AiService {
       contribution_count_1h: recent,
       failed_payment_count: failed,
       total_payment_count: total,
-      device_shared_accounts: 0,
       amount_z_score: 0,
-      ip_country_changes: 0,
       new_account_days: Math.max(
         0,
         Math.floor((Date.now() - new Date(user.createdAt).getTime()) / DAY_MS),
       ),
-      profile_change_frequency: 0,
     };
   }
 

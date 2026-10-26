@@ -30,6 +30,11 @@ ai-service/models/*.joblib
 !ai-service/data/processed/.gitkeep
 !ai-service/artifacts/README.md
 !ai-service/models/README.md
+# Mô hình dùng khi chạy được commit để máy nào clone về cũng chấm bằng AI (không lùi về luật);
+# tạo lại bằng `python -m training.train` với đúng phiên bản thư viện ghim trong requirements.txt
+!ai-service/models/fraud_isolation.pkl
+!ai-service/models/fraud_scaler.pkl
+!ai-service/models/success_model.pkl
 
 # Terraform (state có thể chứa mật khẩu/secret; lock file .terraform.lock.hcl vẫn được commit)
 **/.terraform/

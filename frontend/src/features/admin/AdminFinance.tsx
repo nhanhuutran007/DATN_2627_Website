@@ -83,7 +83,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
   const [refundTotal, setRefundTotal] = useState(0);
   const [reportPage, setReportPage] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const [from, setFrom] = useState(() => isoDay(new Date(Date.now() - 30 * 86_400_000)));
   const [to, setTo] = useState(() => isoDay(new Date()));
@@ -94,7 +94,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
     const minAmount = amountParam(filters.minAmount);
     const maxAmount = amountParam(filters.maxAmount);
     if (minAmount !== undefined && maxAmount !== undefined && minAmount > maxAmount) {
-      setNotice("Số tiền \"từ\" không được lớn hơn số tiền \"đến\"");
+      setNotice({ tone: "error", text: "Số tiền \"từ\" không được lớn hơn số tiền \"đến\"" });
       return;
     }
     const search = { q: filters.q.trim() || undefined, minAmount, maxAmount };
@@ -112,7 +112,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
       setRefundPage(page);
       setNotice(null);
     } catch (err) {
-      setNotice(errorText(err, "Không tải được yêu cầu hoàn tiền"));
+      setNotice({ tone: "error", text: errorText(err, "Không tải được yêu cầu hoàn tiền") });
     }
   }, []);
 
@@ -120,7 +120,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
     let cancelled = false;
     fetchAdminRefunds("pending", { limit: PAGE_SIZE })
       .then((r) => { if (!cancelled) { setRefunds(r.items); setRefundTotal(r.total); } })
-      .catch((err) => { if (!cancelled) setNotice(errorText(err, "Không tải được yêu cầu hoàn tiền")); });
+      .catch((err) => { if (!cancelled) setNotice({ tone: "error", text: errorText(err, "Không tải được yêu cầu hoàn tiền") }); });
     fetchReconciliation({})
       .then((r) => { if (!cancelled) setReport(r); })
       .catch((err) => { if (!cancelled) setReportError(errorText(err, "Không tải được đối soát")); });
@@ -161,10 +161,10 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
     try {
       await approveRefund(request.id, result.notes, { transferReference: result.transferReference, proofMediaId: result.proofMediaId });
       await loadRefunds(refundFilter, refundPage);
-      setNotice(`Đã ghi nhận hoàn ${amount} qua chuyển khoản (mã ${result.transferReference}).`);
+      setNotice({ tone: "ok", text: `Đã ghi nhận hoàn ${amount} qua chuyển khoản (mã ${result.transferReference}).` });
       onChanged?.();
     } catch (err) {
-      setNotice(errorText(err, "Không xử lý được yêu cầu"));
+      setNotice({ tone: "error", text: errorText(err, "Không xử lý được yêu cầu") });
     } finally {
       setBusy(null);
     }
@@ -176,7 +176,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
     try {
       await downloadRefundsCsv(refundFilter.status || undefined);
     } catch (err) {
-      setNotice(errorText(err, "Không xuất được CSV"));
+      setNotice({ tone: "error", text: errorText(err, "Không xuất được CSV") });
     } finally {
       setBusy(null);
     }
@@ -209,10 +209,10 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
       if (approve) await approveRefund(request.id, input);
       else await rejectRefund(request.id, input);
       await loadRefunds(refundFilter, refundPage);
-      setNotice(approve ? `Đã hoàn ${amount} qua cổng thanh toán sandbox.` : "Đã từ chối yêu cầu hoàn tiền.");
+      setNotice({ tone: "ok", text: approve ? `Đã hoàn ${amount} qua cổng thanh toán sandbox.` : "Đã từ chối yêu cầu hoàn tiền." });
       onChanged?.();
     } catch (err) {
-      setNotice(errorText(err, "Không xử lý được yêu cầu"));
+      setNotice({ tone: "error", text: errorText(err, "Không xử lý được yêu cầu") });
     } finally {
       setBusy(null);
     }
@@ -333,7 +333,11 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
             </button>
           )}
         </form>
-        {notice && <p className="admin-notice" role="status">{notice}</p>}
+        {notice && (
+          <p className={notice.tone === "ok" ? "admin-notice" : "admin-notice error"} role={notice.tone === "ok" ? "status" : "alert"}>
+            {notice.text}
+          </p>
+        )}
         <div className="risk-list">
           {refunds.length === 0 ? (
             <article>

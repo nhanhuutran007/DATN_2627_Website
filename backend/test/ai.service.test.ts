@@ -4,6 +4,7 @@ import { beforeEach, describe, it } from "node:test";
 import type { AiGateway } from "../src/integrations/ai/ai.gateway";
 import type {
   AiFraudResponse,
+  AiPredictRequest,
   AiPredictResponse,
   AiRecommendRequest,
   AiRecommendResponse,
@@ -81,7 +82,9 @@ class FakeAiGateway implements AiGateway {
     };
   }
 
-  async predict(): Promise<AiPredictResponse> {
+  lastPredict: AiPredictRequest | null = null;
+  async predict(request: AiPredictRequest): Promise<AiPredictResponse> {
+    this.lastPredict = request;
     if (this.unavailable) throw new Error("down");
     return {
       probability: 0.72,
@@ -131,7 +134,10 @@ function createRepos() {
       { campaignId: CAMPAIGN_ID, eventType: BehaviorEventType.VIEW, category: "Giáo dục" },
     ],
   };
-  return { campaignRepo, donationRepo, userRepo, eventRepo };
+  const viewDailyRepo: any = {
+    find: async () => [{ views: 40 }, { views: 25 }],
+  };
+  return { campaignRepo, donationRepo, userRepo, eventRepo, viewDailyRepo };
 }
 
 describe("AiService", () => {
@@ -147,6 +153,7 @@ describe("AiService", () => {
       repos.donationRepo,
       repos.userRepo,
       repos.eventRepo,
+      repos.viewDailyRepo,
       gateway,
     );
   });
@@ -197,6 +204,26 @@ describe("AiService", () => {
         equal(result.data.probability, 0.72);
         equal(result.data.prediction, "LIKELY");
       }
+    });
+
+    it("should use first-week activity and plain-text story metrics as features", async () => {
+      repos.campaignRepo.findOne = async () =>
+        makeCampaign({
+          description: '<p>Xin chào&nbsp;cộng đồng</p><img src="a.png"><p><img src="b.png">Cảm ơn</p>',
+          backerCount: 99,
+          viewCount: 5000,
+        });
+      repos.donationRepo.count = async (opts: any) => (opts?.where?.createdAt ? 4 : 0);
+
+      await service.predict({ campaignId: CAMPAIGN_ID });
+
+      const features = gateway.lastPredict?.features;
+      ok(features);
+      equal(features.earlyViews, 65);
+      equal(features.earlyBackers, 4);
+      equal(features.imageCount, 3);
+      equal(features.storyWordCount, 6);
+      equal(features.contentLength, "Xin chào cộng đồng Cảm ơn".length);
     });
 
     it("should report unavailable when the AI service is down", async () => {

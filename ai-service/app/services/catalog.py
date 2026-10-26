@@ -34,13 +34,13 @@ SUCCESS_FEATURES: list[str] = [
     "early_backers",
 ]
 
+# Đầu vào của mô hình IsolationForest: chỉ các đặc trưng nền tảng đo được thật.
+# device_shared_accounts / ip_country_changes / profile_change_frequency vẫn có trong
+# dataset và luật nghiệp vụ (dùng khi có dữ liệu) nhưng không đưa vào mô hình.
 FRAUD_FEATURES: list[str] = [
     "contribution_count_1h",
     "failed_payment_count",
     "total_payment_count",
-    "device_shared_accounts",
     "amount_z_score",
-    "ip_country_changes",
     "new_account_days",
-    "profile_change_frequency",
 ]

@@ -1,17 +1,26 @@
 # Models
 
-Đặt model đã duyệt tại thư mục này khi triển khai. File `.pkl` và `.joblib` bị bỏ qua mặc định để tránh vô tình commit artifact lớn hoặc không rõ nguồn gốc.
+Ba mô hình dùng khi chạy được commit vào git để máy nào clone về cũng chấm bằng AI:
 
-Mỗi model nên có metadata cùng tên, ví dụ `success_model.metadata.json`, chứa tối thiểu:
+| File | Dùng cho |
+|------|----------|
+| `fraud_isolation.pkl` + `fraud_scaler.pkl` | Phát hiện rủi ro (IsolationForest + StandardScaler) |
+| `success_model.pkl` | Dự đoán khả năng thành công (mô hình có ROC-AUC tốt nhất) |
 
-```json
-{
-  "model_version": "success-2026-09-05.1",
-  "feature_schema_version": "1.0.0",
-  "trained_at": "2026-09-05T00:00:00Z"
-}
+Các `.pkl` khác (vd. `success_lr.pkl`, `success_rf.pkl`) là sản phẩm phụ khi huấn luyện và vẫn bị bỏ qua.
+Thiếu file mô hình thì dịch vụ không lỗi mà lùi về luật/công thức dự phòng (`fallback: true`).
+
+## Tạo lại
+
+Từ thư mục `ai-service`, trong môi trường có **đúng phiên bản thư viện ghim trong `requirements.txt`**
+(khác phiên bản thì `joblib.load` có thể lỗi):
+
+```bash
+python -m training.train
 ```
 
-Chỉ nạp model do dự án tạo và kiểm soát. Không dùng `joblib.load` hoặc `pickle.load` với file do người dùng tải lên.
+Dữ liệu tổng hợp sinh với seed cố định nên kết quả lặp lại được. Số liệu đánh giá được ghi vào
+`fraud_metrics.json`, `success_metrics.json` và `README.json`. Sau khi thay mô hình, khởi động lại
+AI service (mô hình được nạp một lần và giữ trong bộ nhớ).
 
-Các thư viện `joblib`, `scikit-learn`, `numpy` và `pandas` chưa nằm trong bộ cài mặc định vì scaffold chưa có model. Hãy thêm đúng phiên bản đã dùng khi huấn luyện vào `requirements.txt` trước khi bật `AI_LOAD_MODEL=true`.
+Chỉ nạp mô hình do dự án tạo và kiểm soát. Không dùng `joblib.load` hoặc `pickle.load` với file do người dùng tải lên.

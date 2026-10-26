@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { Icon } from "@/components/ui/Icon";
+import { trackBehaviorEvent } from "@/lib/api/ai";
 import {
   apiCampaignToView,
   fetchCampaigns,
@@ -257,7 +258,14 @@ export function CampaignExplorer({ initialQuery = "", initialCategory = "" }: Ca
         </div>
       ) : (
         <div className={`card-grid search-grid${loading ? " is-loading" : ""}`} aria-busy={loading}>
-          {items.map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
+          {items.map((campaign) => (
+            <CampaignCard
+              campaign={campaign}
+              key={campaign.slug}
+              // Chỉ khi đang tìm theo từ khóa: bấm vào kết quả là tín hiệu "search" cho gợi ý AI
+              onOpen={text.q ? () => void trackBehaviorEvent(campaign.slug, "search") : undefined}
+            />
+          ))}
         </div>
       )}
 

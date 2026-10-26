@@ -375,8 +375,12 @@ export function AdminDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // Kết quả thao tác: thành công hay thất bại hiển thị khác nhau; `error` chỉ dành cho lỗi tải dữ liệu
+  const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const showNotice = (text: string) => setNotice({ tone: "ok", text });
+  const showActionError = (err: unknown, fallback: string) =>
+    setNotice({ tone: "error", text: err instanceof Error ? err.message : fallback });
 
   // Thông báo kết quả thao tác tự tắt sau vài giây và không mang sang mục khác
   useEffect(() => {
@@ -586,11 +590,11 @@ export function AdminDashboard() {
     try {
       await setCampaignFeatured(campaign.id, next);
       await loadCampaigns(campaignFilter, campaignPaging.page);
-      setNotice(next
+      showNotice(next
         ? `Đã đưa "${campaign.title}" vào mục Dự án nổi bật ở trang chủ.`
         : `Đã bỏ "${campaign.title}" khỏi mục Dự án nổi bật.`);
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Không cập nhật được mục nổi bật");
+      showActionError(err, "Không cập nhật được mục nổi bật");
     } finally {
       setBusy(null);
     }
@@ -646,9 +650,9 @@ export function AdminDashboard() {
         loadCampaigns(campaignFilter, campaignPaging.page),
         reloadOverview(),
       ]);
-      setNotice(`Đã cập nhật trạng thái chiến dịch "${campaign.title}".`);
+      showNotice(`Đã cập nhật trạng thái chiến dịch "${campaign.title}".`);
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Không cập nhật được chiến dịch");
+      showActionError(err, "Không cập nhật được chiến dịch");
     } finally {
       setBusy(null);
     }
@@ -688,13 +692,13 @@ export function AdminDashboard() {
     try {
       await setUserStatus(adminUser.id, next, reason);
       await Promise.all([loadUsers(userFilter, userPaging.page), reloadOverview()]);
-      setNotice(
+      showNotice(
         next === "banned"
           ? `Đã khóa tài khoản ${adminUser.name}.`
           : `Đã mở khóa tài khoản ${adminUser.name}.`,
       );
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Không cập nhật được tài khoản");
+      showActionError(err, "Không cập nhật được tài khoản");
     } finally {
       setBusy(null);
     }
@@ -732,13 +736,13 @@ export function AdminDashboard() {
     try {
       const result = await generateRiskWarnings();
       await Promise.all([loadRisks(riskFilter, riskPaging.page), reloadOverview()]);
-      setNotice(
+      showNotice(
         result.aiAvailable
           ? `Đã quét ${result.scanned} chiến dịch, phát hiện ${result.flagged} cảnh báo (AI service khả dụng).`
           : `Đã quét ${result.scanned} chiến dịch bằng luật dự phòng (AI service không khả dụng), phát hiện ${result.flagged} cảnh báo.`,
       );
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Không quét được cảnh báo");
+      showActionError(err, "Không quét được cảnh báo");
     } finally {
       setBusy(null);
     }
@@ -768,13 +772,13 @@ export function AdminDashboard() {
     try {
       await setRiskStatus(alert.id, status, result.value);
       await Promise.all([loadRisks(riskFilter, riskPaging.page), reloadOverview()]);
-      setNotice(
+      showNotice(
         status === "resolved"
           ? `Đã xác nhận cảnh báo "${alert.entityName}".`
           : `Đã bỏ qua cảnh báo "${alert.entityName}".`,
       );
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Không cập nhật được cảnh báo");
+      showActionError(err, "Không cập nhật được cảnh báo");
     } finally {
       setBusy(null);
     }
@@ -851,7 +855,7 @@ export function AdminDashboard() {
       if (hideReportedComment) reloads.push(loadComments(commentFilter, commentPaging.page));
       if (pauseCampaign) reloads.push(loadCampaigns(campaignFilter, campaignPaging.page), reloadOverview());
       await Promise.all(reloads);
-      setNotice(
+      showNotice(
         status === "reviewing"
           ? `Đã chuyển báo cáo về "${title}" sang đang xem xét.`
           : status === "resolved"
@@ -859,7 +863,7 @@ export function AdminDashboard() {
             : `Đã bỏ qua báo cáo về "${title}".`,
       );
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Không cập nhật được báo cáo");
+      showActionError(err, "Không cập nhật được báo cáo");
     } finally {
       setBusy(null);
     }
@@ -872,16 +876,16 @@ export function AdminDashboard() {
       const result = await syncSepayDonation(donation.id);
       if (result.applied) {
         await Promise.all([loadDonations(donationFilter, donationPaging.page), reloadOverview()]);
-        setNotice(`SePay xác nhận đã thu ${money(donation.amount)} — đã ghi nhận khoản ủng hộ.`);
+        showNotice(`SePay xác nhận đã thu ${money(donation.amount)} — đã ghi nhận khoản ủng hộ.`);
       } else {
-        setNotice(
+        showNotice(
           result.sepayStatus
             ? `SePay báo trạng thái ${result.sepayStatus}: chưa thu tiền hoặc số tiền không khớp, không thay đổi gì.`
             : "SePay không có đơn này hoặc giao dịch không cần đối soát.",
         );
       }
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Không đối soát được với SePay");
+      showActionError(err, "Không đối soát được với SePay");
     } finally {
       setBusy(null);
     }
@@ -906,9 +910,9 @@ export function AdminDashboard() {
           proofMediaId: manual.proofMediaId,
         });
         await Promise.all([loadDonations(donationFilter, donationPaging.page), reloadOverview()]);
-        setNotice(`Đã ghi nhận hoàn ${money(donation.amount)} qua chuyển khoản (mã ${manual.transferReference}).`);
+        showNotice(`Đã ghi nhận hoàn ${money(donation.amount)} qua chuyển khoản (mã ${manual.transferReference}).`);
       } catch (err) {
-        setNotice(err instanceof Error ? err.message : "Không hoàn được giao dịch");
+        showActionError(err, "Không hoàn được giao dịch");
       } finally {
         setBusy(null);
       }
@@ -935,9 +939,9 @@ export function AdminDashboard() {
     try {
       await refundDonationDirectly(donation.id, input);
       await Promise.all([loadDonations(donationFilter, donationPaging.page), reloadOverview()]);
-      setNotice(`Đã hoàn ${money(donation.amount)} qua cổng thanh toán sandbox.`);
+      showNotice(`Đã hoàn ${money(donation.amount)} qua cổng thanh toán sandbox.`);
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Không hoàn được giao dịch");
+      showActionError(err, "Không hoàn được giao dịch");
     } finally {
       setBusy(null);
     }
@@ -957,8 +961,9 @@ export function AdminDashboard() {
         }),
         page, setComments, setCommentPaging,
       );
+      setError(null);
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Không tải được bình luận");
+      setError(err instanceof Error ? err.message : "Không tải được bình luận");
     }
   }
 
@@ -989,10 +994,10 @@ export function AdminDashboard() {
     try {
       if (hiding) await hideComment(comment.id, reason);
       else await unhideComment(comment.id);
-      await loadComments(commentFilter, commentPaging.page);
-      setNotice(hiding ? "Đã ẩn bình luận và thông báo cho tác giả." : "Đã hiện lại bình luận.");
+      await Promise.all([loadComments(commentFilter, commentPaging.page), refreshNavCounts()]);
+      showNotice(hiding ? "Đã ẩn bình luận và thông báo cho tác giả." : "Đã hiện lại bình luận.");
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : "Không cập nhật được bình luận");
+      showActionError(err, "Không cập nhật được bình luận");
     } finally {
       setBusy(null);
     }
@@ -1272,9 +1277,12 @@ export function AdminDashboard() {
               </button>
             </div>
           )}
-          {notice && !error && (
-            <div className="admin-notice" role="status">
-              <Icon name="check" size={16} /> <span>{notice}</span>
+          {notice && (
+            <div
+              className={notice.tone === "error" ? "admin-notice error" : "admin-notice"}
+              role={notice.tone === "error" ? "alert" : "status"}
+            >
+              <Icon name={notice.tone === "error" ? "bell" : "check"} size={16} /> <span>{notice.text}</span>
               <button className="admin-notice-close" type="button" aria-label="Đóng thông báo" onClick={() => setNotice(null)}>
                 <Icon name="x" size={16} />
               </button>
@@ -1588,8 +1596,8 @@ export function AdminDashboard() {
                 onChange={(event) => applyRiskFilters({ ...riskDraft, method: event.target.value as RiskFilters["method"] })}
               >
                 <option value="">Mọi phương pháp</option>
-                <option value="ai">Chấm điểm bằng AI</option>
-                <option value="rule">Luật dự phòng</option>
+                <option value="ai">Luật + mô hình AI (IsolationForest)</option>
+                <option value="rule">Chỉ luật (dự phòng)</option>
               </select>
               <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
               {(riskFilter.q || riskFilter.level || riskFilter.entityType || riskFilter.method) && (
@@ -1619,7 +1627,7 @@ export function AdminDashboard() {
                           <button className="link-inline" type="button" title="Xem thông tin tài khoản" onClick={() => setViewingUserId(alert.entityId)}>{alert.entityName}</button>
                         )}
                       </h3>
-                      <p>{alert.entityId.slice(0, 8).toUpperCase()} · {riskEntityLabel(alert)} · Điểm rủi ro <b>{alert.score.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> · {alert.method === "ai" ? "Chấm điểm bằng AI" : "Cảnh báo bằng luật dự phòng"}</p>
+                      <p>{alert.entityId.slice(0, 8).toUpperCase()} · {riskEntityLabel(alert)} · Điểm rủi ro <b>{alert.score.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> · {alert.method === "ai" ? "Chấm điểm bằng luật + mô hình IsolationForest" : "Chỉ chấm bằng luật (mô hình AI không khả dụng)"}</p>
                       <small><b>Nguyên nhân:</b> {riskReasonSummary(alert)}</small>
                       <small><b>Bằng chứng:</b> {evidenceSummary(alert.evidences)}</small>
                     </div>
