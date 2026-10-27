@@ -66,14 +66,18 @@ HEURISTIC_TERMS: list[tuple[str, float, float, str]] = [
 ]
 
 
-def _read_json(path: Path) -> dict | None:
+def _read_json_value(path: Path) -> object | None:
     if not path.is_file():
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else None
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
+
+
+def _read_json(path: Path) -> dict | None:
+    data = _read_json_value(path)
+    return data if isinstance(data, dict) else None
 
 
 @lru_cache(maxsize=8)
@@ -92,7 +96,8 @@ def _load_model_artifacts(
         return None, None, None
 
     features: list[str] | None = None
-    features_raw = _read_json(Path(features_path_str))
+    # success_features.json là một mảng tên đặc trưng theo đúng thứ tự lúc huấn luyện
+    features_raw = _read_json_value(Path(features_path_str))
     if isinstance(features_raw, list):
         features = [str(item) for item in features_raw if isinstance(item, str)]
 

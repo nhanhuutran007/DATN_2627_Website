@@ -18,8 +18,11 @@ class Settings:
     success_metrics_path: Path
     success_features_path: Path
     recommender_index_path: Path
+    category_similarity_path: Path
     fraud_model_path: Path
     fraud_scaler_path: Path
+    fraud_classifier_path: Path
+    fraud_reference_path: Path
     api_key: str | None
 
 
@@ -36,7 +39,16 @@ settings = Settings(
     recommender_index_path=Path(
         os.getenv("AI_RECOMMENDER_INDEX_PATH", "data/synthetic_campaigns.csv")
     ),
+    category_similarity_path=Path(
+        os.getenv("AI_CATEGORY_SIMILARITY_PATH", "models/category_similarity.json")
+    ),
     fraud_model_path=Path(os.getenv("AI_FRAUD_MODEL_PATH", "models/fraud_isolation.pkl")),
     fraud_scaler_path=Path(os.getenv("AI_FRAUD_SCALER_PATH", "models/fraud_scaler.pkl")),
+    fraud_classifier_path=Path(
+        os.getenv("AI_FRAUD_CLASSIFIER_PATH", "models/fraud_classifier.pkl")
+    ),
+    fraud_reference_path=Path(
+        os.getenv("AI_FRAUD_REFERENCE_PATH", "models/fraud_score_reference.json")
+    ),
     api_key=os.getenv("AI_API_KEY") or None,
 )
