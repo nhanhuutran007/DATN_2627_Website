@@ -9,6 +9,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { In, Repository } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
+import { closedWithoutReachingGoal } from "../campaigns/campaign-outcome";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
 import { MediaFile, MediaPurpose } from "../media/entities/media-file.entity";
@@ -39,7 +40,8 @@ const LOCKED_STATUSES = [
 /**
  * Trạng thái được đăng cập nhật/đánh dấu hoàn thành mốc: đã phát hành, kể cả sau
  * khi gây quỹ thành công (tiền thường được chi sau thời điểm này). Chiến dịch
- * thất bại/bị hủy đã hoàn tiền nên không còn khoản chi để báo cáo.
+ * thất bại/bị hủy không báo cáo chi: người ủng hộ đang được quyền yêu cầu hoàn tiền
+ * (`ended` sau khi không đạt mục tiêu cũng vậy, xem `assertReportable`).
  */
 const REPORTABLE_STATUSES = [
   CampaignStatus.APPROVED,
@@ -311,7 +313,7 @@ export class ProgressService {
     const milestone = await this.getMilestone(id);
     const campaign = await this.getCampaign(milestone.campaignId);
     this.assertCanManage(campaign, user);
-    this.assertReportable(campaign);
+    await this.assertReportable(campaign);
 
     const wasCompleted = milestone.isCompleted;
     milestone.isCompleted = true;
@@ -348,7 +350,7 @@ export class ProgressService {
     const milestone = await this.getMilestone(milestoneId);
     const campaign = await this.getCampaign(milestone.campaignId);
     this.assertCanManage(campaign, user);
-    this.assertReportable(campaign);
+    await this.assertReportable(campaign);
 
     const expense = Number(dto.expenseAmount ?? 0);
     const receiptInputs = dto.receipts ?? [];
@@ -572,8 +574,11 @@ export class ProgressService {
     }
   }
 
-  private assertReportable(campaign: Campaign): void {
-    if (!REPORTABLE_STATUSES.includes(campaign.status)) {
+  private async assertReportable(campaign: Campaign): Promise<void> {
+    if (
+      !REPORTABLE_STATUSES.includes(campaign.status) ||
+      (await closedWithoutReachingGoal(campaign, this.donationRepo))
+    ) {
       throw new ConflictException(
         "Chỉ báo cáo tiến độ cho chiến dịch đã phát hành và chưa thất bại/hủy.",
       );

@@ -16,6 +16,7 @@ import { Between, DataSource, FindOptionsWhere, In, Like, Repository } from "typ
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { rangeFilter } from "../../common/query/range";
 import type { PaymentGateway } from "../../integrations/payment/payment.gateway";
+import { closedWithoutReachingGoal } from "../campaigns/campaign-outcome";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus, RefundMethod } from "../donations/entities/donation.entity";
 import { MediaFile, MediaPurpose } from "../media/entities/media-file.entity";
@@ -37,8 +38,6 @@ import { RefundRequest, RefundRequestStatus } from "./entities/refund-request.en
 /** Người ủng hộ tự yêu cầu hoàn trong khoảng này nếu chiến dịch còn đang gây quỹ. */
 export const REFUND_WINDOW_DAYS = 7;
 
-/** Chiến dịch thất bại/hủy: luôn được yêu cầu hoàn. */
-const ALWAYS_REFUNDABLE = [CampaignStatus.FAILED, CampaignStatus.CANCELLED];
 const WINDOW_REFUNDABLE = [CampaignStatus.ACTIVE, CampaignStatus.PAUSED, CampaignStatus.APPROVED];
 
 const DAY_MS = 86_400_000;
@@ -124,9 +123,11 @@ export class FinanceService {
     }
     const completedAt = donation.completedAt ? new Date(donation.completedAt).getTime() : 0;
     const withinWindow = now.getTime() - completedAt <= REFUND_WINDOW_DAYS * DAY_MS;
+    // Chiến dịch khép lại mà không đạt mục tiêu (thất bại, bị hủy, hoặc đã đóng sau
+    // đó): luôn được yêu cầu hoàn, không giới hạn 7 ngày.
     const eligible =
-      ALWAYS_REFUNDABLE.includes(campaign.status) ||
-      (WINDOW_REFUNDABLE.includes(campaign.status) && withinWindow);
+      (WINDOW_REFUNDABLE.includes(campaign.status) && withinWindow) ||
+      (await closedWithoutReachingGoal(campaign, this.donationRepo));
     if (!eligible) {
       throw new ConflictException(
         `Chỉ yêu cầu hoàn trong ${REFUND_WINDOW_DAYS} ngày sau khi ủng hộ, hoặc khi chiến dịch không đạt mục tiêu/bị hủy.`,

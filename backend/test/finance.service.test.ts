@@ -74,6 +74,7 @@ describe("FinanceService — hoàn tiền", () => {
   let tierUpdates: number;
   let claimAffected: number;
   let gatewayOk: boolean;
+  let grossRaised: number;
   let audit: ReturnType<typeof makeAuditRecorder>;
   let notifier: ReturnType<typeof makeNotifierRecorder>;
   let service: FinanceService;
@@ -83,12 +84,13 @@ describe("FinanceService — hoàn tiền", () => {
       id: DONATION_ID, userId: DONOR.id, campaignId: "c1", amount: "300000.00", status: DonationStatus.COMPLETED,
       transactionId: "DEMO-1", completedAt: new Date(Date.now() - 2 * DAY), rewardTierId: "tier-1", currency: "VND",
     };
-    campaign = { id: "c1", title: "Thư viện", ownerId: OWNER_ID, status: CampaignStatus.ACTIVE, currentAmount: 300000, backerCount: 1 };
+    campaign = { id: "c1", title: "Thư viện", ownerId: OWNER_ID, status: CampaignStatus.ACTIVE, currentAmount: 300000, goalAmount: 1000000, backerCount: 1 };
     requests = [];
     campaignUpdates = 0;
     tierUpdates = 0;
     claimAffected = 1;
     gatewayOk = true;
+    grossRaised = 300000;
     audit = makeAuditRecorder();
     notifier = makeNotifierRecorder();
     const refundRepo: any = {
@@ -102,7 +104,7 @@ describe("FinanceService — hoàn tiền", () => {
         return r;
       },
     };
-    const donationRepo: any = { findOne: async () => donation };
+    const donationRepo: any = { findOne: async () => donation, sum: async () => grossRaised };
     const campaignRepo: any = { findOne: async () => campaign };
     const qb: any = {
       update: (entity: any) => {
@@ -188,6 +190,17 @@ describe("FinanceService — hoàn tiền", () => {
     campaign.status = CampaignStatus.FAILED;
     const r = await service.requestRefund(DONATION_ID, { reason: "Chiến dịch không đạt mục tiêu." }, DONOR);
     equal(r.status, RefundRequestStatus.PENDING);
+  });
+
+  it("chiến dịch đã đóng sau khi không đạt mục tiêu → vẫn yêu cầu hoàn được; đã đạt mục tiêu → không", async () => {
+    donation.completedAt = new Date(Date.now() - (REFUND_WINDOW_DAYS + 30) * DAY);
+    campaign.status = CampaignStatus.ENDED;
+    const r = await service.requestRefund(DONATION_ID, { reason: "Chiến dịch đã đóng, không đạt mục tiêu." }, DONOR);
+    equal(r.status, RefundRequestStatus.PENDING);
+    requests.length = 0;
+    // Tổng gộp tính cả khoản đã hoàn: chiến dịch từng đạt mục tiêu thì hoàn bớt cũng không đổi kết quả
+    grossRaised = 1000000;
+    await rejects(service.requestRefund(DONATION_ID, { reason: "Muốn rút lại khoản ủng hộ." }, DONOR), ConflictException);
   });
 
   it("không yêu cầu được khoản của người khác, khoản chưa xác nhận hoặc trùng yêu cầu", async () => {

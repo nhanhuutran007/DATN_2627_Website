@@ -487,6 +487,26 @@ describe("CampaignsService", () => {
         });
     });
 
+    it("chặn đóng chiến dịch thất bại khi còn yêu cầu hoàn tiền đang chờ", async () => {
+      let pending = 2;
+      const countQuery: any = {
+        innerJoin: () => countQuery, where: () => countQuery, andWhere: () => countQuery,
+        getCount: async () => pending,
+      };
+      repo.manager = { getRepository: () => ({ createQueryBuilder: () => countQuery }) };
+      repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.FAILED });
+      const admin = makeUser(UserRole.ADMIN, ADMIN_ID);
+      await rejects(
+        campaignsService.moderate("123e4567-e89b-12d3-a456-426614174000", { status: CampaignStatus.ENDED } as any, admin),
+        (err: { status: number; message: string }) => err.status === 409 && err.message.includes("2 yêu cầu hoàn tiền"),
+      );
+      pending = 0;
+      const closed = await campaignsService.moderate(
+        "123e4567-e89b-12d3-a456-426614174000", { status: CampaignStatus.ENDED } as any, admin,
+      );
+      equal(closed.status, CampaignStatus.ENDED);
+    });
+
     it("should allow pausing an active campaign with a reason", async () => {
       repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.ACTIVE });
       const campaign = await campaignsService.moderate(

@@ -462,6 +462,20 @@ describe("ProgressService", () => {
       equal(update.milestoneId, MILESTONE_ID);
     });
 
+    it("chiến dịch đã đóng mà không đạt mục tiêu → không báo cáo chi; đã đạt → được", async () => {
+      repos.campaignRepo.findOne = async () => ({ ...repos.mockCampaign, status: CampaignStatus.ENDED });
+      // sum giả = 5.000.000 < mục tiêu 50.000.000
+      await expectStatus(
+        service.addMilestoneUpdate(MILESTONE_ID, { content: "Không được phép" }, makeUser()),
+        409,
+      );
+      repos.campaignRepo.findOne = async () => ({
+        ...repos.mockCampaign, status: CampaignStatus.ENDED, goalAmount: 5000000,
+      });
+      const update = await service.addMilestoneUpdate(MILESTONE_ID, { content: "Báo cáo sau khi đóng" }, makeUser());
+      equal(update.milestoneId, MILESTONE_ID);
+    });
+
     it("should reject updates for draft or failed campaigns", async () => {
       for (const status of [CampaignStatus.DRAFT, CampaignStatus.FAILED]) {
         repos.campaignRepo.findOne = async () => ({ ...repos.mockCampaign, status });
