@@ -1599,7 +1599,7 @@ export function AdminDashboard() {
                 onChange={(event) => applyRiskFilters({ ...riskDraft, method: event.target.value as RiskFilters["method"] })}
               >
                 <option value="">Mọi phương pháp</option>
-                <option value="ai">Luật + mô hình AI (IsolationForest)</option>
+                <option value="ai">Luật + mô hình học máy</option>
                 <option value="rule">Chỉ luật (dự phòng)</option>
               </select>
               <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
@@ -1630,7 +1630,7 @@ export function AdminDashboard() {
                           <button className="link-inline" type="button" title="Xem thông tin tài khoản" onClick={() => setViewingUserId(alert.entityId)}>{alert.entityName}</button>
                         )}
                       </h3>
-                      <p>{alert.entityId.slice(0, 8).toUpperCase()} · {riskEntityLabel(alert)} · Điểm rủi ro <b>{alert.score.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> · {alert.method === "ai" ? "Chấm điểm bằng luật + mô hình IsolationForest" : "Chỉ chấm bằng luật (mô hình AI không khả dụng)"}</p>
+                      <p>{alert.entityId.slice(0, 8).toUpperCase()} · {riskEntityLabel(alert)} · Điểm rủi ro <b>{alert.score.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> · {alert.method === "ai" ? "Chấm điểm bằng luật + mô hình học máy" : "Chỉ chấm bằng luật (mô hình AI không khả dụng)"}</p>
                       <small><b>Nguyên nhân:</b> {riskReasonSummary(alert)}</small>
                       <small><b>Bằng chứng:</b> {evidenceSummary(alert.evidences)}</small>
                     </div>
