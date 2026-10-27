@@ -27,6 +27,8 @@ const FOLDER_BY_PURPOSE: Record<MediaPurpose, string> = {
   [MediaPurpose.AVATAR]: "avatars",
   [MediaPurpose.EXPENSE_RECEIPT]: "receipts",
   [MediaPurpose.REFUND_PROOF]: "refunds",
+  [MediaPurpose.ORGANIZATION_LOGO]: "organizations",
+  [MediaPurpose.ORGANIZATION_DOCUMENT]: "org-documents",
 };
 
 export type IncomingFile = {

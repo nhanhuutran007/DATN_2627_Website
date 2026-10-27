@@ -604,6 +604,17 @@ paths:
         - $ref: "#/components/parameters/CampaignQ"
         - $ref: "#/components/parameters/CampaignCategory"
         - $ref: "#/components/parameters/CampaignStatusFilter"
+        - name: organizationId
+          in: query
+          description: Chỉ chiến dịch gây quỹ cho tổ chức này
+          schema:
+            type: string
+            format: uuid
+        - name: forOrganization
+          in: query
+          description: "`true` = chỉ chiến dịch gây quỹ cho một tổ chức đang ở trạng thái đã xác minh"
+          schema:
+            type: boolean
         - name: location
           in: query
           description: Địa điểm chứa chuỗi này
@@ -1761,6 +1772,158 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Category"
+  /organizations:
+    get:
+      operationId: listOrganizations
+      summary: Danh bạ tổ chức đã xác minh (công khai), kèm số chiến dịch và tổng đã huy động
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: type, in: query, schema: { $ref: "#/components/schemas/OrganizationType" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 12 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Trang kết quả
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationPage"
+    post:
+      operationId: createOrganization
+      summary: Người đại diện gửi hồ sơ đăng ký tổ chức (trạng thái `pending`)
+      description: >-
+        Không cho admin. Tối đa 3 tổ chức/tài khoản (không tính hồ sơ bị từ chối); số giấy phép không trùng với hồ sơ
+        đang chờ/đã xác minh/tạm ngưng. Rate limit 5 lần/giờ. Audit `organization.create`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganizationInput"
+      responses:
+        "201":
+          description: Đã gửi hồ sơ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "409":
+          description: Trùng số giấy phép hoặc vượt số tổ chức cho phép
+  /organizations/mine:
+    get:
+      operationId: listMyOrganizations
+      summary: Hồ sơ tổ chức mình đại diện (mọi trạng thái, kèm ảnh giấy phép và ghi chú của admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Danh sách hồ sơ
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Organization"
+  /organizations/{key}:
+    get:
+      operationId: getOrganization
+      summary: Trang tổ chức công khai theo slug hoặc id (chỉ tổ chức đã xác minh)
+      parameters:
+        - { name: key, in: path, required: true, description: Slug hoặc id, schema: { type: string } }
+      responses:
+        "200":
+          description: Tổ chức
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "404":
+          description: Không tồn tại hoặc chưa xác minh
+    patch:
+      operationId: updateOrganization
+      summary: Người đại diện sửa hồ sơ
+      description: >-
+        Đã xác minh/tạm ngưng: chỉ sửa thông tin giới thiệu, thông tin pháp lý (tên, loại, số giấy phép, nơi cấp, ảnh
+        giấy phép, chức vụ) bị khóa (400). Đang `needs_info`/`rejected`: lưu là gửi xét lại (về `pending`, audit
+        `organization.resubmit`).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: key, in: path, required: true, description: Id của tổ chức, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganizationInput"
+      responses:
+        "200":
+          description: Đã lưu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/organizations:
+    get:
+      operationId: adminListOrganizations
+      summary: Hàng chờ xác minh tổ chức (chỉ admin); `status=open` = đang chờ xác minh, cũ nhất trước
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, pending, needs_info, verified, rejected, suspended]
+        - { name: q, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0 } }
+      responses:
+        "200":
+          description: Trang kết quả (kèm người đại diện, ảnh giấy phép)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationPage"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /admin/organizations/{id}/review:
+    patch:
+      operationId: adminReviewOrganization
+      summary: Admin quyết định hồ sơ tổ chức (human-in-the-loop)
+      description: >-
+        Ma trận: pending → verified | needs_info | rejected; needs_info → verified | rejected; verified ⇄ suspended.
+        Bắt buộc `notes` ≥ 10 ký tự trừ khi xác minh. Admin không tự xét tổ chức mình đại diện (403). Audit
+        `organization.review`, thông báo + email cho người đại diện.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [verified, needs_info, rejected, suspended] }
+                notes: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: Đã cập nhật
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "400":
+          description: Thiếu lý do
+        "409":
+          description: Chuyển trạng thái không hợp lệ
   /admin/categories:
     get:
       operationId: adminListCategories
@@ -3305,6 +3468,50 @@ components:
         description: { type: string, nullable: true }
         sortOrder: { type: integer }
         isActive: { type: boolean }
+    OrganizationType:
+      type: string
+      enum: [charity_fund, ngo, social_enterprise, education, health, other]
+    OrganizationInput:
+      type: object
+      required: [name, type, registrationNumber, issuedBy, mission, email, phone, address, province, documentUrl, representativeTitle]
+      properties:
+        name: { type: string, minLength: 3, maxLength: 200 }
+        type: { $ref: "#/components/schemas/OrganizationType" }
+        registrationNumber: { type: string, minLength: 3, maxLength: 100, description: Số giấy phép/quyết định thành lập }
+        issuedBy: { type: string, minLength: 3, maxLength: 200 }
+        category: { type: string, maxLength: 100, description: Lĩnh vực đang nhận chiến dịch }
+        mission: { type: string, minLength: 50, maxLength: 3000 }
+        website: { type: string, format: uri, maxLength: 300 }
+        email: { type: string, format: email }
+        phone: { type: string, pattern: "^\\+?[0-9 .-]{8,20}$" }
+        address: { type: string, minLength: 5, maxLength: 300 }
+        province: { type: string, description: Một trong 34 tỉnh/thành }
+        logoUrl: { type: string, description: Ảnh `purpose=organization_logo` }
+        documentUrl: { type: string, description: Ảnh giấy phép `purpose=organization_document` (chỉ người đại diện và admin thấy) }
+        representativeTitle: { type: string, minLength: 2, maxLength: 100 }
+    Organization:
+      allOf:
+        - $ref: "#/components/schemas/OrganizationInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            slug: { type: string }
+            status: { type: string, enum: [pending, needs_info, verified, rejected, suspended] }
+            reviewNotes: { type: string, nullable: true, description: Chỉ ở API người đại diện/admin }
+            verifiedAt: { type: string, format: date-time, nullable: true }
+            submittedAt: { type: string, format: date-time }
+            campaignCount: { type: integer, description: Chiến dịch đã công khai (danh bạ/admin) }
+            totalRaised: { type: number, description: Tổng đã xác nhận của các chiến dịch đó }
+    OrganizationPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Organization"
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
     Campaign:
       type: object
       properties:
@@ -3323,6 +3530,14 @@ components:
         owner:
           nullable: true
           $ref: "#/components/schemas/UserSummary"
+        organizationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Tổ chức thụ hưởng đã xác minh (null = gây quỹ cá nhân); gửi khi tạo/sửa, lọc danh sách bằng `?organizationId=`
+        organization:
+          nullable: true
+          $ref: "#/components/schemas/Organization"
         goalAmount:
           type: number
         currentAmount:

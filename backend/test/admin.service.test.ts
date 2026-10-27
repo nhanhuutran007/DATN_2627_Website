@@ -335,6 +335,7 @@ describe("AdminService", () => {
           params.push(args);
           if (sql.includes("`audit_logs`")) return [{ createdAt: "2026-10-15T15:16:19Z" }];
           if (sql.includes("`refund_requests`")) return [{ n: "4" }];
+          if (sql.includes("`organizations`")) return [{ n: 7 }];
           if (sql.includes("COUNT(DISTINCT")) return [{ n: 2 }];
           if (sql.includes("`risk_alerts`")) return [{ n: 16 }];
           if (sql.includes("LEFT JOIN")) return [{ n: 1 }];
@@ -350,6 +351,7 @@ describe("AdminService", () => {
         reportedComments: 2,
         stalePendingSepay: 3,
         pendingRefunds: 4,
+        pendingOrganizations: 7,
         ledgerMismatches: 1,
         daysSinceBackup: 6,
       });

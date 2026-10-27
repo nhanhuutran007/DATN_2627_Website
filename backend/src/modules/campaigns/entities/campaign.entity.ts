@@ -34,6 +34,14 @@ export class Campaign extends BaseEntity {
   @JoinColumn({ name: "owner_id" })
   owner!: any;
 
+  /** Tổ chức thụ hưởng (đã xác minh); NULL = chiến dịch gây quỹ cá nhân. */
+  @Column({ name: "organization_id", type: "char", length: 36, nullable: true })
+  organizationId?: string | null;
+
+  @ManyToOne("Organization")
+  @JoinColumn({ name: "organization_id" })
+  organization?: unknown;
+
   @Column({
     name: "goal_amount",
     type: "decimal",

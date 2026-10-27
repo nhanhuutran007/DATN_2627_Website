@@ -13,6 +13,11 @@ import { CampaignFollow } from "../src/modules/follows/entities/campaign-follow.
 import { CampaignComment, CommentStatus } from "../src/modules/comments/entities/campaign-comment.entity";
 import { Report, ReportReason, ReportStatus } from "../src/modules/moderation/entities/report.entity";
 import { Milestone } from "../src/modules/progress/entities/milestone.entity";
+import {
+  Organization,
+  OrganizationStatus,
+  OrganizationType,
+} from "../src/modules/organizations/entities/organization.entity";
 
 config({ path: ".env" });
 
@@ -63,34 +68,60 @@ type CampaignSeed = {
   /** Tỷ lệ chuyển đổi xấp xỉ: lượt ủng hộ / lượt xem. */
   conversion: number;
   rejectionReason?: string;
+  /** Chỉ số trong ORGANIZATIONS: chiến dịch gây quỹ cho tổ chức đã xác minh đó. */
+  organization?: number;
 };
+
+type OrganizationSeed = {
+  name: string;
+  slug: string;
+  type: OrganizationType;
+  registrationNumber: string;
+  issuedBy: string;
+  category: string;
+  mission: string;
+  province: string;
+  address: string;
+  /** Chỉ số người dùng thường (user1..user8) làm người đại diện. */
+  representative: number;
+  status: OrganizationStatus;
+  verifiedDaysAgo?: number;
+};
+
+// 4 tổ chức (số giấy phép là dữ liệu giả): 3 đã xác minh để có danh bạ/trang tổ chức, 1 chờ xác minh cho hàng đợi admin.
+const ORGANIZATIONS: OrganizationSeed[] = [
+  { name: "Quỹ Học bổng Mầm Xanh", slug: "quy-hoc-bong-mam-xanh", type: OrganizationType.CHARITY_FUND, registrationNumber: "DEMO-128/QĐ-BNV", issuedBy: "Bộ Nội vụ (dữ liệu mẫu)", category: "Giáo dục", mission: "Trao học bổng và đồng hành cùng học sinh, sinh viên có hoàn cảnh khó khăn ở vùng sâu vùng xa, để không em nào phải bỏ học vì thiếu học phí.", province: "Huế", address: "12 Lê Lợi, TP. Huế", representative: 2, status: OrganizationStatus.VERIFIED, verifiedDaysAgo: 160 },
+  { name: "Trung tâm Bảo tồn Rừng ngập mặn Cửu Long", slug: "trung-tam-bao-ton-rung-ngap-man-cuu-long", type: OrganizationType.NGO, registrationNumber: "DEMO-45/GP-UBND", issuedBy: "UBND TP. Cần Thơ (dữ liệu mẫu)", category: "Môi trường", mission: "Phục hồi rừng ngập mặn ven biển đồng bằng sông Cửu Long cùng cộng đồng ngư dân và trường học, theo dõi tỷ lệ cây sống minh bạch.", province: "Cần Thơ", address: "88 Nguyễn Văn Cừ, Ninh Kiều", representative: 3, status: OrganizationStatus.VERIFIED, verifiedDaysAgo: 45 },
+  { name: "Hội Thầy thuốc Tình nguyện Nghệ An", slug: "hoi-thay-thuoc-tinh-nguyen-nghe-an", type: OrganizationType.HEALTH, registrationNumber: "DEMO-302/QĐ-SYT", issuedBy: "Sở Y tế Nghệ An (dữ liệu mẫu)", category: "Y tế", mission: "Khám chữa bệnh miễn phí định kỳ cho người cao tuổi neo đơn và người dân vùng khó khăn, cấp thuốc cơ bản và hướng dẫn chăm sóc sức khỏe.", province: "Nghệ An", address: "5 Trường Thi, TP. Vinh", representative: 4, status: OrganizationStatus.VERIFIED, verifiedDaysAgo: 70 },
+  { name: "Doanh nghiệp xã hội Gốm Làng", slug: "doanh-nghiep-xa-hoi-gom-lang", type: OrganizationType.SOCIAL_ENTERPRISE, registrationNumber: "DEMO-0316/ĐKKD", issuedBy: "Sở KH&ĐT Quảng Nam (dữ liệu mẫu)", category: "Khởi nghiệp", mission: "Tạo việc làm ổn định cho người khuyết tật qua nghề gốm truyền thống, tái đầu tư lợi nhuận vào đào tạo nghề.", province: "Quảng Nam", address: "Thôn Thanh Hà, Hội An", representative: 5, status: OrganizationStatus.PENDING },
+];
 
 const M = 1_000_000;
 
 // 25 chiến dịch: đủ 6 lĩnh vực, nhiều địa phương, đủ trạng thái vòng đời, mục tiêu
 // từ 20 triệu tới 1,5 tỷ và tiến độ từ ~5% tới >100% để bộ lọc/thống kê có ý nghĩa.
 const CAMPAIGNS: CampaignSeed[] = [
-  { title: "Xây dựng thư viện cộng đồng cho trẻ em vùng cao", description: "Thư viện nhỏ với 5.000 cuốn sách và 20 máy tính cho trẻ em xã Bản Hồ, kèm lớp đọc sách cuối tuần do giáo viên tình nguyện phụ trách.", category: "Giáo dục", location: "Lào Cai", owner: 0, goal: 50 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 40, durationDays: 70, fundedRatio: 0.92, conversion: 0.05 },
+  { title: "Xây dựng thư viện cộng đồng cho trẻ em vùng cao", description: "Thư viện nhỏ với 5.000 cuốn sách và 20 máy tính cho trẻ em xã Bản Hồ, kèm lớp đọc sách cuối tuần do giáo viên tình nguyện phụ trách.", category: "Giáo dục", location: "Lào Cai", owner: 0, goal: 50 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 40, durationDays: 70, fundedRatio: 0.92, conversion: 0.05, organization: 0 },
   { title: "Hỗ trợ nông dân trồng rau sạch hữu cơ", description: "Giúp 100 hộ nông dân chuyển đổi sang canh tác hữu cơ: tập huấn kỹ thuật, nhà màng và kết nối đầu ra với bếp ăn trường học.", category: "Nông nghiệp", location: "Lâm Đồng", owner: 1, goal: 80 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 25, durationDays: 75, fundedRatio: 0.34, conversion: 0.03 },
   { title: "Ứng dụng luyện tiếng Anh cho học sinh tiểu học", description: "Ứng dụng học tiếng Anh có trợ lý phát âm, miễn phí cho 30 trường tiểu học vùng khó khăn trong năm đầu.", category: "Công nghệ", location: "Hà Nội", owner: 1, goal: 120 * M, status: CampaignStatus.PENDING, startedDaysAgo: 2, durationDays: 60, fundedRatio: 0, conversion: 0 },
-  { title: "Phòng khám lưu động cho người cao tuổi", description: "Xe khám lưu động định kỳ hằng tháng tại 12 xã, khám mắt, đo huyết áp và cấp thuốc cơ bản cho người cao tuổi neo đơn.", category: "Y tế", location: "Nghệ An", owner: 0, goal: 300 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 55, durationDays: 90, fundedRatio: 0.61, conversion: 0.04 },
-  { title: "Trồng 10.000 cây ngập mặn chắn sóng", description: "Phục hồi rừng ngập mặn ven biển cùng học sinh và ngư dân địa phương, theo dõi tỷ lệ cây sống sau 6 và 12 tháng.", category: "Môi trường", location: "Cần Thơ", owner: 2, goal: 150 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 30, durationDays: 35, fundedRatio: 0.78, conversion: 0.06 },
+  { title: "Phòng khám lưu động cho người cao tuổi", description: "Xe khám lưu động định kỳ hằng tháng tại 12 xã, khám mắt, đo huyết áp và cấp thuốc cơ bản cho người cao tuổi neo đơn.", category: "Y tế", location: "Nghệ An", owner: 0, goal: 300 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 55, durationDays: 90, fundedRatio: 0.61, conversion: 0.04, organization: 2 },
+  { title: "Trồng 10.000 cây ngập mặn chắn sóng", description: "Phục hồi rừng ngập mặn ven biển cùng học sinh và ngư dân địa phương, theo dõi tỷ lệ cây sống sau 6 và 12 tháng.", category: "Môi trường", location: "Cần Thơ", owner: 2, goal: 150 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 30, durationDays: 35, fundedRatio: 0.78, conversion: 0.06, organization: 1 },
   { title: "Xưởng tái chế nhựa thành gạch lát", description: "Xưởng nhỏ ép nhựa phế thải thành gạch lát vỉa hè, tạo việc làm cho 15 lao động và giảm rác nhựa ra kênh rạch.", category: "Khởi nghiệp", location: "TP. Hồ Chí Minh", owner: 2, goal: 450 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 20, durationDays: 80, fundedRatio: 0.18, conversion: 0.02 },
-  { title: "Bếp ăn bán trú cho học sinh dân tộc", description: "Cải tạo bếp và duy trì bữa trưa đủ chất cho 180 học sinh bán trú trong một năm học.", category: "Giáo dục", location: "Sơn La", owner: 0, goal: 90 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 50, durationDays: 55, fundedRatio: 0.87, conversion: 0.07 },
+  { title: "Bếp ăn bán trú cho học sinh dân tộc", description: "Cải tạo bếp và duy trì bữa trưa đủ chất cho 180 học sinh bán trú trong một năm học.", category: "Giáo dục", location: "Sơn La", owner: 0, goal: 90 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 50, durationDays: 55, fundedRatio: 0.87, conversion: 0.07, organization: 0 },
   { title: "Nền tảng kết nối tình nguyện viên y tế", description: "Website giúp phòng khám từ thiện đăng nhu cầu và tình nguyện viên y tế đăng ký ca trực, có xác minh chứng chỉ hành nghề.", category: "Công nghệ", location: "Đà Nẵng", owner: 1, goal: 200 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 12, durationDays: 60, fundedRatio: 0.09, conversion: 0.015 },
-  { title: "Giếng nước sạch cho bản vùng biên", description: "Khoan 4 giếng và lắp hệ thống lọc cho 3 bản thường xuyên thiếu nước sạch vào mùa khô.", category: "Y tế", location: "Sơn La", owner: 0, goal: 60 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 28, durationDays: 33, fundedRatio: 0.71, conversion: 0.05 },
+  { title: "Giếng nước sạch cho bản vùng biên", description: "Khoan 4 giếng và lắp hệ thống lọc cho 3 bản thường xuyên thiếu nước sạch vào mùa khô.", category: "Y tế", location: "Sơn La", owner: 0, goal: 60 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 28, durationDays: 33, fundedRatio: 0.71, conversion: 0.05, organization: 2 },
   { title: "Vườn ươm doanh nghiệp xã hội cho sinh viên", description: "Chương trình 12 tuần hỗ trợ 10 nhóm sinh viên xây dựng mô hình kinh doanh có tác động xã hội, kèm vốn mồi.", category: "Khởi nghiệp", location: "Huế", owner: 2, goal: 1500 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 15, durationDays: 90, fundedRatio: 0.05, conversion: 0.01 },
   { title: "Hệ thống tưới tiết kiệm cho vườn cà phê", description: "Lắp tưới nhỏ giọt dùng năng lượng mặt trời cho 40 hộ trồng cà phê, giảm 40% lượng nước tưới mùa khô.", category: "Nông nghiệp", location: "Đắk Lắk", owner: 1, goal: 250 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 45, durationDays: 50, fundedRatio: 0.52, conversion: 0.035 },
-  { title: "Lớp học bơi miễn phí phòng đuối nước", description: "Dạy bơi an toàn cho 600 trẻ em vùng sông nước trong mùa hè, có huấn luyện viên và bể bơi di động.", category: "Giáo dục", location: "Quảng Nam", owner: 0, goal: 40 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 8, durationDays: 45, fundedRatio: 0.26, conversion: 0.04 },
+  { title: "Lớp học bơi miễn phí phòng đuối nước", description: "Dạy bơi an toàn cho 600 trẻ em vùng sông nước trong mùa hè, có huấn luyện viên và bể bơi di động.", category: "Giáo dục", location: "Quảng Nam", owner: 0, goal: 40 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 8, durationDays: 45, fundedRatio: 0.26, conversion: 0.04, organization: 0 },
   { title: "Thùng rác phân loại cho trường học", description: "Trang bị thùng rác phân loại và chương trình thi đua tái chế cho 25 trường tiểu học nội thành.", category: "Môi trường", location: "Hà Nội", owner: 2, goal: 30 * M, status: CampaignStatus.APPROVED, startedDaysAgo: -3, durationDays: 40, fundedRatio: 0, conversion: 0 },
   { title: "Máy lọc không khí cho phòng điều trị nhi", description: "Trang bị máy lọc không khí cho 8 phòng điều trị hô hấp nhi khoa của bệnh viện huyện.", category: "Y tế", location: "Hà Nội", owner: 0, goal: 70 * M, status: CampaignStatus.PAUSED, startedDaysAgo: 35, durationDays: 60, fundedRatio: 0.44, conversion: 0.03, rejectionReason: "Tạm dừng để chủ dự án bổ sung báo giá thiết bị từ nhà cung cấp." },
-  { title: "Học bổng tiếp sức tân sinh viên nghèo", description: "30 suất học bổng năm nhất cho tân sinh viên hoàn cảnh khó khăn, kèm người hướng dẫn trong năm học đầu.", category: "Giáo dục", location: "Huế", owner: 0, goal: 120 * M, status: CampaignStatus.SUCCESS, startedDaysAgo: 150, durationDays: 60, fundedRatio: 1.18, conversion: 0.06 },
+  { title: "Học bổng tiếp sức tân sinh viên nghèo", description: "30 suất học bổng năm nhất cho tân sinh viên hoàn cảnh khó khăn, kèm người hướng dẫn trong năm học đầu.", category: "Giáo dục", location: "Huế", owner: 0, goal: 120 * M, status: CampaignStatus.SUCCESS, startedDaysAgo: 150, durationDays: 60, fundedRatio: 1.18, conversion: 0.06, organization: 0 },
   { title: "Cầu dân sinh cho học sinh qua suối", description: "Xây cầu bê tông dài 24 m thay cầu tre tạm để học sinh đến trường an toàn mùa mưa lũ.", category: "Môi trường", location: "Quảng Nam", owner: 2, goal: 350 * M, status: CampaignStatus.SUCCESS, startedDaysAgo: 170, durationDays: 75, fundedRatio: 1.03, conversion: 0.05 },
   { title: "Sàn thương mại nông sản cho hợp tác xã", description: "Sàn bán hàng trực tuyến cho 6 hợp tác xã, truy xuất nguồn gốc bằng mã QR.", category: "Khởi nghiệp", location: "Cần Thơ", owner: 1, goal: 180 * M, status: CampaignStatus.SUCCESS, startedDaysAgo: 120, durationDays: 50, fundedRatio: 1.31, conversion: 0.045 },
   { title: "Trạm sạc pin năng lượng mặt trời cho chợ nổi", description: "Lắp 5 trạm sạc pin bằng năng lượng mặt trời cho tiểu thương chợ nổi.", category: "Công nghệ", location: "Cần Thơ", owner: 1, goal: 95 * M, status: CampaignStatus.SUCCESS, startedDaysAgo: 100, durationDays: 45, fundedRatio: 1.07, conversion: 0.04 },
   { title: "Nhà văn hóa cộng đồng thôn Nà Lừa", description: "Sửa mái và trang bị bàn ghế cho nhà văn hóa thôn dùng làm lớp học xóa mù chữ buổi tối.", category: "Giáo dục", location: "Lào Cai", owner: 0, goal: 65 * M, status: CampaignStatus.FAILED, startedDaysAgo: 110, durationDays: 45, fundedRatio: 0.38, conversion: 0.02 },
   { title: "Ứng dụng nhắc lịch tiêm chủng cho mẹ bỉm", description: "Ứng dụng nhắc lịch tiêm chủng theo độ tuổi của trẻ, tích hợp bản đồ điểm tiêm.", category: "Công nghệ", location: "TP. Hồ Chí Minh", owner: 1, goal: 140 * M, status: CampaignStatus.FAILED, startedDaysAgo: 95, durationDays: 40, fundedRatio: 0.22, conversion: 0.015 },
-  { title: "Dọn rác bãi biển mùa du lịch", description: "Chuỗi 12 buổi dọn rác bãi biển cùng du khách, kèm truyền thông giảm đồ nhựa dùng một lần.", category: "Môi trường", location: "Đà Nẵng", owner: 2, goal: 25 * M, status: CampaignStatus.ENDED, startedDaysAgo: 140, durationDays: 30, fundedRatio: 1.12, conversion: 0.08 },
+  { title: "Dọn rác bãi biển mùa du lịch", description: "Chuỗi 12 buổi dọn rác bãi biển cùng du khách, kèm truyền thông giảm đồ nhựa dùng một lần.", category: "Môi trường", location: "Đà Nẵng", owner: 2, goal: 25 * M, status: CampaignStatus.ENDED, startedDaysAgo: 140, durationDays: 30, fundedRatio: 1.12, conversion: 0.08, organization: 1 },
   { title: "Mô hình nuôi ong lấy mật cho hộ nghèo", description: "Cấp 200 thùng ong giống và tập huấn kỹ thuật cho 40 hộ nghèo, bao tiêu đầu ra mật ong.", category: "Nông nghiệp", location: "Nghệ An", owner: 1, goal: 110 * M, status: CampaignStatus.PENDING, startedDaysAgo: 1, durationDays: 60, fundedRatio: 0, conversion: 0 },
   { title: "Tủ thuốc cộng đồng cho xã đảo", description: "Duy trì tủ thuốc thiết yếu và lớp sơ cứu cho người dân xã đảo trong 12 tháng.", category: "Y tế", location: "Quảng Nam", owner: 0, goal: 45 * M, status: CampaignStatus.NEEDS_INFO, startedDaysAgo: 4, durationDays: 50, fundedRatio: 0, conversion: 0, rejectionReason: "Vui lòng bổ sung xác nhận của trạm y tế xã về danh mục thuốc." },
   { title: "Robot giáo dục STEM cho trường làng", description: "Bộ robot lắp ghép và giáo án STEM cho 10 trường tiểu học, tập huấn giáo viên hai buổi.", category: "Công nghệ", location: "Đắk Lắk", owner: 2, goal: 85 * M, status: CampaignStatus.DRAFT, startedDaysAgo: 0, durationDays: 60, fundedRatio: 0, conversion: 0 },
@@ -140,6 +171,34 @@ async function seed() {
   );
   await userRepo.save([admin, ...owners, ...donors]);
 
+  const organizationRepo = dataSource.getRepository(Organization);
+  const organizations = await organizationRepo.save(
+    ORGANIZATIONS.map((row) =>
+      organizationRepo.create({
+        name: row.name,
+        slug: row.slug,
+        type: row.type,
+        registrationNumber: row.registrationNumber,
+        issuedBy: row.issuedBy,
+        category: row.category,
+        mission: row.mission,
+        email: `lienhe@${row.slug.slice(0, 20)}.example`,
+        phone: "0900 000 000",
+        address: row.address,
+        province: row.province,
+        // Ảnh minh họa có sẵn thay cho ảnh giấy phép (dữ liệu mẫu).
+        documentUrl: "/images/cover-library.webp",
+        representativeId: donors[row.representative].id,
+        representativeTitle: "Giám đốc",
+        status: row.status,
+        ...(row.verifiedDaysAgo !== undefined
+          ? { verifiedAt: at(row.verifiedDaysAgo), reviewedAt: at(row.verifiedDaysAgo), reviewedBy: admin.id }
+          : {}),
+        submittedAt: at((row.verifiedDaysAgo ?? 0) + 3),
+      }),
+    ),
+  );
+
   const campaignRepo = dataSource.getRepository(Campaign);
   const campaigns = campaignRepo.create(
     CAMPAIGNS.map((seedRow) => ({
@@ -148,6 +207,7 @@ async function seed() {
       category: seedRow.category,
       location: seedRow.location,
       ownerId: owners[seedRow.owner].id,
+      organizationId: seedRow.organization !== undefined ? organizations[seedRow.organization].id : null,
       goalAmount: seedRow.goal,
       currentAmount: 0,
       backerCount: 0,
@@ -324,7 +384,7 @@ async function seed() {
 
   const completedCount = donationRows.filter((row) => row.status === DonationStatus.COMPLETED).length;
   console.log(
-    `Seeded: ${1 + owners.length + donors.length} users, ${campaigns.length} campaigns, ` +
+    `Seeded: ${1 + owners.length + donors.length} users, ${organizations.length} organizations, ${campaigns.length} campaigns, ` +
       `${donationRows.length} donations (${completedCount} completed), ${viewRows.length} daily view rows, ` +
       `${milestoneRows.length} milestones, ${followRows.length} follows, ${reportRows.length} reports. Password: ${SEED_PASSWORD}`,
   );

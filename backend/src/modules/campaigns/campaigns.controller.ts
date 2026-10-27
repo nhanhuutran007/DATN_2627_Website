@@ -15,6 +15,7 @@ import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { NonAdminGuard } from "../auth/guards/non-admin.guard";
 import { CategoriesService } from "../categories/categories.service";
+import { OrganizationsService } from "../organizations/organizations.service";
 import { User } from "../users/entities/user.entity";
 import { CampaignsService } from "./campaigns.service";
 import {
@@ -29,6 +30,7 @@ export class CampaignsController {
   constructor(
     private readonly campaignsService: CampaignsService,
     private readonly categoriesService: CategoriesService,
+    private readonly organizationsService: OrganizationsService,
   ) {}
 
   @Get()
@@ -57,6 +59,7 @@ export class CampaignsController {
   @UseGuards(JwtAuthGuard, NonAdminGuard)
   async create(@Body() dto: CreateCampaignDto, @GetCurrentUser() user: User) {
     await this.categoriesService.assertUsable(dto.category);
+    if (dto.organizationId) await this.organizationsService.assertCanReceiveCampaigns(dto.organizationId);
     return this.campaignsService.create(dto, user);
   }
 
@@ -70,6 +73,7 @@ export class CampaignsController {
     if (dto.category !== undefined) {
       await this.categoriesService.assertUsable(dto.category);
     }
+    if (dto.organizationId) await this.organizationsService.assertCanReceiveCampaigns(dto.organizationId);
     return this.campaignsService.update(id, dto, user);
   }
 

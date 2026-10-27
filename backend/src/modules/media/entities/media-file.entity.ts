@@ -9,6 +9,9 @@ export enum MediaPurpose {
   EXPENSE_RECEIPT = "expense_receipt",
   /** Ảnh chứng từ chuyển khoản hoàn tiền thủ công — chỉ admin tải lên. */
   REFUND_PROOF = "refund_proof",
+  ORGANIZATION_LOGO = "organization_logo",
+  /** Ảnh chụp giấy phép/quyết định thành lập để admin xác minh tổ chức. */
+  ORGANIZATION_DOCUMENT = "organization_document",
 }
 
 @Entity("media_files")
