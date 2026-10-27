@@ -1,6 +1,13 @@
 import { apiFetch } from "../api";
 
-export type MediaPurpose = "campaign_image" | "progress_image" | "avatar" | "expense_receipt" | "refund_proof";
+export type MediaPurpose =
+  | "campaign_image"
+  | "progress_image"
+  | "avatar"
+  | "expense_receipt"
+  | "refund_proof"
+  | "organization_logo"
+  | "organization_document";
 
 export type UploadedImage = {
   id: string;

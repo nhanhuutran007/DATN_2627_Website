@@ -18,6 +18,7 @@ import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ShareSpread } from "@/features/follows/ShareSpread";
 import { CampaignViewTracker } from "@/features/campaign-stats/CampaignViewTracker";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
+import { OrganizationLogo } from "@/features/organizations/OrganizationLogo";
 import {
   apiCampaignToView,
   fetchCampaign,
@@ -164,7 +165,10 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
 
           <a className="detail-organizer" href="#nguoi-to-chuc">
             <span className="organizer-avatar" aria-hidden="true">{ownerInitial}</span>
-            <span><b>{campaign.owner}</b> đang tổ chức gây quỹ</span>
+            <span>
+              <b>{campaign.owner}</b>{" "}
+              {campaign.organization ? <>đang gây quỹ cho <b>{campaign.organization.name}</b></> : "đang tổ chức gây quỹ"}
+            </span>
           </a>
 
           <p className="detail-protected">
@@ -173,6 +177,16 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               ? "Ủng hộ được bảo vệ · hồ sơ đã kiểm duyệt, chỉ ghi nhận giao dịch đã xác nhận"
               : "Chỉ ghi nhận giao dịch đã xác nhận"}
           </p>
+
+          {campaign.organization && (
+            <Link className="detail-beneficiary" href={`/to-chuc/${encodeURIComponent(campaign.organization.slug)}`}>
+              <OrganizationLogo organization={campaign.organization} size="sm" />
+              <span>
+                <span>Bạn có thể tạo nên khác biệt bằng cách ủng hộ <b>{campaign.organization.name}</b> qua chiến dịch này.</span>
+                <small><Icon name="shield" size={13} /> Tổ chức đã xác minh · Xem trang tổ chức</small>
+              </span>
+            </Link>
+          )}
 
           <section className="detail-story-block" aria-labelledby="gioi-thieu-du-an">
             <h2 id="gioi-thieu-du-an" className="sr-only">Câu chuyện dự án</h2>
@@ -232,14 +246,29 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           )}
 
           <section className="detail-section" id="nguoi-to-chuc" aria-labelledby="nguoi-to-chuc-title">
-            <h2 id="nguoi-to-chuc-title">Người tổ chức</h2>
-            <div className="organizer-card">
-              <span className="organizer-avatar organizer-avatar-lg" aria-hidden="true">{ownerInitial}</span>
-              <div>
-                <b>{campaign.owner}</b>
-                <span>Người tổ chức</span>
-                <span className="organizer-location"><Icon name="location" size={14} /> {campaign.location}</span>
+            <h2 id="nguoi-to-chuc-title">{campaign.organization ? "Người tổ chức và đơn vị thụ hưởng" : "Người tổ chức"}</h2>
+            <div className="organizer-pair">
+              <div className="organizer-card">
+                <span className="organizer-avatar organizer-avatar-lg" aria-hidden="true">{ownerInitial}</span>
+                <div>
+                  <b>{campaign.owner}</b>
+                  <span>Người tổ chức</span>
+                  <span className="organizer-location"><Icon name="location" size={14} /> {campaign.location}</span>
+                </div>
               </div>
+              {campaign.organization && (
+                <>
+                  <span className="organizer-arrow" aria-hidden="true"><Icon name="arrow-right" size={18} /></span>
+                  <div className="organizer-card organizer-beneficiary">
+                    <OrganizationLogo organization={campaign.organization} size="lg" />
+                    <div>
+                      <b>{campaign.organization.name}</b>
+                      <span className="organizer-verified"><Icon name="shield" size={14} /> Tổ chức đã xác minh · Đơn vị thụ hưởng</span>
+                      <Link href={`/to-chuc/${encodeURIComponent(campaign.organization.slug)}`}>Xem trang tổ chức</Link>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </section>
 

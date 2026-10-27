@@ -85,6 +85,17 @@ export type ApiCampaign = {
   createdAt?: string;
   updatedAt?: string;
   milestones?: ApiMilestone[];
+  /** Tổ chức được gây quỹ cho (chỉ gắn được với tổ chức đã xác minh). */
+  organizationId?: string | null;
+  organization?: ApiCampaignOrganization | null;
+};
+
+export type ApiCampaignOrganization = {
+  id: string;
+  slug: string;
+  name: string;
+  logoUrl?: string | null;
+  status: string;
 };
 
 export type CampaignListResponse = {
@@ -110,6 +121,10 @@ export type CampaignQuery = {
   maxProgress?: number;
   /** Chỉ chiến dịch đang gây quỹ, kết thúc trong N ngày tới. */
   endingWithinDays?: number;
+  /** Chỉ chiến dịch gây quỹ cho tổ chức này. */
+  organizationId?: string;
+  /** Chỉ chiến dịch gây quỹ cho một tổ chức đã xác minh. */
+  forOrganization?: boolean;
   sort?: CampaignSort;
   limit?: number;
   offset?: number;
@@ -138,6 +153,8 @@ export type CreateCampaignPayload = {
   startDate?: string;
   location?: string;
   imageUrl?: string;
+  /** `null` khi cập nhật = bỏ gắn tổ chức. */
+  organizationId?: string | null;
 };
 
 export async function createCampaign(payload: CreateCampaignPayload): Promise<ApiCampaign> {
@@ -166,6 +183,8 @@ function toParams(query: CampaignQuery): string {
   const statuses = Array.isArray(query.status) ? query.status : query.status ? [query.status] : [];
   if (statuses.length > 0) params.set("status", statuses.join(","));
   if (query.location) params.set("location", query.location);
+  if (query.organizationId) params.set("organizationId", query.organizationId);
+  if (query.forOrganization) params.set("forOrganization", "true");
   for (const key of ["minGoal", "maxGoal", "minProgress", "maxProgress", "endingWithinDays"] as const) {
     const value = query[key];
     if (value !== undefined) params.set(key, String(value));
@@ -306,6 +325,10 @@ export function apiCampaignToView(api: ApiCampaign): Campaign {
     ...(looksLikeHtml(api.description) ? { storyHtml: api.description } : {}),
     transparencyScore: milestones.length > 0 ? 95 : 86,
     milestones,
+    organization:
+      api.organization && api.organization.status === "verified"
+        ? { slug: api.organization.slug, name: api.organization.name, logoUrl: api.organization.logoUrl ?? null }
+        : null,
     latestUpdate: {
       date: formatDate(latestDate),
       title: firstMilestone?.title ?? "Chiến dịch vừa được tạo",

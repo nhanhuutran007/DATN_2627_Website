@@ -90,6 +90,12 @@ export default async function DonatePage({ params, searchParams }: DonatePagePro
             <ProgressRing value={percent} size={72} />
             <div>
               <h1>{campaign.title}</h1>
+              {campaign.organization && (
+                <p className="donate-beneficiary">
+                  <Icon name="shield" size={14} />
+                  <span>Khoản ủng hộ dành cho <b>{campaign.organization.name}</b> · tổ chức đã xác minh</span>
+                </p>
+              )}
               <p>
                 {!accepting
                   ? `Dự án hiện không nhận ủng hộ (${campaign.status.toLowerCase()}).`

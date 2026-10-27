@@ -40,6 +40,8 @@ export type Campaign = {
   /** Mô tả dạng HTML từ trình soạn thảo (chưa làm sạch); không có với mô tả văn bản thuần cũ. */
   storyHtml?: string;
   transparencyScore: number;
+  /** Tổ chức đã xác minh mà chiến dịch gây quỹ cho; dữ liệu mẫu không có. */
+  organization?: { slug: string; name: string; logoUrl: string | null } | null;
   milestones: Array<{
     /** Có với chiến dịch thật (API); dữ liệu mẫu không có. */
     id?: string;

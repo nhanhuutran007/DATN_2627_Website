@@ -11,6 +11,7 @@ import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { CategoryManager, StatsExport } from "@/features/admin/AdminContent";
 import { BackupManager } from "@/features/admin/BackupManager";
+import { OrganizationReview } from "@/features/admin/OrganizationReview";
 import { AdminFinance } from "@/features/admin/AdminFinance";
 import { CampaignReviewDialog } from "@/features/admin/CampaignReviewDialog";
 import { CopyableCode, DonationDetailDialog } from "@/features/admin/DonationDetailDialog";
@@ -119,6 +120,8 @@ function navBadge(slug: string, counts: AdminNavCounts | null): NavBadge | null 
   switch (slug) {
     case "cho-duyet":
       return numeric(counts.pendingCampaigns, "chiến dịch chờ duyệt");
+    case "to-chuc":
+      return numeric(counts.pendingOrganizations, "hồ sơ tổ chức chờ xác minh");
     case "rui-ro":
       return numeric(counts.openRisks, "cảnh báo rủi ro chưa xử lý");
     case "bao-cao-vi-pham":
@@ -2132,6 +2135,7 @@ export function AdminDashboard() {
             />
           )}
           {view === "sao-luu" && <BackupManager />}
+          {view === "to-chuc" && <OrganizationReview />}
 
           {view === "nhat-ky-kiem-toan" && (
           <AuditLogViewer onShowUser={setViewingUserId} />

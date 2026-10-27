@@ -248,6 +248,7 @@ export type AdminNavCounts = {
   reportedComments: number;
   stalePendingSepay: number;
   pendingRefunds: number;
+  pendingOrganizations: number;
   ledgerMismatches: number;
   daysSinceBackup: number | null;
 };
