@@ -114,7 +114,7 @@ Các nền tảng gây quỹ thông thường còn tồn tại một số hạn 
 | **Chủ dự án**      | Tạo và chỉnh sửa chiến dịch; gửi xét duyệt; theo dõi số liệu; công bố cập nhật và mốc tiến độ. Một tài khoản có thể đồng thời là người tài trợ. |
 | **Người đại diện tổ chức** | Đăng ký hồ sơ tổ chức kèm ảnh giấy phép; bổ sung khi được yêu cầu; cập nhật logo, sứ mệnh, liên hệ; theo dõi các chiến dịch gây quỹ cho tổ chức. Là một tài khoản người dùng bình thường, không phải vai trò riêng. |
 | **Quản trị viên**  | Xét duyệt chiến dịch; xác minh tổ chức; quản lý và khóa/mở tài khoản; xử lý báo cáo vi phạm; xem cảnh báo rủi ro AI; tra cứu nhật ký kiểm toán; sao lưu/khôi phục dữ liệu. |
-| **Hệ thống ngoài** | Cổng thanh toán (sandbox), dịch vụ email, lưu trữ tệp. Được đóng gói qua interface để thay nhà cung cấp mà không ảnh hưởng nghiệp vụ lõi.       |
+| **Hệ thống ngoài** | Cổng thanh toán (ví demo sandbox và SePay), dịch vụ email, lưu trữ tệp, đăng nhập Google. Được đóng gói qua interface để thay nhà cung cấp mà không ảnh hưởng nghiệp vụ lõi. |
 
 Vai trò trong hệ thống: `user` (người tài trợ), `campaign_owner` (chủ dự án), `admin` (quản trị viên). Người dùng **không thể tự đăng ký vai trò `admin`**.
 
@@ -136,7 +136,7 @@ Vai trò trong hệ thống: `user` (người tài trợ), `campaign_owner` (ch�
 | **Trí tuệ nhân tạo**       | Gợi ý dự án, dự đoán khả năng thành công, chấm điểm rủi ro gian lận; có giải thích, phiên bản mô hình và phương án dự phòng. Ước lượng thành công chỉ hiển thị cho chủ dự án (kèm gợi ý cải thiện) và quản trị viên (tham khảo khi xét duyệt), không công khai để tránh ảnh hưởng người ủng hộ. Chỉ ghi nhận hành vi khi người dùng **đồng ý** (opt-in, rút lại sẽ xóa lịch sử); lượt bấm vào dự án từ kết quả tìm kiếm cũng là một tín hiệu cho gợi ý. Cảnh báo gian lận ghi rõ được chấm bằng luật kết hợp mô hình hay chỉ bằng luật dự phòng. |     ✅      |
 | **Giao diện**              | Trang chủ, danh sách và chi tiết dự án, đăng nhập/đăng ký, tạo chiến dịch (mô tả soạn bằng trình soạn thảo định dạng, HTML được làm sạch ở máy chủ), dashboard chủ dự án, trang quản trị; SEO (metadata, Open Graph, sitemap, JSON-LD). Bố cục tham khảo các nền tảng gây quỹ phổ biến: header ba phần có menu thả xuống, trang chi tiết dự án có thẻ gây quỹ dính bên phải (vòng tiến độ, người ủng hộ gần nhất/lớn nhất), trang ủng hộ riêng toàn màn hình, thẻ dự án tối giản (ảnh, tên, người tổ chức, thanh tiến độ, số đã nhận), footer gọn, hero trang chủ nền sáng với vòng cung ảnh; trang khám phá theo lĩnh vực, trang riêng từng lĩnh vực, trang tìm kiếm `/tim-kiem` với bộ lọc dạng nút bo tròn, trang tạo chiến dịch toàn màn hình 8 bước, trang Cài đặt (tài khoản/thông báo), **Trang của tôi** `/dashboard` (tổng số đã ủng hộ, dự án đã ủng hộ/đang theo dõi, chiến dịch của mình), thông báo quyền riêng tư lần đầu truy cập + trang `/chinh-sach-bao-mat`, hiệu ứng tải khi chuyển trang (che ngay trang cũ, không nháy nội dung mới); hộp hỗ trợ hỏi đáp nhanh ở góc màn hình (gõ câu hỏi tự do hoặc chọn gợi ý, trả lời theo câu hỏi thường gặp soạn sẵn); đăng nhập xong quay lại trang đang xem. |     ✅     |
 | **Thông báo**              | Thông báo trong ứng dụng (chuông trên thanh điều hướng, trang `/thong-bao`) và email cho các quyết định xét duyệt; thông báo khi dự án cập nhật tiến độ, hoàn thành hoặc đổi lịch mốc, nhắc chủ dự án khi mốc quá hạn; xác minh email, quên/đặt lại mật khẩu. |     ✅      |
-| **Tương tác cộng đồng**    | Bình luận/hỏi đáp trên trang dự án, trả lời theo luồng (đánh dấu phản hồi của chủ dự án), báo cáo bình luận vi phạm; theo dõi dự án (nhận thông báo cập nhật như người ủng hộ) và chia sẻ (Web Share/sao chép liên kết/Facebook). |     ✅      |
+| **Tương tác cộng đồng**    | Bình luận/hỏi đáp trên trang dự án, trả lời theo luồng (đánh dấu phản hồi của chủ dự án), báo cáo bình luận vi phạm; theo dõi dự án (nhận thông báo cập nhật như người ủng hộ) và chia sẻ (sao chép liên kết, Facebook, X, LinkedIn, Telegram, WhatsApp, email). |     ✅      |
 | **Tổ chức thụ hưởng**      | Tổ chức (quỹ, NGO, doanh nghiệp xã hội…) đăng ký hồ sơ kèm ảnh giấy phép; quản trị viên xác minh, yêu cầu bổ sung, từ chối hoặc tạm ngưng (bắt buộc ghi lý do, ghi nhật ký kiểm toán, thông báo người đại diện). Sau khi xác minh, thông tin pháp lý bị khóa; ảnh giấy phép và ghi chú của quản trị viên không bao giờ lộ ra API công khai. Tổ chức đã xác minh có trang công khai `/to-chuc/[slug]` (sứ mệnh, thông tin pháp lý, số tiền đã huy động tính từ giao dịch đã xác nhận, các chiến dịch gây quỹ cho tổ chức) và danh bạ `/to-chuc` (tìm theo tên, lọc theo loại hình). Mọi người có thể **gây quỹ cho tổ chức**: trang `/gay-quy-cho-to-chuc` giới thiệu và liệt kê các chiến dịch đang gây quỹ cho tổ chức, nút "Gây quỹ cho tổ chức" mở form tạo chiến dịch với tổ chức đã chọn sẵn; trang dự án và trang ủng hộ hiện rõ đơn vị thụ hưởng. Trang `/danh-cho-to-chuc` hướng dẫn tổ chức đăng ký. |     ✅      |
 
 > ✅ Đã triển khai · 🔶 Triển khai một phần · ⏳ Kế hoạch
@@ -181,7 +181,7 @@ stateDiagram-v2
 
 ### 6.2. Luồng tài trợ và xác nhận thanh toán
 
-Trạng thái giao dịch chỉ được cập nhật sau khi **xác minh chữ ký** phản hồi từ cổng thanh toán. Trình duyệt không bao giờ gọi trực tiếp webhook.
+Trạng thái giao dịch chỉ được cập nhật sau khi **xác minh** phản hồi từ cổng thanh toán: chữ ký HMAC với ví demo, khóa `X-Secret-Key` và đối chiếu số tiền với IPN của SePay (khi lỡ IPN, hệ thống đối soát bằng API tra cứu đơn của SePay). Trình duyệt không bao giờ gọi trực tiếp webhook.
 
 ```mermaid
 sequenceDiagram
@@ -189,14 +189,14 @@ sequenceDiagram
     actor D as Người tài trợ
     participant FE as Frontend
     participant BE as Backend
-    participant PG as Cổng thanh toán (sandbox)
+    participant PG as Cổng thanh toán (ví demo / SePay)
     D->>FE: Chọn số tiền, xác nhận
     FE->>BE: POST /donations (Idempotency-Key)
     BE->>BE: Kiểm tra chiến dịch đang gây quỹ, chưa hết hạn
     BE->>PG: Tạo phiên thanh toán
-    PG-->>FE: Trang thanh toán ví demo
-    PG->>BE: Webhook (X-Signature HMAC + timestamp)
-    BE->>BE: Xác minh chữ ký, chống phát lại, cập nhật có điều kiện
+    PG-->>FE: Trang thanh toán (ví demo hoặc QR SePay)
+    PG->>BE: Webhook HMAC (ví demo) / IPN X-Secret-Key (SePay)
+    BE->>BE: Xác minh, đối chiếu số tiền, chống phát lại, cập nhật có điều kiện
     BE-->>FE: Giao dịch thành công
     FE-->>D: Hiển thị kết quả, cập nhật tiến độ quỹ
 ```
@@ -267,8 +267,8 @@ flowchart LR
     BE --> DB[(MySQL 8)]
     BE --> RD[(Redis 7<br/>Rate limit)]
     BE -- REST nội bộ --> AI[AI Service<br/>FastAPI + scikit-learn]
-    BE --> PAY[Cổng thanh toán<br/>Sandbox]
-    PAY -- Webhook HMAC --> BE
+    BE --> PAY[Cổng thanh toán<br/>Ví demo · SePay]
+    PAY -- Webhook / IPN --> BE
 ```
 
 Kiến trúc backend theo mô-đun nghiệp vụ, mỗi mô-đun tổ chức theo lớp **Controller → Service → Repository (TypeORM) → Entity**. Các tích hợp ngoài (thanh toán, AI, email, lưu trữ) nằm trong `backend/src/integrations/` dưới dạng interface, luôn có bản giả lập (sandbox) để kiểm thử.
@@ -279,7 +279,7 @@ Kiến trúc backend theo mô-đun nghiệp vụ, mỗi mô-đun tổ chức the
 | ----------------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
 | **Frontend**      | Next.js 16, React 19, TypeScript                             | Giao diện responsive, render phía máy chủ, SEO              |
 | **Backend**       | NestJS 12, TypeScript, TypeORM, class-validator              | Nghiệp vụ, xác thực/phân quyền, giao dịch, kiểm toán        |
-| **AI Service**    | Python 3.12, FastAPI, scikit-learn, pandas, NumPy            | Huấn luyện ngoại tuyến và suy luận mô hình                  |
+| **AI Service**    | Python 3.12, FastAPI, scikit-learn, pandas, NumPy; Google Colab + Kaggle | Suy luận mô hình; huấn luyện ngoại tuyến trên dữ liệu công khai |
 | **Cơ sở dữ liệu** | MySQL 8                                                      | Lưu trữ dữ liệu nghiệp vụ, migration có rollback            |
 | **Bộ nhớ đệm**    | Redis 7                                                      | Giới hạn tần suất (tự chuyển về bộ nhớ trong nếu Redis lỗi) |
 | **Hạ tầng**       | Docker Compose, Nginx, Terraform (AWS ECS Fargate, ALB, RDS) | Môi trường chạy thống nhất và triển khai đám mây            |
@@ -382,9 +382,11 @@ cd ..
 cd ai-service; ..\scripts\python-ai.cmd -m uvicorn app.main:app --reload
 ```
 
-### 11.4. Thanh toán thử nghiệm
+### 11.4. Thanh toán
 
-Hệ thống dùng **ví demo (sandbox)**, không phát sinh giao dịch tiền thật. Để thử webhook có chữ ký từ dòng lệnh:
+Mặc định chỉ bật **ví demo (sandbox)**, không phát sinh giao dịch tiền thật. Để bật **SePay** (QR chuyển khoản), điền `SEPAY_ENV`, `SEPAY_MERCHANT_ID`, `SEPAY_SECRET_KEY` (và tùy chọn `SEPAY_IPN_SECRET`) trong `.env` (Docker) hoặc `backend/.env` (phát triển), rồi khai báo IPN URL `https://<tên-miền>/api/v1/payments/sepay/ipn` trên trang quản lý SePay. Khi `SEPAY_ENV=production`, ví demo tự tắt.
+
+Để thử webhook ví demo có chữ ký từ dòng lệnh:
 
 ```powershell
 cd backend
@@ -398,7 +400,7 @@ cd backend
 | Loại              | Công cụ                  | Phạm vi                                                                                                                                                                                     |
 | ----------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unit test backend | `node --test`            | Xác thực, người dùng, chiến dịch (chuyển trạng thái, tự chốt hết hạn), tài trợ, sổ cái, tiến độ (chứng từ chi tiêu, chậm tiến độ, lịch sử kế hoạch), kiểm duyệt, quản trị (dự án nổi bật, lĩnh vực, xuất thống kê, sao lưu/khôi phục), tổ chức (đăng ký, khóa thông tin pháp lý, ma trận xét duyệt, xung đột lợi ích), cảnh báo rủi ro, rate limit, kiểm toán, tuần tự hóa dữ liệu nhạy cảm |
-| Test AI service   | `pytest`                 | Gợi ý, dự đoán, phát hiện gian lận, health, bảo mật                                                                                                                                         |
+| Test AI service   | `pytest`                 | Gợi ý (kể cả độ tương đồng lĩnh vực học được), dự đoán (chọn đúng tập đặc trưng của mô hình), phát hiện gian lận (mô hình có giám sát, phân vị rủi ro, dự phòng Isolation Forest), health, bảo mật |
 | Kiểm tra tĩnh     | TypeScript, ESLint, Ruff | Kiểu dữ liệu, quy ước mã                                                                                                                                                                    |
 | Smoke test        | Docker Compose + Nginx   | Toàn bộ 6 dịch vụ                                                                                                                                                                           |
 
@@ -461,7 +463,8 @@ DATN_2627_Website/
 │   │   │                     #   donations, payments, progress, rewards, finance,
 │   │   │                     #   comments, follows, media, moderation, admin, ai,
 │   │   │                     #   notifications, health
-│   │   ├── integrations/     # ai, payment, email, storage (interface + sandbox)
+│   │   ├── integrations/     # ai, payment (ví demo, SePay), email, storage,
+│   │   │                     #   identity (Google) — interface + bản giả lập
 │   │   └── common/           # Guard, interceptor, tiện ích dùng chung
 │   ├── database/migrations/  # Migration TypeORM có rollback
 │   └── test/                 # Unit test
@@ -507,7 +510,7 @@ _Cập nhật lần cuối: 27/10/2026._
 
 ### 15.3. Hướng phát triển
 
-- Tích hợp cổng thanh toán thật và eKYC qua nhà cung cấp chuyên nghiệp; ký quỹ và giải ngân theo mốc tiến độ.
+- Thêm cổng thẻ/ví điện tử (hiện SePay chỉ hỗ trợ QR chuyển khoản) và eKYC qua nhà cung cấp chuyên nghiệp; ký quỹ và giải ngân theo mốc tiến độ.
 - Thông báo đẩy (push) và email tóm tắt cập nhật cho người theo dõi.
 - Luồng "nhận trang tổ chức" (tìm tổ chức có sẵn trong danh bạ rồi gửi yêu cầu quản lý) và chuyển tiền trực tiếp cho tổ chức thụ hưởng.
 - Cập nhật mô hình AI định kỳ, giám sát trôi dữ liệu (drift), đánh giá công bằng giữa các nhóm dự án; phân tích mạng lưới để phát hiện nhóm tài khoản thông đồng.
