@@ -1,4 +1,4 @@
-// Góp Mầm — schema MySQL 8 (khớp migration tới 1790000000006).
+// Góp Mầm — schema MySQL 8 (khớp migration tới 1790000000012).
 // Dán vào https://dbdiagram.io để vẽ ERD vật lý, hoặc xuất PNG/PDF cho báo cáo.
 
 Project gop_mam {
@@ -39,6 +39,9 @@ Enum media_files_purpose {
   progress_image
   avatar
   expense_receipt
+  refund_proof
+  organization_logo
+  organization_document
 }
 
 Enum donations_status {
@@ -107,6 +110,24 @@ Enum behavior_events_event_type {
   view
   follow
   contribute
+  search
+}
+
+Enum organizations_org_type {
+  charity_fund
+  ngo
+  social_enterprise
+  education
+  health
+  other
+}
+
+Enum organizations_status {
+  pending
+  needs_info
+  verified
+  rejected
+  suspended
 }
 
 Enum notifications_type {
@@ -137,13 +158,14 @@ Table users {
   id char(36) [pk]
   name varchar(100) [not null]
   email varchar(255) [not null, unique]
-  password_hash varchar(255) [not null]
+  password_hash varchar(255) [not null, note: 'tài khoản tạo bằng Google nhận hash của mật khẩu ngẫu nhiên']
+  google_id varchar(64) [unique, note: 'sub của Google; NULL nếu chưa liên kết']
   role users_role [not null, default: 'user']
   status users_status [not null, default: 'active']
   avatar varchar(255)
   bio varchar(500)
   phone varchar(100)
-  organization varchar(255)
+  organization varchar(255) [note: 'đơn vị công tác ghi tự do, khác bảng organizations']
   email_verified tinyint(1) [not null, default: 0]
   failed_login_count int [not null, default: 0]
   locked_until datetime
@@ -182,6 +204,21 @@ Table password_reset_tokens {
   }
 }
 
+Table step_up_codes {
+  id char(36) [pk]
+  user_id char(36) [not null, ref: > users.id, note: 'ON DELETE CASCADE']
+  purpose varchar(30) [not null, note: 'change_password / refund_request / admin_refund / admin_backup']
+  code_hash char(64) [not null, note: 'HMAC-SHA256 của mã OTP 6 số (khóa bí mật phía server)']
+  expires_at datetime [not null, note: 'hết hạn sau 10 phút']
+  attempts int [not null, default: 0, note: 'tối đa 5 lần nhập sai']
+  used_at datetime
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  indexes {
+    (user_id, purpose, created_at)
+  }
+}
+
 Table revoked_tokens {
   jti char(36) [pk, note: 'jti của JWT đã đăng xuất']
   user_id char(36) [not null, ref: > users.id]
@@ -197,14 +234,16 @@ Table revoked_tokens {
 Table campaigns {
   id char(36) [pk]
   title varchar(200) [not null]
-  description text [not null]
+  description mediumtext [not null, note: 'HTML đã làm sạch ở server']
   category varchar(100) [not null, note: 'tên danh mục (categories.name), không có FK']
   owner_id char(36) [not null, ref: > users.id]
+  organization_id char(36) [ref: > organizations.id, note: 'tổ chức thụ hưởng; NULL = gây quỹ cho dự án của chủ chiến dịch']
   goal_amount decimal(15,2) [not null]
   current_amount decimal(15,2) [not null, default: 0]
   start_date datetime [not null]
   end_date datetime [not null]
   status campaigns_status [not null, default: 'draft']
+  submitted_at datetime [note: 'lần gửi duyệt gần nhất, sắp xếp hàng chờ']
   is_featured tinyint(1) [not null, default: 0, note: 'admin chọn nổi bật trên trang chủ']
   featured_at datetime
   image_url varchar(500)
@@ -219,6 +258,40 @@ Table campaigns {
     status
     category
     (is_featured, featured_at)
+    organization_id
+  }
+}
+
+Table organizations {
+  id char(36) [pk]
+  slug varchar(140) [not null, unique]
+  name varchar(200) [not null]
+  org_type organizations_org_type [not null]
+  registration_number varchar(100) [not null, note: 'không trùng giữa các hồ sơ chưa bị từ chối (kiểm ở tầng dịch vụ)']
+  issued_by varchar(200) [not null]
+  category varchar(100) [note: 'lĩnh vực hoạt động ghi tự do, không có FK']
+  mission text [not null]
+  website varchar(300)
+  email varchar(200) [not null]
+  phone varchar(30) [not null]
+  address varchar(300) [not null]
+  province varchar(100) [not null]
+  logo_url varchar(500)
+  document_url varchar(500) [not null, note: 'ảnh giấy phép, không trả ở API công khai']
+  representative_id char(36) [not null, ref: > users.id]
+  representative_title varchar(100) [not null]
+  status organizations_status [not null, default: 'pending']
+  review_notes text
+  reviewed_by char(36) [ref: > users.id]
+  reviewed_at datetime
+  verified_at datetime
+  submitted_at datetime [not null]
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  deleted_at datetime(6) [note: 'xóa mềm']
+  indexes {
+    (status, submitted_at)
+    registration_number
   }
 }
 
@@ -341,6 +414,7 @@ Table donations {
   status donations_status [not null, default: 'pending']
   payment_method varchar(50)
   transaction_id varchar(255) [unique]
+  transfer_code varchar(20) [unique, note: 'nội dung chuyển khoản VietQR/SePay, vd. GM7K2QX9AB']
   idempotency_key varchar(255) [not null, unique]
   message text
   is_anonymous tinyint(1) [not null, default: 0]
@@ -348,6 +422,8 @@ Table donations {
   refunded_at datetime
   refund_reference varchar(255)
   refund_reason varchar(500)
+  refund_method varchar(20) [note: 'gateway / manual_transfer']
+  refund_proof_url varchar(500) [note: 'ảnh chứng từ chuyển khoản hoàn (manual_transfer)']
   created_at datetime(6) [not null]
   updated_at datetime(6) [not null]
   indexes {
@@ -362,6 +438,9 @@ Table refund_requests {
   donation_id char(36) [not null, ref: > donations.id]
   user_id char(36) [not null, ref: > users.id]
   reason text [not null]
+  bank_name varchar(100) [note: 'tài khoản nhận hoàn khi phải chuyển khoản thủ công']
+  bank_account_number varchar(30)
+  bank_account_name varchar(100)
   status refund_requests_status [not null, default: 'pending']
   admin_notes text
   reviewed_by char(36) [ref: > users.id]
@@ -506,9 +585,11 @@ TableGroup tai_khoan {
   email_verification_tokens
   password_reset_tokens
   revoked_tokens
+  step_up_codes
 }
 TableGroup chien_dich {
   campaigns
+  organizations
   categories
   campaign_view_daily
   milestones

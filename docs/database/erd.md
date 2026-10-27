@@ -1,6 +1,6 @@
 # Database Design
 
-Schema MySQL 8 gồm **22 bảng** (khớp migration tới `1790000000006`). Định nghĩa cột đầy đủ ở [`schema.dbml`](./schema.dbml) (dán vào dbdiagram.io để vẽ ERD vật lý); đặc tả chi tiết từng thực thể và quan hệ ở [`dac-ta-erd.md`](./dac-ta-erd.md).
+Schema MySQL 8 gồm **24 bảng** (khớp migration tới `1790000000012`). Định nghĩa cột đầy đủ ở [`schema.dbml`](./schema.dbml) (dán vào dbdiagram.io để vẽ ERD vật lý); đặc tả chi tiết từng thực thể và quan hệ ở [`dac-ta-erd.md`](./dac-ta-erd.md).
 
 ## ERD Overview
 
@@ -20,6 +20,10 @@ erDiagram
     users ||--o{ revoked_tokens : "đăng xuất"
     users |o--o{ risk_alerts : "xử lý cảnh báo"
     users ||--o{ milestone_revisions : "sửa mốc"
+    users ||--o{ step_up_codes : "xác minh OTP"
+    users ||--o{ organizations : "đại diện"
+
+    organizations |o--o{ campaigns : "thụ hưởng"
 
     campaigns ||--o{ donations : "nhận"
     campaigns ||--o{ milestones : "có"
@@ -44,6 +48,7 @@ erDiagram
         varchar name
         varchar email UK
         varchar password_hash
+        varchar google_id UK
         enum role
         enum status
         boolean email_verified
@@ -54,6 +59,7 @@ erDiagram
     campaigns {
         char36 id PK
         char36 owner_id FK
+        char36 organization_id FK
         varchar title
         varchar category
         decimal goal_amount
@@ -61,9 +67,24 @@ erDiagram
         datetime start_date
         datetime end_date
         enum status
+        datetime submitted_at
         boolean is_featured
         datetime featured_at
         int backer_count
+    }
+    organizations {
+        char36 id PK
+        varchar slug UK
+        varchar name
+        enum org_type
+        varchar registration_number
+        varchar document_url
+        char36 representative_id FK
+        enum status
+        char36 reviewed_by FK
+        datetime verified_at
+        datetime submitted_at
+        datetime deleted_at
     }
     categories {
         char36 id PK
@@ -84,14 +105,17 @@ erDiagram
         decimal amount
         enum status
         varchar transaction_id UK
+        varchar transfer_code UK
         varchar idempotency_key UK
         boolean is_anonymous
+        varchar refund_method
     }
     refund_requests {
         char36 id PK
         char36 donation_id FK
         char36 user_id FK
         char36 reviewed_by FK
+        varchar bank_account_number
         enum status
     }
     reward_tiers {
@@ -195,6 +219,14 @@ erDiagram
         char64 token_hash UK
         datetime expires_at
     }
+    step_up_codes {
+        char36 id PK
+        char36 user_id FK
+        varchar purpose
+        char64 code_hash
+        datetime expires_at
+        int attempts
+    }
     revoked_tokens {
         char36 jti PK
         char36 user_id FK
@@ -211,7 +243,7 @@ erDiagram
     }
 ```
 
-Sơ đồ chỉ hiện các cột chính; `created_at`/`updated_at` có ở mọi bảng (trừ `revoked_tokens` chỉ có `created_at`, `campaign_view_daily` không có cột thời gian). `campaigns.category` lưu tên danh mục nên `categories` không nối FK với `campaigns`. Các quan hệ tới `users` qua cột người xử lý (`campaign_comments.hidden_by`, `reports.resolved_by`, `refund_requests.reviewed_by`) có FK nhưng không vẽ để sơ đồ đỡ rối — xem [`dac-ta-erd.md`](./dac-ta-erd.md).
+Sơ đồ chỉ hiện các cột chính; `created_at`/`updated_at` có ở mọi bảng (trừ `revoked_tokens` chỉ có `created_at`, `campaign_view_daily` không có cột thời gian). `campaigns.category` lưu tên danh mục nên `categories` không nối FK với `campaigns`. Các quan hệ tới `users` qua cột người xử lý (`campaign_comments.hidden_by`, `reports.resolved_by`, `refund_requests.reviewed_by`, `organizations.reviewed_by`) có FK nhưng không vẽ để sơ đồ đỡ rối — xem [`dac-ta-erd.md`](./dac-ta-erd.md).
 
 ## Tables Description
 
@@ -220,7 +252,9 @@ Sơ đồ chỉ hiện các cột chính; `created_at`/`updated_at` có ở mọ
 | Tài khoản | `users` | Người dùng; một tài khoản có thể vừa ủng hộ vừa làm chủ dự án |
 | | `email_verification_tokens`, `password_reset_tokens` | Token một lần (lưu hash SHA-256) |
 | | `revoked_tokens` | `jti` của JWT đã đăng xuất |
+| | `step_up_codes` | Mã OTP qua email cho thao tác nhạy cảm (đổi mật khẩu, hoàn tiền, sao lưu) |
 | Chiến dịch & tiến độ | `campaigns` | Vòng đời chiến dịch từ nháp đến kết thúc |
+| | `organizations` | Tổ chức thụ hưởng (quỹ, NGO…) do admin xác minh; chiến dịch có thể gây quỹ cho tổ chức |
 | | `categories` | Danh mục lĩnh vực do admin quản lý |
 | | `campaign_view_daily` | Lượt xem theo ngày (khóa chính ghép) cho thống kê chủ dự án |
 | | `milestones`, `milestone_updates` | Mốc tiến độ và cập nhật minh bạch chi tiêu |
@@ -228,20 +262,20 @@ Sơ đồ chỉ hiện các cột chính; `created_at`/`updated_at` có ở mọ
 | | `milestone_revisions` | Lịch sử sửa mốc sau khi phát hành, kèm lý do |
 | | `reward_tiers` | Mức ủng hộ kèm quà |
 | | `media_files` | Ảnh tải lên (chiến dịch, tiến độ, avatar, chứng từ) |
-| Giao dịch | `donations` | Giao dịch ủng hộ; `idempotency_key` chống ghi trùng |
-| | `refund_requests` | Yêu cầu hoàn tiền do admin duyệt |
+| Giao dịch | `donations` | Giao dịch ủng hộ; `idempotency_key` chống ghi trùng, `transfer_code` đối chiếu chuyển khoản |
+| | `refund_requests` | Yêu cầu hoàn tiền do admin duyệt (kèm tài khoản nhận nếu hoàn thủ công) |
 | Cộng đồng | `campaign_comments` | Bình luận/hỏi đáp, trả lời 1 cấp |
 | | `campaign_follows` | Theo dõi chiến dịch (N-N users–campaigns) |
 | Kiểm duyệt & rủi ro | `reports` | Báo cáo vi phạm chiến dịch hoặc bình luận |
 | | `risk_alerts` | Cảnh báo gian lận từ AI/luật |
-| AI | `behavior_events` | Hành vi xem/theo dõi/ủng hộ (chỉ ghi khi đồng ý) |
+| AI | `behavior_events` | Hành vi xem/theo dõi/ủng hộ/bấm từ kết quả tìm kiếm (chỉ ghi khi đồng ý) |
 | Hệ thống | `notifications` | Thông báo trong ứng dụng |
 | | `audit_logs` | Nhật ký thay đổi quan trọng |
 
 ## Principles
 
 - UUID (`CHAR(36)`) cho primary keys
-- Xóa mềm (`deleted_at`) cho `campaign_comments`, `reward_tiers`, `media_files`
+- Xóa mềm (`deleted_at`) cho `campaign_comments`, `reward_tiers`, `media_files`, `organizations`
 - Audit trail cho thay đổi quan trọng
 - Webhook phải verify chữ ký
 - Idempotency cho giao dịch

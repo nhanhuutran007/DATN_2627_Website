@@ -1,10 +1,10 @@
 # ĐẶC TẢ ERD — NỀN TẢNG GÂY QUỸ CỘNG ĐỒNG GÓP MẦM
 
-> Bản nháp theo cấu trúc tài liệu đặc tả ERD mẫu của khoa. Nguồn: các file `backend/src/**/entities/*.entity.ts` và migration trong `backend/database/migrations/` (tới `1790000000006`). Hình ERD vật lý vẽ từ [`schema.dbml`](./schema.dbml), sơ đồ tổng quan ở [`erd.md`](./erd.md).
+> Bản nháp theo cấu trúc tài liệu đặc tả ERD mẫu của khoa. Nguồn: các file `backend/src/**/entities/*.entity.ts` và migration trong `backend/database/migrations/` (tới `1790000000012`). Hình ERD vật lý vẽ từ [`schema.dbml`](./schema.dbml), sơ đồ tổng quan ở [`erd.md`](./erd.md).
 
 ## CHƯƠNG 1. TỔNG QUAN HỆ THỐNG
 
-Góp Mầm là nền tảng gây quỹ cộng đồng cho dự án xã hội và khởi nghiệp. Cơ sở dữ liệu quản lý toàn bộ quy trình: đăng ký tài khoản, tạo và kiểm duyệt chiến dịch, ủng hộ trực tuyến kèm mức quà, cập nhật tiến độ giải ngân kèm chứng từ chi tiêu, theo dõi chậm tiến độ và lịch sử thay đổi kế hoạch, hoàn tiền, tương tác cộng đồng (bình luận, theo dõi), quản trị nội dung (danh mục, dự án nổi bật), thống kê lượt xem, kiểm duyệt vi phạm, phát hiện gian lận bằng AI và thông báo. Hệ thống gồm **22 thực thể**, **33 mối quan hệ có khóa ngoại** và 5 tham chiếu logic không có khóa ngoại.
+Góp Mầm là nền tảng gây quỹ cộng đồng cho dự án xã hội và khởi nghiệp. Cơ sở dữ liệu quản lý toàn bộ quy trình: đăng ký tài khoản, tạo và kiểm duyệt chiến dịch, ủng hộ trực tuyến kèm mức quà, cập nhật tiến độ giải ngân kèm chứng từ chi tiêu, theo dõi chậm tiến độ và lịch sử thay đổi kế hoạch, hoàn tiền, tương tác cộng đồng (bình luận, theo dõi), quản trị nội dung (danh mục, dự án nổi bật), thống kê lượt xem, kiểm duyệt vi phạm, phát hiện gian lận bằng AI, thông báo, xác minh tổ chức thụ hưởng và xác minh bổ sung bằng mã OTP cho thao tác nhạy cảm. Hệ thống gồm **24 thực thể**, **37 mối quan hệ có khóa ngoại** và 5 tham chiếu logic không có khóa ngoại.
 
 Hệ quản trị: MySQL 8 (tương thích MariaDB), engine InnoDB. Schema chỉ thay đổi qua migration TypeORM có thứ tự và có rollback.
 
@@ -33,13 +33,14 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `id`, `created_at`, `updated_at`: theo quy ước chung
 - `name` (VARCHAR(100), NOT NULL): Họ tên hiển thị
 - `email` (VARCHAR(255), NOT NULL, UNIQUE): Email đăng nhập
-- `password_hash` (VARCHAR(255), NOT NULL): Mật khẩu đã băm (không bao giờ trả ra API)
+- `password_hash` (VARCHAR(255), NOT NULL): Mật khẩu đã băm (không bao giờ trả ra API); tài khoản tạo bằng Google nhận hash của một mật khẩu ngẫu nhiên, người dùng đặt mật khẩu riêng qua "Quên mật khẩu"
+- `google_id` (VARCHAR(64), UNIQUE): Mã tài khoản Google (`sub`) khi đăng nhập bằng Google; NULL nếu chưa liên kết. Nhận diện theo cột này nên người dùng đổi email Google vẫn vào đúng tài khoản
 - `role` (ENUM: user / campaign_owner / admin, NOT NULL): Vai trò, mặc định `user`
 - `status` (ENUM: active / inactive / banned, NOT NULL): Trạng thái tài khoản, mặc định `active`
 - `avatar` (VARCHAR(255)): Đường dẫn ảnh đại diện
 - `bio` (VARCHAR(500)): Giới thiệu ngắn
 - `phone` (VARCHAR(100)): Số điện thoại (chỉ chính chủ/admin xem được)
-- `organization` (VARCHAR(255)): Tổ chức/đơn vị
+- `organization` (VARCHAR(255)): Đơn vị công tác ghi tự do trên hồ sơ cá nhân; không liên quan tới bảng `organizations` (tổ chức thụ hưởng đã xác minh, mục 2.23)
 - `email_verified` (TINYINT(1), NOT NULL): Đã xác minh email, mặc định 0
 - `failed_login_count` (INT, NOT NULL): Số lần đăng nhập sai liên tiếp, mặc định 0
 - `locked_until` (DATETIME): Khóa đăng nhập tạm thời tới thời điểm này
@@ -48,7 +49,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `ai_tracking_consent` (TINYINT(1), NOT NULL): Đồng ý ghi nhận hành vi cho gợi ý AI, mặc định 0
 - `ai_consent_updated_at` (DATETIME): Lần cuối thay đổi lựa chọn đồng ý; NULL = chưa từng quyết định
 
-**Ràng buộc**: UNIQUE trên `email`.
+**Ràng buộc**: UNIQUE trên `email`, UNIQUE trên `google_id` (cho phép NULL).
 
 ### 2.2. EMAIL_VERIFICATION_TOKENS (Token xác minh email)
 
@@ -112,14 +113,16 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 
 - `id`, `created_at`, `updated_at`
 - `title` (VARCHAR(200), NOT NULL): Tên chiến dịch
-- `description` (TEXT, NOT NULL): Nội dung mô tả
+- `description` (MEDIUMTEXT, NOT NULL): Nội dung mô tả dạng HTML soạn bằng trình soạn thảo định dạng, được làm sạch ở server trước khi lưu
 - `category` (VARCHAR(100), NOT NULL): Tên danh mục, lấy từ `categories.name` (tham chiếu logic, không có FK)
 - `owner_id` (CHAR(36), NOT NULL, FK): Chủ chiến dịch
+- `organization_id` (CHAR(36), FK): Tổ chức thụ hưởng khi gây quỹ cho một tổ chức đã xác minh; NULL = gây quỹ cho dự án của chính chủ chiến dịch
 - `goal_amount` (DECIMAL(15,2), NOT NULL): Mục tiêu gây quỹ
 - `current_amount` (DECIMAL(15,2), NOT NULL): Số tiền đã gây được, mặc định 0 (chỉ cộng từ giao dịch đã xác minh)
 - `start_date` (DATETIME, NOT NULL): Ngày bắt đầu
 - `end_date` (DATETIME, NOT NULL): Ngày kết thúc
 - `status` (ENUM, NOT NULL): draft / pending / approved / rejected / needs_info / active / paused / success / failed / cancelled / ended, mặc định `draft`
+- `submitted_at` (DATETIME): Lần gửi (lại) duyệt gần nhất; hàng chờ kiểm duyệt xếp theo cột này
 - `is_featured` (TINYINT(1), NOT NULL): Được quản trị viên chọn làm dự án nổi bật trên trang chủ, mặc định 0
 - `featured_at` (DATETIME): Thời điểm được chọn nổi bật (dùng để sắp xếp)
 - `image_url` (VARCHAR(500)): Ảnh đại diện
@@ -131,8 +134,8 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 
 **Ràng buộc**:
 
-- FK `owner_id` tham chiếu `users(id)`
-- INDEX `status`, INDEX `category`, INDEX (`is_featured`, `featured_at`)
+- FK `owner_id` tham chiếu `users(id)`, FK `organization_id` tham chiếu `organizations(id)`
+- INDEX `status`, INDEX `category`, INDEX (`is_featured`, `featured_at`), INDEX `organization_id`
 
 ### 2.6. CATEGORIES (Danh mục lĩnh vực)
 
@@ -262,7 +265,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 
 ### 2.13. MEDIA_FILES (Tệp đa phương tiện)
 
-**Mục đích**: Quản lý ảnh người dùng tải lên (ảnh chiến dịch, ảnh tiến độ, avatar, ảnh hóa đơn/biên lai chi tiêu).
+**Mục đích**: Quản lý ảnh người dùng tải lên (ảnh chiến dịch, ảnh tiến độ, avatar, ảnh hóa đơn/biên lai chi tiêu, chứng từ hoàn tiền, logo và giấy phép tổ chức).
 
 **Thuộc tính**:
 
@@ -271,7 +274,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `storage_key` (VARCHAR(120), NOT NULL, UNIQUE): Khóa trong kho lưu trữ do server sinh, ví dụ `campaigns/<uuid>.webp`
 - `mime_type` (VARCHAR(50), NOT NULL): Kiểu MIME
 - `size_bytes` (INT, NOT NULL): Dung lượng
-- `purpose` (ENUM: campaign_image / progress_image / avatar / expense_receipt, NOT NULL): Mục đích sử dụng; `expense_receipt` lưu trong thư mục `receipts/`
+- `purpose` (ENUM: campaign_image / progress_image / avatar / expense_receipt / refund_proof / organization_logo / organization_document, NOT NULL): Mục đích sử dụng; `expense_receipt` lưu trong thư mục `receipts/`; `refund_proof` chỉ quản trị viên tải lên; `organization_document` là ảnh giấy phép, chỉ người đại diện và quản trị viên xem
 - `original_name` (VARCHAR(255)): Tên file gốc (chỉ để hiển thị)
 - `deleted_at` (DATETIME(6)): Xóa mềm
 
@@ -283,7 +286,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 
 ### 2.14. DONATIONS (Khoản ủng hộ)
 
-**Mục đích**: Ghi nhận giao dịch ủng hộ qua cổng thanh toán và trạng thái của giao dịch.
+**Mục đích**: Ghi nhận giao dịch ủng hộ (qua cổng thanh toán hoặc chuyển khoản VietQR đối soát bằng SePay) và trạng thái của giao dịch.
 
 **Thuộc tính**:
 
@@ -294,8 +297,9 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `amount` (DECIMAL(15,2), NOT NULL): Số tiền
 - `currency` (VARCHAR(3), NOT NULL): Đơn vị tiền, mặc định `VND`
 - `status` (ENUM, NOT NULL): pending / completed / failed / refunded / expired / cancelled, mặc định `pending`
-- `payment_method` (VARCHAR(50)): Phương thức thanh toán
+- `payment_method` (VARCHAR(50)): Phương thức thanh toán (vd. `sepay` cho chuyển khoản VietQR)
 - `transaction_id` (VARCHAR(255), UNIQUE): Mã giao dịch của cổng thanh toán
+- `transfer_code` (VARCHAR(20), UNIQUE): Mã nội dung chuyển khoản VietQR (vd. `GM7K2QX9AB`), dùng để khớp giao dịch ngân hàng báo về với đúng đơn
 - `idempotency_key` (VARCHAR(255), NOT NULL, UNIQUE): Khóa chống ghi nhận trùng
 - `message` (TEXT): Lời nhắn
 - `is_anonymous` (TINYINT(1), NOT NULL): Ủng hộ ẩn danh, mặc định 0
@@ -303,10 +307,12 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `refunded_at` (DATETIME): Thời điểm hoàn tiền
 - `refund_reference` (VARCHAR(255)): Mã hoàn tiền từ cổng thanh toán
 - `refund_reason` (VARCHAR(500)): Lý do hoàn tiền
+- `refund_method` (VARCHAR(20)): `gateway` (cổng thanh toán hoàn) hoặc `manual_transfer` (quản trị viên chuyển khoản trả lại — bắt buộc với khoản qua SePay)
+- `refund_proof_url` (VARCHAR(500)): Ảnh chứng từ chuyển khoản hoàn (chỉ với `manual_transfer`, không bắt buộc)
 
 **Ràng buộc**:
 
-- UNIQUE trên `transaction_id` (cho phép NULL), UNIQUE trên `idempotency_key`
+- UNIQUE trên `transaction_id`, `transfer_code` (đều cho phép NULL), UNIQUE trên `idempotency_key`
 - INDEX `user_id`, INDEX `campaign_id`, INDEX (`status`, `created_at`)
 - FK `user_id` → `users(id)`, FK `campaign_id` → `campaigns(id)`, FK `reward_tier_id` → `reward_tiers(id)`
 
@@ -320,6 +326,9 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `donation_id` (CHAR(36), NOT NULL, FK): Khoản ủng hộ cần hoàn
 - `user_id` (CHAR(36), NOT NULL, FK): Người yêu cầu
 - `reason` (TEXT, NOT NULL): Lý do
+- `bank_name` (VARCHAR(100)): Ngân hàng nhận tiền hoàn
+- `bank_account_number` (VARCHAR(30)): Số tài khoản nhận (nhật ký kiểm toán chỉ giữ 4 số cuối)
+- `bank_account_name` (VARCHAR(100)): Tên chủ tài khoản
 - `status` (ENUM: pending / approved / rejected, NOT NULL): Mặc định `pending`
 - `admin_notes` (TEXT): Ghi chú của quản trị viên
 - `reviewed_by` (CHAR(36), FK): Quản trị viên xử lý
@@ -328,6 +337,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 **Ràng buộc**:
 
 - INDEX (`status`, `created_at`), INDEX (`donation_id`, `status`)
+- Ba cột ngân hàng nhập đủ cả ba hoặc để trống cả ba (kiểm ở tầng dịch vụ); cần khi khoản ủng hộ phải hoàn bằng chuyển khoản thủ công
 - FK `donation_id` → `donations(id)`, FK `user_id` → `users(id)`, FK `reviewed_by` → `users(id)`
 
 ### 2.16. CAMPAIGN_COMMENTS (Bình luận chiến dịch)
@@ -419,14 +429,14 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 
 ### 2.20. BEHAVIOR_EVENTS (Sự kiện hành vi)
 
-**Mục đích**: Ghi nhận hành vi xem, theo dõi, ủng hộ làm dữ liệu cho gợi ý AI. Chỉ ghi khi người dùng bật `ai_tracking_consent`.
+**Mục đích**: Ghi nhận hành vi xem, theo dõi, ủng hộ, bấm vào dự án từ kết quả tìm kiếm làm dữ liệu cho gợi ý AI. Chỉ ghi khi người dùng bật `ai_tracking_consent`.
 
 **Thuộc tính**:
 
 - `id`, `created_at`, `updated_at`
 - `user_id` (CHAR(36), NOT NULL, FK): Người dùng
 - `campaign_id` (CHAR(36), NOT NULL, FK): Chiến dịch
-- `event_type` (ENUM: view / follow / contribute, NOT NULL): Loại hành vi
+- `event_type` (ENUM: view / follow / contribute / search, NOT NULL): Loại hành vi; `search` = bấm vào một dự án trong kết quả tìm kiếm (vẫn gắn với `campaign_id`)
 - `category` (VARCHAR(100), NOT NULL): Danh mục chiến dịch tại thời điểm ghi
 - `event_data` (JSON): Dữ liệu bổ sung
 
@@ -443,7 +453,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 
 - `id`, `created_at`, `updated_at`
 - `user_id` (CHAR(36), NOT NULL, FK): Người nhận
-- `type` (ENUM, NOT NULL): campaign_approved, campaign_rejected, campaign_needs_info, campaign_paused, campaign_resumed, campaign_ended, donation_received, donation_confirmed, milestone_completed, progress_update, report_resolved, comment_new, comment_reply, comment_hidden, refund_approved, refund_rejected, donation_refunded, milestone_overdue, milestone_rescheduled, system
+- `type` (ENUM, NOT NULL): campaign_approved, campaign_rejected, campaign_needs_info, campaign_paused, campaign_resumed, campaign_ended, donation_received, donation_confirmed, milestone_completed, progress_update, report_resolved, comment_new, comment_reply, comment_hidden, refund_approved, refund_rejected, donation_refunded, milestone_overdue, milestone_rescheduled, system (kết quả xét duyệt tổ chức dùng loại `system`)
 - `title` (VARCHAR(200), NOT NULL): Tiêu đề
 - `message` (TEXT, NOT NULL): Nội dung
 - `link` (VARCHAR(300)): Đường dẫn tương đối để mở khi bấm, ví dụ `/du-an/<id>`
@@ -472,6 +482,61 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `user_agent` (VARCHAR(500)): Trình duyệt/thiết bị
 
 **Ràng buộc**: Không có FK (xem 5.2).
+
+### 2.23. ORGANIZATIONS (Tổ chức thụ hưởng)
+
+**Mục đích**: Hồ sơ tổ chức xã hội (quỹ từ thiện, NGO, doanh nghiệp xã hội…) do người đại diện đăng ký kèm ảnh giấy phép. Chỉ khi quản trị viên xác minh (`verified`), tổ chức mới hiện công khai và nhận chiến dịch gây quỹ. Người đại diện là tài khoản người dùng bình thường, không phải vai trò riêng.
+
+**Thuộc tính**:
+
+- `id`, `created_at`, `updated_at`
+- `slug` (VARCHAR(140), NOT NULL, UNIQUE): Đường dẫn trang công khai `/to-chuc/<slug>`
+- `name` (VARCHAR(200), NOT NULL): Tên tổ chức
+- `org_type` (ENUM: charity_fund / ngo / social_enterprise / education / health / other, NOT NULL): Loại hình
+- `registration_number` (VARCHAR(100), NOT NULL): Số giấy phép/quyết định thành lập
+- `issued_by` (VARCHAR(200), NOT NULL): Cơ quan cấp
+- `category` (VARCHAR(100)): Lĩnh vực hoạt động (ghi tự do, không tham chiếu `categories`)
+- `mission` (TEXT, NOT NULL): Sứ mệnh
+- `website` (VARCHAR(300)), `email` (VARCHAR(200), NOT NULL), `phone` (VARCHAR(30), NOT NULL), `address` (VARCHAR(300), NOT NULL), `province` (VARCHAR(100), NOT NULL): Thông tin liên hệ
+- `logo_url` (VARCHAR(500)): Logo
+- `document_url` (VARCHAR(500), NOT NULL): Ảnh giấy phép — chỉ người đại diện và quản trị viên xem, không trả ở API công khai
+- `representative_id` (CHAR(36), NOT NULL, FK): Người đại diện
+- `representative_title` (VARCHAR(100), NOT NULL): Chức danh người đại diện
+- `status` (ENUM: pending / needs_info / verified / rejected / suspended, NOT NULL): Mặc định `pending`
+- `review_notes` (TEXT): Ghi chú/lý do của quản trị viên (bắt buộc từ 10 ký tự với mọi quyết định khác `verified`)
+- `reviewed_by` (CHAR(36), FK): Quản trị viên xét duyệt lần gần nhất
+- `reviewed_at` (DATETIME): Thời điểm xét duyệt gần nhất
+- `verified_at` (DATETIME): Lần đầu được xác minh
+- `submitted_at` (DATETIME, NOT NULL): Lần gửi (lại) hồ sơ gần nhất; hàng chờ xác minh xếp theo cột này
+- `deleted_at` (DATETIME(6)): Xóa mềm
+
+**Ràng buộc**:
+
+- UNIQUE trên `slug`
+- INDEX (`status`, `submitted_at`), INDEX `registration_number`
+- FK `representative_id` → `users(id)`, FK `reviewed_by` → `users(id)`
+- Ở tầng dịch vụ: `registration_number` không được trùng với hồ sơ khác đang ở `pending`/`needs_info`/`verified`/`suspended` (hồ sơ bị từ chối không giữ chỗ); mỗi tài khoản đại diện tối đa 3 tổ chức; sau khi xác minh, các trường pháp lý (`name`, `org_type`, `registration_number`, `issued_by`, `document_url`, `representative_title`) bị khóa
+- Ma trận xét duyệt: `pending` → `verified`/`needs_info`/`rejected`; `needs_info` → `verified`/`rejected`; `verified` ⇄ `suspended`; `rejected` là trạng thái cuối. Quản trị viên không được xét tổ chức mình đại diện
+
+### 2.24. STEP_UP_CODES (Mã xác minh bổ sung)
+
+**Mục đích**: Mã OTP 6 số gửi qua email để xác minh lại trước các thao tác nhạy cảm, kể cả khi người dùng đang đăng nhập.
+
+**Thuộc tính**:
+
+- `id`, `created_at`, `updated_at`
+- `user_id` (CHAR(36), NOT NULL, FK): Người nhận mã
+- `purpose` (VARCHAR(30), NOT NULL): Thao tác cần xác minh — `change_password`, `refund_request`, `admin_refund`, `admin_backup`
+- `code_hash` (CHAR(64), NOT NULL): HMAC-SHA256 của mã (khóa bí mật phía server); mã gốc không được lưu
+- `expires_at` (DATETIME, NOT NULL): Hết hạn sau 10 phút
+- `attempts` (INT, NOT NULL): Số lần nhập sai, mặc định 0; tối đa 5 lần
+- `used_at` (DATETIME): Thời điểm đã dùng; NULL = chưa dùng
+
+**Ràng buộc**:
+
+- INDEX (`user_id`, `purpose`, `created_at`)
+- FK `user_id` tham chiếu `users(id)` ON DELETE CASCADE
+- Gửi lại mã cách nhau tối thiểu 60 giây; mã đúng đổi thành token xác minh ngắn hạn (10 phút) gửi kèm yêu cầu thực hiện thao tác
 
 ## CHƯƠNG 3. MỐI QUAN HỆ (RELATIONSHIPS)
 
@@ -512,6 +577,10 @@ Các quan hệ dưới đây là 1-N (trừ 3.31 là 1-1) và đều có ràng b
 | 3.31 | MEDIA_FILES – MILESTONE_UPDATE_ATTACHMENTS | là chứng từ | `milestone_update_attachments.media_file_id → media_files.id` (UNIQUE) | Có | Quan hệ **1-1 (tùy chọn phía tệp)**: mỗi tệp chứng từ gắn với tối đa một bài cập nhật |
 | 3.32 | MILESTONES – MILESTONE_REVISIONS | có lịch sử | `milestone_revisions.milestone_id → milestones.id` (CASCADE) | Có | Một mốc có nhiều lần sửa sau khi phát hành |
 | 3.33 | USERS – MILESTONE_REVISIONS | sửa mốc | `milestone_revisions.changed_by → users.id` | Có | Một chủ dự án thực hiện nhiều lần sửa mốc |
+| 3.34 | USERS – ORGANIZATIONS (người đại diện) | đại diện | `organizations.representative_id → users.id` | Có | Một người dùng đại diện tối đa 3 tổ chức (giới hạn ở tầng dịch vụ) |
+| 3.35 | USERS – ORGANIZATIONS (người duyệt) | xác minh | `organizations.reviewed_by → users.id` | Không | Một quản trị viên xét duyệt nhiều tổ chức |
+| 3.36 | ORGANIZATIONS – CAMPAIGNS | thụ hưởng | `campaigns.organization_id → organizations.id` | Không | Một tổ chức đã xác minh được nhiều chiến dịch gây quỹ thay; chiến dịch có thể không gắn tổ chức |
+| 3.37 | USERS – STEP_UP_CODES | xác minh OTP | `step_up_codes.user_id → users.id` (CASCADE) | Có | Mỗi lần yêu cầu thao tác nhạy cảm tạo một mã mới |
 
 **Quan hệ N-N**: USERS – CAMPAIGNS (theo dõi) được tách thành hai quan hệ 1-N qua bảng trung gian `campaign_follows` (3.15, 3.16) với UNIQUE (`user_id`, `campaign_id`). Tương tự, `donations` có thể xem là bảng liên kết N-N USERS – CAMPAIGNS kèm thuộc tính giao dịch.
 
@@ -529,19 +598,22 @@ Các quan hệ dưới đây là 1-N (trừ 3.31 là 1-1) và đều có ràng b
 
 ### 4.1. Quy trình tổng quan
 
-1. **Đăng ký tài khoản** → tạo `USERS`, gửi `EMAIL_VERIFICATION_TOKENS`.
-2. **Tạo chiến dịch** → tạo `CAMPAIGNS` (status `draft`, `category` chọn từ `CATEGORIES` đang bật), kèm `MILESTONES`, `REWARD_TIERS`, ảnh trong `MEDIA_FILES`.
-3. **Gửi duyệt và kiểm duyệt** → `campaigns.status`: `pending` → `approved`/`rejected`/`needs_info` → `active`; ghi `AUDIT_LOGS`, gửi `NOTIFICATIONS`. Quản trị viên có thể đặt `is_featured` để đưa lên trang chủ.
+1. **Đăng ký tài khoản** → tạo `USERS`, gửi `EMAIL_VERIFICATION_TOKENS`. Đăng nhập bằng Google: tìm theo `users.google_id`; chưa có thì nối với tài khoản cùng email (Google đã xác minh email), chưa có tài khoản thì tạo mới vai trò `user`.
+2. **Tạo chiến dịch** → tạo `CAMPAIGNS` (status `draft`, `category` chọn từ `CATEGORIES` đang bật), kèm `MILESTONES`, `REWARD_TIERS`, ảnh trong `MEDIA_FILES`. Nếu gây quỹ cho tổ chức thì gán `organization_id`; tổ chức phải đang `verified`.
+3. **Gửi duyệt và kiểm duyệt** → `campaigns.status`: `pending` (ghi `submitted_at`) → `approved`/`rejected`/`needs_info` → `active`; chủ dự án sửa rồi gửi lại từ `rejected`/`needs_info`. Ghi `AUDIT_LOGS`, gửi `NOTIFICATIONS`; quản trị viên không được duyệt chiến dịch của chính mình. Quản trị viên có thể đặt `is_featured` để đưa lên trang chủ.
 4. **Xem chiến dịch** → tăng `campaigns.view_count` và cộng `CAMPAIGN_VIEW_DAILY.views` của ngày hiện tại (dùng cho biểu đồ và tỷ lệ chuyển đổi của chủ dự án).
-5. **Ủng hộ** → tạo `DONATIONS` (`pending`); webhook cổng thanh toán xác nhận → `completed`, cộng `campaigns.current_amount`, `backer_count`, `reward_tiers.claimed_count`. Đơn quá hạn → `expired`; người dùng hủy → `cancelled`.
+5. **Ủng hộ** → tạo `DONATIONS` (`pending`); với chuyển khoản VietQR, đơn có `transfer_code` làm nội dung chuyển khoản để webhook SePay tìm đúng đơn. Webhook (đã xác minh chữ ký) xác nhận → `completed`, cộng `campaigns.current_amount`, `backer_count`, `reward_tiers.claimed_count`. Đơn quá hạn → `expired`; người dùng hủy → `cancelled`.
 6. **Cập nhật tiến độ** → tạo `MILESTONE_UPDATES` kèm chứng từ chi tiêu (`MEDIA_FILES` mục đích `expense_receipt` + `MILESTONE_UPDATE_ATTACHMENTS`), đánh dấu `milestones.is_completed`; thông báo tới người ủng hộ và người theo dõi (`CAMPAIGN_FOLLOWS`).
 7. **Theo dõi chậm tiến độ** → tác vụ định kỳ tìm mốc quá `target_date` chưa hoàn thành, gửi `NOTIFICATIONS` loại `milestone_overdue` và ghi `milestones.overdue_notified_at`. Chủ dự án sửa mốc sau khi chiến dịch phát hành → tạo `MILESTONE_REVISIONS` (lý do bắt buộc); nếu đổi hạn hoặc ngân sách thì gửi thông báo `milestone_rescheduled` tới người ủng hộ.
 8. **Kết thúc chiến dịch** → `success`/`failed`/`ended`.
-9. **Hoàn tiền** → tạo `REFUND_REQUESTS`; quản trị viên duyệt → `donations.status = refunded`, ghi `refunded_at`, `refund_reference`.
+9. **Hoàn tiền** → người ủng hộ nhập mã OTP (`STEP_UP_CODES`, mục đích `refund_request`) rồi tạo `REFUND_REQUESTS`; khoản qua SePay kèm tài khoản ngân hàng nhận. Quản trị viên nhập OTP (`admin_refund`) rồi duyệt → `donations.status = refunded`, ghi `refunded_at`, `refund_reference` và `refund_method`: `gateway` (cổng thanh toán hoàn) hoặc `manual_transfer` (quản trị viên tự chuyển khoản, nhập mã giao dịch, có thể tải ảnh chứng từ vào `refund_proof_url`).
+10. **Xác minh tổ chức** → người đại diện tạo `ORGANIZATIONS` (`pending`) kèm ảnh giấy phép (`MEDIA_FILES` mục đích `organization_document`); quản trị viên xác minh / yêu cầu bổ sung / từ chối / tạm ngưng theo ma trận ở mục 2.23, ghi `AUDIT_LOGS`, gửi `NOTIFICATIONS` (loại `system`) kèm email. Tổ chức `verified` có trang công khai; số tiền đã huy động chỉ tính từ khoản ủng hộ đã xác nhận của các chiến dịch đang công khai. Trong phạm vi đồ án, tiền vẫn ghi vào chiến dịch; người tổ chức cam kết chuyển cho tổ chức và báo cáo chi tiêu kèm chứng từ.
 
 ### 4.2. Các nghiệp vụ phụ
 
-- Xác thực và bảo mật phiên (`USERS`, `PASSWORD_RESET_TOKENS`, `REVOKED_TOKENS`)
+- Xác thực và bảo mật phiên (`USERS` kể cả đăng nhập Google, `PASSWORD_RESET_TOKENS`, `REVOKED_TOKENS`)
+- Xác minh bổ sung bằng OTP cho đổi mật khẩu, yêu cầu/duyệt hoàn tiền, sao lưu dữ liệu (`STEP_UP_CODES`)
+- Gây quỹ cho tổ chức thụ hưởng (`ORGANIZATIONS`, `campaigns.organization_id`)
 - Tương tác cộng đồng (`CAMPAIGN_COMMENTS`, `CAMPAIGN_FOLLOWS`)
 - Kiểm duyệt vi phạm (`REPORTS`; có thể tạm dừng chiến dịch hoặc ẩn bình luận)
 - Phát hiện gian lận (`RISK_ALERTS`)
@@ -560,10 +632,11 @@ Các quan hệ dưới đây là 1-N (trừ 3.31 là 1-1) và đều có ràng b
 - `risk_alerts.entity_id`, `audit_logs.entity_id`, `notifications.related_id` trỏ tới nhiều bảng tùy cột loại đi kèm nên không đặt FK; tính toàn vẹn do tầng ứng dụng đảm bảo.
 - `audit_logs.user_id` cố ý không có FK để nhật ký không bị mất hay chặn khi xóa tài khoản.
 - `campaigns.category` lưu tên danh mục thay vì `categories.id`; đổi tên danh mục được đồng bộ ở tầng dịch vụ, tắt danh mục (`is_active = 0`) không làm chiến dịch cũ mất danh mục.
+- `organizations.category` và `users.organization` chỉ là văn bản ghi tự do để hiển thị, không phải tham chiếu (không tính vào 5 tham chiếu logic).
 
 ### 5.3. Nhiều khóa ngoại cùng trỏ về USERS
 
-- `refund_requests` (`user_id`, `reviewed_by`), `reports` (`reporter_id`, `resolved_by`), `campaign_comments` (`user_id`, `hidden_by`): cùng một bảng `users` nhưng đóng vai trò khác nhau (người dùng thường và quản trị viên/người xử lý).
+- `refund_requests` (`user_id`, `reviewed_by`), `reports` (`reporter_id`, `resolved_by`), `campaign_comments` (`user_id`, `hidden_by`), `organizations` (`representative_id`, `reviewed_by`): cùng một bảng `users` nhưng đóng vai trò khác nhau (người dùng thường và quản trị viên/người xử lý).
 - `milestone_revisions.changed_by`: người sửa mốc (chủ dự án), tách khỏi `audit_logs` vì lịch sử này được công khai cho người ủng hộ.
 
 ### 5.4. Quan hệ 1-1 và khóa chính ghép
@@ -575,29 +648,30 @@ Các quan hệ dưới đây là 1-N (trừ 3.31 là 1-1) và đều có ràng b
 
 - Khóa chính là UUID `CHAR(36)`; riêng `revoked_tokens` dùng `jti` của JWT làm khóa chính và `campaign_view_daily` dùng khóa ghép (xem 5.4).
 - `created_at`/`updated_at` dùng `CURRENT_TIMESTAMP(6)`; `updated_at` tự cập nhật.
-- `campaigns.status` mặc định `draft`; `donations.status`, `refund_requests.status`, `reports.status` mặc định `pending`; `risk_alerts.status` mặc định `open`.
+- `campaigns.status` mặc định `draft`; `donations.status`, `refund_requests.status`, `reports.status`, `organizations.status` mặc định `pending`; `risk_alerts.status` mặc định `open`.
 - `users.role` mặc định `user`; `users.ai_tracking_consent` mặc định 0 (opt-in).
 - `donations.currency` mặc định `VND`.
 - `campaigns.is_featured` mặc định 0; `categories.is_active` mặc định 1.
 
 ### 5.6. Toàn vẹn giao dịch
 
-- `donations.idempotency_key` UNIQUE và `transaction_id` UNIQUE chống ghi nhận trùng khi webhook gửi lại.
+- `donations.idempotency_key` UNIQUE, `transaction_id` UNIQUE và `transfer_code` UNIQUE chống ghi nhận trùng khi webhook gửi lại và bảo đảm mỗi giao dịch ngân hàng chỉ khớp một đơn.
+- Hoàn tiền (cả phía người ủng hộ và quản trị viên) yêu cầu mã OTP còn hạn trong `step_up_codes`; mã chỉ dùng một lần và bị vô hiệu sau 5 lần nhập sai.
 - `campaigns.current_amount` chỉ cộng từ khoản ủng hộ đã xác minh.
 - CHECK trên `reward_tiers` chặn vượt số suất quà.
 - Chứng từ chi tiêu là tệp riêng (UNIQUE `media_file_id`) và lịch sử sửa mốc (`milestone_revisions`) chỉ được thêm mới (ứng dụng không có thao tác sửa/xóa), giúp người ủng hộ đối chiếu việc giải ngân.
 
 ### 5.7. Xóa mềm và xóa dây chuyền
 
-- Xóa mềm (`deleted_at`): `campaign_comments`, `reward_tiers`, `media_files`.
-- ON DELETE CASCADE: các bảng token, `campaign_follows`, `campaign_view_daily` (dữ liệu phụ, không cần giữ khi xóa người dùng/chiến dịch); `milestone_update_attachments` theo bài cập nhật (tệp gốc vẫn còn trong kho); `milestone_revisions` theo mốc. Các bảng nghiệp vụ khác không cascade để tránh mất dữ liệu tài chính.
+- Xóa mềm (`deleted_at`): `campaign_comments`, `reward_tiers`, `media_files`, `organizations`.
+- ON DELETE CASCADE: các bảng token (kể cả `step_up_codes`), `campaign_follows`, `campaign_view_daily` (dữ liệu phụ, không cần giữ khi xóa người dùng/chiến dịch); `milestone_update_attachments` theo bài cập nhật (tệp gốc vẫn còn trong kho); `milestone_revisions` theo mốc. Các bảng nghiệp vụ khác không cascade để tránh mất dữ liệu tài chính.
 
 ## TỔNG KẾT
 
 Cơ sở dữ liệu Góp Mầm được thiết kế với:
 
-- **22 thực thể** chia 6 nhóm: tài khoản, chiến dịch và tiến độ, giao dịch, cộng đồng, kiểm duyệt và rủi ro, AI và hệ thống
-- **33 mối quan hệ có khóa ngoại** (32 quan hệ 1-N, 1 quan hệ 1-1) và 5 tham chiếu logic, bảo đảm toàn vẹn dữ liệu
+- **24 thực thể** chia 6 nhóm: tài khoản, chiến dịch và tiến độ, giao dịch, cộng đồng, kiểm duyệt và rủi ro, AI và hệ thống
+- **37 mối quan hệ có khóa ngoại** (36 quan hệ 1-N, 1 quan hệ 1-1) và 5 tham chiếu logic, bảo đảm toàn vẹn dữ liệu
 - **Minh bạch giải ngân** nhờ chứng từ chi tiêu gắn với từng bài cập nhật, nhắc mốc quá hạn và lịch sử thay đổi kế hoạch công khai
 - **An toàn giao dịch** nhờ idempotency key, unique constraint, CHECK constraint và nhật ký kiểm toán
 - **Khả năng mở rộng** qua migration có thứ tự và có rollback, cho phép bổ sung loại thông báo, trạng thái và mô-đun AI mà không phá vỡ dữ liệu cũ
