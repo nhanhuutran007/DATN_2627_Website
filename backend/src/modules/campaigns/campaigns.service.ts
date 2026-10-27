@@ -11,6 +11,7 @@ import { Brackets, In, Repository, SelectQueryBuilder } from "typeorm";
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { sanitizeRichText } from "../../common/html/rich-text";
 import { NotificationsService } from "../notifications/notifications.service";
+import { OrganizationStatus } from "../organizations/entities/organization.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import { campaignStatusNotifications } from "./campaign-notifications";
 import {
@@ -154,7 +155,7 @@ export class CampaignsService {
     // Bước 2: nạp đủ quan hệ cho đúng trang đó rồi giữ thứ tự của bước 1.
     const loaded = await this.campaignRepo.find({
       where: { id: In(ids) },
-      relations: { owner: true, milestones: true },
+      relations: { owner: true, milestones: true, organization: true },
     });
     const byId = new Map(loaded.map((campaign) => [campaign.id, campaign]));
     const items = ids
@@ -176,6 +177,15 @@ export class CampaignsService {
     } else {
       qb.where("c.status IN (:...statuses)", { statuses: statuses ?? PUBLIC_STATUSES });
       if (query.category) qb.andWhere("c.category = :category", { category: query.category });
+    }
+    if (query.organizationId) {
+      qb.andWhere("c.organizationId = :organizationId", { organizationId: query.organizationId });
+    }
+    if (query.forOrganization) {
+      qb.andWhere(
+        "EXISTS (SELECT 1 FROM organizations o WHERE o.id = c.organization_id AND o.status = :verifiedOrg AND o.deleted_at IS NULL)",
+        { verifiedOrg: OrganizationStatus.VERIFIED },
+      );
     }
 
     const q = query.q?.trim();
@@ -246,7 +256,7 @@ export class CampaignsService {
   async findById(id: string): Promise<Campaign> {
     const campaign = await this.campaignRepo.findOne({
       where: { id },
-      relations: { owner: true, milestones: true },
+      relations: { owner: true, milestones: true, organization: true },
     });
     if (!campaign) {
       throw new NotFoundException("Campaign not found");
@@ -280,6 +290,7 @@ export class CampaignsService {
       status: CampaignStatus.DRAFT,
       imageUrl: dto.imageUrl,
       location: dto.location,
+      organizationId: dto.organizationId ?? null,
       backerCount: 0,
       viewCount: 0,
     });
@@ -312,6 +323,8 @@ export class CampaignsService {
     }
 
     Object.assign(campaign, dto);
+    // Quan hệ đã nạp sẽ ghi đè cột khi save nếu không bỏ đi.
+    if (dto.organizationId !== undefined) campaign.organization = undefined;
     const saved = await this.campaignRepo.save(campaign);
     await this.auditService.record({
       userId: currentUser.id,

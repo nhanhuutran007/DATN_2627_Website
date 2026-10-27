@@ -74,6 +74,8 @@ export type AdminNavCounts = {
   /** Giao dịch SePay chờ thanh toán quá lâu, có thể cần đối soát tay. */
   stalePendingSepay: number;
   pendingRefunds: number;
+  /** Hồ sơ tổ chức đang chờ admin xác minh. */
+  pendingOrganizations: number;
   /** Chiến dịch có số ghi trên chiến dịch lệch với tổng giao dịch thành công (lũy kế). */
   ledgerMismatches: number;
   /** Ngày từ lần sao lưu gần nhất; null nếu chưa từng sao lưu. */
@@ -110,6 +112,7 @@ export class AdminService {
       reportedComments,
       stalePendingSepay,
       pendingRefunds,
+      pendingOrganizations,
       ledgerMismatches,
       lastBackupRows,
     ] = await Promise.all([
@@ -126,6 +129,7 @@ export class AdminService {
         [new Date(now.getTime() - STALE_SEPAY_MINUTES * 60_000)],
       ),
       count("SELECT COUNT(*) AS n FROM `refund_requests` WHERE `status` = 'pending'"),
+      count("SELECT COUNT(*) AS n FROM `organizations` WHERE `status` = 'pending' AND `deleted_at` IS NULL"),
       // Cùng tiêu chí "lệch" với trang Đối soát (chênh > 0,5đ hoặc khác số lượt), nhưng xét mọi chiến dịch.
       count(
         "SELECT COUNT(*) AS n FROM `campaigns` c LEFT JOIN (" +
@@ -145,6 +149,7 @@ export class AdminService {
       reportedComments,
       stalePendingSepay,
       pendingRefunds,
+      pendingOrganizations,
       ledgerMismatches,
       daysSinceBackup: lastBackup ? Math.floor((now.getTime() - new Date(lastBackup).getTime()) / 86_400_000) : null,
     };

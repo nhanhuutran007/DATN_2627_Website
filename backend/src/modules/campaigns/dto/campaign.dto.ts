@@ -10,9 +10,11 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from "class-validator";
 
 import { PROVINCES } from "../../../common/constants/provinces";
@@ -52,6 +54,11 @@ export class CreateCampaignDto {
   @IsOptional()
   @IsIn(PROVINCES, { message: "Địa điểm phải là một trong 34 tỉnh/thành phố" })
   location?: string;
+
+  /** Gây quỹ cho một tổ chức đã xác minh (bỏ trống = gây quỹ cá nhân). */
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string;
 }
 
 export class UpdateCampaignDto {
@@ -90,6 +97,12 @@ export class UpdateCampaignDto {
   @IsOptional()
   @IsIn(PROVINCES, { message: "Địa điểm phải là một trong 34 tỉnh/thành phố" })
   location?: string;
+
+  /** `null` = chuyển về gây quỹ cá nhân. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID()
+  organizationId?: string | null;
 }
 
 /** `?status=active,success` hoặc `?status=active&status=success` → mảng trạng thái. */
@@ -111,6 +124,17 @@ export class CampaignQueryDto {
   @IsString()
   @MaxLength(100)
   category?: string;
+
+  /** Chỉ chiến dịch gây quỹ cho tổ chức này. */
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string;
+
+  /** Chỉ chiến dịch gây quỹ cho một tổ chức đang ở trạng thái đã xác minh. */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true" || value === "1")
+  @IsBoolean()
+  forOrganization?: boolean;
 
   /** Một hoặc nhiều trạng thái (cách nhau bởi dấu phẩy). */
   @IsOptional()
