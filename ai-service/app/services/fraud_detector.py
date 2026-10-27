@@ -1,7 +1,15 @@
-"""Fraud-detection service: business rules + optional IsolationForest layer."""
+"""Fraud-detection service: business rules + optional machine-learning layer.
+
+The ML layer prefers a supervised classifier trained on labelled real transactions
+(``models/fraud_classifier.pkl``, see ``notebooks/train_real_data_colab.ipynb``); its
+probability is turned into a risk percentile against the training score distribution
+(``models/fraud_score_reference.json``) because fraud is rare and raw probabilities stay
+small. Without those files the legacy IsolationForest + scaler artifacts are used.
+"""
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass
 from functools import lru_cache
@@ -45,6 +53,23 @@ def _load_fraud_artifacts(
         if not hasattr(model, "decision_function") or not hasattr(scaler, "transform"):
             return None, None
         return model, scaler
+    except Exception:
+        return None, None
+
+
+@lru_cache(maxsize=8)
+def _load_classifier_artifacts(
+    model_path_str: str, reference_path_str: str
+) -> tuple[Any | None, np.ndarray | None]:
+    try:
+        model = joblib.load(Path(model_path_str))
+        payload = json.loads(Path(reference_path_str).read_text(encoding="utf-8"))
+        reference = np.sort(np.asarray(payload["quantiles"], dtype=float))
+        if not hasattr(model, "predict_proba") or reference.size < 2:
+            return None, None
+        if not np.all(np.isfinite(reference)):
+            return None, None
+        return model, reference
     except Exception:
         return None, None
 
@@ -140,9 +165,17 @@ class FraudDetectorService:
         self,
         model_path: Path | str | None = None,
         scaler_path: Path | str | None = None,
+        classifier_path: Path | str | None = None,
+        reference_path: Path | str | None = None,
     ) -> None:
         self._model_path = Path(model_path) if model_path else settings.fraud_model_path
         self._scaler_path = Path(scaler_path) if scaler_path else settings.fraud_scaler_path
+        self._classifier_path = (
+            Path(classifier_path) if classifier_path else settings.fraud_classifier_path
+        )
+        self._reference_path = (
+            Path(reference_path) if reference_path else settings.fraud_reference_path
+        )
 
     def score(
         self, entity_type: str, entity_id: str | None, features: dict[str, float]
@@ -191,6 +224,36 @@ class FraudDetectorService:
         )
 
     def _ml_risk(self, features: dict[str, float]) -> float | None:
+        classifier_risk = self._classifier_risk(features)
+        if classifier_risk is not None:
+            return classifier_risk
+        return self._isolation_risk(features)
+
+    def _classifier_risk(self, features: dict[str, float]) -> float | None:
+        model, reference = _load_classifier_artifacts(
+            str(self._classifier_path), str(self._reference_path)
+        )
+        if model is None or reference is None:
+            return None
+        try:
+            # Mô hình cây xử lý được giá trị thiếu (NaN) nên không cần điền trung bình
+            vector = np.asarray(
+                [[
+                    value if (value := _as_finite(features.get(name))) is not None else np.nan
+                    for name in FRAUD_FEATURES
+                ]],
+                dtype=float,
+            )
+            probability = float(np.asarray(model.predict_proba(vector))[0][1])
+            if not math.isfinite(probability):
+                return None
+            # Phân vị rủi ro: giao dịch này rủi ro hơn bao nhiêu phần giao dịch lúc huấn luyện
+            rank = float(np.searchsorted(reference, probability, side="right"))
+            return max(0.0, min(1.0, rank / reference.size))
+        except Exception:
+            return None
+
+    def _isolation_risk(self, features: dict[str, float]) -> float | None:
         model, scaler = _load_fraud_artifacts(str(self._model_path), str(self._scaler_path))
         if model is None:
             return None

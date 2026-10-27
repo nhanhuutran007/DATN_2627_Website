@@ -1,14 +1,11 @@
 {
-  "model_version": "2026.09.1",
-  "model": "isolation_forest",
-  "trained_at": "2026-10-26T15:17:57+00:00",
-  "contamination": 0.02,
-  "n_estimators": 200,
-  "scaler": "standard_scaler",
-  "rows": 2040,
-  "known_anomalies": 40,
-  "detection_rate": 0.75,
-  "false_positive_rate": 0.0055,
+  "model_version": "2026.10-real.1",
+  "model": "hist_gradient_boosting (có giám sát)",
+  "trained_at": "2026-10-27T08:19:55+00:00",
+  "risk_output": "phân vị rủi ro so với phân phối điểm tập train (fraud_score_reference.json)",
+  "rows": 590540,
+  "known_anomalies": 20663,
+  "fraud_rate_train": 0.035135,
   "features": [
     "contribution_count_1h",
     "failed_payment_count",
@@ -16,5 +13,53 @@
     "amount_z_score",
     "new_account_days"
   ],
-  "generation": "synthetic (2% anomalies: high-volume, many-failed, agent clusters)"
+  "dataset": "IEEE-CIS Fraud Detection (Kaggle, Vesta) — giao dịch thẻ thật có nhãn isFraud",
+  "split": {
+    "strategy": "time_order",
+    "train_rows": 472432,
+    "test_rows": 118108
+  },
+  "test_metrics": {
+    "roc_auc": 0.7181004447499473,
+    "pr_auc": 0.07197852822997551,
+    "pr_auc_random_baseline": 0.034409184813899145,
+    "top_1pct": {
+      "precision": 0.08890770533446232,
+      "lift": 2.583836432490816,
+      "recall": 0.025836614173228346
+    },
+    "top_5pct": {
+      "precision": 0.08585944115156646,
+      "lift": 2.495247754805416,
+      "recall": 0.12475393700787402
+    }
+  },
+  "time_series_cv_roc_auc": {
+    "mean": 0.7023397261602584,
+    "std": 0.025515218757140436
+  },
+  "rejected_alternatives": {
+    "isolation_forest": {
+      "roc_auc": 0.4912404269663705,
+      "pr_auc": 0.032747156769025516,
+      "pr_auc_random_baseline": 0.034409184813899145,
+      "top_1pct": {
+        "precision": 0.0,
+        "lift": 0.0,
+        "recall": 0.0
+      },
+      "top_5pct": {
+        "precision": 0.031837425910245555,
+        "lift": 0.9252595224919493,
+        "recall": 0.04625984251968504
+      },
+      "reason": "Không giám sát, xấp xỉ ngẫu nhiên trên dữ liệu thật: bất thường thống kê không trùng với gian lận."
+    }
+  },
+  "ensemble": "risk = max(0.75 * luật + 0.25 * mô hình, luật); quản trị viên xác nhận mọi cảnh báo",
+  "limitations": [
+    "failed_payment_count không có trong IEEE-CIS (đặt 0); tầng luật của hệ thống xử lý tín hiệu này.",
+    "Giao dịch thương mại điện tử bằng thẻ, khác hành vi ủng hộ trên nền tảng gây quỹ.",
+    "Mô hình chỉ tạo tín hiệu phụ; quản trị viên xác nhận trước mọi hành động."
+  ]
 }

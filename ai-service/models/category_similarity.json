@@ -1,0 +1,63 @@
+{
+  "model_version": "2026.10-real.1",
+  "trained_at": "2026-10-27T08:22:03+00:00",
+  "source": "DonorsChoose.org (Kaggle hanselhansel/donorschoose) — cosine giữa lĩnh vực theo người quyên góp chung",
+  "categories": [
+    "Môi trường",
+    "Khởi nghiệp",
+    "Giáo dục",
+    "Y tế",
+    "Văn hóa",
+    "Công nghệ"
+  ],
+  "similarity": {
+    "Môi trường": {
+      "Môi trường": 1.0,
+      "Khởi nghiệp": 0.0,
+      "Giáo dục": 0.0,
+      "Y tế": 0.0,
+      "Văn hóa": 0.0,
+      "Công nghệ": 0.0
+    },
+    "Khởi nghiệp": {
+      "Môi trường": 0.0,
+      "Khởi nghiệp": 1.0,
+      "Giáo dục": 0.1607,
+      "Y tế": 0.1171,
+      "Văn hóa": 0.1066,
+      "Công nghệ": 0.1471
+    },
+    "Giáo dục": {
+      "Môi trường": 0.0,
+      "Khởi nghiệp": 0.1607,
+      "Giáo dục": 1.0,
+      "Y tế": 0.1169,
+      "Văn hóa": 0.1089,
+      "Công nghệ": 0.182
+    },
+    "Y tế": {
+      "Môi trường": 0.0,
+      "Khởi nghiệp": 0.1171,
+      "Giáo dục": 0.1169,
+      "Y tế": 1.0,
+      "Văn hóa": 0.0927,
+      "Công nghệ": 0.1159
+    },
+    "Văn hóa": {
+      "Môi trường": 0.0,
+      "Khởi nghiệp": 0.1066,
+      "Giáo dục": 0.1089,
+      "Y tế": 0.0927,
+      "Văn hóa": 1.0,
+      "Công nghệ": 0.1078
+    },
+    "Công nghệ": {
+      "Môi trường": 0.0,
+      "Khởi nghiệp": 0.1471,
+      "Giáo dục": 0.182,
+      "Y tế": 0.1159,
+      "Văn hóa": 0.1078,
+      "Công nghệ": 1.0
+    }
+  }
+}

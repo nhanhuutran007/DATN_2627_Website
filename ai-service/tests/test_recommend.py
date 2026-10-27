@@ -90,3 +90,22 @@ def test_preferences_drive_content_source() -> None:
 
     assert response.source == "CONTENT"
     assert response.items[0].campaign_id == "camp-102"
+
+def test_learned_similarity_file_is_loaded(tmp_path) -> None:
+    import json
+
+    from app.services.catalog import CATEGORIES
+    from app.services.rec_index import RecIndex
+
+    pair = {"Giáo dục", "Y tế"}
+    matrix = {a: {b: (0.8 if {a, b} == pair else 0.0) for b in CATEGORIES} for a in CATEGORIES}
+    path = tmp_path / "category_similarity.json"
+    path.write_text(json.dumps({"similarity": matrix}), encoding="utf-8")
+
+    index = RecIndex.from_json(path)
+
+    assert index is not None
+    assert index.similarity("Giáo dục", "Y tế") == 0.8
+    assert index.similarity("Giáo dục", "Giáo dục") == 1.0
+    assert index.similarity("Giáo dục", "Công nghệ") == 0.0
+    assert RecIndex.from_json(tmp_path / "missing.json") is None

@@ -1,0 +1,55 @@
+{
+  "model_version": "2026.10-real.1",
+  "generated_at": "2026-10-27T08:22:03+00:00",
+  "dataset": {
+    "name": "DonorsChoose.org",
+    "events": 3551103,
+    "train_events": 2842074,
+    "test_events": 709029,
+    "users_evaluated": 20000,
+    "category_mapping": {
+      "Math & Science": "Công nghệ",
+      "Applied Learning": "Khởi nghiệp",
+      "Literacy & Language": "Giáo dục",
+      "History & Civics": "Giáo dục",
+      "Special Needs": "Giáo dục",
+      "Music & The Arts": "Văn hóa",
+      "Health & Sports": "Y tế",
+      "Warmth, Care & Hunger": "Y tế"
+    }
+  },
+  "split": {
+    "strategy": "chronological",
+    "fraction": 0.8,
+    "cut_time": "2017-05-20 00:00:00",
+    "time_source": "Projects.Project Posted Date"
+  },
+  "task": "Dự đoán lĩnh vực của lượt quyên góp kế tiếp (xếp hạng 6 lĩnh vực)",
+  "results": {
+    "random": {
+      "hit@1": 0.16365,
+      "hit@2": 0.32845,
+      "mrr": 0.4052649999999786
+    },
+    "popular": {
+      "hit@1": 0.49585,
+      "hit@2": 0.7195,
+      "mrr": 0.6842625000000395
+    },
+    "history": {
+      "hit@1": 0.45905,
+      "hit@2": 0.71815,
+      "mrr": 0.6675800000000368
+    },
+    "history_similarity": {
+      "hit@1": 0.46065,
+      "hit@2": 0.72155,
+      "mrr": 0.670480833333365
+    }
+  },
+  "limitations": [
+    "Dự án lớp học ở Mỹ; lĩnh vực ánh xạ gần đúng.",
+    "Đánh giá ở mức lĩnh vực, chưa ở mức từng dự án.",
+    "Không có ngày quyên góp: thời gian lấy theo ngày đăng dự án."
+  ]
+}
