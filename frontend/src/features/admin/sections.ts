@@ -22,6 +22,7 @@ export const ADMIN_SECTION_GROUPS: AdminSectionGroup[] = [
     label: "Kiểm duyệt",
     sections: [
       { slug: "cho-duyet", label: "Duyệt chiến dịch", title: "Duyệt chiến dịch", icon: "clipboard-check" },
+      { slug: "to-chuc", label: "Xác minh tổ chức", title: "Xác minh tổ chức", icon: "document" },
       { slug: "rui-ro", label: "Cảnh báo rủi ro", title: "Cảnh báo rủi ro", icon: "shield" },
       { slug: "bao-cao-vi-pham", label: "Báo cáo vi phạm", title: "Báo cáo vi phạm", icon: "flag" },
       { slug: "binh-luan", label: "Bình luận", title: "Kiểm duyệt bình luận", icon: "message" },

@@ -10,6 +10,7 @@ const COLUMNS: Array<{ id: string; title: string; links: FooterLink[] }> = [
     title: "Ủng hộ",
     links: [
       { href: "/du-an", label: "Khám phá dự án" },
+      { href: "/to-chuc", label: "Tổ chức đã xác minh" },
       ...["Giáo dục", "Môi trường", "Y tế", "Khởi nghiệp"].map((name) => ({
         href: `/du-an?category=${encodeURIComponent(name)}`,
         label: name,
@@ -22,6 +23,8 @@ const COLUMNS: Array<{ id: string; title: string; links: FooterLink[] }> = [
     links: [
       { href: "/tao-chien-dich", label: "Tạo chiến dịch" },
       { href: "/bat-dau-gay-quy", label: "Cách bắt đầu gây quỹ" },
+      { href: "/gay-quy-cho-to-chuc", label: "Gây quỹ cho tổ chức" },
+      { href: "/danh-cho-to-chuc", label: "Dành cho tổ chức" },
       { href: "/dashboard", label: "Trang của tôi" },
     ],
   },

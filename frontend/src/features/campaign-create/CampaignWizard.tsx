@@ -11,6 +11,7 @@ import { MoneyInput } from "@/components/ui/MoneyInput";
 import { PROVINCES } from "@/lib/provinces";
 import { escapeHtml, htmlToText } from "@/lib/rich-text";
 import { ImageUploader } from "@/features/media/ImageUploader";
+import { OrganizationPicker } from "@/features/organizations/OrganizationPicker";
 import {
   emptyTier,
   RewardTiersEditor,
@@ -26,6 +27,7 @@ import {
   type CreateCampaignPayload,
 } from "@/lib/api/campaigns";
 import { useCategories } from "@/lib/api/categories";
+import type { PickedOrganization } from "@/lib/api/organizations";
 import {
   createMilestone,
   deleteMilestone,
@@ -154,9 +156,13 @@ function isHttpUrl(value: string): boolean {
 type CampaignWizardProps = {
   /** Lĩnh vực chọn sẵn (từ trang "Bắt đầu gây quỹ"), server đã kiểm tra là lĩnh vực đang nhận dự án. */
   initialCategory?: string;
+  /** Tổ chức chọn sẵn (từ trang tổ chức, `?to-chuc=`), server đã kiểm tra là tổ chức đã xác minh. */
+  initialOrganization?: PickedOrganization;
 };
 
-export function CampaignWizard({ initialCategory }: CampaignWizardProps) {
+type Beneficiary = "self" | "organization";
+
+export function CampaignWizard({ initialCategory, initialOrganization }: CampaignWizardProps) {
   const router = useRouter();
   const user = useAuthUser();
   const redirecting = useRedirectAdmin();
@@ -190,6 +196,10 @@ export function CampaignWizard({ initialCategory }: CampaignWizardProps) {
   const [tiers, setTiers] = useState<DraftTier[]>([{ ...emptyTier }]);
   const [savedTierIds, setSavedTierIds] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [beneficiary, setBeneficiary] = useState<Beneficiary>(initialOrganization ? "organization" : "self");
+  const [organization, setOrganization] = useState<PickedOrganization | null>(initialOrganization ?? null);
+  // Chỉ gắn tổ chức khi đang chọn "Một tổ chức đã xác minh".
+  const pickedOrganization = beneficiary === "organization" ? organization : null;
 
   const plannedBudget = milestones.reduce((sum, m) => sum + (Number(m.budget) || 0), 0);
   const target = Number(draft.target) || 0;
@@ -228,6 +238,7 @@ export function CampaignWizard({ initialCategory }: CampaignWizardProps) {
   /** Lỗi của một bước; `forDraft` chỉ đòi các trường bắt buộc để lưu nháp (bước câu chuyện chỉ cần tên). */
   const validateStep = (index: number, forDraft = false): string => {
     if (index === STEP_BASICS) {
+      if (beneficiary === "organization" && !organization) return "Vui lòng chọn tổ chức bạn gây quỹ cho.";
       if (!draft.location.trim()) return "Vui lòng chọn tỉnh/thành nơi thực hiện dự án.";
       if (!draft.category) return "Vui lòng chọn lĩnh vực của dự án.";
     }
@@ -286,6 +297,8 @@ export function CampaignWizard({ initialCategory }: CampaignWizardProps) {
       location: draft.location.trim(),
       description: parts.filter(Boolean).join("\n"),
       ...(isImageValue(draft.imageUrl.trim()) ? { imageUrl: draft.imageUrl.trim() } : {}),
+      // Bản nháp đã lưu: gửi null để bỏ gắn khi người dùng đổi sang gây quỹ cho dự án của mình.
+      ...(pickedOrganization ? { organizationId: pickedOrganization.id } : campaignId ? { organizationId: null } : {}),
     };
   };
 
@@ -436,6 +449,45 @@ export function CampaignWizard({ initialCategory }: CampaignWizardProps) {
 
               {step === STEP_BASICS && (
                 <>
+                  <fieldset className="create-q">
+                    <legend>Bạn gây quỹ cho ai?</legend>
+                    <div className="create-beneficiary">
+                      <button
+                        type="button"
+                        aria-pressed={beneficiary === "self"}
+                        onClick={() => {
+                          setBeneficiary("self");
+                          setNotice("");
+                        }}
+                      >
+                        <Icon name="user" size={22} />
+                        <b>Dự án của tôi</b>
+                        <small>Bạn hoặc nhóm của bạn trực tiếp thực hiện dự án.</small>
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={beneficiary === "organization"}
+                        onClick={() => {
+                          setBeneficiary("organization");
+                          setNotice("");
+                        }}
+                      >
+                        <Icon name="shield" size={22} />
+                        <b>Một tổ chức đã xác minh</b>
+                        <small>Gây quỹ cho quỹ, tổ chức xã hội nhân dịp sinh nhật, sự kiện hay tưởng nhớ.</small>
+                      </button>
+                    </div>
+                    {beneficiary === "organization" && (
+                      <OrganizationPicker
+                        value={organization}
+                        disabled={busy}
+                        onChange={(next) => {
+                          setOrganization(next);
+                          setNotice("");
+                        }}
+                      />
+                    )}
+                  </fieldset>
                   <div className="create-q">
                     <label htmlFor="create-location">Dự án được thực hiện ở đâu?</label>
                     <p>Chọn tỉnh/thành nơi dự án diễn ra.</p>
@@ -574,6 +626,7 @@ export function CampaignWizard({ initialCategory }: CampaignWizardProps) {
                 <div className="form">
                   <dl className="review-grid">
                     <div><dt>Tên chiến dịch</dt><dd>{draft.title || "—"}</dd></div>
+                    <div><dt>Gây quỹ cho</dt><dd>{pickedOrganization ? pickedOrganization.name : "Dự án của tôi"}</dd></div>
                     <div><dt>Lĩnh vực</dt><dd>{draft.category || "—"}</dd></div>
                     <div><dt>Địa điểm</dt><dd>{draft.location || "—"}</dd></div>
                     <div><dt>Mục tiêu</dt><dd>{target ? `${target.toLocaleString("vi-VN")} ₫` : "—"}</dd></div>
