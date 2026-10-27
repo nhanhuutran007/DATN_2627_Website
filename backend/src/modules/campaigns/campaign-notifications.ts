@@ -57,8 +57,8 @@ export function campaignStatusNotifications(
       };
     case CampaignStatus.FAILED:
       return {
-        owner: owner(NotificationType.CAMPAIGN_ENDED, "Chiến dịch kết thúc chưa đạt mục tiêu", `Chiến dịch ${name} đã hết hạn nhưng chưa đạt mục tiêu gây quỹ.`),
-        backers: { type: NotificationType.CAMPAIGN_ENDED, title: "Chiến dịch bạn ủng hộ đã kết thúc", message: `Chiến dịch ${name} đã hết hạn nhưng chưa đạt mục tiêu.`, link: publicLink, relatedId: campaign.id },
+        owner: owner(NotificationType.CAMPAIGN_ENDED, "Chiến dịch kết thúc chưa đạt mục tiêu", `Chiến dịch ${name} đã hết hạn nhưng chưa đạt mục tiêu gây quỹ. Người ủng hộ có thể yêu cầu hoàn tiền và quản trị viên sẽ xử lý từng yêu cầu.`),
+        backers: { type: NotificationType.CAMPAIGN_ENDED, title: "Chiến dịch bạn ủng hộ đã kết thúc", message: `Chiến dịch ${name} đã hết hạn nhưng chưa đạt mục tiêu. Nếu đã ủng hộ, bạn có thể yêu cầu hoàn tiền từ biên nhận trong mục "Khoản ủng hộ của tôi".`, link: publicLink, relatedId: campaign.id },
       };
     case CampaignStatus.ENDED:
       return { owner: owner(NotificationType.CAMPAIGN_ENDED, "Chiến dịch đã đóng", `Chiến dịch ${name} đã được đóng.`, false) };

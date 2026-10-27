@@ -10,6 +10,7 @@ import { Brackets, In, Repository, SelectQueryBuilder } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { sanitizeRichText } from "../../common/html/rich-text";
+import { RefundRequest, RefundRequestStatus } from "../finance/entities/refund-request.entity";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrganizationStatus } from "../organizations/entities/organization.entity";
 import { User, UserRole } from "../users/entities/user.entity";
@@ -383,6 +384,23 @@ export class CampaignsService {
       throw new ConflictException(
         `Cannot move campaign from "${campaign.status}" to "${dto.status}"`,
       );
+    }
+
+    // Đóng chiến dịch thất bại: xử lý hết yêu cầu hoàn tiền đang chờ trước, để
+    // người ủng hộ không bị bỏ lại giữa chừng.
+    if (campaign.status === CampaignStatus.FAILED && dto.status === CampaignStatus.ENDED) {
+      const pendingRefunds = await this.campaignRepo.manager
+        .getRepository(RefundRequest)
+        .createQueryBuilder("r")
+        .innerJoin("r.donation", "d")
+        .where("d.campaignId = :campaignId", { campaignId: campaign.id })
+        .andWhere("r.status = :status", { status: RefundRequestStatus.PENDING })
+        .getCount();
+      if (pendingRefunds > 0) {
+        throw new ConflictException(
+          `Còn ${pendingRefunds} yêu cầu hoàn tiền đang chờ xử lý; hãy duyệt hoặc từ chối trước khi đóng chiến dịch.`,
+        );
+      }
     }
 
     const needsReason = [
