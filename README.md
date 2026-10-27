@@ -234,20 +234,19 @@ Ba mô-đun chạy trong dịch vụ `ai-service` riêng (FastAPI + scikit-learn
 
 | Mô-đun                          | Phương pháp                                                                                                                            | Người hưởng lợi          | Dự phòng                                  |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ----------------------------------------- |
-| **Gợi ý dự án**                 | Lọc theo nội dung (sở thích, danh mục) kết hợp tín hiệu cộng tác từ lịch sử tương tác (xem, theo dõi, ủng hộ, bấm từ kết quả tìm kiếm), có suy giảm theo thời gian; trả về lý do gợi ý. | Người tài trợ            | Danh sách dự án phổ biến                  |
-| **Dự đoán khả năng thành công** | Phân loại nhị phân; so sánh Logistic Regression với Random Forest, chọn theo ROC-AUC; hiển thị các yếu tố ảnh hưởng.                   | Chủ dự án, quản trị viên | Không hiển thị điểm, không chặn nghiệp vụ |
-| **Phát hiện gian lận**          | Hai tầng: luật nghiệp vụ + Isolation Forest (chuẩn hóa StandardScaler; đặc trưng thiếu được điền giá trị trung bình tập huấn luyện thay vì 0). Tạo cảnh báo rủi ro kèm nhóm nguyên nhân. | Quản trị viên            | Chỉ áp dụng tầng luật                     |
+| **Gợi ý dự án**                 | Lọc theo nội dung (sở thích, danh mục) kết hợp tín hiệu cộng tác (xem, theo dõi, ủng hộ, bấm từ kết quả tìm kiếm), có suy giảm theo thời gian; độ tương đồng giữa các lĩnh vực **học từ hành vi quyên góp thật** (DonorsChoose); trả về lý do gợi ý. | Người tài trợ            | Danh sách dự án phổ biến                  |
+| **Dự đoán khả năng thành công** | Gradient Boosting học từ **~332.000 dự án Kickstarter thật**, chỉ dùng thông tin có lúc tạo chiến dịch (lĩnh vực, mục tiêu, thời gian kêu gọi); so với đoán lớp đa số, Logistic Regression, Random Forest; hiển thị các yếu tố ảnh hưởng. | Chủ dự án, quản trị viên | Không hiển thị điểm, không chặn nghiệp vụ |
+| **Phát hiện gian lận**          | Hai tầng: luật nghiệp vụ + mô hình có giám sát (HistGradientBoosting) học từ **~590.000 giao dịch thật có nhãn** (IEEE-CIS); điểm mô hình đổi thành phân vị rủi ro và chỉ chiếm 25% điểm cuối. Tạo cảnh báo rủi ro kèm nhóm nguyên nhân. | Quản trị viên            | Chỉ áp dụng tầng luật                     |
 
-**Kết quả đánh giá** (phiên bản mô hình `2026.09.1`; mô hình dự đoán huấn luyện ngày 11/09/2026, mô hình phát hiện gian lận huấn luyện lại ngày 26/10/2026):
+**Kết quả đánh giá** (phiên bản mô hình `2026.10-real.1`, huấn luyện ngày 27/10/2026 trên dữ liệu công khai thật bằng notebook [`ai-service/notebooks/train_real_data_colab.ipynb`](ai-service/notebooks/train_real_data_colab.ipynb); mọi tập đều chia **theo thời gian 80/20**):
 
-| Mô-đun                                             | Dữ liệu                         | Cách chia            | Chỉ số                                                    |
-| -------------------------------------------------- | ------------------------------- | -------------------- | --------------------------------------------------------- |
-| Dự đoán thành công (Random Forest)                 | 1.000 chiến dịch                | Theo thời gian 80/20 | ROC-AUC 0,685 · F1 0,627 · Precision 0,697 · Recall 0,570 |
-| Dự đoán thành công (Logistic Regression, baseline) | 1.000 chiến dịch                | Theo thời gian 80/20 | ROC-AUC 0,573 · F1 0,522                                  |
-| Phát hiện gian lận (Isolation Forest)              | 2.040 giao dịch (40 bất thường) | —                    | Tỷ lệ phát hiện 75% · Tỷ lệ cảnh báo sai 0,55%            |
-| Gợi ý dự án                                        | 6.000 sự kiện, 300 người dùng   | Theo thời gian 80/20 | Precision@10 0,012 · Recall@10 0,031 · NDCG@10 0,021      |
+| Mô-đun | Dữ liệu | Kết quả trên tập kiểm tra | So với mốc |
+| ------ | ------- | ------------------------- | ---------- |
+| Dự đoán thành công (Gradient Boosting) | Kickstarter 2009–2017, 331.675 dự án (Kaggle) | ROC-AUC **0,685** · PR-AUC 0,586 · Brier 0,219; kiểm định chéo theo thời gian 0,678 ± 0,012 | Đoán lớp đa số 0,500 · Logistic Regression 0,654 · thêm 21 đặc trưng (thí nghiệm, chưa triển khai) 0,725 |
+| Phát hiện gian lận (có giám sát) | IEEE-CIS, 590.540 giao dịch thẻ, 3,5% gian lận | ROC-AUC **0,718** · PR-AUC 0,072; trong 1% giao dịch rủi ro nhất, tỷ lệ gian lận gấp **2,6 lần** ngẫu nhiên; kiểm định chéo 0,702 ± 0,026 | Isolation Forest không giám sát (phương án cũ) 0,491 — **đã loại** vì không tốt hơn ngẫu nhiên |
+| Gợi ý (dự đoán lĩnh vực lần quyên góp kế tiếp) | DonorsChoose, 3,55 triệu lượt quyên góp; 20.000 người đánh giá | Lịch sử + độ tương đồng: Hit@2 **0,722** · MRR 0,671 | Ngẫu nhiên 0,329 · Phổ biến 0,720 (Hit@1 của phổ biến 0,496 cao hơn 0,461) |
 
-> **Giới hạn dữ liệu:** Các chỉ số trên đo trên **dữ liệu tổng hợp (synthetic) sinh có seed cố định**, do nền tảng mới chưa có dữ liệu thực. Chúng chứng minh pipeline huấn luyện – đánh giá – suy luận hoạt động đúng, **không** phản ánh hiệu năng trên dữ liệu thật. Chi tiết tái lập: [`ai-service/data/README.md`](ai-service/data/README.md), [`ai-service/training/`](ai-service/training).
+> **Giới hạn:** Dữ liệu là các nền tảng ở Mỹ (Kickstarter, DonorsChoose) và giao dịch thẻ thương mại điện tử (IEEE-CIS), khác thị trường và loại hình gây quỹ xã hội tại Việt Nam; Kickstarter không có lĩnh vực Môi trường và Y tế; DonorsChoose không có ngày quyên góp nên thời gian lấy theo ngày đăng dự án. Với gợi ý, người quyên góp hay quay lại lĩnh vực phổ biến nên cá nhân hóa theo lĩnh vực chỉ ngang mốc "phổ biến" — vì vậy thuật toán luôn kết hợp độ phổ biến của từng dự án. Khi nền tảng có dữ liệu thật, notebook cho phép huấn luyện lại mà không sửa code. Dữ liệu tổng hợp trong [`ai-service/data/`](ai-service/data/README.md) chỉ còn dùng để kiểm thử pipeline.
 
 **Nguyên tắc AI có trách nhiệm:** AI chỉ hỗ trợ; mọi quyết định khóa, từ chối hoặc tạm dừng đều do quản trị viên xác nhận. Kết quả dự đoán không phải cam kết và không được dùng làm căn cứ duy nhất để từ chối chiến dịch. Hệ thống không công khai cáo buộc gian lận.
 
@@ -469,8 +468,9 @@ DATN_2627_Website/
 ├── ai-service/               # FastAPI – mô-đun AI
 │   ├── app/                  # API suy luận: recommend, predict, fraud
 │   ├── training/             # Sinh dữ liệu, huấn luyện, đánh giá
+│   ├── notebooks/            # Huấn luyện trên dữ liệu thật (Google Colab)
 │   ├── models/               # Mô hình đã huấn luyện + chỉ số đánh giá
-│   ├── data/                 # Dữ liệu tổng hợp
+│   ├── data/                 # Dữ liệu tổng hợp để kiểm thử pipeline
 │   └── tests/
 ├── infra/                    # Docker Compose, Nginx, Terraform
 ├── docs/                     # Kiến trúc, API, cơ sở dữ liệu, kiểm thử, vận hành
@@ -500,7 +500,7 @@ _Cập nhật lần cuối: 27/10/2026._
 
 ### 15.2. Hạn chế
 
-- Mô hình AI được huấn luyện trên dữ liệu tổng hợp; hiệu năng thực tế cần đánh giá lại khi có dữ liệu thật.
+- Mô hình AI được huấn luyện trên dữ liệu công khai của nền tảng nước ngoài (Kickstarter, DonorsChoose, IEEE-CIS); hiệu năng trên người dùng Việt Nam cần đánh giá lại khi nền tảng có dữ liệu thật.
 - Hoàn tiền khoản SePay phải chuyển khoản thủ công (SePay không có API hoàn tiền); chưa có giải ngân thực tế cho chủ dự án hay chuyển tiền trực tiếp tới tổ chức thụ hưởng.
 - Xác minh tổ chức dựa trên ảnh giấy phép do quản trị viên đối chiếu thủ công; chưa tra cứu được nguồn dữ liệu đăng ký chính thức.
 - Kiểm thử đầu-cuối tự động chưa hoàn chỉnh.
