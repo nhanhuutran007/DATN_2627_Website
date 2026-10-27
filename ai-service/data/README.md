@@ -5,6 +5,24 @@ Thư mục này chứa dataset cho 3 mô hình AI của đồ án. Mặc định
 chất lượng, bạn có thể thay bằng dữ liệu **cào từ các nền tảng gây quỹ** theo
 đúng schema contract bên dưới — không cần sửa code, chỉ cần thay file CSV.
 
+## 0. Huấn luyện trên dữ liệu công khai thật (khuyến nghị)
+
+Notebook [`notebooks/train_real_data_colab.ipynb`](../notebooks/train_real_data_colab.ipynb)
+chạy trên Google Colab, tải dữ liệu từ Kaggle và xuất đúng các file `models/` mà dịch vụ đang đọc:
+
+| Mô hình | Dữ liệu | Đặc trưng / cách làm |
+|---------|---------|----------------------|
+| Dự đoán thành công | Kickstarter Projects (`kemical/kickstarter-projects`) | `category_id`, `goal_amount` (USD → VNĐ), `duration_days` — chỉ thông tin có lúc tạo chiến dịch; so với mốc đoán lớp đa số và Logistic Regression, kiểm định chéo theo thời gian |
+| Phát hiện bất thường | IEEE-CIS Fraud Detection (cuộc thi `ieee-fraud-detection`, phải chấp nhận luật trên Kaggle) | 5 đặc trưng của `FRAUD_FEATURES` tính từ lịch sử từng khách; Isolation Forest không dùng nhãn, nhãn `isFraud` chỉ để đánh giá |
+| Gợi ý (độ tương đồng lĩnh vực) | DonorsChoose.org (`hanselhansel/donorschoose`, bản sao bộ DonorsChoose.org 2018) | cosine giữa lĩnh vực theo người quyên góp chung → `models/category_similarity.json` (`RecIndex` ưu tiên đọc file này) |
+
+Các bước: tải `kaggle.json` (Kaggle → Settings → API), mở notebook trên Colab, chạy lần lượt từng cell
+(sau cell cài thư viện thì *Restart session*), tải `gopmam_models.zip` về và giải nén vào `ai-service/models/`,
+rồi `docker compose -f infra/compose.yaml restart ai-service`. Notebook cài đúng phiên bản thư viện
+trong `requirements.txt` để `joblib.load` ở server không lỗi.
+
+Dữ liệu tổng hợp bên dưới vẫn được giữ để kiểm thử pipeline và chạy test.
+
 ## 1. Các file dữ liệu
 
 | File | Mô hình | Dòng | Mô tả |
@@ -82,8 +100,9 @@ Cột: `user_id, campaign_id, category, event_type, occurred_at` với
 
 ### 3.2. Nguồn gợi ý
 
-- Quốc tế: Kickstarter (*API chính thức*, profile về dự án + câu chuyện rất
-  giống schema), Indiegogo, GoFundMe (chỉ trang công khai), CrowdFunder.
+- Quốc tế: Kickstarter (**không có API công khai**; dùng bộ dữ liệu có sẵn trên Kaggle
+  hoặc của Web Robots thay vì tự cào), Indiegogo, GoFundMe (chỉ trang công khai,
+  điều khoản hạn chế thu thập tự động), CrowdFunder.
 - Việt Nam: ComOn, Vì Ngày Mai Tươi Sáng, Momo / MoMoStartup, Vững Việt Nam,
   hay sàn gây quỹ cộng đồng của các trường/đoàn hội (nếu có dữ liệu công khai).
 - Lưu ý tiền tệ: quy đổi đơn vị (VNĐ / USD) về **một đơn vị** để `goal_amount`
@@ -115,7 +134,7 @@ Cột: `user_id, campaign_id, category, event_type, occurred_at` với
        --out data/processed/recommend_events.csv
    ```
 
-   `--mapping` ví dụ cho API kiểu Kickstarter:
+   `--mapping` ví dụ cho dữ liệu kiểu Kickstarter:
    `{"goal_amount": {"path": "goal"}, "raised_amount": {"path": "pledged"},
     "early_views": {"path": "stats.views"}, "has_video": {"path": "video"},
     "end_date": {"path": "deadline"}, "start_date": {"path": "launched_at"}}`
