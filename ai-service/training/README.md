@@ -8,8 +8,8 @@ dữ liệu cào thật theo schema trong [`data/README.md`](../data/README.md).
 
 | File | Chức năng |
 |------|-----------|
-| `datasets.py` | Sinh/lười-load 3 dataset: campaigns, fraud, events (seed 42/43/44) |
-| `train.py` | Huấn luyện success (LogisticRegression + RandomForest) & fraud (IsolationForest), split theo thời gian, ghi model + metadata vào `models/` |
+| `datasets.py` | Sinh/lười-load 2 dataset tổng hợp: campaigns, events (seed 42/44) |
+| `train.py` | Pipeline cũ: huấn luyện success (LogisticRegression + RandomForest) từ dữ liệu tổng hợp, split theo thời gian, ghi model + metadata vào `models/`. Từ chối ghi đè mô hình thật (notebook Colab) nếu không có `--force` |
 | `evaluate_recommender.py` | Đánh giá offline recommender: Precision@K, Recall@K, NDCG@K (K=5,10), ghi `artifacts/recommender_metrics.json` |
 
 ## Chạy
@@ -18,7 +18,7 @@ dữ liệu cào thật theo schema trong [`data/README.md`](../data/README.md).
 # từ thư mục ai-service
 ..\scripts\python-ai.cmd -m training.datasets            # tái sinh dataset
 ..\scripts\python-ai.cmd -m training.evaluate_recommender # metric recommender
-..\scripts\python-ai.cmd -m training.train                # huấn luyện 2 model
+..\scripts\python-ai.cmd -m training.train --force        # chỉ khi muốn quay về mô hình tổng hợp
 ```
 
 ## Lưu ý
