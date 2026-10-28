@@ -13,7 +13,7 @@ chạy trên Google Colab, tải dữ liệu từ Kaggle và xuất đúng các 
 | Mô hình | Dữ liệu | Đặc trưng / cách làm |
 |---------|---------|----------------------|
 | Dự đoán thành công | Kickstarter Projects (`kemical/kickstarter-projects`) | `category_id`, `goal_amount` (USD → VNĐ), `duration_days` — chỉ thông tin có lúc tạo chiến dịch; so với mốc đoán lớp đa số và Logistic Regression, kiểm định chéo theo thời gian |
-| Phát hiện bất thường | IEEE-CIS Fraud Detection (cuộc thi `ieee-fraud-detection`, phải chấp nhận luật trên Kaggle) | 5 đặc trưng của `FRAUD_FEATURES` tính từ lịch sử từng khách; Isolation Forest không dùng nhãn, nhãn `isFraud` chỉ để đánh giá |
+| Phát hiện bất thường | IEEE-CIS Fraud Detection (cuộc thi `ieee-fraud-detection`, phải chấp nhận luật trên Kaggle) | 5 đặc trưng của `FRAUD_FEATURES` tính từ lịch sử từng khách; HistGradientBoosting có giám sát theo nhãn `isFraud` (Isolation Forest không giám sát đã thử, ROC-AUC 0,491, bị loại) |
 | Gợi ý (độ tương đồng lĩnh vực) | DonorsChoose.org (`hanselhansel/donorschoose`, bản sao bộ DonorsChoose.org 2018) | cosine giữa lĩnh vực theo người quyên góp chung → `models/category_similarity.json` (`RecIndex` ưu tiên đọc file này) |
 
 Các bước: tải `kaggle.json` (Kaggle → Settings → API), mở notebook trên Colab, chạy lần lượt từng cell
@@ -27,12 +27,11 @@ Dữ liệu tổng hợp bên dưới vẫn được giữ để kiểm thử pi
 
 | File | Mô hình | Dòng | Mô tả |
 |------|---------|------|-------|
-| `synthetic_campaigns.csv` | success (LogisticRegression/RandomForest) + RecIndex | 1000 | Features lúc tạo + nhãn `success` |
-| `synthetic_fraud.csv` | fraud (IsolationForest) | 2040 (2% bất thường) | Feature matrix giao dịch + nhãn `is_anomaly` |
+| `synthetic_campaigns.csv` | success (LogisticRegression/RandomForest, pipeline cũ) + đánh giá offline RecIndex | 1000 | Features lúc tạo + nhãn `success` |
 | `recommend_events.csv` | recommender (đánh giá Precision@K...) | 6000 (300 users) | Log tương tác user ↔ campaign theo thời gian |
 
-Tất cả được tái sinh xác định bằng `training/datasets.py` (3 seed riêng:
-campaigns=42, fraud=43, events=44). Lệnh tái sinh:
+Tất cả được tái sinh xác định bằng `training/datasets.py` (2 seed riêng:
+campaigns=42, events=44). Lệnh tái sinh:
 
 ```powershell
 # từ thư mục ai-service
@@ -68,15 +67,11 @@ Cột chuẩn (`CAMPAIGN_COLUMNS` trong `tools/scrape_campaigns.py`):
 | `success` | int | **nhãn**: 0/1 đạt 100% mục tiêu lúc kết thúc |
 | `launch_seq` | int | thứ tự thời gian tạo (dùng để split train/test) |
 
-### 2.2. Fraud (IsolationForest)
+### 2.2. Fraud
 
-Cột: `contribution_count_1h, failed_payment_count, total_payment_count,
-device_shared_accounts, amount_z_score, ip_country_changes, new_account_days,
-profile_change_frequency, is_anomaly`.
-
-Mô hình chỉ huấn luyện trên 5 cột trong `FRAUD_FEATURES` (`app/services/catalog.py`):
-`device_shared_accounts`, `ip_country_changes`, `profile_change_frequency` giữ lại trong
-dataset để dùng sau, khi nền tảng thật sự thu thập được các tín hiệu này.
+Không có dữ liệu tổng hợp: mô hình chỉ học từ IEEE-CIS (có nhãn) trong notebook Colab, trên 5 cột
+của `FRAUD_FEATURES` (`app/services/catalog.py`). `device_shared_accounts`, `ip_country_changes`,
+`profile_change_frequency` chỉ dùng trong luật nghiệp vụ, khi nền tảng thật sự thu thập được.
 
 Dữ liệu thật phải **anonymized**: không chứa tên, email, số thẻ, IP thô (che hoặc
 thay bằng giá trị gom cụm/quốc gia), chỉ giữ đặc trưng giao dịch.
@@ -151,7 +146,7 @@ Cột: `user_id, campaign_id, category, event_type, occurred_at` với
    ```
 
 5. **Đánh giá & lặp**: xem `models/success_metrics.json`,
-   `models/fraud_metrics.json`, `artifacts/recommender_metrics.json`; nếu chỉ
+   `artifacts/recommender_metrics.json`; nếu chỉ
    số tệ hơn synthetic là dấu hiệu dữ liệu nhiễu/lệch — tăng số mẫu, lọc, gán
    nhãn lại, hoặc huấn luyện lại với biến thể đặc trưng.
 
@@ -181,7 +176,7 @@ Cột: `user_id, campaign_id, category, event_type, occurred_at` với
 ..\scripts\python-ai.cmd -m training.datasets
 # đánh giá recommender offline (ghi artifacts/recommender_metrics.json)
 ..\scripts\python-ai.cmd -m training.evaluate_recommender
-# huấn luyện lại success + fraud model (sử dụng CSV trong thư mục data/)
+# pipeline cũ: huấn luyện success model từ CSV tổng hợp (chặn ghi đè mô hình thật, cần --force)
 ..\scripts\python-ai.cmd -m training.train
 # kiểm tra lint + test
 ..\scripts\python-ai.cmd -m ruff check . 
