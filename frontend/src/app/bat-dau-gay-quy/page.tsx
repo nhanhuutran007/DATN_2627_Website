@@ -7,7 +7,13 @@ import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { FAQ_ITEMS } from "@/features/support/faq";
 import { api } from "@/lib/api";
-import { apiCampaignToView, fetchCampaigns, fetchPlatformStats, type PlatformStats } from "@/lib/api/campaigns";
+import {
+  apiCampaignToView,
+  fetchCampaigns,
+  fetchPlatformStats,
+  spreadCategoryImages,
+  type PlatformStats,
+} from "@/lib/api/campaigns";
 import { categoryIcon } from "@/lib/covers";
 import type { Campaign } from "@/lib/data/campaigns";
 import { formatVndShort } from "@/lib/format";
@@ -207,7 +213,7 @@ export default async function StartFundraisingPage() {
               <p>Các chiến dịch đang gây quỹ đều đã qua kiểm duyệt và công khai sổ cái giao dịch.</p>
             </div>
             <div className="card-grid">
-              {campaigns.map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
+              {spreadCategoryImages(campaigns).map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
             </div>
             <div className="block-more"><Link className="button button-outline" href="/du-an">Xem tất cả dự án</Link></div>
           </div>

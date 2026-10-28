@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { fetchAiRecommendations, type AiRecommendSource } from "@/lib/api/ai";
+import { spreadCategoryImages } from "@/lib/api/campaigns";
 import type { Campaign } from "@/lib/data/campaigns";
 
 type AiRecommendationsProps = {
@@ -51,7 +52,7 @@ export function AiRecommendations({ fallback = [] }: AiRecommendationsProps) {
           </p>
         </div>
         <div className="card-grid">
-          {items.map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} showAiReason />)}
+          {spreadCategoryImages(items).map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} showAiReason />)}
         </div>
       </div>
     </section>

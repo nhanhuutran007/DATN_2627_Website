@@ -240,21 +240,95 @@ function statusToDisplay(status: ApiCampaignStatus): CampaignStatus {
   }
 }
 
-/** Ảnh minh họa theo lĩnh vực khi chiến dịch chưa có ảnh riêng. */
-export function imageByCategory(category: string): Campaign["image"] {
-  switch (category) {
-    case "Môi trường":
-    case "Nông nghiệp":
-      return "mangrove";
-    case "Khởi nghiệp":
-    case "Công nghệ":
-      return "startup";
-    case "Y tế":
-      return "health";
-    case "Giáo dục":
-    default:
-      return "library";
+/** Ảnh minh họa của từng lĩnh vực; ảnh đầu tiên là ảnh đại diện (banner trang lĩnh vực). */
+const CATEGORY_IMAGES: Record<string, Campaign["image"][]> = {
+  "Môi trường": ["mangrove", "beach"],
+  "Nông nghiệp": ["farm", "highland"],
+  "Khởi nghiệp": ["startup", "market"],
+  "Công nghệ": ["computer", "robot"],
+  "Y tế": ["health", "clinic"],
+  "Giáo dục": ["library", "reading"],
+  "Văn hóa nghệ thuật": ["music", "lantern"],
+};
+
+/**
+ * Ảnh theo chủ đề, dò từ khóa trong tên rồi tóm tắt chiến dịch (đã bỏ dấu). Thứ tự quan trọng: mẫu cụ thể
+ * đứng trước; tránh từ ngắn dễ trùng sau khi bỏ dấu (vd. "ong" nằm trong "không", "sach" là cả "sách" lẫn "sạch",
+ * "cau" là cả "cầu" lẫn "nhu cầu").
+ */
+const TOPIC_IMAGES: [RegExp, Campaign["image"]][] = [
+  [/nang luong mat troi|dien mat troi|pin mat troi|solar/, "solar"],
+  [/tiem chung|vac ?xin|vaccine/, "clinic"],
+  [/hoc boi|day boi|duoi nuoc/, "swim"],
+  [/ca phe|coffee/, "coffee"],
+  [/nuoi ong|mat ong|thung ong/, "bees"],
+  [/bep an|bua an|bua trua|ban tru|suat an/, "meal"],
+  [/thuy canh|nha mang|tuoi nho giot/, "seedling"],
+  [/rau sach|trong rau|rau huu co|canh tac huu co/, "vegetable"],
+  [/tai che|phe thai nhua|rac thai nhua|phan loai rac|thung rac|don rac|bai bien/, "beach"],
+  [/ngap man|trong cay|trong rung/, "mangrove"],
+  [/nuoc sach|gieng|loc nuoc/, "water"],
+  [/cau dan sinh|xay cau|cau tre|cau treo|cau be tong|qua suoi/, "bridge"],
+  [/vuon uom|doanh nghiep xa hoi/, "startup"],
+  [/hoc bong|sinh vien/, "graduate"],
+  [/tieng anh|ngoai ngu|thu vien|doc sach|dau sach|cuon sach/, "reading"],
+  [/robot|stem/, "robot"],
+  [/ung dung|nen tang|phan mem|website|app/, "computer"],
+  [/kham mat|nguoi cao tuoi|luu dong|benh nhi|dieu tri nhi/, "health"],
+  [/tu thuoc|so cuu|tram y te|kham benh/, "clinic"],
+  [/tho cam|thu cong|lang nghe|hop tac xa/, "market"],
+  [/den long/, "lantern"],
+  [/am nhac|ca nhac|nghe thuat|le hoi/, "music"],
+];
+
+function foldVietnamese(text: string): string {
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d").toLowerCase();
+}
+
+/** Ảnh khớp chủ đề của chiến dịch (ưu tiên tên, rồi tóm tắt); `null` khi không chủ đề nào khớp. */
+export function topicImage(title: string, summary = ""): Campaign["image"] | null {
+  for (const text of [title, summary]) {
+    const folded = foldVietnamese(text);
+    const match = TOPIC_IMAGES.find(([pattern]) => pattern.test(folded));
+    if (match) return match[1];
   }
+  return null;
+}
+
+/** Lĩnh vực có bộ ảnh minh họa riêng (lĩnh vực admin mới tạo thì chưa có). */
+export function hasCategoryImages(category: string): boolean {
+  return category in CATEGORY_IMAGES;
+}
+
+/**
+ * Ảnh minh họa theo lĩnh vực khi chiến dịch chưa có ảnh riêng. Truyền `seed` (id chiến dịch)
+ * để các chiến dịch cùng lĩnh vực luân phiên ảnh, mỗi chiến dịch luôn giữ cùng một ảnh.
+ */
+export function imageByCategory(category: string, seed = ""): Campaign["image"] {
+  const images = CATEGORY_IMAGES[category] ?? CATEGORY_IMAGES["Giáo dục"];
+  let hash = 0;
+  for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return images[hash % images.length];
+}
+
+/** Ảnh minh họa cho một chiến dịch chưa có ảnh riêng: đúng chủ đề nếu nhận ra, không thì theo lĩnh vực. */
+export function imageForCampaign(campaign: { category: string; title: string; summary?: string; id?: string }) {
+  return topicImage(campaign.title, campaign.summary) ?? imageByCategory(campaign.category, campaign.id);
+}
+
+/**
+ * Trong một danh sách, các chiến dịch cùng lĩnh vực chỉ dùng ảnh chung của lĩnh vực (không nhận ra chủ đề)
+ * lần lượt nhận các ảnh khác nhau của lĩnh vực đó, để lưới thẻ không lặp ảnh. Ảnh theo chủ đề giữ nguyên.
+ */
+export function spreadCategoryImages(campaigns: Campaign[]): Campaign[] {
+  const next = new Map<string, number>();
+  return campaigns.map((campaign) => {
+    const images = CATEGORY_IMAGES[campaign.category];
+    if (campaign.imageUrl || !images || topicImage(campaign.title, campaign.summary)) return campaign;
+    const index = next.get(campaign.category) ?? Math.max(images.indexOf(campaign.image), 0);
+    next.set(campaign.category, index + 1);
+    return { ...campaign, image: images[index % images.length] };
+  });
 }
 
 function toStory(description: string): string[] {
@@ -318,7 +392,7 @@ export function apiCampaignToView(api: ApiCampaign): Campaign {
     daysLeft,
     status: statusToDisplay(api.status),
     apiStatus: api.status,
-    image: imageByCategory(api.category),
+    image: imageForCampaign({ category: api.category, title: api.title, summary: toSummary(api), id: api.id }),
     imageUrl: api.imageUrl ?? null,
     endDate: formatDate(api.endDate),
     ...(api.createdAt ? { createdDate: formatDate(api.createdAt) } : {}),

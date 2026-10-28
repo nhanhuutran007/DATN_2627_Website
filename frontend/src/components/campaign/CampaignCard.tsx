@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 
 import { ProgressBar } from "@/components/campaign/ProgressBar";
+import { FadeInImage } from "@/components/ui/FadeInImage";
 import { Icon } from "@/components/ui/Icon";
 import { campaignProgress, type Campaign } from "@/lib/data/campaigns";
 import { coverFor } from "@/lib/covers";
@@ -28,7 +28,7 @@ export function CampaignCard({ campaign, showAiReason = false, onOpen }: Campaig
   return (
     <article className="c-card">
       <Link className="c-card-media" href={href} tabIndex={-1} aria-hidden="true" onClick={onOpen}>
-        <Image src={cover.src} alt="" fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 380px" unoptimized={!cover.illustrative} />
+        <FadeInImage src={cover.src} alt="" fill sizes="(max-width: 700px) 100vw, (max-width: 1100px) 50vw, 380px" unoptimized={!cover.illustrative} />
         {!open && <span className="c-card-status">{campaign.status}</span>}
       </Link>
       <div className="c-card-body">

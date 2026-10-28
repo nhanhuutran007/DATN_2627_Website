@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ApiError } from "@/lib/api";
-import { imageByCategory } from "@/lib/api/campaigns";
+import { imageForCampaign } from "@/lib/api/campaigns";
 import { cancelDonation, type ApiDonation } from "@/lib/api/donations";
 import { coverFor } from "@/lib/covers";
 import { formatVnd, paymentMethodLabel } from "@/lib/format";
@@ -65,7 +65,7 @@ export function MyDonations({ items, onChange }: MyDonationsProps) {
           const hasReceipt = d.status === "completed" || d.status === "refunded";
           const date = d.completedAt ?? d.createdAt;
           const cover = d.campaign
-            ? coverFor({ image: imageByCategory(d.campaign.category ?? ""), imageUrl: d.campaign.imageUrl ?? undefined, title: d.campaign.title })
+            ? coverFor({ image: imageForCampaign({ category: d.campaign.category ?? "", title: d.campaign.title, id: d.campaign.id }), imageUrl: d.campaign.imageUrl ?? undefined, title: d.campaign.title })
             : null;
           return (
             <li className="activity-item" key={d.id}>

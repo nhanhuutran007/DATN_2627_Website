@@ -1,10 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { Icon } from "@/components/ui/Icon";
 import { api } from "@/lib/api";
-import { apiCampaignToView, fetchCampaigns } from "@/lib/api/campaigns";
-import { categoryIcon } from "@/lib/covers";
+import { apiCampaignToView, fetchCampaigns, hasCategoryImages, imageByCategory, spreadCategoryImages } from "@/lib/api/campaigns";
+import { categoryIcon, coverByKey } from "@/lib/covers";
 import { campaigns as mockCampaigns, type Campaign } from "@/lib/data/campaigns";
 
 const PER_CATEGORY = 3;
@@ -62,7 +63,14 @@ export async function DiscoverHub() {
           {groups.map((group) => (
             <li key={group.name}>
               <Link className="discover-cat" href={categoryHref(group.name)}>
-                <span className="discover-cat-icon"><Icon name={categoryIcon(group.name)} size={44} /></span>
+                {hasCategoryImages(group.name) ? (
+                  <span className="discover-cat-photo">
+                    <Image src={coverByKey(imageByCategory(group.name)).src} alt="" fill sizes="(max-width: 700px) 30vw, 200px" />
+                    <span className="discover-cat-badge"><Icon name={categoryIcon(group.name)} size={22} /></span>
+                  </span>
+                ) : (
+                  <span className="discover-cat-icon"><Icon name={categoryIcon(group.name)} size={44} /></span>
+                )}
                 <span className="discover-cat-name">{group.name}</span>
               </Link>
             </li>
@@ -78,7 +86,7 @@ export async function DiscoverHub() {
             <section className="discover-group" key={group.name} aria-labelledby={`nhom-${index}`}>
               <h2 id={`nhom-${index}`}>Dự án {group.name.toLocaleLowerCase("vi")}</h2>
               <div className="card-grid">
-                {group.items.map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
+                {spreadCategoryImages(group.items).map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
               </div>
               <div className="discover-more">
                 <Link className="button button-outline" href={categoryHref(group.name)}>

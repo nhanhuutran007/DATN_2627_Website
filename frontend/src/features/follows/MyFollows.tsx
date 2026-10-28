@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { ApiError } from "@/lib/api";
-import { imageByCategory, type ApiCampaignStatus } from "@/lib/api/campaigns";
+import { imageForCampaign, type ApiCampaignStatus } from "@/lib/api/campaigns";
 import { unfollowCampaign, type FollowedCampaign } from "@/lib/api/follows";
 import { coverFor } from "@/lib/covers";
 import { formatVnd } from "@/lib/format";
@@ -65,7 +65,7 @@ export function MyFollows({ items, onRemove }: MyFollowsProps) {
           const status = STATUS_LABEL[item.campaign.status];
           const percent = percentOf(item);
           const cover = coverFor({
-            image: imageByCategory(item.campaign.category),
+            image: imageForCampaign({ category: item.campaign.category, title: item.campaign.title, id: item.campaign.id }),
             imageUrl: item.campaign.imageUrl ?? undefined,
             title: item.campaign.title,
           });

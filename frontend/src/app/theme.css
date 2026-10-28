@@ -1711,7 +1711,7 @@ h3 {
 
 .c-card-media img {
   object-fit: cover;
-  transition: transform 400ms ease;
+  transition: transform 400ms ease, opacity 400ms ease-out;
 }
 
 .c-card:hover .c-card-media img {
@@ -5737,9 +5737,121 @@ button {
   grid-column: 1 / -1;
 }
 
+/* Kết quả lọc/tìm kiếm: theo cách GoFundMe (kết quả hiện dần 0,25s, thẻ khung nhấp nháy nhẹ). */
+.card-grid {
+  transition: opacity 200ms ease-out;
+}
+
 .card-grid.is-loading {
-  opacity: 0.55;
-  transition: opacity 160ms ease;
+  opacity: 0.6;
+}
+
+.results-enter {
+  animation: results-fade-in 250ms ease-out both;
+}
+
+.results-enter > * {
+  animation: results-fade-in-up 360ms ease-out both;
+}
+
+.results-enter > :nth-child(2) { animation-delay: 40ms; }
+.results-enter > :nth-child(3) { animation-delay: 80ms; }
+.results-enter > :nth-child(4) { animation-delay: 120ms; }
+.results-enter > :nth-child(5) { animation-delay: 160ms; }
+.results-enter > :nth-child(6) { animation-delay: 200ms; }
+.results-enter > :nth-child(7) { animation-delay: 240ms; }
+.results-enter > :nth-child(8) { animation-delay: 280ms; }
+
+@keyframes results-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes results-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 1rem, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.result-skeleton {
+  animation: results-fade-in 200ms ease-out both;
+}
+
+.skeleton-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.skeleton-block {
+  display: block;
+  border-radius: 8px;
+  background: rgb(35 35 35 / 10%);
+  animation: skeleton-pulse 1s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.skeleton-media {
+  aspect-ratio: 16 / 10;
+  border-radius: 14px;
+}
+
+.skeleton-line {
+  height: 16px;
+  width: 85%;
+}
+
+.skeleton-line-short {
+  width: 50%;
+}
+
+.skeleton-bar {
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 999px;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.75;
+  }
+}
+
+.fade-in-image {
+  opacity: 0;
+  transition: opacity 400ms ease-out, transform 400ms ease;
+}
+
+.fade-in-image.is-loaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .results-enter,
+  .results-enter > *,
+  .result-skeleton,
+  .skeleton-block {
+    animation: none;
+  }
+
+  .fade-in-image {
+    transition: none;
+  }
 }
 
 .load-more {
@@ -8511,6 +8623,59 @@ html:has(dialog:modal) .admin-sidebar {
   transform: translateY(-3px);
 }
 
+.discover-cat-photo {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--soft);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.discover-cat-photo img {
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.discover-cat-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: #232323;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+}
+
+.discover-cat:hover .discover-cat-photo,
+.discover-cat:focus-visible .discover-cat-photo {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 14%);
+}
+
+.discover-cat:hover .discover-cat-photo img,
+.discover-cat:focus-visible .discover-cat-photo img {
+  transform: scale(1.05);
+}
+
+.discover-cat:hover .discover-cat-badge,
+.discover-cat:focus-visible .discover-cat-badge {
+  color: var(--primary-dark);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-cat-photo,
+  .discover-cat-photo img {
+    transition: none;
+  }
+}
+
 .discover-cat-name {
   font-size: 1rem;
   font-weight: 500;
@@ -8599,6 +8764,18 @@ html:has(dialog:modal) .admin-sidebar {
   .discover-cat-icon svg {
     width: 32px;
     height: 32px;
+  }
+
+  .discover-cat-badge {
+    bottom: 6px;
+    left: 6px;
+    width: 30px;
+    height: 30px;
+  }
+
+  .discover-cat-badge svg {
+    width: 16px;
+    height: 16px;
   }
 
   .discover-cat-name {
