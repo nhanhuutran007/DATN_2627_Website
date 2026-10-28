@@ -915,6 +915,25 @@ h3 {
   list-style: none;
 }
 
+/* Nhóm theo thời gian: Hôm nay / 7 ngày qua / Trước đó */
+.notification-groups {
+  display: grid;
+  gap: 24px;
+}
+
+.notification-group h3 {
+  margin: 0 0 10px;
+  color: #232323;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.account-intro .notification-retention {
+  margin-top: 6px;
+  color: var(--text-2);
+  font-size: 0.86rem;
+}
+
 .notification-item {
   display: grid;
   grid-template-columns: auto 1fr auto;

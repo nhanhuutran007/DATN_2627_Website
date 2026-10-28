@@ -41,6 +41,25 @@ const ICONS: Partial<Record<NotificationType, IconName>> = {
   milestone_rescheduled: "clock",
 };
 
+/** Khớp NOTIFICATION_RETENTION_DAYS ở backend (job xóa thông báo cũ mỗi đêm). */
+const RETENTION_DAYS = 90;
+
+/** Chia danh sách (đã xếp mới nhất trước) theo mốc thời gian như Facebook/LinkedIn. */
+function groupByTime(items: AppNotification[], now = new Date()): Array<{ label: string; items: AppNotification[] }> {
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const weekAgo = startOfToday - 6 * 24 * 60 * 60 * 1000;
+  const groups = [
+    { label: "Hôm nay", items: [] as AppNotification[] },
+    { label: "7 ngày qua", items: [] as AppNotification[] },
+    { label: "Trước đó", items: [] as AppNotification[] },
+  ];
+  for (const item of items) {
+    const time = new Date(item.createdAt).getTime();
+    groups[time >= startOfToday ? 0 : time >= weekAgo ? 1 : 2].items.push(item);
+  }
+  return groups.filter((group) => group.items.length > 0);
+}
+
 type LoadState = "loading" | "ready" | "error";
 type FilterKey = "all" | "unread";
 type ListSnapshot = { items: AppNotification[]; total: number; page: number };
@@ -179,6 +198,7 @@ export function NotificationCenter() {
           Kết quả xét duyệt, khoản ủng hộ và tiến độ của các dự án bạn tạo, ủng hộ hoặc theo dõi đều được gửi về đây.{" "}
           {unread > 0 ? <b>Bạn có {unread} thông báo chưa đọc.</b> : "Bạn đã đọc hết thông báo."}
         </p>
+        <p className="notification-retention">Thông báo được lưu {RETENTION_DAYS} ngày. Biên nhận và lịch sử ủng hộ vẫn lưu đầy đủ trong tài khoản.</p>
       </section>
 
       <div className="notification-tools">
@@ -207,30 +227,37 @@ export function NotificationCenter() {
       )}
 
       {items.length > 0 && state !== "loading" && (
-        <ul className="notification-list">
-          {items.map((item) => (
-            <li key={item.id}>
-              <button
-                className={`notification-item ${item.isRead ? "" : "is-unread"}`}
-                type="button"
-                onClick={() => open(item)}
-              >
-                <span className="notification-icon" aria-hidden="true">
-                  <Icon name={ICONS[item.type] ?? "bell"} size={18} />
-                </span>
-                <span className="notification-body">
-                  <b>{item.title}</b>
-                  <span>{item.message}</span>
-                  <small>
-                    <time dateTime={item.createdAt}>{timeAgo(item.createdAt)}</time>
-                    {!item.isRead && <span className="sr-only"> · chưa đọc</span>}
-                  </small>
-                </span>
-                {!item.isRead && <span className="notification-dot" aria-hidden="true" />}
-              </button>
-            </li>
+        <div className="notification-groups">
+          {groupByTime(items).map((group) => (
+            <section className="notification-group" key={group.label} aria-label={group.label}>
+              <h3>{group.label}</h3>
+              <ul className="notification-list list-reveal">
+                {group.items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      className={`notification-item ${item.isRead ? "" : "is-unread"}`}
+                      type="button"
+                      onClick={() => open(item)}
+                    >
+                      <span className="notification-icon" aria-hidden="true">
+                        <Icon name={ICONS[item.type] ?? "bell"} size={18} />
+                      </span>
+                      <span className="notification-body">
+                        <b>{item.title}</b>
+                        <span>{item.message}</span>
+                        <small>
+                          <time dateTime={item.createdAt}>{timeAgo(item.createdAt)}</time>
+                          {!item.isRead && <span className="sr-only"> · chưa đọc</span>}
+                        </small>
+                      </span>
+                      {!item.isRead && <span className="notification-dot" aria-hidden="true" />}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </ul>
+        </div>
       )}
 
       {state === "ready" && items.length < total && (
