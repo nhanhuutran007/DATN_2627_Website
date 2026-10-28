@@ -29,7 +29,31 @@ export type Campaign = {
   status: CampaignStatus;
   /** Trạng thái gốc từ API; dữ liệu mẫu không có. */
   apiStatus?: ApiCampaignStatus;
-  image: "mangrove" | "startup" | "library" | "health";
+  image:
+    | "mangrove"
+    | "beach"
+    | "farm"
+    | "highland"
+    | "startup"
+    | "market"
+    | "computer"
+    | "robot"
+    | "library"
+    | "reading"
+    | "health"
+    | "clinic"
+    | "music"
+    | "lantern"
+    | "solar"
+    | "swim"
+    | "coffee"
+    | "bees"
+    | "meal"
+    | "vegetable"
+    | "seedling"
+    | "graduate"
+    | "water"
+    | "bridge";
   /** Ảnh do chủ dự án cung cấp; không có thì giao diện hiển thị dạng chữ, không dùng ảnh minh họa. */
   imageUrl?: string | null;
   /** Ngày kết thúc dạng dd/mm/yyyy. */

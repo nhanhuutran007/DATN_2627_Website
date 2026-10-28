@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { CampaignCard } from "@/components/campaign/CampaignCard";
-import { apiCampaignToView, fetchCampaigns } from "@/lib/api/campaigns";
+import { apiCampaignToView, fetchCampaigns, spreadCategoryImages } from "@/lib/api/campaigns";
 import type { Campaign } from "@/lib/data/campaigns";
 
 type CategoryCampaignGridProps = {
@@ -42,8 +42,8 @@ export function CategoryCampaignGrid({ category, initialItems, total, pageSize, 
 
   return (
     <>
-      <div className="card-grid" aria-busy={loading}>
-        {items.map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
+      <div className="card-grid results-enter" aria-busy={loading}>
+        {spreadCategoryImages(items).map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
       </div>
       {live && items.length < count && (
         <div className="category-more">

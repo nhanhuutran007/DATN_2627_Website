@@ -24,6 +24,7 @@ import {
   fetchCampaign,
   fetchCampaigns,
   isPublishedStatus,
+  spreadCategoryImages,
 } from "@/lib/api/campaigns";
 import {
   fetchCampaignProgress,
@@ -421,7 +422,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               <Link className="button button-outline button-sm" href="/tim-kiem">Xem tất cả dự án</Link>
             </div>
             <div className="card-grid">
-              {related.map((item) => <CampaignCard campaign={item} key={item.slug} />)}
+              {spreadCategoryImages(related).map((item) => <CampaignCard campaign={item} key={item.slug} />)}
             </div>
           </div>
         </section>

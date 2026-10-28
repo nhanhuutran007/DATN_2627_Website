@@ -10,6 +10,7 @@ import {
   apiCampaignToView,
   fetchCampaigns,
   fetchPlatformStats,
+  spreadCategoryImages,
   type PlatformStats,
 } from "@/lib/api/campaigns";
 import { campaigns as mockCampaigns, type Campaign } from "@/lib/data/campaigns";
@@ -166,7 +167,7 @@ export default async function Home() {
           </div>
           {featured.length > 0 ? (
             <div className="card-grid">
-              {featured.map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
+              {spreadCategoryImages(featured).map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} />)}
             </div>
           ) : (
             <p className="muted-center">Chưa có chiến dịch nào được phát hành.</p>

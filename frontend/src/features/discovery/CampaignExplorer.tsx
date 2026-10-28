@@ -8,6 +8,7 @@ import { trackBehaviorEvent } from "@/lib/api/ai";
 import {
   apiCampaignToView,
   fetchCampaigns,
+  spreadCategoryImages,
   type ApiCampaignStatus,
   type CampaignQuery,
   type CampaignSort,
@@ -21,6 +22,8 @@ type CampaignExplorerProps = {
 };
 
 const PAGE_SIZE = 12;
+const SKELETON_DELAY_MS = 180;
+const SKELETON_CARDS = 8;
 const DEBOUNCE_MS = 350;
 const MILLION = 1_000_000;
 
@@ -152,6 +155,16 @@ export function CampaignExplorer({ initialQuery = "", initialCategory = "" }: Ca
 
   const loading = result?.key !== queryKey;
   const items = result?.items ?? [];
+
+  // Như GoFundMe: lần tải đầu hoặc tải lâu thì hiện thẻ khung; lọc nhanh chỉ làm mờ nhẹ kết quả cũ
+  // để lưới không chớp qua khung chờ rồi lại hiện kết quả.
+  const [slowKey, setSlowKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!loading) return;
+    const timer = window.setTimeout(() => setSlowKey(queryKey), SKELETON_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [loading, queryKey]);
+  const showSkeleton = loading && (!result || slowKey === queryKey);
   const total = result?.total ?? 0;
   const canLoadMore = !loading && result?.source === "live" && items.length < total;
 
@@ -250,15 +263,31 @@ export function CampaignExplorer({ initialQuery = "", initialCategory = "" }: Ca
         <p className="sample-flag">Dữ liệu mẫu — không kết nối được máy chủ (chỉ lọc theo từ khóa, lĩnh vực)</p>
       )}
 
-      {!loading && items.length === 0 ? (
-        <div className="search-empty">
+      {showSkeleton ? (
+        <div className="card-grid search-grid result-skeleton" aria-hidden="true">
+          {Array.from({ length: SKELETON_CARDS }, (_, index) => (
+            <div className="skeleton-card" key={index}>
+              <span className="skeleton-block skeleton-media" />
+              <span className="skeleton-block skeleton-line" />
+              <span className="skeleton-block skeleton-line skeleton-line-short" />
+              <span className="skeleton-block skeleton-bar" />
+            </div>
+          ))}
+        </div>
+      ) : !loading && items.length === 0 ? (
+        <div className="search-empty results-enter">
           <h2>Không tìm thấy dự án phù hợp</h2>
           <p>Thử từ khóa ngắn hơn hoặc bỏ bớt bộ lọc.</p>
           {hasFilter && <button className="account-pill" type="button" onClick={reset}>Xóa bộ lọc</button>}
         </div>
       ) : (
-        <div className={`card-grid search-grid${loading ? " is-loading" : ""}`} aria-busy={loading}>
-          {items.map((campaign) => (
+        <div
+          className={`card-grid search-grid results-enter${loading ? " is-loading" : ""}`}
+          aria-busy={loading}
+          // Đổi khóa khi có bộ kết quả mới để cả lưới chạy lại hiệu ứng hiện dần
+          key={result?.key ?? "initial"}
+        >
+          {spreadCategoryImages(items).map((campaign) => (
             <CampaignCard
               campaign={campaign}
               key={campaign.slug}
