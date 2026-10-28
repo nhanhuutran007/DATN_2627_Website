@@ -95,6 +95,11 @@ function PredictionBody({ data, variant }: { data: AiPredictData; variant: "owne
 
   return (
     <>
+      {data.fallback && (
+        <p className="hint" role="note">
+          Mô hình học máy tạm không khả dụng. Đây là ước lượng sơ bộ theo công thức kinh nghiệm.
+        </p>
+      )}
       <p className="model-figure">
         <span className="num">{Math.round(data.probability * 100)}%</span>
         <span>khả năng đạt mục tiêu</span>
@@ -123,7 +128,10 @@ function PredictionBody({ data, variant }: { data: AiPredictData; variant: "owne
         {variant === "admin"
           ? "Không dùng làm căn cứ duyệt hay từ chối — quyết định thuộc về quản trị viên."
           : "Chỉ bạn và quản trị viên thấy ước lượng này; nó không ảnh hưởng tới việc duyệt hay nhận tiền."}
-        {" "}Mô hình {data.model ?? "dự đoán"} huấn luyện trên dữ liệu mô phỏng.
+        {" "}
+        {data.fallback
+          ? "Công thức kinh nghiệm xuất phát từ tỷ lệ thành công chung, không phải kết quả học máy."
+          : `Mô hình ${data.model ?? "dự đoán"} học từ dữ liệu gây quỹ thực tế (Kickstarter), chỉ dựa trên lĩnh vực, mục tiêu và thời gian kêu gọi.`}
       </p>
     </>
   );
