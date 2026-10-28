@@ -50,7 +50,9 @@ export async function CategoryLanding({ category }: { category: string }) {
 
       <section className="container category-browse" aria-labelledby="category-browse-title">
         <h2 id="category-browse-title">Duyệt dự án {label}</h2>
-        <CategoryCampaignGrid category={category} initialItems={items} total={total} pageSize={PAGE_SIZE} live={live} />
+        {/* Đổi lĩnh vực (vd. link ở footer) vẫn cùng trang /du-an: khóa theo lĩnh vực để lưới tạo lại
+            với danh sách mới và chạy lại hiệu ứng hiện dần, thay vì giữ thẻ của lĩnh vực cũ. */}
+        <CategoryCampaignGrid key={category} category={category} initialItems={items} total={total} pageSize={PAGE_SIZE} live={live} />
       </section>
 
       <section className="category-values" aria-labelledby="category-values-title">

@@ -86,7 +86,7 @@ export function WordsOfSupport({ campaignId, titleId, open }: WordsOfSupportProp
       )}
       {state.status === "ready" && state.items.length > 0 && (
         <>
-          <ul className="support-list">
+          <ul className="support-list list-reveal">
             {state.items.map((item) => {
               const name = item.donorName ?? "Người ủng hộ ẩn danh";
               return (

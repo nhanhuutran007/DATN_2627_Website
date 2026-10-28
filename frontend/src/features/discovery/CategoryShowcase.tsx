@@ -39,7 +39,8 @@ export function CategoryShowcase({ campaigns }: CategoryShowcaseProps) {
       {shown.length === 0 ? (
         <p className="muted-center">Chưa có dự án nào được phát hành.</p>
       ) : (
-        <div className="tile-grid" role="tabpanel">
+        // Khóa theo tab để lưới chạy lại hiệu ứng hiện dần khi đổi lĩnh vực, như kết quả lọc
+        <div className="tile-grid results-enter" role="tabpanel" key={active || "all"}>
           {shown.map((campaign) => {
             const cover = coverFor(campaign);
             return (

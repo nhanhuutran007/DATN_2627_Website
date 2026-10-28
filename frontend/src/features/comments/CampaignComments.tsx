@@ -310,7 +310,7 @@ export function CampaignComments({ campaignId }: { campaignId: string }) {
       {state === "ready" && items.length === 0 && <p className="hint">Chưa có câu hỏi hay bình luận nào. Hãy là người đầu tiên!</p>}
 
       {items.length > 0 && (
-        <div className="comment-list">
+        <div className="comment-list list-reveal">
           {items.map((comment) => (
             <CommentItem
               key={comment.id}

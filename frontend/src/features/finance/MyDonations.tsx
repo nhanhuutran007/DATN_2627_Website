@@ -59,7 +59,7 @@ export function MyDonations({ items, onChange }: MyDonationsProps) {
   return (
     <>
       {actionError && <p className="form-error" role="alert">{actionError}</p>}
-      <ul className="activity-list">
+      <ul className="activity-list list-reveal">
         {items.slice(0, visible).map((d) => {
           const status = STATUS_LABEL[d.status];
           const hasReceipt = d.status === "completed" || d.status === "refunded";

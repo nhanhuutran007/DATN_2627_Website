@@ -196,7 +196,7 @@ export function AccountDashboard() {
           ))}
         </div>
 
-        <div className="impact-panel" id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
+        <div className="impact-panel fade-swap" key={activeTab} id={`panel-${activeTab}`} role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
           {state === "loading" && <p className="hint" role="status">Đang tải…</p>}
           {state === "error" && (
             <div className="form-error" role="alert">

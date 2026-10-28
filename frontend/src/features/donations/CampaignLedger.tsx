@@ -42,7 +42,7 @@ export function CampaignLedger({ campaignId, sort = "recent" }: CampaignLedgerPr
 
   return (
     <>
-      <div className="table-wrap">
+      <div className="table-wrap fade-swap">
         <table className="plain-table ledger-table">
           <caption className="sr-only">Các khoản ủng hộ đã được xác nhận, {sort === "top" ? "lớn nhất" : "mới nhất"} trước</caption>
           <thead>

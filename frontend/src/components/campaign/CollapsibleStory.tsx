@@ -11,6 +11,10 @@ export function CollapsibleStory({ children }: { children: ReactNode }) {
   const id = useId();
   const [overflowing, setOverflowing] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // Mở/thu bằng max-height có chuyển tiếp (theme.css): trượt tới chiều cao thật rồi bỏ giới hạn,
+  // để ảnh tải muộn trong câu chuyện không bị cắt.
+  const [fullHeight, setFullHeight] = useState(0);
+  const [settled, setSettled] = useState(false);
 
   useEffect(() => {
     const element = ref.current;
@@ -24,18 +28,35 @@ export function CollapsibleStory({ children }: { children: ReactNode }) {
 
   const collapsed = overflowing && !expanded;
 
+  const toggle = () => {
+    const element = ref.current;
+    if (!element) return;
+    if (expanded && settled) {
+      // Đang không giới hạn chiều cao: đặt chiều cao thật và ép trình duyệt tính bố cục,
+      // để chuyển tiếp thu gọn có điểm xuất phát thay vì nhảy thẳng về COLLAPSED_HEIGHT.
+      element.style.maxHeight = `${element.scrollHeight}px`;
+      void element.offsetHeight;
+    }
+    setFullHeight(element.scrollHeight);
+    setSettled(false);
+    setExpanded(!expanded);
+  };
+
   return (
     <>
       <div
         id={id}
         ref={ref}
         className={`story-collapse${collapsed ? " is-collapsed" : ""}`}
-        style={collapsed ? { maxHeight: COLLAPSED_HEIGHT } : undefined}
+        style={overflowing ? { maxHeight: collapsed ? COLLAPSED_HEIGHT : settled ? undefined : fullHeight } : undefined}
+        onTransitionEnd={(event) => {
+          if (event.target === event.currentTarget && expanded) setSettled(true);
+        }}
       >
         {children}
       </div>
       {overflowing && (
-        <button className="story-toggle" type="button" aria-expanded={expanded} aria-controls={id} onClick={() => setExpanded(!expanded)}>
+        <button className="story-toggle" type="button" aria-expanded={expanded} aria-controls={id} onClick={toggle}>
           {expanded ? "Thu gọn" : "Xem thêm"}
         </button>
       )}
