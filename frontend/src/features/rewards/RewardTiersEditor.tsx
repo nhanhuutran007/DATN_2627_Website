@@ -1,3 +1,4 @@
+import { MoneyInput } from "@/components/ui/MoneyInput";
 import { MIN_REWARD_AMOUNT, type RewardTierPayload } from "@/lib/api/rewards";
 
 export type DraftTier = { title: string; description: string; minAmount: string; limit: string; delivery: string };
@@ -61,7 +62,7 @@ export function RewardTiersEditor({ tiers, onChange }: Props) {
             </label>
             <label className="field">
               <span>Ủng hộ từ (VNĐ)</span>
-              <input type="number" min={MIN_REWARD_AMOUNT} step={10000} value={tier.minAmount} placeholder="200000" onChange={(e) => set(index, "minAmount", e.target.value)} />
+              <MoneyInput value={tier.minAmount} placeholder="200.000đ" onChange={(digits) => set(index, "minAmount", digits)} />
             </label>
             <label className="field">
               <span>Số suất</span>

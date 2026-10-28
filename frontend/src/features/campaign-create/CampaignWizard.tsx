@@ -595,7 +595,7 @@ export function CampaignWizard({ initialCategory, initialOrganization }: Campaig
                         </label>
                         <label className="field field-span-2">
                           <span>Ngân sách (VNĐ)</span>
-                          <input type="number" min={0} value={milestone.budget} placeholder="0" onChange={(e) => updateMilestone(index, "budget", e.target.value)} />
+                          <MoneyInput value={milestone.budget} placeholder="0đ" onChange={(digits) => updateMilestone(index, "budget", digits)} />
                         </label>
                         <label className="field field-span-4">
                           <span>Kết quả đầu ra</span>
