@@ -31,10 +31,8 @@ ai-service/models/*.joblib
 !ai-service/artifacts/README.md
 !ai-service/models/README.md
 # Mô hình dùng khi chạy được commit để máy nào clone về cũng chấm bằng AI (không lùi về luật);
-# mô hình thật tạo bằng ai-service/notebooks/train_real_data_colab.ipynb; IsolationForest dự phòng
-# tạo bằng `python -m training.train`, cùng phiên bản thư viện ghim trong requirements.txt
-!ai-service/models/fraud_isolation.pkl
-!ai-service/models/fraud_scaler.pkl
+# mô hình thật tạo bằng ai-service/notebooks/train_real_data_colab.ipynb, cùng phiên bản thư viện
+# ghim trong requirements.txt
 !ai-service/models/success_model.pkl
 !ai-service/models/fraud_classifier.pkl
 

@@ -71,3 +71,39 @@ def test_predict_uses_trained_feature_subset(tmp_path) -> None:
 
     assert response.fallback is False
     assert {factor.feature for factor in response.factors} <= set(names)
+
+
+def _fallback_service() -> PredictorService:
+    return PredictorService(
+        model_path="definitely/missing/success_model.pkl",
+        features_path="definitely/missing/success_features.json",
+    )
+
+
+def test_fallback_directions_match_trained_model() -> None:
+    service = _fallback_service()
+    base = {"category_id": 2, "profile_score": 50, "image_count": 2}
+
+    small = service.predict(PredictFeatures(goal_amount=20_000_000, duration_days=30, **base))
+    large = service.predict(PredictFeatures(goal_amount=2_000_000_000, duration_days=30, **base))
+    short = service.predict(PredictFeatures(goal_amount=100_000_000, duration_days=30, **base))
+    long = service.predict(PredictFeatures(goal_amount=100_000_000, duration_days=90, **base))
+
+    # Mục tiêu lớn hơn và kêu gọi dài hơn đều làm giảm khả năng, như mô hình thật
+    assert small.probability > large.probability
+    assert short.probability > long.probability
+    goal_factor = next(f for f in small.factors if f.feature == "goal_amount")
+    assert goal_factor.direction == "UP"
+
+
+def test_fallback_starts_from_base_success_rate() -> None:
+    service = _fallback_service()
+    neutral = PredictFeatures(
+        category_id=2, goal_amount=100_000_000, duration_days=30, profile_score=50, image_count=1
+    )
+
+    response = service.predict(neutral)
+
+    # Không có tín hiệu nào lệch khỏi mốc: xác suất gần tỷ lệ thành công nền (40%)
+    assert abs(response.probability - 0.4) < 0.05
+    assert response.fallback is True

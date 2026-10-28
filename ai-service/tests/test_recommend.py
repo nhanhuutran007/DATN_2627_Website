@@ -109,3 +109,37 @@ def test_learned_similarity_file_is_loaded(tmp_path) -> None:
     assert index.similarity("Giáo dục", "Giáo dục") == 1.0
     assert index.similarity("Giáo dục", "Công nghệ") == 0.0
     assert RecIndex.from_json(tmp_path / "missing.json") is None
+
+
+def test_without_learned_similarity_history_stays_content_based() -> None:
+    from app.services.rec_index import RecIndex
+
+    service = RecommenderService(index=RecIndex())
+    request = RecommendRequest(
+        user_id="user-7",
+        history=[UserEvent(campaign_id="camp-1", event_type="VIEW", category="Giáo dục")],
+        candidates=_candidates(),
+    )
+
+    response = service.recommend(request)
+
+    assert response.source == "CONTENT"
+    assert response.fallback is False
+    assert response.items[0].campaign_id == "camp-101"
+    assert response.items[0].reason == "Cùng lĩnh vực Giáo dục với dự án bạn đã xem hoặc ủng hộ"
+
+
+def test_learned_similarity_explains_cross_category_items() -> None:
+    service = RecommenderService()
+    request = RecommendRequest(
+        user_id="user-7",
+        history=[UserEvent(campaign_id="camp-1", event_type="CONTRIBUTE", category="Giáo dục")],
+        candidates=_candidates(),
+    )
+
+    response = service.recommend(request)
+
+    reasons = {item.campaign_id: item.reason for item in response.items}
+    assert reasons["camp-103"] == (
+        "Người ủng hộ lĩnh vực Giáo dục cũng thường ủng hộ lĩnh vực Công nghệ"
+    )

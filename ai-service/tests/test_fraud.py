@@ -36,6 +36,30 @@ def test_rules_with_zero_score_are_not_reasons() -> None:
     assert groups == {"RULE_BIG_JUMP"}
 
 
+def test_weak_signals_are_scored_but_not_reported_as_reasons() -> None:
+    service = FraudDetectorService()
+    # 1 lượt/giờ, 1/35 giao dịch lỗi: điểm luật nhỏ, không được gọi là "quá cao"
+    response = service.score(
+        "CAMPAIGN",
+        "campaign-1",
+        {"contribution_count_1h": 1, "failed_payment_count": 1, "total_payment_count": 35},
+    )
+
+    assert response.level == "LOW"
+    assert not [reason for reason in response.reasons if reason.group.startswith("RULE_")]
+
+
+def test_without_classifier_only_rules_score(tmp_path) -> None:
+    service = FraudDetectorService(
+        classifier_path=tmp_path / "missing.pkl", reference_path=tmp_path / "missing.json"
+    )
+    response = service.score("TRANSACTION", None, {"contribution_count_1h": 12.0})
+
+    assert response.method == "RULE"
+    assert response.fallback is True
+    assert response.level == "HIGH"
+
+
 def test_unknown_entity_and_features_are_harmless() -> None:
     service = FraudDetectorService()
     response = service.score("BOGUS_ENTITY", None, {"made_up_feature": 99})
@@ -43,40 +67,6 @@ def test_unknown_entity_and_features_are_harmless() -> None:
     assert response.level == "LOW"
     assert response.risk_score < 0.35
     assert not response.reasons
-
-def test_missing_feature_uses_training_mean_not_zero(tmp_path) -> None:
-    import joblib
-    import numpy as np
-    from sklearn.ensemble import IsolationForest
-    from sklearn.preprocessing import StandardScaler
-
-    from app.services.catalog import FRAUD_FEATURES
-
-    rng = np.random.default_rng(0)
-    rows = rng.normal(0.0, 1.0, (300, len(FRAUD_FEATURES)))
-    rows[:, FRAUD_FEATURES.index("new_account_days")] = rng.uniform(20.0, 400.0, 300)
-    scaler = StandardScaler().fit(rows)
-    model = IsolationForest(n_estimators=50, random_state=0).fit(scaler.transform(rows))
-    joblib.dump(model, tmp_path / "fraud.pkl")
-    joblib.dump(scaler, tmp_path / "scaler.pkl")
-
-    # Chỉ kiểm tra nhánh Isolation Forest: trỏ mô hình có giám sát tới file không tồn tại
-    service = FraudDetectorService(
-        tmp_path / "fraud.pkl",
-        tmp_path / "scaler.pkl",
-        classifier_path=tmp_path / "missing_classifier.pkl",
-        reference_path=tmp_path / "missing_reference.json",
-    )
-    base = {name: 0.0 for name in FRAUD_FEATURES if name != "new_account_days"}
-    missing = service._ml_risk(base)
-    mean_days = float(scaler.mean_[FRAUD_FEATURES.index("new_account_days")])
-    as_mean = service._ml_risk({**base, "new_account_days": mean_days})
-    as_zero = service._ml_risk({**base, "new_account_days": 0.0})
-
-    assert missing is not None and missing == as_mean
-    assert as_zero > missing
-    assert service.score("CAMPAIGN", "c-1", base).method == "ENSEMBLE"
-
 
 def _classifier_service(tmp_path):
     import json
@@ -106,8 +96,6 @@ def _classifier_service(tmp_path):
         json.dumps({"quantiles": quantiles.tolist()}), encoding="utf-8"
     )
     return FraudDetectorService(
-        model_path=tmp_path / "missing_if.pkl",
-        scaler_path=tmp_path / "missing_scaler.pkl",
         classifier_path=tmp_path / "fraud_classifier.pkl",
         reference_path=tmp_path / "reference.json",
     )
@@ -116,8 +104,8 @@ def _classifier_service(tmp_path):
 def test_supervised_classifier_is_preferred_and_ranks_risk(tmp_path) -> None:
     service = _classifier_service(tmp_path)
 
-    young = service._ml_risk({"new_account_days": 2, "total_payment_count": 5})
-    old = service._ml_risk({"new_account_days": 300, "total_payment_count": 5})
+    young = service._classifier_risk({"new_account_days": 2, "total_payment_count": 5})
+    old = service._classifier_risk({"new_account_days": 300, "total_payment_count": 5})
 
     assert young is not None and old is not None
     assert young > old
@@ -131,7 +119,16 @@ def test_supervised_classifier_is_preferred_and_ranks_risk(tmp_path) -> None:
 def test_missing_features_are_passed_as_nan_to_classifier(tmp_path) -> None:
     service = _classifier_service(tmp_path)
 
-    risk = service._ml_risk({})
+    risk = service._classifier_risk({})
 
     assert risk is not None
     assert 0.0 <= risk <= 1.0
+
+
+def test_classifier_is_named_as_reason_when_it_ranks_risk_top(tmp_path) -> None:
+    service = _classifier_service(tmp_path)
+
+    response = service.score("TRANSACTION", None, {"new_account_days": 2, "total_payment_count": 5})
+
+    groups = {reason.group for reason in response.reasons}
+    assert "ML_CLASSIFIER" in groups

@@ -1,11 +1,13 @@
 """In-memory collaborative index of category-to-category similarity.
 
-Preferred source is ``models/category_similarity.json``, learned offline from real
+The service reads ``models/category_similarity.json``, learned offline from real
 donation behaviour (categories often funded by the same donors are similar; see
-``notebooks/train_real_data_colab.ipynb``). Without that file the index falls back
-to feature-centroid cosine similarity over the synthetic campaign dataset, and
-when both are missing similarity is an identity match (a category is 100% similar
-to itself, 0% to others).
+``notebooks/train_real_data_colab.ipynb``). Without that file similarity is an identity
+match (a category is 100% similar to itself, 0% to others), so recommendations stay
+content-based instead of borrowing similarities from synthetic data.
+
+``from_csv`` (feature-centroid cosine over the synthetic campaigns) is kept only for the
+offline evaluation in ``training/evaluate_recommender.py``.
 """
 
 from __future__ import annotations
@@ -36,6 +38,9 @@ class RecIndex:
     def __init__(self) -> None:
         self._sim: dict[str, dict[str, float]] = {cat: {} for cat in CATEGORIES}
         self.category_stats: dict[str, dict[str, float]] = {}
+        # True only when similarities were learned from real donation behaviour
+        self.learned = False
+        self.version: str | None = None
 
     @classmethod
     def from_json(cls, path: Path) -> RecIndex | None:
@@ -53,6 +58,9 @@ class RecIndex:
                     if not math.isfinite(value):
                         value = 0.0
                     index._sim[cat_a][cat_b] = max(0.0, min(1.0, value))
+            index.learned = True
+            version = payload.get("model_version")
+            index.version = str(version) if version is not None else None
             return index
         except Exception:
             return None
@@ -134,7 +142,7 @@ class RecIndex:
 @lru_cache(maxsize=1)
 def _default_index() -> RecIndex:
     learned = RecIndex.from_json(settings.category_similarity_path)
-    return learned if learned is not None else RecIndex.from_csv(settings.recommender_index_path)
+    return learned if learned is not None else RecIndex()
 
 
 def get_index() -> RecIndex:

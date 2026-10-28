@@ -92,9 +92,9 @@ class RecommenderService:
         if history and collab_used:
             source = "COLLABORATIVE"
             detail = "Kết hợp lựa chọn người dùng, lịch sử tương tác và độ tương đồng cộng đồng"
-        elif preferences:
+        elif preferences or history:
             source = "CONTENT"
-            detail = "Dựa trên lĩnh vực bạn đã chọn"
+            detail = "Dựa trên lĩnh vực bạn đã chọn hoặc đã tương tác"
         else:
             source = "COLD_START"
             detail = "Chưa có dữ liệu người dùng, xếp hạng theo mức độ phổ biến và chất lượng"
@@ -149,11 +149,20 @@ class RecommenderService:
             score += 0.05 * min(_to_float(candidate.days_left) / max_days, 1.0)
         score += 0.10 * min(_to_float(candidate.profile_score) / 100.0, 1.0)
 
-        collab = self._collab_boost(category, history_categories)
-        score += collab
+        same_category = bool(category) and category in history_categories
+        related_category, similarity = self._related_category(category, history_categories)
+        if same_category:
+            score += 0.35
+        else:
+            score += 0.35 * similarity
 
-        if collab > 0.0 and history_categories:
-            reason = "Tương tự các dự án bạn đã theo dõi"
+        if same_category:
+            reason = f"Cùng lĩnh vực {category} với dự án bạn đã xem hoặc ủng hộ"
+        elif similarity > 0.0:
+            reason = (
+                f"Người ủng hộ lĩnh vực {related_category} "
+                f"cũng thường ủng hộ lĩnh vực {category}"
+            )
         elif content_term > 0.0:
             reason = f"Phù hợp với lĩnh vực {category or 'chung'} bạn quan tâm"
         else:
@@ -165,18 +174,21 @@ class RecommenderService:
                 score=round(float(score), 6),
                 reason=reason,
             ),
-            collab > 0.0,
+            similarity > 0.0,
         )
 
-    def _collab_boost(self, category: str, history_categories: set[str]) -> float:
-        if not category or not history_categories:
-            return 0.0
-        best = 0.0
-        for history_category in history_categories:
+    def _related_category(self, category: str, history_categories: set[str]) -> tuple[str, float]:
+        """Most similar *other* category from the user's history (learned co-donation data)."""
+        if not category:
+            return "", 0.0
+        best_category, best = "", 0.0
+        for history_category in sorted(history_categories):
+            if history_category == category:
+                continue
             similarity = self._index.similarity(category, history_category)
             if similarity > best:
-                best = similarity
-        return 0.35 * best
+                best_category, best = history_category, similarity
+        return best_category, best
 
     def _popular_fallback(self, request: RecommendRequest, detail: str) -> RecommendResponse:
         excluded = set(request.exclude_ids or [])
