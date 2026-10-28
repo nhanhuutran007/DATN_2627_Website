@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 
+import { MoneyInput } from "@/components/ui/MoneyInput";
 import { ApiError } from "@/lib/api";
 import {
   createRewardTier,
@@ -129,7 +130,7 @@ export function RewardManager({ campaignId, closed }: { campaignId: string; clos
             </label>
             <label className="field">
               <span>Ủng hộ từ (VNĐ)</span>
-              <input type="number" min={20000} step={10000} value={draft.minAmount} onChange={(e) => setDraft({ ...draft, minAmount: e.target.value })} />
+              <MoneyInput value={draft.minAmount} placeholder="200.000đ" onChange={(digits) => setDraft({ ...draft, minAmount: digits })} />
             </label>
             <label className="field">
               <span>Số suất</span>
