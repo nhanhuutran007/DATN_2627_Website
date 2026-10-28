@@ -1,0 +1,186 @@
+\section{THIẾT KẾ CHI TIẾT CÁC THÀNH PHẦN}\label{sec:thiet_ke_chi_tiet}
+
+Mỗi thành phần có vòng đời và Dockerfile riêng. Chỉ backend được ghi vào cơ sở dữ liệu và gọi dịch vụ AI; các thành phần còn lại giao tiếp với dữ liệu thông qua backend.
+
+\subsection{Frontend}
+
+Frontend dùng Next.js App Router. Trang công khai (trang chủ, danh sách và chi tiết dự án, trang tổ chức) được render phía máy chủ để hỗ trợ SEO, Open Graph, sitemap và JSON-LD; các trang tương tác (tạo chiến dịch, ủng hộ, quản trị) được render phía trình duyệt. Cấu trúc thư mục được trình bày trong Bảng~\ref{tab:frontend}.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Cấu trúc thư mục frontend}
+    \label{tab:frontend}
+    \begin{tabularx}{\textwidth}{|P{3.6cm}|X|}
+        \hline
+        \textbf{Thư mục} & \textbf{Vai trò} \\
+        \hline
+        \texttt{src/app/} & Route theo URL tiếng Việt: \texttt{du-an}, \texttt{tim-kiem}, \texttt{tao-chien-dich}, \texttt{to-chuc}, \texttt{dashboard}, \texttt{admin}\ldots \\
+        \hline
+        \texttt{src/features/} & Mã giao diện theo nghiệp vụ, 21 nhóm: campaigns, donations, progress, organizations, admin\ldots \\
+        \hline
+        \texttt{src/components/} & Thành phần giao diện dùng chung \\
+        \hline
+        \texttt{src/lib/} & API client, xác thực, định dạng tiền VND, chính sách mật khẩu \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+Khi render phía máy chủ, frontend gọi thẳng backend trong mạng nội bộ qua biến \texttt{API\_INTERNAL\_URL}; trình duyệt gọi qua đường dẫn tương đối \texttt{/api/v1} đi qua reverse proxy.
+
+\subsection{Backend}
+
+\subsubsection{Kiến trúc phân lớp}
+
+Backend NestJS chia theo module nghiệp vụ. Mỗi module tổ chức theo bốn lớp như Hình~\ref{fig:phan_lop_backend}: controller nhận yêu cầu và DTO đã được kiểm tra, service giữ quy tắc nghiệp vụ, repository (TypeORM) truy vấn tham số hóa, entity ánh xạ bảng dữ liệu.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        font=\small,
+        >=stealth,
+        layer/.style={draw=black!70, rounded corners, align=center, minimum height=0.9cm, text width=8.5cm},
+        side/.style={draw=black!60, dashed, rounded corners, align=center, minimum height=4.6cm, text width=3.0cm}
+    ]
+        \node[layer] (c) at (0,3) {\textbf{Controller}: định tuyến, guard phân quyền, DTO};
+        \node[layer, fill=blue!7, draw=blue!65!black] (s) at (0,1.8) {\textbf{Service}: quy tắc nghiệp vụ, giao dịch, nhật ký kiểm toán};
+        \node[layer] (r) at (0,0.6) {\textbf{Repository (TypeORM)}: truy vấn tham số hóa};
+        \node[layer] (e) at (0,-0.6) {\textbf{Entity}: ánh xạ bảng MySQL};
+        \node[side] (i) at (6.6,1.2) {\textbf{Integrations}\\Payment, Storage, Email, Google, AI\\(interface + bản giả lập)};
+        \draw[->] (c) -- (s);
+        \draw[->] (s) -- (r);
+        \draw[->] (r) -- (e);
+        \draw[->] (s.east) -- (i.west |- s.east);
+    \end{tikzpicture}
+    \caption{Kiến trúc phân lớp bên trong một module backend}
+    \label{fig:phan_lop_backend}
+\end{figure}
+
+\subsubsection{Các module nghiệp vụ}
+
+Backend gồm 18 module, trách nhiệm của từng module được nêu trong Bảng~\ref{tab:module_backend}.
+
+\begin{longtable}{|P{3.2cm}|p{10.6cm}|}
+    \caption{Các module nghiệp vụ của backend}
+    \label{tab:module_backend} \\
+    \hline
+    \textbf{Module} & \textbf{Trách nhiệm chính} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Module} & \textbf{Trách nhiệm chính} \\
+    \hline
+    \endhead
+    \texttt{auth} & Đăng ký, đăng nhập JWT, refresh token xoay vòng, đăng nhập Google, xác minh email, đặt lại mật khẩu, OTP cho thao tác nhạy cảm \\
+    \hline
+    \texttt{users} & Hồ sơ, vai trò, khóa và mở tài khoản \\
+    \hline
+    \texttt{campaigns} & Vòng đời chiến dịch, ma trận chuyển trạng thái, cron chốt chiến dịch, thống kê lượt xem \\
+    \hline
+    \texttt{categories} & Lĩnh vực chiến dịch do quản trị viên quản lý \\
+    \hline
+    \texttt{donations} & Tạo giao dịch với idempotency key, nhận IPN SePay, sổ cái công khai, cron hết hạn đơn chờ quá 30 phút \\
+    \hline
+    \texttt{payments} & Webhook ví demo có chữ ký HMAC, chống phát lại \\
+    \hline
+    \texttt{finance} & Hoàn tiền, đối soát, biên nhận điện tử, xuất CSV \\
+    \hline
+    \texttt{rewards} & Mức quà tặng và số suất còn lại \\
+    \hline
+    \texttt{progress} & Mốc tiến độ, bài cập nhật, chứng từ chi tiêu, lịch sử thay đổi kế hoạch, cron nhắc mốc quá hạn \\
+    \hline
+    \texttt{organizations} & Hồ sơ và xác minh tổ chức thụ hưởng \\
+    \hline
+    \texttt{comments} & Bình luận và hỏi đáp theo luồng \\
+    \hline
+    \texttt{follows} & Theo dõi dự án \\
+    \hline
+    \texttt{moderation} & Báo cáo vi phạm và hàng đợi xử lý \\
+    \hline
+    \texttt{notifications} & Thông báo trong ứng dụng và email \\
+    \hline
+    \texttt{media} & Tải ảnh lên, kiểm tra loại và dung lượng \\
+    \hline
+    \texttt{ai} & Gợi ý dự án, dự đoán khả năng thành công, ghi hành vi khi người dùng đồng ý \\
+    \hline
+    \texttt{admin} & Dashboard, cảnh báo rủi ro, dự án nổi bật, sao lưu và khôi phục dữ liệu \\
+    \hline
+    \texttt{health} & Kiểm tra trạng thái sống cho Docker và load balancer \\
+    \hline
+\end{longtable}
+
+\subsubsection{Lớp dùng chung}
+
+Thư mục \texttt{src/common/} chứa các thành phần dùng chung cho mọi module:
+
+\begin{itemize}
+    \item \texttt{audit}: ghi nhật ký kiểm toán gồm thời điểm, người thực hiện, giá trị trước và sau.
+    \item \texttt{rate-limit}: giới hạn tần suất dựa trên Redis, tự lùi về bộ nhớ trong khi Redis lỗi.
+    \item \texttt{html}: làm sạch HTML mô tả chiến dịch trước khi lưu.
+    \item \texttt{validators}: kiểm tra mật khẩu mạnh và URL ảnh hợp lệ.
+\end{itemize}
+
+\subsection{Dịch vụ AI}
+
+Dịch vụ AI chỉ làm nhiệm vụ suy luận. Việc huấn luyện chạy ngoại tuyến (thư mục \texttt{training/}, trên Google Colab hoặc Kaggle), kết quả là các file mô hình \texttt{.pkl} được nạp từ thư mục \texttt{models/}. Dịch vụ không truy cập cơ sở dữ liệu: backend gửi kèm dữ liệu cần thiết (danh sách chiến dịch ứng viên, lịch sử hành vi đã được đồng ý) trong mỗi yêu cầu. Các endpoint được liệt kê trong Bảng~\ref{tab:ai_endpoint}.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Các endpoint của dịch vụ AI}
+    \label{tab:ai_endpoint}
+    \begin{tabularx}{\textwidth}{|P{3.3cm}|X|P{4.2cm}|}
+        \hline
+        \textbf{Endpoint} & \textbf{Chức năng} & \textbf{Dự phòng khi không nạp được mô hình} \\
+        \hline
+        \texttt{/api/v1/recommend} & Gợi ý dự án theo sở thích và hành vi người dùng & Xếp hạng theo mức phổ biến \\
+        \hline
+        \texttt{/api/v1/predict} & Xác suất chiến dịch đạt mục tiêu, kèm giải thích các yếu tố ảnh hưởng & Luật kinh nghiệm, đánh dấu \texttt{fallback=true} \\
+        \hline
+        \texttt{/api/v1/fraud} & Điểm rủi ro gian lận kèm bằng chứng & Chỉ dùng luật nghiệp vụ \\
+        \hline
+        \texttt{/api/v1/health} & Trạng thái dịch vụ và mô hình & -- \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+File mô hình \texttt{.pkl} không được đưa vào Git, vì vậy một môi trường mới sẽ chạy bằng luật dự phòng cho tới khi mô hình được huấn luyện lại và đặt vào thư mục \texttt{models/}.
+
+\subsection{Cơ sở dữ liệu và bộ nhớ đệm}
+
+MySQL 8.4 lưu toàn bộ dữ liệu nghiệp vụ; chi tiết từng bảng được trình bày trong Đặc tả ERD. Thiết kế dữ liệu tuân theo các nguyên tắc:
+
+\begin{itemize}
+    \item Khóa chính dạng UUID.
+    \item Xóa mềm cho các dữ liệu quan trọng để có thể truy vết.
+    \item Schema chỉ thay đổi qua migration có thứ tự và có rollback, không dùng chế độ tự đồng bộ của ORM.
+    \item Tương thích cả MySQL 8 và MariaDB để có thể đưa lên hosting thông thường.
+\end{itemize}
+
+Redis 7 chỉ giữ bộ đếm giới hạn tần suất. Mất dữ liệu Redis không làm mất dữ liệu nghiệp vụ.
+
+\subsection{Tích hợp bên ngoài}
+
+Mỗi tích hợp nằm trong \texttt{backend/src/integrations/} dưới dạng một interface kèm ít nhất một bản giả lập, nên có thể đổi nhà cung cấp mà không sửa code nghiệp vụ (Bảng~\ref{tab:tich_hop}).
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Các gateway tích hợp bên ngoài}
+    \label{tab:tich_hop}
+    \begin{tabularx}{\textwidth}{|P{3.6cm}|X|X|}
+        \hline
+        \textbf{Gateway} & \textbf{Bản triển khai} & \textbf{Cấu hình chuyển đổi} \\
+        \hline
+        \texttt{PaymentGateway} & \texttt{DemoWalletGateway} (sandbox), SePay & \texttt{SEPAY\_ENV}, \texttt{SEPAY\_MERCHANT\_ID}; môi trường production tự tắt ví demo \\
+        \hline
+        \texttt{StorageGateway} & \texttt{LocalStorageGateway}, \texttt{S3StorageGateway} & \texttt{STORAGE\_DRIVER=local} hoặc \texttt{s3} \\
+        \hline
+        \texttt{EmailGateway} & SMTP qua Nodemailer hoặc chỉ ghi log & Để trống \texttt{SMTP\_HOST} thì chỉ ghi log \\
+        \hline
+        \texttt{GoogleIdentityGateway} & Xác minh ID token Google & Để trống \texttt{GOOGLE\_CLIENT\_ID} thì ẩn nút Google \\
+        \hline
+        \texttt{AiGateway} & REST tới dịch vụ AI, timeout 3 giây & \texttt{AI\_SERVICE\_URL}, \texttt{AI\_TIMEOUT\_MS}, \texttt{AI\_API\_KEY} \\
+        \hline
+    \end{tabularx}
+\end{table}

@@ -1,0 +1,110 @@
+\section{TỔNG QUAN KIẾN TRÚC}\label{sec:tong_quan_kien_truc}
+
+\subsection{Mô hình kiến trúc}
+
+Hệ thống theo mô hình client--server nhiều dịch vụ. Ba ứng dụng độc lập là frontend, backend và dịch vụ AI; mỗi ứng dụng có mã nguồn, Dockerfile và vòng đời riêng, giao tiếp với nhau qua REST API có phiên bản \texttt{/api/v1}. Toàn bộ yêu cầu từ người dùng đi qua một reverse proxy: Nginx khi chạy bằng Docker Compose, Application Load Balancer khi chạy trên AWS.
+
+Bên trong backend áp dụng kiến trúc phân lớp theo module nghiệp vụ. Cách chia này giữ được ranh giới nghiệp vụ rõ ràng như một hệ thống microservice nhưng vẫn triển khai đơn giản như một ứng dụng duy nhất, phù hợp với quy mô đồ án hai thành viên.
+
+\subsection{Sơ đồ kiến trúc tổng thể}
+
+Hình~\ref{fig:kien_truc_tong_the} trình bày các thành phần của hệ thống và chiều gọi giữa chúng.
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tikzpicture}[
+        font=\scriptsize,
+        >=stealth,
+        comp/.style={draw=black!70, rounded corners, align=center, minimum height=1.25cm, text width=3.4cm},
+        core/.style={draw=blue!65!black, fill=blue!7, line width=0.9pt, rounded corners, align=center, minimum height=1.25cm, text width=4.4cm},
+        store/.style={draw=black!70, fill=gray!10, rounded corners, align=center, minimum height=1.25cm, text width=2.9cm},
+        ext/.style={draw=black!60, dashed, rounded corners, align=center, minimum height=1.0cm, text width=2.9cm},
+        call/.style={->, draw=black!70, line width=0.6pt},
+        both/.style={<->, draw=black!70, line width=0.6pt}
+    ]
+        \node[comp] (user) at (0,5.6) {\textbf{Người dùng}\\Trình duyệt máy tính, điện thoại};
+        \node[comp, text width=7.0cm] (proxy) at (0,3.8) {\textbf{Nginx (cục bộ) / ALB (AWS)}\\\texttt{/} $\rightarrow$ frontend \quad \texttt{/api/v1} $\rightarrow$ backend};
+
+        \node[comp] (fe) at (-5.2,1.6) {\textbf{Frontend}\\Next.js 16, React 19\\SSR trang công khai, SEO};
+        \node[core] (be) at (0,1.6) {\textbf{Backend API}\\NestJS 12 -- 18 module nghiệp vụ\\Xác thực, giao dịch, cron, kiểm toán};
+
+        \node[ext] (pay) at (5.6,2.15) {\textbf{Cổng thanh toán}\\Ví demo, SePay};
+        \node[ext] (svc) at (5.6,1.05) {\textbf{Dịch vụ ngoài}\\SMTP, Amazon S3, Google};
+
+        \node[store] (db) at (-3.6,-1.0) {\textbf{MySQL 8.4}\\Dữ liệu nghiệp vụ};
+        \node[store] (redis) at (0,-1.0) {\textbf{Redis 7}\\Bộ đếm giới hạn tần suất};
+        \node[comp] (ai) at (3.8,-1.0) {\textbf{AI Service}\\FastAPI, scikit-learn\\Gợi ý, dự đoán, gian lận};
+
+        \draw[call] (user) -- (proxy);
+        \draw[call] (proxy.south west) ++(0.8,0) |- ++(0,-0.5) -| (fe.north);
+        \draw[call] (proxy.south) -- (be.north);
+        \draw[call] (fe) -- node[above] {SSR} (be);
+        \draw[both] (be.east |- pay.west) -- node[above, font=\tiny] {webhook / IPN} (pay.west);
+        \draw[call] (be.east |- svc.west) -- (svc.west);
+        \draw[call] (be.south) ++(-1.2,0) |- ++(0,-0.6) -| (db.north);
+        \draw[call] (be.south) -- (redis.north);
+        \draw[call] (be.south) ++(1.2,0) |- ++(0,-0.6) -| (ai.north);
+        \node[font=\tiny, above] at (2.5,0.375) {X-AI-Key, timeout 3 s};
+
+        \node[font=\scriptsize, align=left] at (0,-2.3) {Khung nét đứt: dịch vụ bên ngoài \quad Khung tô xanh: thành phần trung tâm};
+    \end{tikzpicture}%
+    }
+    \caption{Sơ đồ kiến trúc tổng thể của nền tảng Góp Mầm}
+    \label{fig:kien_truc_tong_the}
+\end{figure}
+
+Người dùng chỉ đi qua reverse proxy. Backend là thành phần duy nhất ghi vào MySQL, gọi dịch vụ AI và nhận webhook/IPN từ cổng thanh toán. Frontend khi render phía máy chủ gọi thẳng backend trong mạng nội bộ; trình duyệt gọi backend qua reverse proxy. Trên AWS, dịch vụ AI không được mở ra load balancer, chỉ backend gọi được.
+
+\subsection{Nguyên tắc thiết kế}
+
+\begin{itemize}
+    \item \textbf{Ranh giới rõ ràng:} nghiệp vụ, phân quyền và trạng thái tiền chỉ nằm ở backend. Frontend chỉ ẩn/hiện giao diện và không được tin cậy.
+    \item \textbf{Số liệu truy vết được:} số tiền đã huy động và số liệu quỹ được tính từ giao dịch đã xác minh; mọi thay đổi quan trọng được ghi nhật ký kiểm toán.
+    \item \textbf{AI chỉ hỗ trợ ra quyết định:} kết quả AI không tự khóa, từ chối hay xóa dữ liệu; luôn có phương án dự phòng khi AI không sẵn sàng.
+    \item \textbf{Tích hợp qua interface:} thanh toán, email, lưu trữ tệp, đăng nhập Google và AI đều có bản giả lập để phát triển và kiểm thử mà không cần dịch vụ thật.
+    \item \textbf{Không lưu trạng thái phiên:} xác thực bằng JWT nên có thể chạy nhiều instance backend phía sau load balancer.
+    \item \textbf{Giống nhau ở mọi môi trường:} cùng một bộ Docker image chạy trên máy cá nhân và trên AWS; cấu hình khác nhau chỉ nằm ở biến môi trường.
+\end{itemize}
+
+\subsection{Công nghệ sử dụng}
+
+Phần web dùng chung TypeScript cho cả frontend và backend; phần AI tách riêng bằng Python vì hệ sinh thái học máy của Python đầy đủ nhất. Bảng~\ref{tab:cong_nghe} tổng hợp công nghệ theo từng tầng, phiên bản lấy từ \texttt{package.json} và \texttt{requirements.txt} tại thời điểm viết tài liệu.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Công nghệ sử dụng theo từng tầng}
+    \label{tab:cong_nghe}
+    \begin{tabularx}{\textwidth}{|P{2.3cm}|P{4.0cm}|X|}
+        \hline
+        \textbf{Tầng} & \textbf{Công nghệ, phiên bản} & \textbf{Lý do lựa chọn} \\
+        \hline
+        Frontend & Next.js 16.3, React 19.2, TypeScript & SSR và App Router tốt cho SEO trang dự án; cùng ngôn ngữ với backend \\
+        \hline
+        Backend & NestJS 12, TypeORM 1.1, class-validator & Module và dependency injection; guard, pipe, interceptor có sẵn cho phân quyền, kiểm tra đầu vào và kiểm toán \\
+        \hline
+        Xác thực & @nestjs/jwt, passport-jwt, bcrypt, google-auth-library & JWT không trạng thái; xác minh ID token Google phía máy chủ \\
+        \hline
+        Tác vụ định kỳ & @nestjs/schedule 12 & Chốt chiến dịch hết hạn, hết hạn đơn chờ, nhắc mốc tiến độ \\
+        \hline
+        Dịch vụ AI & Python 3.12, FastAPI 0.141, scikit-learn 1.9.1, pandas, NumPy & API suy luận nhẹ; scikit-learn ghim đúng phiên bản dùng khi huấn luyện mô hình \\
+        \hline
+        Cơ sở dữ liệu & MySQL 8.4 & Quan hệ, giao dịch ACID cho dữ liệu tiền; tương thích MariaDB trên hosting \\
+        \hline
+        Bộ nhớ đệm & Redis 7 (ioredis) & Bộ đếm giới hạn tần suất dùng chung giữa các instance \\
+        \hline
+        Thanh toán & Ví demo (sandbox), SePay & Kiểm thử không phát sinh tiền thật; SePay hỗ trợ QR chuyển khoản nội địa \\
+        \hline
+        Email, lưu trữ & Nodemailer (SMTP), ổ đĩa cục bộ hoặc Amazon S3 & Đổi nhà cung cấp bằng biến môi trường \\
+        \hline
+        Hạ tầng & Docker Compose, Nginx 1.27, Terraform (AWS) & Môi trường chạy giống nhau từ máy cá nhân tới đám mây; hạ tầng mô tả bằng mã \\
+        \hline
+        Tài liệu API & OpenAPI 3 / Swagger & Hợp đồng giữa frontend và backend \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+\subsection{Quyết định kiến trúc đáng chú ý}
+
+Đề cương ban đầu (ADR-001) dự kiến dùng Java Spring Boot cho backend. Trong quá trình thực hiện, nhóm chuyển sang NestJS để frontend và backend dùng chung một ngôn ngữ, giảm số công cụ phải duy trì. Ranh giới nghiệp vụ, phân quyền và giao dịch vẫn được giữ ở backend theo kiến trúc nhiều lớp như thiết kế ban đầu. Dịch vụ AI vẫn viết bằng Python và tách thành dịch vụ riêng.

@@ -1,0 +1,118 @@
+\section{MỐI QUAN HỆ (RELATIONSHIPS)}\label{sec:chuong3}
+
+Hệ thống có 37 quan hệ có khóa ngoại: 36 quan hệ 1-N và 1 quan hệ 1-1 (quan hệ số 31 trong Bảng~\ref{tab:quan_he}). ``Bắt buộc'' nghĩa là cột khóa ngoại NOT NULL.
+
+{\small
+\begin{longtable}{|c|P{3.6cm}|P{4.9cm}|p{4.4cm}|}
+    \caption{Các quan hệ có khóa ngoại}
+    \label{tab:quan_he} \\
+    \hline
+    \textbf{STT} & \textbf{Quan hệ, loại} & \textbf{Khóa ngoại} & \textbf{Mô tả, tính bắt buộc} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{STT} & \textbf{Quan hệ, loại} & \textbf{Khóa ngoại} & \textbf{Mô tả, tính bắt buộc} \\
+    \hline
+    \endhead
+    1 & \textbf{USERS - CAMPAIGNS (Tạo chiến dịch)} \newline 1-N (One-to-Many) & campaigns.owner\_\allowbreak{}id $\rightarrow$ users.id & Một người dùng tạo nhiều chiến dịch \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    2 & \textbf{USERS - DONATIONS (Ủng hộ)} \newline 1-N (One-to-Many) & donations.user\_\allowbreak{}id $\rightarrow$ users.id & Một người dùng có nhiều khoản ủng hộ \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    3 & \textbf{CAMPAIGNS - DONATIONS (Nhận ủng hộ)} \newline 1-N (One-to-Many) & donations.campaign\_\allowbreak{}id $\rightarrow$ campaigns.id & Một chiến dịch nhận nhiều khoản ủng hộ \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    4 & \textbf{REWARD\_\allowbreak{}TIERS - DONATIONS (Được chọn)} \newline 1-N (One-to-Many) & donations.reward\_\allowbreak{}tier\_\allowbreak{}id $\rightarrow$ reward\_\allowbreak{}tiers.id & Một mức quà được nhiều khoản ủng hộ chọn \newline \textit{Bắt buộc:} Không bắt buộc (ủng hộ có thể không nhận quà) \\
+    \hline
+    5 & \textbf{CAMPAIGNS - REWARD\_\allowbreak{}TIERS} \newline 1-N (One-to-Many) & reward\_\allowbreak{}tiers.campaign\_\allowbreak{}id $\rightarrow$ campaigns.id & Một chiến dịch có nhiều mức quà \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    6 & \textbf{CAMPAIGNS - MILESTONES} \newline 1-N (One-to-Many) & milestones.campaign\_\allowbreak{}id $\rightarrow$ campaigns.id & Một chiến dịch có nhiều mốc tiến độ \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    7 & \textbf{MILESTONES - MILESTONE\_\allowbreak{}UPDATES} \newline 1-N (One-to-Many) & milestone\_\allowbreak{}updates.milestone\_\allowbreak{}id $\rightarrow$ milestones.id & Một mốc có nhiều bài cập nhật \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    8 & \textbf{DONATIONS - REFUND\_\allowbreak{}REQUESTS} \newline 1-N (One-to-Many) & refund\_\allowbreak{}requests.donation\_\allowbreak{}id $\rightarrow$ donations.id & Một khoản ủng hộ có thể có nhiều yêu cầu hoàn (gửi lại sau khi bị từ chối) \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    9 & \textbf{USERS - REFUND\_\allowbreak{}REQUESTS (Người yêu cầu)} \newline 1-N (One-to-Many) & refund\_\allowbreak{}requests.user\_\allowbreak{}id $\rightarrow$ users.id & Một người dùng gửi nhiều yêu cầu hoàn tiền \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    10 & \textbf{USERS - REFUND\_\allowbreak{}REQUESTS (Người duyệt)} \newline 1-N (One-to-Many) & refund\_\allowbreak{}requests.reviewed\_\allowbreak{}by $\rightarrow$ users.id & Một quản trị viên duyệt nhiều yêu cầu hoàn tiền \newline \textit{Bắt buộc:} Không bắt buộc (NULL khi chưa xử lý) \\
+    \hline
+    11 & \textbf{CAMPAIGNS - CAMPAIGN\_\allowbreak{}COMMENTS} \newline 1-N (One-to-Many) & campaign\_\allowbreak{}comments.campaign\_\allowbreak{}id $\rightarrow$ campaigns.id & Một chiến dịch có nhiều bình luận \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    12 & \textbf{USERS - CAMPAIGN\_\allowbreak{}COMMENTS (Tác giả)} \newline 1-N (One-to-Many) & campaign\_\allowbreak{}comments.user\_\allowbreak{}id $\rightarrow$ users.id & Một người dùng viết nhiều bình luận \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    13 & \textbf{USERS - CAMPAIGN\_\allowbreak{}COMMENTS (Người ẩn)} \newline 1-N (One-to-Many) & campaign\_\allowbreak{}comments.hidden\_\allowbreak{}by $\rightarrow$ users.id & Chủ chiến dịch hoặc quản trị viên ẩn nhiều bình luận \newline \textit{Bắt buộc:} Không bắt buộc \\
+    \hline
+    14 & \textbf{CAMPAIGN\_\allowbreak{}COMMENTS - CAMPAIGN\_\allowbreak{}COMMENTS (Trả lời)} \newline 1-N (One-to-Many), quan hệ đệ quy & campaign\_\allowbreak{}comments.parent\_\allowbreak{}id $\rightarrow$ campaign\_\allowbreak{}comments.id & Một bình luận gốc có nhiều trả lời \newline \textit{Bắt buộc:} Không bắt buộc (NULL là bình luận gốc) \newline \textit{Lưu ý:} Chỉ cho phép trả lời một cấp \\
+    \hline
+    15 & \textbf{USERS - CAMPAIGN\_\allowbreak{}FOLLOWS (Theo dõi)} \newline 1-N (One-to-Many) & campaign\_\allowbreak{}follows.user\_\allowbreak{}id $\rightarrow$ users.id (ON DELETE CASCADE) & Một người dùng theo dõi nhiều chiến dịch \newline \textit{Bắt buộc:} Bắt buộc \newline \textit{Lưu ý:} Cùng 3.16 tạo quan hệ N-N giữa USERS và CAMPAIGNS \\
+    \hline
+    16 & \textbf{CAMPAIGNS - CAMPAIGN\_\allowbreak{}FOLLOWS (Được theo dõi)} \newline 1-N (One-to-Many) & campaign\_\allowbreak{}follows.campaign\_\allowbreak{}id $\rightarrow$ campaigns.id (ON DELETE CASCADE) & Một chiến dịch có nhiều người theo dõi \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    17 & \textbf{USERS - REPORTS (Người báo cáo)} \newline 1-N (One-to-Many) & reports.reporter\_\allowbreak{}id $\rightarrow$ users.id & Một người dùng gửi nhiều báo cáo vi phạm \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    18 & \textbf{USERS - REPORTS (Người xử lý)} \newline 1-N (One-to-Many) & reports.resolved\_\allowbreak{}by $\rightarrow$ users.id & Một quản trị viên xử lý nhiều báo cáo \newline \textit{Bắt buộc:} Không bắt buộc \\
+    \hline
+    19 & \textbf{CAMPAIGNS - REPORTS} \newline 1-N (One-to-Many) & reports.campaign\_\allowbreak{}id $\rightarrow$ campaigns.id & Một chiến dịch có thể bị báo cáo nhiều lần \newline \textit{Bắt buộc:} Không bắt buộc \\
+    \hline
+    20 & \textbf{CAMPAIGN\_\allowbreak{}COMMENTS - REPORTS} \newline 1-N (One-to-Many) & reports.comment\_\allowbreak{}id $\rightarrow$ campaign\_\allowbreak{}comments.id & Một bình luận có thể bị báo cáo nhiều lần \newline \textit{Bắt buộc:} Không bắt buộc \\
+    \hline
+    21 & \textbf{USERS - RISK\_\allowbreak{}ALERTS} \newline 1-N (One-to-Many) & risk\_\allowbreak{}alerts.resolved\_\allowbreak{}by $\rightarrow$ users.id & Một quản trị viên xử lý nhiều cảnh báo rủi ro \newline \textit{Bắt buộc:} Không bắt buộc \\
+    \hline
+    22 & \textbf{USERS - BEHAVIOR\_\allowbreak{}EVENTS} \newline 1-N (One-to-Many) & behavior\_\allowbreak{}events.user\_\allowbreak{}id $\rightarrow$ users.id & Một người dùng phát sinh nhiều sự kiện hành vi \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    23 & \textbf{CAMPAIGNS - BEHAVIOR\_\allowbreak{}EVENTS} \newline 1-N (One-to-Many) & behavior\_\allowbreak{}events.campaign\_\allowbreak{}id $\rightarrow$ campaigns.id & Một chiến dịch có nhiều sự kiện hành vi \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    24 & \textbf{USERS - NOTIFICATIONS} \newline 1-N (One-to-Many) & notifications.user\_\allowbreak{}id $\rightarrow$ users.id & Một người dùng nhận nhiều thông báo \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    25 & \textbf{USERS - MEDIA\_\allowbreak{}FILES} \newline 1-N (One-to-Many) & media\_\allowbreak{}files.owner\_\allowbreak{}id $\rightarrow$ users.id & Một người dùng tải lên nhiều tệp \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    26 & \textbf{USERS - EMAIL\_\allowbreak{}VERIFICATION\_\allowbreak{}TOKENS} \newline 1-N (One-to-Many) & email\_\allowbreak{}verification\_\allowbreak{}tokens.user\_\allowbreak{}id $\rightarrow$ users.id (ON DELETE CASCADE) & Mỗi lần gửi lại email xác minh tạo một token mới \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    27 & \textbf{USERS - PASSWORD\_\allowbreak{}RESET\_\allowbreak{}TOKENS} \newline 1-N (One-to-Many) & password\_\allowbreak{}reset\_\allowbreak{}tokens.user\_\allowbreak{}id $\rightarrow$ users.id (ON DELETE CASCADE) & Mỗi lần yêu cầu đặt lại mật khẩu tạo một token mới \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    28 & \textbf{USERS - REVOKED\_\allowbreak{}TOKENS} \newline 1-N (One-to-Many) & revoked\_\allowbreak{}tokens.user\_\allowbreak{}id $\rightarrow$ users.id (ON DELETE CASCADE) & Mỗi lần đăng xuất thu hồi một JWT \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    29 & \textbf{CAMPAIGNS - CAMPAIGN\_\allowbreak{}VIEW\_\allowbreak{}DAILY} \newline 1-N (One-to-Many) & campaign\_\allowbreak{}view\_\allowbreak{}daily.campaign\_\allowbreak{}id $\rightarrow$ campaigns.id (ON DELETE CASCADE) & Một chiến dịch có một dòng thống kê cho mỗi ngày có lượt xem \newline \textit{Bắt buộc:} Bắt buộc (là một phần khóa chính) \\
+    \hline
+    30 & \textbf{MILESTONE\_\allowbreak{}UPDATES - MILESTONE\_\allowbreak{}UPDATE\_\allowbreak{}ATTACHMENTS} \newline 1-N (One-to-Many) & milestone\_\allowbreak{}update\_\allowbreak{}attachments.milestone\_\allowbreak{}update\_\allowbreak{}id $\rightarrow$ milestone\_\allowbreak{}updates.id (ON DELETE CASCADE) & Một bài cập nhật có nhiều chứng từ chi tiêu \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    31 & \textbf{MEDIA\_\allowbreak{}FILES - MILESTONE\_\allowbreak{}UPDATE\_\allowbreak{}ATTACHMENTS} \newline 1-1 hoặc 1-0 (One-to-One/Zero) & milestone\_\allowbreak{}update\_\allowbreak{}attachments.media\_\allowbreak{}file\_\allowbreak{}id $\rightarrow$ media\_\allowbreak{}files.id (UNIQUE) & Mỗi tệp chứng từ gắn với tối đa một khoản chi \newline \textit{Bắt buộc:} Bắt buộc phía chứng từ; tệp có thể không gắn với chứng từ nào \newline \textit{Lưu ý:} Đây là quan hệ 1-1 duy nhất của hệ thống, ngăn dùng một hóa đơn cho nhiều khoản chi \\
+    \hline
+    32 & \textbf{MILESTONES - MILESTONE\_\allowbreak{}REVISIONS} \newline 1-N (One-to-Many) & milestone\_\allowbreak{}revisions.milestone\_\allowbreak{}id $\rightarrow$ milestones.id (ON DELETE CASCADE) & Một mốc có nhiều lần sửa sau khi chiến dịch phát hành \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    33 & \textbf{USERS - MILESTONE\_\allowbreak{}REVISIONS} \newline 1-N (One-to-Many) & milestone\_\allowbreak{}revisions.changed\_\allowbreak{}by $\rightarrow$ users.id & Một chủ dự án thực hiện nhiều lần sửa mốc \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    34 & \textbf{USERS - ORGANIZATIONS (Người đại diện)} \newline 1-N (One-to-Many) & organizations.representative\_\allowbreak{}id $\rightarrow$ users.id & Một người dùng đại diện cho nhiều tổ chức (tối đa 3, giới hạn ở tầng dịch vụ) \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+    35 & \textbf{USERS - ORGANIZATIONS (Người xác minh)} \newline 1-N (One-to-Many) & organizations.reviewed\_\allowbreak{}by $\rightarrow$ users.id & Một quản trị viên xét duyệt nhiều hồ sơ tổ chức \newline \textit{Bắt buộc:} Không bắt buộc (NULL khi chưa xét duyệt) \\
+    \hline
+    36 & \textbf{ORGANIZATIONS - CAMPAIGNS (Thụ hưởng)} \newline 1-N (One-to-Many) & campaigns.organization\_\allowbreak{}id $\rightarrow$ organizations.id & Một tổ chức đã xác minh được nhiều chiến dịch gây quỹ thay \newline \textit{Bắt buộc:} Không bắt buộc (NULL là gây quỹ cho dự án của chủ chiến dịch) \newline \textit{Lưu ý:} Chỉ gắn được tổ chức đang ở trạng thái verified \\
+    \hline
+    37 & \textbf{USERS - STEP\_\allowbreak{}UP\_\allowbreak{}CODES (Xác minh OTP)} \newline 1-N (One-to-Many) & step\_\allowbreak{}up\_\allowbreak{}codes.user\_\allowbreak{}id $\rightarrow$ users.id (ON DELETE CASCADE) & Mỗi lần yêu cầu thao tác nhạy cảm tạo một mã OTP mới \newline \textit{Bắt buộc:} Bắt buộc \\
+    \hline
+\end{longtable}
+}
+
+\subsection{Tham chiếu logic (không có khóa ngoại)}
+
+Năm cột trong Bảng~\ref{tab:tham_chieu_logic} trỏ tới bảng khác nhưng cố ý không đặt khóa ngoại.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Các tham chiếu logic không có khóa ngoại}
+    \label{tab:tham_chieu_logic}
+    \begin{tabularx}{\textwidth}{|P{4.0cm}|P{4.6cm}|X|}
+        \hline
+        \textbf{Cột} & \textbf{Trỏ tới} & \textbf{Lý do không đặt khóa ngoại} \\
+        \hline
+        risk\_\allowbreak{}alerts.entity\_\allowbreak{}id & campaigns.id hoặc users.id theo entity\_\allowbreak{}type & Tham chiếu đa hình \\
+        \hline
+        audit\_\allowbreak{}logs.entity\_\allowbreak{}id & Bảng bất kỳ theo entity & Tham chiếu đa hình \\
+        \hline
+        audit\_\allowbreak{}logs.user\_\allowbreak{}id & users.id & Giữ nhật ký kể cả khi tài khoản bị xóa \\
+        \hline
+        notifications.related\_\allowbreak{}id & Chiến dịch, khoản ủng hộ, bình luận, mốc... theo type & Tham chiếu đa hình \\
+        \hline
+        campaigns.category & categories.name & Lưu tên danh mục; đổi tên được đồng bộ ở tầng dịch vụ \\
+        \hline
+    \end{tabularx}
+\end{table}

@@ -1,0 +1,73 @@
+\section{GIỚI THIỆU}\label{sec:gioi_thieu}
+
+\subsection{Mục đích tài liệu}
+
+Tài liệu mô tả kiến trúc của nền tảng Góp Mầm: các thành phần của hệ thống, trách nhiệm của từng thành phần, cách chúng giao tiếp với nhau, cách hệ thống được bảo mật và triển khai. Đây là cơ sở để hiện thực, kiểm thử và vận hành hệ thống, đồng thời giải thích lý do của các quyết định kỹ thuật chính.
+
+Tài liệu bổ sung cho ba nhóm tài liệu khác của đề tài: Đặc tả yêu cầu phần mềm (SRS) trả lời câu hỏi hệ thống \emph{cần làm gì}; Đặc tả ERD mô tả \emph{dữ liệu} được lưu như thế nào; các sơ đồ UML mô tả \emph{hành vi} của từng chức năng. Tài liệu kiến trúc trả lời câu hỏi hệ thống \emph{được tổ chức} như thế nào để đáp ứng các yêu cầu đó.
+
+\subsection{Phạm vi}
+
+Phạm vi tài liệu bao gồm toàn bộ mã nguồn trong kho \texttt{DATN\_2627\_Website}:
+
+\begin{itemize}
+    \item \texttt{frontend/}: ứng dụng web Next.js.
+    \item \texttt{backend/}: API nghiệp vụ NestJS, migration và dữ liệu mẫu.
+    \item \texttt{ai-service/}: dịch vụ suy luận AI FastAPI và pipeline huấn luyện ngoại tuyến.
+    \item \texttt{infra/}: cấu hình Docker Compose, Nginx và Terraform cho AWS.
+\end{itemize}
+
+Thiết kế giao diện chi tiết, đặc tả từng bảng dữ liệu và kịch bản của từng use case nằm ở các tài liệu riêng và chỉ được nhắc tới khi cần.
+
+\subsection{Thuật ngữ}
+
+Các thuật ngữ chuyên môn dùng trong tài liệu được giải thích trong Bảng~\ref{tab:thuat_ngu}. Các từ viết tắt được liệt kê ở Danh mục các từ viết tắt.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Thuật ngữ sử dụng trong tài liệu}
+    \label{tab:thuat_ngu}
+    \begin{tabularx}{\textwidth}{|P{3.6cm}|X|}
+        \hline
+        \textbf{Thuật ngữ} & \textbf{Ý nghĩa} \\
+        \hline
+        Server-Side Rendering & Trang được render ở máy chủ trước khi gửi về trình duyệt, giúp công cụ tìm kiếm đọc được nội dung \\
+        \hline
+        REST API & Giao diện lập trình qua HTTP, có phiên bản \texttt{/api/v1} \\
+        \hline
+        Webhook / IPN & Lời gọi từ cổng thanh toán về backend để báo kết quả giao dịch \\
+        \hline
+        Idempotency key & Khóa do client gửi kèm để một yêu cầu tạo giao dịch gửi lại nhiều lần chỉ được xử lý một lần \\
+        \hline
+        Fallback & Phương án dự phòng khi mô hình AI hoặc dịch vụ AI không sẵn sàng \\
+        \hline
+        Reverse proxy & Máy chủ trung gian nhận mọi yêu cầu từ người dùng rồi chuyển tới dịch vụ phù hợp \\
+        \hline
+        Cron & Tác vụ chạy định kỳ theo lịch trong backend \\
+        \hline
+        Human-in-the-loop & Kết quả AI chỉ là gợi ý, quyết định cuối cùng do con người đưa ra \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+\subsection{Tài liệu liên quan}
+
+\begin{itemize}
+    \item Đặc tả yêu cầu phần mềm: \url{Document/01_TaiLieuPhanTich/01_SRS/SRS_GopMam.docx}.
+    \item Danh sách Actor và Đặc tả Use Case: \url{Document/01_TaiLieuPhanTich/}.
+    \item Đặc tả ERD và mô hình quan hệ: \url{Document/02_TaiLieuThietKe/01_ERD/}, \url{docs/database/schema.dbml}.
+    \item Sơ đồ UML (Use Case, Activity, Sequence, Class): \url{Document/03_SoDoUML/}.
+    \item Hợp đồng API OpenAPI 3: \url{docs/api/openapi.yaml}.
+    \item ADR-001 -- chọn NestJS cho backend: \url{docs/architecture/adr-001-backend-stack.md}.
+\end{itemize}
+
+\subsection{Bố cục tài liệu}
+
+\begin{itemize}
+    \item \textbf{Chương 1 -- Giới thiệu:} mục đích, phạm vi, thuật ngữ và tài liệu liên quan.
+    \item \textbf{Chương 2 -- Tổng quan kiến trúc:} mô hình kiến trúc, sơ đồ tổng thể, nguyên tắc thiết kế và công nghệ sử dụng.
+    \item \textbf{Chương 3 -- Thiết kế chi tiết các thành phần:} frontend, backend, dịch vụ AI, cơ sở dữ liệu và các tích hợp bên ngoài.
+    \item \textbf{Chương 4 -- Giao tiếp và bảo mật:} các kênh giao tiếp, tác vụ định kỳ, luồng nghiệp vụ trọng tâm và thiết kế bảo mật.
+    \item \textbf{Chương 5 -- Triển khai, chất lượng và hạn chế:} kiến trúc triển khai trên Docker Compose và AWS, thuộc tính chất lượng, hạn chế và hướng mở rộng.
+\end{itemize}
