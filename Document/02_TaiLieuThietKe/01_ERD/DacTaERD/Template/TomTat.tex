@@ -1,0 +1,13 @@
+\section*{\fontsize{18pt}{18pt}\selectfont\MakeUppercase{\de}\\TÓM TẮT TÀI LIỆU ĐẶC TẢ ERD}
+
+Tài liệu đặc tả mô hình dữ liệu của nền tảng gây quỹ cộng đồng Góp Mầm (phiên bản 1.1, cập nhật ngày 27/10/2026). Cơ sở dữ liệu chạy trên MySQL 8 với engine InnoDB; schema chỉ thay đổi qua migration TypeORM có thứ tự và có rollback.
+
+Hệ thống gồm 24 thực thể chia thành sáu nhóm: tài khoản, chiến dịch và tiến độ, giao dịch, cộng đồng, kiểm duyệt và rủi ro, AI và hệ thống. Giữa các thực thể có 37 mối quan hệ có khóa ngoại (36 quan hệ 1-N, 1 quan hệ 1-1) và 5 tham chiếu logic không đặt khóa ngoại. Mọi khóa chính là UUID dạng \texttt{CHAR(36)}, trừ hai ngoại lệ có giải thích.
+
+Thiết kế dữ liệu ưu tiên tính toàn vẹn của giao dịch tài chính: khóa idempotency và các ràng buộc UNIQUE chống ghi nhận trùng, số tiền đã huy động chỉ cộng từ khoản ủng hộ đã xác minh, thao tác hoàn tiền yêu cầu mã OTP, dữ liệu quan trọng dùng xóa mềm và mọi thay đổi được ghi nhật ký kiểm toán. Việc giải ngân được minh bạch bằng chứng từ chi tiêu, nhắc mốc quá hạn và lịch sử thay đổi kế hoạch công khai.
+
+Tài liệu gồm năm chương: tổng quan hệ thống và sơ đồ ERD; đặc tả từng thực thể; các mối quan hệ; quy trình nghiệp vụ theo dữ liệu; các điểm lưu ý đặc biệt và tổng kết.
+
+\textbf{Từ khóa:} ERD, cơ sở dữ liệu, MySQL, InnoDB, khóa ngoại, migration, crowdfunding.
+
+\newpage

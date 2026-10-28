@@ -1,0 +1,149 @@
+\section{TRIỂN KHAI, CHẤT LƯỢNG VÀ HẠN CHẾ}\label{sec:trien_khai}
+
+Hệ thống có hai môi trường chạy dùng chung một bộ Docker image: Docker Compose cho máy cá nhân và môi trường thử nghiệm, AWS được mô tả bằng Terraform cho môi trường đám mây.
+
+\subsection{Triển khai bằng Docker Compose}
+
+File \texttt{infra/compose.yaml} khởi động sáu dịch vụ (Bảng~\ref{tab:compose}). Thứ tự khởi động dựa trên healthcheck: MySQL, Redis và dịch vụ AI sẵn sàng trước, sau đó tới backend, frontend và cuối cùng là Nginx.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Các dịch vụ trong Docker Compose}
+    \label{tab:compose}
+    \begin{tabularx}{\textwidth}{|P{2.2cm}|P{3.6cm}|P{2.0cm}|X|}
+        \hline
+        \textbf{Dịch vụ} & \textbf{Image / build} & \textbf{Cổng} & \textbf{Ghi chú} \\
+        \hline
+        \texttt{nginx} & nginx:1.27-alpine & 8080 $\rightarrow$ 80 & \texttt{/} $\rightarrow$ frontend, \texttt{/api/} $\rightarrow$ backend, \texttt{/ai/} $\rightarrow$ AI; giới hạn 10 MB, riêng khôi phục sao lưu 200 MB \\
+        \hline
+        \texttt{frontend} & \texttt{frontend/Dockerfile} & 3000 & Healthcheck \texttt{/api/health} \\
+        \hline
+        \texttt{backend} & \texttt{backend/Dockerfile} & 4000 & Healthcheck \texttt{/api/v1/health}; volume \texttt{uploads\_data} lưu ảnh \\
+        \hline
+        \texttt{ai-service} & \texttt{ai-service/Dockerfile} & 8000 & Gắn thư mục \texttt{models/} chỉ đọc \\
+        \hline
+        \texttt{mysql} & mysql:8.4 & 3307 $\rightarrow$ 3306 & Volume \texttt{mysql\_data} \\
+        \hline
+        \texttt{redis} & redis:7-alpine & 6379 & Bật AOF, volume \texttt{redis\_data} \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+\subsection{Triển khai trên AWS}
+
+Thư mục \texttt{infra/terraform/} mô tả hạ tầng tại vùng \texttt{ap-southeast-1} (Singapore). Sơ đồ triển khai được trình bày trong Hình~\ref{fig:trien_khai_aws}, chi tiết tài nguyên trong Bảng~\ref{tab:aws}.
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tikzpicture}[
+        font=\scriptsize,
+        >=stealth,
+        task/.style={draw=orange!80!black, fill=orange!6, rounded corners, align=center, minimum height=1.0cm, text width=2.6cm},
+        svc/.style={draw=black!70, rounded corners, align=center, minimum height=1.0cm, text width=2.6cm},
+        call/.style={->, draw=black!70, line width=0.6pt}
+    ]
+        \node[svc] (user) at (0,5.2) {\textbf{Người dùng}};
+        \node[svc, text width=6.5cm] (alb) at (0,3.8) {\textbf{Application Load Balancer} (HTTP/HTTPS, ACM)\\\texttt{/api/v1/*} $\rightarrow$ backend, còn lại $\rightarrow$ frontend};
+
+        \node[task] (fe) at (-4.5,1.8) {\textbf{Frontend}\\0.25 vCPU, 512 MB};
+        \node[task] (be) at (-1.5,1.8) {\textbf{Backend}\\0.5 vCPU, 1 GB};
+        \node[task] (ai) at (1.5,1.8) {\textbf{AI Service}\\0.5 vCPU, 1 GB};
+        \node[task] (rd) at (4.5,1.8) {\textbf{Redis}\\0.25 vCPU, 512 MB};
+
+        \node[svc] (rds) at (-3.0,-0.4) {\textbf{RDS MySQL 8.4}\\t4g.micro};
+        \node[svc] (s3) at (0,-0.4) {\textbf{S3}\\Ảnh tải lên};
+        \node[svc] (ecr) at (3.0,-0.4) {\textbf{ECR}\\3 kho image};
+
+        \begin{scope}[on background layer]
+            \node[draw=black!50, dashed, rounded corners, fit=(fe)(rd), inner sep=0.35cm, label={[font=\scriptsize, anchor=south east]north east:ECS Fargate -- Cloud Map DNS nội bộ}] (ecs) {};
+        \end{scope}
+
+        \draw[call] (user) -- (alb);
+        \draw[call] (alb.south) ++(-1.5,0) |- ++(0,-0.6) -| (fe.north);
+        \draw[call] (alb.south) ++(0.5,0) |- ++(0,-0.6) -| (be.north);
+        \draw[call] (be) -- (ai);
+        \draw[call] (be.south) ++(-0.4,0) |- ++(0,-0.6) -| (rds.north);
+        \draw[call] (be.south) ++(0.2,0) |- ++(0,-0.9) -| (s3.north);
+        \draw[call] (be.south) ++(0.8,0) -- ++(0,-0.2) -| (rd.south);
+    \end{tikzpicture}%
+    }
+    \caption{Sơ đồ triển khai trên AWS}
+    \label{fig:trien_khai_aws}
+\end{figure}
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Tài nguyên AWS được tạo bằng Terraform}
+    \label{tab:aws}
+    \begin{tabularx}{\textwidth}{|P{3.6cm}|X|}
+        \hline
+        \textbf{Tài nguyên} & \textbf{Cấu hình} \\
+        \hline
+        VPC & 2 public subnet trên 2 vùng sẵn sàng, Internet Gateway; không dùng NAT Gateway để tiết kiệm chi phí \\
+        \hline
+        Application Load Balancer & HTTP và HTTPS (chứng chỉ ACM); \texttt{/api/v1/*} chuyển tới backend, còn lại tới frontend \\
+        \hline
+        ECS Fargate & 4 service, mỗi service 1 task: frontend 0.25 vCPU/512 MB, backend 0.5 vCPU/1 GB, AI 0.5 vCPU/1 GB, Redis 0.25 vCPU/512 MB \\
+        \hline
+        Cloud Map & DNS nội bộ cho \texttt{backend}, \texttt{ai}, \texttt{redis}; dịch vụ AI không mở ra load balancer \\
+        \hline
+        RDS & MySQL 8.4, lớp \texttt{t4g.micro}, \texttt{publicly\_accessible = false} \\
+        \hline
+        S3 & Bucket lưu ảnh, chặn truy cập công khai, mã hóa phía máy chủ; backend truy cập qua IAM task role \\
+        \hline
+        ECR & 3 kho image: frontend, backend, ai-service \\
+        \hline
+        CloudWatch & Log group cho các task \\
+        \hline
+        Security Group & Chỉ load balancer được gọi vào các task; chỉ các task được gọi vào RDS \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+Quy trình triển khai gồm bốn bước: \texttt{terraform apply} tạo các kho ECR; build và đẩy ba image lên ECR (script \texttt{deploy.ps1}); \texttt{terraform apply} để tạo toàn bộ hạ tầng; \texttt{terraform destroy} khi không còn sử dụng để tránh phát sinh chi phí.
+
+\subsection{Thuộc tính chất lượng}
+
+Kiến trúc ưu tiên tính đúng của dữ liệu tiền và khả năng truy vết hơn hiệu năng tối đa, phù hợp với quy mô đồ án. Bảng~\ref{tab:chat_luong} tóm tắt cách kiến trúc đáp ứng từng thuộc tính.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Thuộc tính chất lượng và cách đáp ứng}
+    \label{tab:chat_luong}
+    \begin{tabularx}{\textwidth}{|P{3.4cm}|X|}
+        \hline
+        \textbf{Thuộc tính} & \textbf{Cách kiến trúc đáp ứng} \\
+        \hline
+        Tính đúng giao dịch & Idempotency key, cập nhật có điều kiện, số liệu quỹ tính từ giao dịch đã xác minh, đối soát SePay khi lỡ IPN \\
+        \hline
+        Tính sẵn sàng & AI có dự phòng hai lớp; giới hạn tần suất tự lùi về bộ nhớ trong khi Redis lỗi; healthcheck cho Docker và load balancer \\
+        \hline
+        Khả năng mở rộng & Frontend, backend và AI không lưu trạng thái phiên nên có thể tăng số task; ảnh lưu trên S3 không phụ thuộc ổ đĩa cục bộ \\
+        \hline
+        Khả năng bảo trì & Module nghiệp vụ độc lập; tích hợp qua interface; migration có rollback; OpenAPI làm hợp đồng giữa các thành phần \\
+        \hline
+        Khả năng truy vết & Nhật ký kiểm toán trước/sau; \texttt{X-Request-ID}; log tập trung trên CloudWatch \\
+        \hline
+        Hiệu năng & Phân trang và lọc phía máy chủ; SSR cho trang công khai \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+\subsection{Hạn chế và hướng mở rộng}
+
+\begin{itemize}
+    \item Mỗi service trên AWS chỉ có một task và chưa cấu hình tự động mở rộng. Hướng mở rộng: bật ECS Service Auto Scaling theo CPU hoặc số yêu cầu.
+    \item Redis chạy dưới dạng task Fargate thay vì ElastiCache; khởi động lại thì mất bộ đếm giới hạn tần suất.
+    \item Tác vụ định kỳ chạy trong mọi instance backend. Khi tăng số task cần thêm khóa phân tán hoặc tách thành một worker riêng.
+    \item File mô hình \texttt{.pkl} không nằm trong Git nên môi trường mới chạy bằng luật dự phòng cho tới khi huấn luyện lại.
+    \item Chưa có hàng đợi thông điệp; email được gửi trực tiếp từ process backend.
+    \item Hoàn tiền các khoản qua SePay phải chuyển khoản thủ công vì SePay không cung cấp API hoàn tiền.
+\end{itemize}
+
+\subsection{Kết luận}
+
+Kiến trúc của Góp Mầm tách rõ ba thành phần ứng dụng, đặt toàn bộ nghiệp vụ và trạng thái tiền tại backend, đóng gói mọi tích hợp bên ngoài qua interface và giữ cho AI ở vai trò hỗ trợ có phương án dự phòng. Cùng một bộ image chạy được trên Docker Compose và AWS giúp nhóm phát triển, kiểm thử và triển khai trên cùng một cấu hình. Các hạn chế nêu trên chủ yếu liên quan tới vận hành ở quy mô lớn và không ảnh hưởng tới các chức năng trong phạm vi đồ án.

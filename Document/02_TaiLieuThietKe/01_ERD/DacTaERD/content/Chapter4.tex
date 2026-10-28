@@ -1,0 +1,30 @@
+\section{QUY TRÌNH NGHIỆP VỤ}\label{sec:chuong4}
+
+\subsection{Quy trình tổng quan}
+
+\begin{itemize}
+    \item \textbf{Đăng ký tài khoản:} Tạo USERS, gửi EMAIL\_\allowbreak{}VERIFICATION\_\allowbreak{}TOKENS để xác minh email; đăng nhập Google tìm theo users.google\_\allowbreak{}id, chưa có thì nối với tài khoản cùng email (Google đã xác minh email), chưa có tài khoản thì tạo mới vai trò user
+    \item \textbf{Tạo chiến dịch:} Tạo CAMPAIGNS (trạng thái draft, danh mục chọn từ CATEGORIES đang bật), kèm MILESTONES, REWARD\_\allowbreak{}TIERS và ảnh trong MEDIA\_\allowbreak{}FILES; gây quỹ cho tổ chức thì gán organization\_\allowbreak{}id, tổ chức phải đang verified
+    \item \textbf{Gửi duyệt và kiểm duyệt:} pending (ghi submitted\_\allowbreak{}at) $\rightarrow$ approved / rejected / needs\_\allowbreak{}info $\rightarrow$ active; chủ dự án sửa và gửi lại từ rejected / needs\_\allowbreak{}info; quản trị viên không duyệt chiến dịch của chính mình; ghi AUDIT\_\allowbreak{}LOGS, gửi NOTIFICATIONS; quản trị viên có thể đặt is\_\allowbreak{}featured
+    \item \textbf{Xem chiến dịch:} Tăng campaigns.view\_\allowbreak{}count và cộng CAMPAIGN\_\allowbreak{}VIEW\_\allowbreak{}DAILY của ngày hiện tại
+    \item \textbf{Ủng hộ:} Tạo DONATIONS (pending); với chuyển khoản VietQR, transfer\_\allowbreak{}code là nội dung chuyển khoản để webhook SePay tìm đúng đơn; webhook (đã xác minh chữ ký) xác nhận $\rightarrow$ completed, cộng current\_\allowbreak{}amount, backer\_\allowbreak{}count, reward\_\allowbreak{}tiers.claimed\_\allowbreak{}count; đơn quá hạn $\rightarrow$ expired, người dùng hủy $\rightarrow$ cancelled
+    \item \textbf{Cập nhật tiến độ:} Tạo MILESTONE\_\allowbreak{}UPDATES kèm chứng từ (MEDIA\_\allowbreak{}FILES expense\_\allowbreak{}receipt + MILESTONE\_\allowbreak{}UPDATE\_\allowbreak{}ATTACHMENTS), đánh dấu mốc hoàn thành; thông báo tới người ủng hộ và người theo dõi (CAMPAIGN\_\allowbreak{}FOLLOWS)
+    \item \textbf{Theo dõi chậm tiến độ:} Tác vụ định kỳ nhắc chủ dự án mốc quá hạn (milestone\_\allowbreak{}overdue), ghi overdue\_\allowbreak{}notified\_\allowbreak{}at; sửa mốc sau phát hành $\rightarrow$ tạo MILESTONE\_\allowbreak{}REVISIONS, đổi hạn hoặc ngân sách thì báo người ủng hộ (milestone\_\allowbreak{}rescheduled)
+    \item \textbf{Kết thúc chiến dịch:} Cập nhật trạng thái success / failed / ended
+    \item \textbf{Hoàn tiền:} Người ủng hộ nhập mã OTP (STEP\_\allowbreak{}UP\_\allowbreak{}CODES, refund\_\allowbreak{}request) rồi tạo REFUND\_\allowbreak{}REQUESTS, khoản qua SePay kèm tài khoản ngân hàng nhận; quản trị viên nhập OTP (admin\_\allowbreak{}refund) rồi duyệt $\rightarrow$ donations.status = refunded, ghi refunded\_\allowbreak{}at, refund\_\allowbreak{}reference, refund\_\allowbreak{}method: gateway hoặc manual\_\allowbreak{}transfer (quản trị viên tự chuyển khoản, nhập mã giao dịch, có thể đính ảnh chứng từ refund\_\allowbreak{}proof\_\allowbreak{}url)
+    \item \textbf{Xác minh tổ chức:} Người đại diện tạo ORGANIZATIONS (pending) kèm ảnh giấy phép (MEDIA\_\allowbreak{}FILES organization\_\allowbreak{}document); quản trị viên xác minh / yêu cầu bổ sung / từ chối / tạm ngưng theo ma trận ở 2.23, ghi AUDIT\_\allowbreak{}LOGS, gửi NOTIFICATIONS (system) kèm email; tổ chức verified có trang công khai, số tiền đã huy động chỉ tính từ khoản ủng hộ đã xác nhận. Trong phạm vi đồ án, tiền vẫn ghi vào chiến dịch, người tổ chức cam kết chuyển cho tổ chức và báo cáo chi tiêu kèm chứng từ
+\end{itemize}
+
+\subsection{Các nghiệp vụ phụ}
+
+\begin{itemize}
+    \item Xác thực và bảo mật phiên (USERS kể cả đăng nhập Google, PASSWORD\_\allowbreak{}RESET\_\allowbreak{}TOKENS, REVOKED\_\allowbreak{}TOKENS)
+    \item Xác minh bổ sung bằng OTP cho đổi mật khẩu, yêu cầu và duyệt hoàn tiền, sao lưu dữ liệu (STEP\_\allowbreak{}UP\_\allowbreak{}CODES)
+    \item Gây quỹ cho tổ chức thụ hưởng (ORGANIZATIONS, campaigns.organization\_\allowbreak{}id)
+    \item Tương tác cộng đồng (CAMPAIGN\_\allowbreak{}COMMENTS, CAMPAIGN\_\allowbreak{}FOLLOWS)
+    \item Kiểm duyệt vi phạm (REPORTS; có thể tạm dừng chiến dịch hoặc ẩn bình luận)
+    \item Phát hiện gian lận (RISK\_\allowbreak{}ALERTS)
+    \item Gợi ý chiến dịch bằng AI (BEHAVIOR\_\allowbreak{}EVENTS, khi người dùng đồng ý)
+    \item Quản trị nội dung (CATEGORIES, cờ campaigns.is\_\allowbreak{}featured)
+    \item Thống kê cho chủ dự án (CAMPAIGN\_\allowbreak{}VIEW\_\allowbreak{}DAILY kết hợp DONATIONS để tính tỷ lệ chuyển đổi)
+\end{itemize}

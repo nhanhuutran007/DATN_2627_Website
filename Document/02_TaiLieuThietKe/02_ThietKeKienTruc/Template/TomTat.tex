@@ -1,0 +1,13 @@
+\section*{\fontsize{18pt}{18pt}\selectfont\MakeUppercase{\de}\\TÓM TẮT TÀI LIỆU THIẾT KẾ KIẾN TRÚC}
+
+Tài liệu mô tả kiến trúc của nền tảng gây quỹ cộng đồng Góp Mầm tính đến ngày \mocbaocao{}. Mục đích là làm cơ sở thống nhất cho việc hiện thực, kiểm thử và triển khai hệ thống, bổ sung cho Đặc tả yêu cầu phần mềm (SRS), Đặc tả ERD và bộ sơ đồ UML của đề tài.
+
+Hệ thống được thiết kế theo mô hình client--server nhiều dịch vụ. Ba ứng dụng độc lập gồm frontend Next.js, backend NestJS và dịch vụ AI FastAPI giao tiếp qua REST API có phiên bản \texttt{/api/v1}, đặt sau một reverse proxy (Nginx khi chạy cục bộ, Application Load Balancer trên AWS). Dữ liệu nghiệp vụ lưu trong MySQL 8.4; Redis 7 giữ bộ đếm giới hạn tần suất. Bên trong, backend chia thành 18 module nghiệp vụ, mỗi module theo lớp Controller -- Service -- Repository -- Entity; các tích hợp bên ngoài (thanh toán, email, lưu trữ tệp, đăng nhập Google, AI) được đóng gói qua interface và luôn có bản giả lập để kiểm thử.
+
+Các quyết định chính: backend là nơi duy nhất ghi dữ liệu và cập nhật trạng thái tiền, chỉ sau khi xác minh webhook/IPN; AI chỉ hỗ trợ ra quyết định và có dự phòng hai lớp; cùng một bộ Docker image chạy trên Docker Compose và AWS ECS Fargate (Terraform).
+
+Tài liệu gồm năm chương: giới thiệu; tổng quan kiến trúc; thiết kế chi tiết các thành phần; giao tiếp và bảo mật; triển khai, chất lượng và hạn chế.
+
+\textbf{Từ khóa:} kiến trúc phần mềm, crowdfunding, Next.js, NestJS, FastAPI, MySQL, Docker, AWS.
+
+\newpage

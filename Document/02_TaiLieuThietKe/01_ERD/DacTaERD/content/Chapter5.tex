@@ -1,0 +1,69 @@
+\section{CÁC ĐIỂM LƯU Ý ĐẶC BIỆT}\label{sec:chuong5}
+
+\subsection{Quan hệ đệ quy (Self-reference)}
+
+\begin{itemize}
+    \item campaign\_\allowbreak{}comments.parent\_\allowbreak{}id $\rightarrow$ campaign\_\allowbreak{}comments.id: chỉ cho phép trả lời một cấp; ứng dụng kiểm tra bình luận cha phải là bình luận gốc.
+\end{itemize}
+
+\subsection{Tham chiếu đa hình và cột không có khóa ngoại}
+
+\begin{itemize}
+    \item risk\_\allowbreak{}alerts.entity\_\allowbreak{}id, audit\_\allowbreak{}logs.entity\_\allowbreak{}id, notifications.related\_\allowbreak{}id trỏ tới nhiều bảng tùy cột loại đi kèm nên không đặt khóa ngoại; tính toàn vẹn do tầng ứng dụng đảm bảo.
+    \item audit\_\allowbreak{}logs.user\_\allowbreak{}id cố ý không có khóa ngoại để nhật ký không bị mất hay chặn khi xóa tài khoản.
+    \item campaigns.category lưu tên danh mục thay vì categories.id; tắt danh mục không làm chiến dịch cũ mất danh mục.
+    \item organizations.category và users.organization chỉ là văn bản ghi tự do để hiển thị, không phải tham chiếu (không tính vào 5 tham chiếu logic).
+\end{itemize}
+
+\subsection{Nhiều khóa ngoại cùng trỏ về USERS}
+
+\begin{itemize}
+    \item refund\_\allowbreak{}requests (user\_\allowbreak{}id, reviewed\_\allowbreak{}by), reports (reporter\_\allowbreak{}id, resolved\_\allowbreak{}by), campaign\_\allowbreak{}comments (user\_\allowbreak{}id, hidden\_\allowbreak{}by), organizations (representative\_\allowbreak{}id, reviewed\_\allowbreak{}by): cùng bảng users nhưng đóng vai trò khác nhau (người dùng thường và người xử lý).
+    \item milestone\_\allowbreak{}revisions.changed\_\allowbreak{}by tách khỏi audit\_\allowbreak{}logs vì lịch sử này được công khai cho người ủng hộ.
+\end{itemize}
+
+\subsection{Quan hệ 1-1 và khóa chính ghép}
+
+\begin{itemize}
+    \item milestone\_\allowbreak{}update\_\allowbreak{}attachments.media\_\allowbreak{}file\_\allowbreak{}id vừa là khóa ngoại vừa UNIQUE nên mỗi tệp chỉ làm chứng từ cho tối đa một khoản chi.
+    \item campaign\_\allowbreak{}view\_\allowbreak{}daily dùng khóa chính ghép (campaign\_\allowbreak{}id, view\_\allowbreak{}date): mỗi lượt xem chỉ tăng views của đúng một dòng bằng INSERT ... ON DUPLICATE KEY UPDATE.
+\end{itemize}
+
+\subsection{Các giá trị mặc định quan trọng}
+
+\begin{itemize}
+    \item created\_\allowbreak{}at, updated\_\allowbreak{}at mặc định CURRENT\_\allowbreak{}TIMESTAMP(6); updated\_\allowbreak{}at tự cập nhật
+    \item campaigns.status mặc định draft; donations.status, refund\_\allowbreak{}requests.status, reports.status, organizations.status mặc định pending; risk\_\allowbreak{}alerts.status mặc định open
+    \item users.role mặc định user; users.ai\_\allowbreak{}tracking\_\allowbreak{}consent mặc định 0 (người dùng phải chủ động bật)
+    \item donations.currency mặc định VND; campaigns.is\_\allowbreak{}featured mặc định 0; categories.is\_\allowbreak{}active mặc định 1
+\end{itemize}
+
+\subsection{Toàn vẹn giao dịch}
+
+\begin{itemize}
+    \item donations.idempotency\_\allowbreak{}key, transaction\_\allowbreak{}id và transfer\_\allowbreak{}code UNIQUE chống ghi nhận trùng khi webhook gửi lại và bảo đảm mỗi giao dịch ngân hàng chỉ khớp một đơn.
+    \item Hoàn tiền (cả phía người ủng hộ và quản trị viên) yêu cầu mã OTP còn hạn trong step\_\allowbreak{}up\_\allowbreak{}codes; mã chỉ dùng một lần và bị vô hiệu sau 5 lần nhập sai.
+    \item campaigns.current\_\allowbreak{}amount chỉ cộng từ khoản ủng hộ đã xác minh.
+    \item CHECK trên reward\_\allowbreak{}tiers chặn vượt số suất quà.
+\end{itemize}
+
+\subsection{Xóa mềm và xóa dây chuyền}
+
+\begin{itemize}
+    \item Xóa mềm (deleted\_\allowbreak{}at): campaign\_\allowbreak{}comments, reward\_\allowbreak{}tiers, media\_\allowbreak{}files, organizations.
+    \item ON DELETE CASCADE: các bảng token (kể cả step\_\allowbreak{}up\_\allowbreak{}codes), campaign\_\allowbreak{}follows, campaign\_\allowbreak{}view\_\allowbreak{}daily, milestone\_\allowbreak{}update\_\allowbreak{}attachments (tệp gốc vẫn còn), milestone\_\allowbreak{}revisions. Các bảng nghiệp vụ khác không cascade để tránh mất dữ liệu tài chính.
+\end{itemize}
+
+\subsection{Tổng kết}
+
+Hệ thống Góp Mầm được thiết kế với:
+
+\begin{itemize}
+    \item 24 thực thể chia 6 nhóm, quản lý đầy đủ quy trình từ tài khoản, chiến dịch, ủng hộ đến giải ngân, hoàn tiền và gây quỹ cho tổ chức đã xác minh
+    \item 37 mối quan hệ có khóa ngoại (36 quan hệ 1-N, 1 quan hệ 1-1) và 5 tham chiếu logic, bảo đảm toàn vẹn dữ liệu
+    \item Minh bạch giải ngân nhờ chứng từ chi tiêu, nhắc mốc quá hạn và lịch sử thay đổi kế hoạch công khai
+    \item An toàn giao dịch nhờ idempotency key, ràng buộc UNIQUE, CHECK và nhật ký kiểm toán
+    \item Khả năng mở rộng qua migration có thứ tự và rollback, cho phép bổ sung loại thông báo, trạng thái, danh mục và mô-đun AI mà không phá vỡ dữ liệu cũ
+\end{itemize}
+
+Thiết kế hướng đến việc số hóa và minh bạch toàn bộ quá trình gây quỹ cộng đồng, từ lúc chiến dịch được tạo đến khi từng khoản chi được giải trình với người ủng hộ.

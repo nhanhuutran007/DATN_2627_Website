@@ -1,0 +1,1185 @@
+\section{CÁC THỰC THỂ (ENTITIES)}\label{sec:chuong2}
+
+Mọi khóa chính là UUID dạng CHAR(36) do ứng dụng sinh, trừ hai ngoại lệ ghi rõ ở 2.4 và 2.7. Cột created\_\allowbreak{}at, updated\_\allowbreak{}at kiểu DATETIME(6), mặc định CURRENT\_\allowbreak{}TIMESTAMP(6); updated\_\allowbreak{}at tự cập nhật khi sửa bản ghi.
+
+\subsection{USERS (Người dùng)}
+
+\textbf{Mục đích:} Lưu tài khoản đăng nhập và hồ sơ người dùng. Một tài khoản có thể vừa ủng hộ vừa làm chủ chiến dịch; quyền quản trị phân biệt bằng role.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng USERS}
+    \label{tab:users} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{name} & VARCHAR(100) & NOT NULL & Họ tên hiển thị \\
+    \hline
+    \texttt{email} & VARCHAR(255) & NOT NULL, UNIQUE & Email đăng nhập \\
+    \hline
+    \texttt{password\_\allowbreak{}hash} & VARCHAR(255) & NOT NULL & Mật khẩu đã băm, không bao giờ trả ra API; tài khoản tạo bằng Google nhận hash của một mật khẩu ngẫu nhiên, người dùng tự đặt mật khẩu qua chức năng quên mật khẩu \\
+    \hline
+    \texttt{google\_\allowbreak{}id} & VARCHAR(64) & UNIQUE & Mã tài khoản Google (sub) khi đăng nhập bằng Google; NULL là chưa liên kết. Nhận diện theo cột này nên người dùng đổi email Google vẫn vào đúng tài khoản \\
+    \hline
+    \texttt{role} & ENUM: user / campaign\_\allowbreak{}owner / admin & NOT NULL & Vai trò, mặc định user \\
+    \hline
+    \texttt{status} & ENUM: active / inactive / banned & NOT NULL & Trạng thái tài khoản, mặc định active \\
+    \hline
+    \texttt{avatar} & VARCHAR(255) &  & Đường dẫn ảnh đại diện \\
+    \hline
+    \texttt{bio} & VARCHAR(500) &  & Giới thiệu ngắn \\
+    \hline
+    \texttt{phone} & VARCHAR(100) &  & Số điện thoại, chỉ chính chủ và quản trị viên xem được \\
+    \hline
+    \texttt{organization} & VARCHAR(255) &  & Đơn vị công tác ghi tự do trên hồ sơ cá nhân; không liên quan tới bảng ORGANIZATIONS (mục 2.23) \\
+    \hline
+    \texttt{email\_\allowbreak{}verified} & TINYINT(1) & NOT NULL & Đã xác minh email, mặc định 0 \\
+    \hline
+    \texttt{failed\_\allowbreak{}login\_\allowbreak{}count} & INT & NOT NULL & Số lần đăng nhập sai liên tiếp, mặc định 0 \\
+    \hline
+    \texttt{locked\_\allowbreak{}until} & DATETIME &  & Khóa đăng nhập tạm thời tới thời điểm này \\
+    \hline
+    \texttt{password\_\allowbreak{}changed\_\allowbreak{}at} & DATETIME &  & JWT phát hành trước thời điểm này bị từ chối \\
+    \hline
+    \texttt{sessions\_\allowbreak{}revoked\_\allowbreak{}at} & DATETIME &  & Thời điểm đăng xuất khỏi mọi thiết bị \\
+    \hline
+    \texttt{ai\_\allowbreak{}tracking\_\allowbreak{}consent} & TINYINT(1) & NOT NULL & Đồng ý ghi nhận hành vi cho gợi ý AI, mặc định 0 \\
+    \hline
+    \texttt{ai\_\allowbreak{}consent\_\allowbreak{}updated\_\allowbreak{}at} & DATETIME &  & Lần cuối đổi lựa chọn đồng ý; NULL là chưa từng quyết định \\
+    \hline
+    \texttt{created\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm cập nhật cuối \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item UNIQUE trên email; UNIQUE trên google\_\allowbreak{}id (cho phép NULL).
+\end{itemize}
+
+\subsection{EMAIL\_\allowbreak{}VERIFICATION\_\allowbreak{}TOKENS (Token xác minh email)}
+
+\textbf{Mục đích:} Lưu token một lần gửi qua email để xác minh địa chỉ email.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng EMAIL\_\allowbreak{}VERIFICATION\_\allowbreak{}TOKENS}
+    \label{tab:email_verification_tokens} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người dùng sở hữu token \\
+    \hline
+    \texttt{token\_\allowbreak{}hash} & CHAR(64) & NOT NULL, UNIQUE & SHA-256 của token; token gốc không được lưu \\
+    \hline
+    \texttt{expires\_\allowbreak{}at} & DATETIME & NOT NULL & Hạn sử dụng \\
+    \hline
+    \texttt{used\_\allowbreak{}at} & DATETIME &  & Thời điểm đã dùng; NULL là chưa dùng \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item UNIQUE trên token\_\allowbreak{}hash
+    \item INDEX (user\_\allowbreak{}id, created\_\allowbreak{}at)
+    \item FK user\_\allowbreak{}id tham chiếu đến users(id), ON DELETE CASCADE
+\end{itemize}
+
+\subsection{PASSWORD\_\allowbreak{}RESET\_\allowbreak{}TOKENS (Token đặt lại mật khẩu)}
+
+\textbf{Mục đích:} Lưu token một lần cho chức năng quên mật khẩu.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng PASSWORD\_\allowbreak{}RESET\_\allowbreak{}TOKENS}
+    \label{tab:password_reset_tokens} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người dùng yêu cầu \\
+    \hline
+    \texttt{token\_\allowbreak{}hash} & CHAR(64) & NOT NULL, UNIQUE & SHA-256 của token \\
+    \hline
+    \texttt{expires\_\allowbreak{}at} & DATETIME & NOT NULL & Hạn sử dụng \\
+    \hline
+    \texttt{used\_\allowbreak{}at} & DATETIME &  & Thời điểm đã dùng \\
+    \hline
+    \texttt{requested\_\allowbreak{}ip} & VARCHAR(45) &  & IP gửi yêu cầu (IPv4/IPv6) \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item UNIQUE trên token\_\allowbreak{}hash
+    \item INDEX (user\_\allowbreak{}id, created\_\allowbreak{}at)
+    \item FK user\_\allowbreak{}id tham chiếu đến users(id), ON DELETE CASCADE
+\end{itemize}
+
+\subsection{REVOKED\_\allowbreak{}TOKENS (Token đã thu hồi)}
+
+\textbf{Mục đích:} Danh sách đen JWT đã đăng xuất, giữ tới khi token tự hết hạn.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng REVOKED\_\allowbreak{}TOKENS}
+    \label{tab:revoked_tokens} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{jti} & CHAR(36) & PK & Mã định danh của JWT \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Chủ token \\
+    \hline
+    \texttt{expires\_\allowbreak{}at} & DATETIME & NOT NULL & Thời điểm JWT hết hạn, sau đó có thể xóa bản ghi \\
+    \hline
+    \texttt{created\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm đăng xuất \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item Khóa chính là jti, không có cột id và updated\_\allowbreak{}at
+    \item INDEX expires\_\allowbreak{}at để dọn bản ghi hết hạn
+    \item FK user\_\allowbreak{}id tham chiếu đến users(id), ON DELETE CASCADE
+\end{itemize}
+
+\subsection{CAMPAIGNS (Chiến dịch)}
+
+\textbf{Mục đích:} Quản lý chiến dịch gây quỹ và vòng đời từ nháp, kiểm duyệt, gây quỹ đến kết thúc.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng CAMPAIGNS}
+    \label{tab:campaigns} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{title} & VARCHAR(200) & NOT NULL & Tên chiến dịch \\
+    \hline
+    \texttt{description} & MEDIUMTEXT & NOT NULL & Nội dung mô tả dạng HTML soạn bằng trình soạn thảo định dạng, được làm sạch ở server trước khi lưu \\
+    \hline
+    \texttt{category} & VARCHAR(100) & NOT NULL & Tên danh mục, lấy từ categories.name (tham chiếu logic, không có FK) \\
+    \hline
+    \texttt{owner\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Chủ chiến dịch \\
+    \hline
+    \texttt{organization\_\allowbreak{}id} & CHAR(36) & FK & Tổ chức thụ hưởng khi gây quỹ cho một tổ chức đã xác minh; NULL là gây quỹ cho dự án của chính chủ chiến dịch \\
+    \hline
+    \texttt{goal\_\allowbreak{}amount} & DECIMAL(15,2) & NOT NULL & Mục tiêu gây quỹ \\
+    \hline
+    \texttt{current\_\allowbreak{}amount} & DECIMAL(15,2) & NOT NULL & Số tiền đã gây được, mặc định 0, chỉ cộng từ giao dịch đã xác minh \\
+    \hline
+    \texttt{start\_\allowbreak{}date} & DATETIME & NOT NULL & Ngày bắt đầu \\
+    \hline
+    \texttt{end\_\allowbreak{}date} & DATETIME & NOT NULL & Ngày kết thúc \\
+    \hline
+    \texttt{status} & ENUM & NOT NULL & draft / pending / approved / rejected / needs\_\allowbreak{}info / active / paused / success / failed / cancelled / ended, mặc định draft \\
+    \hline
+    \texttt{submitted\_\allowbreak{}at} & DATETIME &  & Lần gửi (lại) duyệt gần nhất; hàng chờ kiểm duyệt xếp theo cột này \\
+    \hline
+    \texttt{is\_\allowbreak{}featured} & TINYINT(1) & NOT NULL & Được quản trị viên chọn nổi bật trên trang chủ, mặc định 0 \\
+    \hline
+    \texttt{featured\_\allowbreak{}at} & DATETIME &  & Thời điểm được chọn nổi bật, dùng để sắp xếp \\
+    \hline
+    \texttt{image\_\allowbreak{}url} & VARCHAR(500) &  & Ảnh đại diện \\
+    \hline
+    \texttt{video\_\allowbreak{}url} & VARCHAR(500) &  & Video giới thiệu \\
+    \hline
+    \texttt{location} & VARCHAR(255) &  & Địa điểm \\
+    \hline
+    \texttt{backer\_\allowbreak{}count} & INT & NOT NULL & Số người ủng hộ, mặc định 0 \\
+    \hline
+    \texttt{view\_\allowbreak{}count} & INT & NOT NULL & Tổng lượt xem tích lũy, mặc định 0 \\
+    \hline
+    \texttt{rejection\_\allowbreak{}reason} & TEXT &  & Lý do từ chối hoặc yêu cầu bổ sung khi kiểm duyệt \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item FK owner\_\allowbreak{}id tham chiếu đến users(id); FK organization\_\allowbreak{}id tham chiếu đến organizations(id)
+    \item INDEX status, INDEX category, INDEX (is\_\allowbreak{}featured, featured\_\allowbreak{}at), INDEX organization\_\allowbreak{}id
+\end{itemize}
+
+\subsection{CATEGORIES (Danh mục lĩnh vực)}
+
+\textbf{Mục đích:} Danh mục lĩnh vực chiến dịch do quản trị viên quản lý. Migration tạo sẵn 6 danh mục: Giáo dục, Môi trường, Nông nghiệp, Y tế, Khởi nghiệp, Công nghệ.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng CATEGORIES}
+    \label{tab:categories} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{name} & VARCHAR(100) & NOT NULL, UNIQUE & Tên danh mục \\
+    \hline
+    \texttt{description} & VARCHAR(300) &  & Mô tả ngắn \\
+    \hline
+    \texttt{sort\_\allowbreak{}order} & INT & NOT NULL & Thứ tự hiển thị, mặc định 0 \\
+    \hline
+    \texttt{is\_\allowbreak{}active} & TINYINT(1) & NOT NULL & Đang dùng, mặc định 1; tắt thì không nhận chiến dịch mới \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item UNIQUE trên name; không có khóa ngoại.
+\end{itemize}
+
+\subsection{CAMPAIGN\_\allowbreak{}VIEW\_\allowbreak{}DAILY (Lượt xem theo ngày)}
+
+\textbf{Mục đích:} Đếm lượt xem chiến dịch theo ngày (UTC) để chủ dự án xem diễn biến và tính tỷ lệ chuyển đổi.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng CAMPAIGN\_\allowbreak{}VIEW\_\allowbreak{}DAILY}
+    \label{tab:campaign_view_daily} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{campaign\_\allowbreak{}id} & CHAR(36) & NOT NULL, PK, FK & Chiến dịch \\
+    \hline
+    \texttt{view\_\allowbreak{}date} & DATE & NOT NULL, PK & Ngày thống kê \\
+    \hline
+    \texttt{views} & INT & NOT NULL & Số lượt xem trong ngày, mặc định 0 \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item PRIMARY KEY (campaign\_\allowbreak{}id, view\_\allowbreak{}date); bảng không có id, created\_\allowbreak{}at, updated\_\allowbreak{}at
+    \item FK campaign\_\allowbreak{}id tham chiếu đến campaigns(id), ON DELETE CASCADE
+\end{itemize}
+
+\subsection{MILESTONES (Mốc tiến độ)}
+
+\textbf{Mục đích:} Các mốc sử dụng quỹ của chiến dịch, giúp người ủng hộ theo dõi việc giải ngân.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng MILESTONES}
+    \label{tab:milestones} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{campaign\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Chiến dịch \\
+    \hline
+    \texttt{title} & VARCHAR(200) & NOT NULL & Tên mốc \\
+    \hline
+    \texttt{description} & TEXT &  & Mô tả \\
+    \hline
+    \texttt{target\_\allowbreak{}date} & DATETIME &  & Ngày dự kiến hoàn thành \\
+    \hline
+    \texttt{budget} & DECIMAL(15,2) &  & Ngân sách dự kiến \\
+    \hline
+    \texttt{sort\_\allowbreak{}order} & INT & NOT NULL & Thứ tự hiển thị, mặc định 0 \\
+    \hline
+    \texttt{is\_\allowbreak{}completed} & TINYINT(1) & NOT NULL & Đã hoàn thành, mặc định 0 \\
+    \hline
+    \texttt{completed\_\allowbreak{}at} & DATETIME &  & Thời điểm hoàn thành \\
+    \hline
+    \texttt{overdue\_\allowbreak{}notified\_\allowbreak{}at} & DATETIME &  & Lần cuối nhắc chủ dự án mốc quá hạn (tối đa 7 ngày/lần); đặt lại NULL khi đổi hạn \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item FK campaign\_\allowbreak{}id tham chiếu đến campaigns(id).
+\end{itemize}
+
+\subsection{MILESTONE\_\allowbreak{}UPDATES (Cập nhật tiến độ)}
+
+\textbf{Mục đích:} Bài cập nhật cho từng mốc gồm nội dung, hình ảnh và khoản chi.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng MILESTONE\_\allowbreak{}UPDATES}
+    \label{tab:milestone_updates} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{milestone\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Mốc tiến độ \\
+    \hline
+    \texttt{content} & TEXT & NOT NULL & Nội dung cập nhật \\
+    \hline
+    \texttt{image\_\allowbreak{}url} & VARCHAR(500) &  & Ảnh minh họa \\
+    \hline
+    \texttt{expense\_\allowbreak{}amount} & DECIMAL(15,2) &  & Số tiền đã chi \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item FK milestone\_\allowbreak{}id tham chiếu đến milestones(id).
+\end{itemize}
+
+\subsection{MILESTONE\_\allowbreak{}UPDATE\_\allowbreak{}ATTACHMENTS (Chứng từ chi tiêu)}
+
+\textbf{Mục đích:} Gắn ảnh hóa đơn, biên lai (tệp MEDIA\_\allowbreak{}FILES có purpose = expense\_\allowbreak{}receipt) vào bài cập nhật tiến độ để minh bạch khoản chi.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng MILESTONE\_\allowbreak{}UPDATE\_\allowbreak{}ATTACHMENTS}
+    \label{tab:milestone_update_attachments} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{milestone\_\allowbreak{}update\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Bài cập nhật chứa chứng từ \\
+    \hline
+    \texttt{media\_\allowbreak{}file\_\allowbreak{}id} & CHAR(36) & NOT NULL, UNIQUE, FK & Tệp chứng từ đã tải lên \\
+    \hline
+    \texttt{url} & VARCHAR(500) & NOT NULL & Đường dẫn công khai của chứng từ \\
+    \hline
+    \texttt{caption} & VARCHAR(200) &  & Chú thích khoản chi \\
+    \hline
+    \texttt{sort\_\allowbreak{}order} & INT & NOT NULL & Thứ tự hiển thị, mặc định 0 \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item UNIQUE trên media\_\allowbreak{}file\_\allowbreak{}id: một chứng từ không dùng lại cho nhiều khoản chi
+    \item INDEX (milestone\_\allowbreak{}update\_\allowbreak{}id, sort\_\allowbreak{}order)
+    \item FK milestone\_\allowbreak{}update\_\allowbreak{}id tham chiếu đến milestone\_\allowbreak{}updates(id), ON DELETE CASCADE
+    \item FK media\_\allowbreak{}file\_\allowbreak{}id tham chiếu đến media\_\allowbreak{}files(id)
+\end{itemize}
+
+\subsection{MILESTONE\_\allowbreak{}REVISIONS (Lịch sử thay đổi mốc)}
+
+\textbf{Mục đích:} Ghi lại mỗi lần chủ dự án sửa mốc sau khi chiến dịch đã phát hành, kèm lý do bắt buộc, công khai cho người ủng hộ.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng MILESTONE\_\allowbreak{}REVISIONS}
+    \label{tab:milestone_revisions} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{milestone\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Mốc bị thay đổi \\
+    \hline
+    \texttt{changed\_\allowbreak{}by} & CHAR(36) & NOT NULL, FK & Người thực hiện thay đổi \\
+    \hline
+    \texttt{reason} & VARCHAR(500) & NOT NULL & Lý do thay đổi \\
+    \hline
+    \texttt{old\_\allowbreak{}values} & TEXT & NOT NULL & Giá trị trước khi sửa, dạng chuỗi JSON \\
+    \hline
+    \texttt{new\_\allowbreak{}values} & TEXT & NOT NULL & Giá trị sau khi sửa, dạng chuỗi JSON \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item INDEX (milestone\_\allowbreak{}id, created\_\allowbreak{}at)
+    \item FK milestone\_\allowbreak{}id tham chiếu đến milestones(id), ON DELETE CASCADE
+    \item FK changed\_\allowbreak{}by tham chiếu đến users(id)
+\end{itemize}
+
+\subsection{REWARD\_\allowbreak{}TIERS (Mức quà tặng)}
+
+\textbf{Mục đích:} Các mức ủng hộ kèm phần quà do chủ chiến dịch thiết lập.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng REWARD\_\allowbreak{}TIERS}
+    \label{tab:reward_tiers} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{campaign\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Chiến dịch \\
+    \hline
+    \texttt{title} & VARCHAR(120) & NOT NULL & Tên mức quà \\
+    \hline
+    \texttt{description} & TEXT & NOT NULL & Mô tả phần quà \\
+    \hline
+    \texttt{min\_\allowbreak{}amount} & DECIMAL(15,2) & NOT NULL & Số tiền ủng hộ tối thiểu \\
+    \hline
+    \texttt{quantity\_\allowbreak{}limit} & INT &  & Số suất tối đa; NULL là không giới hạn \\
+    \hline
+    \texttt{claimed\_\allowbreak{}count} & INT & NOT NULL & Số suất đã nhận, mặc định 0, chỉ tăng khi thanh toán được xác nhận \\
+    \hline
+    \texttt{estimated\_\allowbreak{}delivery} & DATE &  & Ngày dự kiến giao quà \\
+    \hline
+    \texttt{sort\_\allowbreak{}order} & INT & NOT NULL & Thứ tự hiển thị, mặc định 0 \\
+    \hline
+    \texttt{is\_\allowbreak{}active} & TINYINT(1) & NOT NULL & Đang mở, mặc định 1 \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+    \texttt{deleted\_\allowbreak{}at} & DATETIME(6) &  & Thời điểm xóa mềm \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item CHECK min\_\allowbreak{}amount \textgreater{} 0
+    \item CHECK quantity\_\allowbreak{}limit IS NULL OR claimed\_\allowbreak{}count \textless{}= quantity\_\allowbreak{}limit
+    \item INDEX (campaign\_\allowbreak{}id, sort\_\allowbreak{}order)
+    \item FK campaign\_\allowbreak{}id tham chiếu đến campaigns(id)
+\end{itemize}
+
+\subsection{MEDIA\_\allowbreak{}FILES (Tệp đa phương tiện)}
+
+\textbf{Mục đích:} Quản lý ảnh người dùng tải lên: ảnh chiến dịch, ảnh tiến độ, avatar, ảnh chứng từ chi tiêu, chứng từ hoàn tiền, logo và giấy phép tổ chức.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng MEDIA\_\allowbreak{}FILES}
+    \label{tab:media_files} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{owner\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người tải lên \\
+    \hline
+    \texttt{storage\_\allowbreak{}key} & VARCHAR(120) & NOT NULL, UNIQUE & Khóa trong kho lưu trữ do server sinh, ví dụ campaigns/\textless{}uuid\textgreater{}.webp \\
+    \hline
+    \texttt{mime\_\allowbreak{}type} & VARCHAR(50) & NOT NULL & Kiểu MIME \\
+    \hline
+    \texttt{size\_\allowbreak{}bytes} & INT & NOT NULL & Dung lượng \\
+    \hline
+    \texttt{purpose} & ENUM: campaign\_\allowbreak{}image / progress\_\allowbreak{}image / avatar / expense\_\allowbreak{}receipt / refund\_\allowbreak{}proof / organization\_\allowbreak{}logo / organization\_\allowbreak{}document & NOT NULL & Mục đích sử dụng; refund\_\allowbreak{}proof chỉ quản trị viên tải lên; organization\_\allowbreak{}document là ảnh giấy phép, chỉ người đại diện và quản trị viên xem \\
+    \hline
+    \texttt{original\_\allowbreak{}name} & VARCHAR(255) &  & Tên file gốc, chỉ để hiển thị \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+    \texttt{deleted\_\allowbreak{}at} & DATETIME(6) &  & Thời điểm xóa mềm \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item UNIQUE trên storage\_\allowbreak{}key
+    \item INDEX (owner\_\allowbreak{}id, created\_\allowbreak{}at)
+    \item FK owner\_\allowbreak{}id tham chiếu đến users(id)
+\end{itemize}
+
+\subsection{DONATIONS (Khoản ủng hộ)}
+
+\textbf{Mục đích:} Ghi nhận giao dịch ủng hộ (qua cổng thanh toán hoặc chuyển khoản VietQR đối soát bằng SePay) và trạng thái của giao dịch.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng DONATIONS}
+    \label{tab:donations} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người ủng hộ \\
+    \hline
+    \texttt{campaign\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Chiến dịch được ủng hộ \\
+    \hline
+    \texttt{reward\_\allowbreak{}tier\_\allowbreak{}id} & CHAR(36) & FK & Mức quà đã chọn; NULL là ủng hộ không nhận quà \\
+    \hline
+    \texttt{amount} & DECIMAL(15,2) & NOT NULL & Số tiền \\
+    \hline
+    \texttt{currency} & VARCHAR(3) & NOT NULL & Đơn vị tiền, mặc định VND \\
+    \hline
+    \texttt{status} & ENUM: pending / completed / failed / refunded / expired / cancelled & NOT NULL & Mặc định pending \\
+    \hline
+    \texttt{payment\_\allowbreak{}method} & VARCHAR(50) &  & Phương thức thanh toán, ví dụ sepay cho chuyển khoản VietQR \\
+    \hline
+    \texttt{transaction\_\allowbreak{}id} & VARCHAR(255) & UNIQUE & Mã giao dịch của cổng thanh toán \\
+    \hline
+    \texttt{transfer\_\allowbreak{}code} & VARCHAR(20) & UNIQUE & Mã nội dung chuyển khoản VietQR (ví dụ GM7K2QX9AB) để khớp giao dịch ngân hàng báo về với đúng đơn \\
+    \hline
+    \texttt{idempotency\_\allowbreak{}key} & VARCHAR(255) & NOT NULL, UNIQUE & Khóa chống ghi nhận trùng \\
+    \hline
+    \texttt{message} & TEXT &  & Lời nhắn \\
+    \hline
+    \texttt{is\_\allowbreak{}anonymous} & TINYINT(1) & NOT NULL & Ủng hộ ẩn danh, mặc định 0 \\
+    \hline
+    \texttt{completed\_\allowbreak{}at} & DATETIME &  & Thời điểm thanh toán thành công \\
+    \hline
+    \texttt{refunded\_\allowbreak{}at} & DATETIME &  & Thời điểm hoàn tiền \\
+    \hline
+    \texttt{refund\_\allowbreak{}reference} & VARCHAR(255) &  & Mã hoàn tiền từ cổng thanh toán \\
+    \hline
+    \texttt{refund\_\allowbreak{}reason} & VARCHAR(500) &  & Lý do hoàn tiền \\
+    \hline
+    \texttt{refund\_\allowbreak{}method} & VARCHAR(20) &  & gateway (cổng thanh toán hoàn) hoặc manual\_\allowbreak{}transfer (quản trị viên chuyển khoản trả lại, bắt buộc với khoản qua SePay) \\
+    \hline
+    \texttt{refund\_\allowbreak{}proof\_\allowbreak{}url} & VARCHAR(500) &  & Ảnh chứng từ chuyển khoản hoàn, chỉ với manual\_\allowbreak{}transfer, không bắt buộc \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item UNIQUE trên transaction\_\allowbreak{}id và transfer\_\allowbreak{}code (đều cho phép NULL), UNIQUE trên idempotency\_\allowbreak{}key
+    \item INDEX user\_\allowbreak{}id, INDEX campaign\_\allowbreak{}id, INDEX (status, created\_\allowbreak{}at)
+    \item FK user\_\allowbreak{}id tham chiếu đến users(id); FK campaign\_\allowbreak{}id tham chiếu đến campaigns(id); FK reward\_\allowbreak{}tier\_\allowbreak{}id tham chiếu đến reward\_\allowbreak{}tiers(id)
+\end{itemize}
+
+\subsection{REFUND\_\allowbreak{}REQUESTS (Yêu cầu hoàn tiền)}
+
+\textbf{Mục đích:} Người ủng hộ gửi yêu cầu hoàn tiền, quản trị viên duyệt hoặc từ chối.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng REFUND\_\allowbreak{}REQUESTS}
+    \label{tab:refund_requests} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{donation\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Khoản ủng hộ cần hoàn \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người yêu cầu \\
+    \hline
+    \texttt{reason} & TEXT & NOT NULL & Lý do \\
+    \hline
+    \texttt{bank\_\allowbreak{}name} & VARCHAR(100) &  & Ngân hàng nhận tiền hoàn \\
+    \hline
+    \texttt{bank\_\allowbreak{}account\_\allowbreak{}number} & VARCHAR(30) &  & Số tài khoản nhận; nhật ký kiểm toán chỉ giữ 4 số cuối \\
+    \hline
+    \texttt{bank\_\allowbreak{}account\_\allowbreak{}name} & VARCHAR(100) &  & Tên chủ tài khoản \\
+    \hline
+    \texttt{status} & ENUM: pending / approved / rejected & NOT NULL & Mặc định pending \\
+    \hline
+    \texttt{admin\_\allowbreak{}notes} & TEXT &  & Ghi chú của quản trị viên \\
+    \hline
+    \texttt{reviewed\_\allowbreak{}by} & CHAR(36) & FK & Quản trị viên xử lý \\
+    \hline
+    \texttt{reviewed\_\allowbreak{}at} & DATETIME &  & Thời điểm xử lý \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item INDEX (status, created\_\allowbreak{}at), INDEX (donation\_\allowbreak{}id, status)
+    \item Ba cột ngân hàng nhập đủ cả ba hoặc để trống cả ba (kiểm ở tầng dịch vụ); cần khi khoản ủng hộ phải hoàn bằng chuyển khoản thủ công
+    \item FK donation\_\allowbreak{}id tham chiếu đến donations(id); FK user\_\allowbreak{}id và reviewed\_\allowbreak{}by tham chiếu đến users(id)
+\end{itemize}
+
+\subsection{CAMPAIGN\_\allowbreak{}COMMENTS (Bình luận chiến dịch)}
+
+\textbf{Mục đích:} Bình luận và câu hỏi của cộng đồng trên trang chiến dịch, hỗ trợ trả lời một cấp.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng CAMPAIGN\_\allowbreak{}COMMENTS}
+    \label{tab:campaign_comments} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{campaign\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Chiến dịch \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người viết \\
+    \hline
+    \texttt{parent\_\allowbreak{}id} & CHAR(36) & FK & Bình luận gốc được trả lời; NULL là bình luận gốc \\
+    \hline
+    \texttt{kind} & ENUM: comment / question & NOT NULL & Loại, mặc định comment \\
+    \hline
+    \texttt{content} & TEXT & NOT NULL & Nội dung \\
+    \hline
+    \texttt{status} & ENUM: visible / hidden & NOT NULL & Mặc định visible \\
+    \hline
+    \texttt{hidden\_\allowbreak{}reason} & VARCHAR(500) &  & Lý do ẩn \\
+    \hline
+    \texttt{hidden\_\allowbreak{}by} & CHAR(36) & FK & Người ẩn bình luận \\
+    \hline
+    \texttt{hidden\_\allowbreak{}at} & DATETIME &  & Thời điểm ẩn \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+    \texttt{deleted\_\allowbreak{}at} & DATETIME(6) &  & Thời điểm xóa mềm \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item INDEX (campaign\_\allowbreak{}id, parent\_\allowbreak{}id, created\_\allowbreak{}at), INDEX (status, created\_\allowbreak{}at)
+    \item FK campaign\_\allowbreak{}id tham chiếu đến campaigns(id); FK user\_\allowbreak{}id, hidden\_\allowbreak{}by tham chiếu đến users(id); FK parent\_\allowbreak{}id tham chiếu đến campaign\_\allowbreak{}comments(id)
+\end{itemize}
+
+\subsection{CAMPAIGN\_\allowbreak{}FOLLOWS (Theo dõi chiến dịch)}
+
+\textbf{Mục đích:} Bảng trung gian thể hiện người dùng theo dõi chiến dịch để nhận thông báo cập nhật.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng CAMPAIGN\_\allowbreak{}FOLLOWS}
+    \label{tab:campaign_follows} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người theo dõi \\
+    \hline
+    \texttt{campaign\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Chiến dịch được theo dõi \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item UNIQUE (user\_\allowbreak{}id, campaign\_\allowbreak{}id): mỗi người chỉ theo dõi một chiến dịch một lần
+    \item INDEX campaign\_\allowbreak{}id
+    \item FK user\_\allowbreak{}id tham chiếu đến users(id) và FK campaign\_\allowbreak{}id tham chiếu đến campaigns(id), đều ON DELETE CASCADE
+\end{itemize}
+
+\subsection{REPORTS (Báo cáo vi phạm)}
+
+\textbf{Mục đích:} Người dùng báo cáo chiến dịch hoặc bình luận vi phạm; quản trị viên xử lý.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng REPORTS}
+    \label{tab:reports} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{reporter\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người báo cáo \\
+    \hline
+    \texttt{campaign\_\allowbreak{}id} & CHAR(36) & FK & Chiến dịch bị báo cáo \\
+    \hline
+    \texttt{comment\_\allowbreak{}id} & CHAR(36) & FK & Bình luận bị báo cáo, nếu có \\
+    \hline
+    \texttt{reason} & ENUM: spam / fraud / inappropriate / misinformation / other & NOT NULL & Lý do \\
+    \hline
+    \texttt{description} & TEXT & NOT NULL & Mô tả chi tiết \\
+    \hline
+    \texttt{status} & ENUM: pending / reviewing / resolved / dismissed & NOT NULL & Mặc định pending \\
+    \hline
+    \texttt{admin\_\allowbreak{}notes} & TEXT &  & Ghi chú xử lý \\
+    \hline
+    \texttt{resolved\_\allowbreak{}by} & CHAR(36) & FK & Quản trị viên xử lý gần nhất \\
+    \hline
+    \texttt{resolved\_\allowbreak{}at} & DATETIME &  & Thời điểm xử lý \\
+    \hline
+    \texttt{campaign\_\allowbreak{}paused} & TINYINT(1) & NOT NULL & Đã tạm dừng chiến dịch khi xử lý, mặc định 0 \\
+    \hline
+    \texttt{comment\_\allowbreak{}hidden} & TINYINT(1) & NOT NULL & Đã ẩn bình luận khi xử lý, mặc định 0 \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item INDEX (status, created\_\allowbreak{}at), INDEX (campaign\_\allowbreak{}id, reporter\_\allowbreak{}id)
+    \item FK reporter\_\allowbreak{}id, resolved\_\allowbreak{}by tham chiếu đến users(id); FK campaign\_\allowbreak{}id tham chiếu đến campaigns(id); FK comment\_\allowbreak{}id tham chiếu đến campaign\_\allowbreak{}comments(id)
+\end{itemize}
+
+\subsection{RISK\_\allowbreak{}ALERTS (Cảnh báo rủi ro)}
+
+\textbf{Mục đích:} Cảnh báo gian lận do mô-đun AI hoặc bộ luật sinh ra cho chiến dịch hoặc người dùng.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng RISK\_\allowbreak{}ALERTS}
+    \label{tab:risk_alerts} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{entity\_\allowbreak{}type} & ENUM: campaign / user & NOT NULL & Loại đối tượng \\
+    \hline
+    \texttt{entity\_\allowbreak{}id} & CHAR(36) & NOT NULL & Id đối tượng, tham chiếu đa hình, không có FK \\
+    \hline
+    \texttt{entity\_\allowbreak{}name} & VARCHAR(255) & NOT NULL & Tên đối tượng tại thời điểm cảnh báo \\
+    \hline
+    \texttt{risk\_\allowbreak{}level} & ENUM: low / medium / high & NOT NULL & Mặc định medium \\
+    \hline
+    \texttt{risk\_\allowbreak{}score} & FLOAT & NOT NULL & Điểm rủi ro, mặc định 0 \\
+    \hline
+    \texttt{method} & ENUM: ai / rule & NOT NULL & Cách phát hiện, mặc định ai \\
+    \hline
+    \texttt{reasons} & JSON & NOT NULL & Danh sách lý do (nhóm, nhãn, trọng số) \\
+    \hline
+    \texttt{evidences} & JSON & NOT NULL & Các chỉ số làm bằng chứng \\
+    \hline
+    \texttt{status} & ENUM: open / resolved / dismissed & NOT NULL & Mặc định open \\
+    \hline
+    \texttt{resolved\_\allowbreak{}by} & CHAR(36) & FK & Quản trị viên xử lý \\
+    \hline
+    \texttt{resolved\_\allowbreak{}at} & DATETIME(6) &  & Thời điểm xử lý \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item INDEX status, INDEX (entity\_\allowbreak{}type, entity\_\allowbreak{}id)
+    \item FK resolved\_\allowbreak{}by tham chiếu đến users(id)
+\end{itemize}
+
+\subsection{BEHAVIOR\_\allowbreak{}EVENTS (Sự kiện hành vi)}
+
+\textbf{Mục đích:} Ghi nhận hành vi xem, theo dõi, ủng hộ, bấm vào dự án từ kết quả tìm kiếm làm dữ liệu cho gợi ý AI; chỉ ghi khi người dùng bật ai\_\allowbreak{}tracking\_\allowbreak{}consent.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng BEHAVIOR\_\allowbreak{}EVENTS}
+    \label{tab:behavior_events} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người dùng \\
+    \hline
+    \texttt{campaign\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Chiến dịch \\
+    \hline
+    \texttt{event\_\allowbreak{}type} & ENUM: view / follow / contribute / search & NOT NULL & Loại hành vi; search là bấm vào một dự án trong kết quả tìm kiếm (vẫn gắn với campaign\_\allowbreak{}id) \\
+    \hline
+    \texttt{category} & VARCHAR(100) & NOT NULL & Danh mục chiến dịch tại thời điểm ghi \\
+    \hline
+    \texttt{event\_\allowbreak{}data} & JSON &  & Dữ liệu bổ sung \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item INDEX (user\_\allowbreak{}id, event\_\allowbreak{}type), INDEX campaign\_\allowbreak{}id
+    \item FK user\_\allowbreak{}id tham chiếu đến users(id); FK campaign\_\allowbreak{}id tham chiếu đến campaigns(id)
+\end{itemize}
+
+\subsection{NOTIFICATIONS (Thông báo)}
+
+\textbf{Mục đích:} Thông báo trong ứng dụng cho người dùng về các sự kiện liên quan.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng NOTIFICATIONS}
+    \label{tab:notifications} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người nhận \\
+    \hline
+    \texttt{type} & ENUM & NOT NULL & campaign\_\allowbreak{}approved, campaign\_\allowbreak{}rejected, campaign\_\allowbreak{}needs\_\allowbreak{}info, campaign\_\allowbreak{}paused, campaign\_\allowbreak{}resumed, campaign\_\allowbreak{}ended, donation\_\allowbreak{}received, donation\_\allowbreak{}confirmed, milestone\_\allowbreak{}completed, progress\_\allowbreak{}update, report\_\allowbreak{}resolved, comment\_\allowbreak{}new, comment\_\allowbreak{}reply, comment\_\allowbreak{}hidden, refund\_\allowbreak{}approved, refund\_\allowbreak{}rejected, donation\_\allowbreak{}refunded, milestone\_\allowbreak{}overdue, milestone\_\allowbreak{}rescheduled, system (kết quả xét duyệt tổ chức dùng loại system) \\
+    \hline
+    \texttt{title} & VARCHAR(200) & NOT NULL & Tiêu đề \\
+    \hline
+    \texttt{message} & TEXT & NOT NULL & Nội dung \\
+    \hline
+    \texttt{link} & VARCHAR(300) &  & Đường dẫn tương đối mở khi bấm, ví dụ /du-an/\textless{}id\textgreater{} \\
+    \hline
+    \texttt{is\_\allowbreak{}read} & TINYINT(1) & NOT NULL & Đã đọc, mặc định 0 \\
+    \hline
+    \texttt{related\_\allowbreak{}id} & CHAR(36) &  & Id đối tượng liên quan, không có FK \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item INDEX (user\_\allowbreak{}id, is\_\allowbreak{}read, created\_\allowbreak{}at)
+    \item FK user\_\allowbreak{}id tham chiếu đến users(id)
+\end{itemize}
+
+\subsection{AUDIT\_\allowbreak{}LOGS (Nhật ký kiểm toán)}
+
+\textbf{Mục đích:} Ghi lại các thay đổi quan trọng (kiểm duyệt, đổi trạng thái, hoàn tiền) để truy vết.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng AUDIT\_\allowbreak{}LOGS}
+    \label{tab:audit_logs} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & VARCHAR(36) &  & Người thực hiện, không có FK để nhật ký còn khi tài khoản bị xóa \\
+    \hline
+    \texttt{action} & VARCHAR(100) & NOT NULL & Hành động \\
+    \hline
+    \texttt{entity} & VARCHAR(100) & NOT NULL & Tên loại đối tượng \\
+    \hline
+    \texttt{entity\_\allowbreak{}id} & VARCHAR(36) &  & Id đối tượng \\
+    \hline
+    \texttt{old\_\allowbreak{}values} & JSON &  & Giá trị trước khi thay đổi \\
+    \hline
+    \texttt{new\_\allowbreak{}values} & JSON &  & Giá trị sau khi thay đổi \\
+    \hline
+    \texttt{ip\_\allowbreak{}address} & VARCHAR(45) &  & Địa chỉ IP \\
+    \hline
+    \texttt{user\_\allowbreak{}agent} & VARCHAR(500) &  & Trình duyệt, thiết bị \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item Không có khóa ngoại (xem 5.2).
+\end{itemize}
+
+\subsection{ORGANIZATIONS (Tổ chức thụ hưởng)}
+
+\textbf{Mục đích:} Hồ sơ tổ chức xã hội (quỹ từ thiện, NGO, doanh nghiệp xã hội\ldots{}) do người đại diện đăng ký kèm ảnh giấy phép. Chỉ khi quản trị viên xác minh (verified), tổ chức mới hiện công khai và nhận chiến dịch gây quỹ. Người đại diện là tài khoản người dùng bình thường, không phải vai trò riêng.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng ORGANIZATIONS}
+    \label{tab:organizations} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{slug} & VARCHAR(140) & NOT NULL, UNIQUE & Đường dẫn trang công khai /to-chuc/\textless{}slug\textgreater{} \\
+    \hline
+    \texttt{name} & VARCHAR(200) & NOT NULL & Tên tổ chức \\
+    \hline
+    \texttt{org\_\allowbreak{}type} & ENUM: charity\_\allowbreak{}fund / ngo / social\_\allowbreak{}enterprise / education / health / other & NOT NULL & Loại hình \\
+    \hline
+    \texttt{registration\_\allowbreak{}number} & VARCHAR(100) & NOT NULL & Số giấy phép hoặc quyết định thành lập \\
+    \hline
+    \texttt{issued\_\allowbreak{}by} & VARCHAR(200) & NOT NULL & Cơ quan cấp \\
+    \hline
+    \texttt{category} & VARCHAR(100) &  & Lĩnh vực hoạt động, ghi tự do, không tham chiếu categories \\
+    \hline
+    \texttt{mission} & TEXT & NOT NULL & Sứ mệnh \\
+    \hline
+    \texttt{website} & VARCHAR(300) &  &  \\
+    \hline
+    \texttt{email} & VARCHAR(200) & NOT NULL &  \\
+    \hline
+    \texttt{phone} & VARCHAR(30) & NOT NULL &  \\
+    \hline
+    \texttt{address} & VARCHAR(300) & NOT NULL &  \\
+    \hline
+    \texttt{province} & VARCHAR(100) & NOT NULL & Thông tin liên hệ \\
+    \hline
+    \texttt{logo\_\allowbreak{}url} & VARCHAR(500) &  & Logo \\
+    \hline
+    \texttt{document\_\allowbreak{}url} & VARCHAR(500) & NOT NULL & Ảnh giấy phép, chỉ người đại diện và quản trị viên xem, không trả ở API công khai \\
+    \hline
+    \texttt{representative\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người đại diện \\
+    \hline
+    \texttt{representative\_\allowbreak{}title} & VARCHAR(100) & NOT NULL & Chức danh người đại diện \\
+    \hline
+    \texttt{status} & ENUM: pending / needs\_\allowbreak{}info / verified / rejected / suspended & NOT NULL & Mặc định pending \\
+    \hline
+    \texttt{review\_\allowbreak{}notes} & TEXT &  & Ghi chú, lý do của quản trị viên; bắt buộc từ 10 ký tự với mọi quyết định khác verified \\
+    \hline
+    \texttt{reviewed\_\allowbreak{}by} & CHAR(36) & FK & Quản trị viên xét duyệt lần gần nhất \\
+    \hline
+    \texttt{reviewed\_\allowbreak{}at} & DATETIME &  & Thời điểm xét duyệt gần nhất \\
+    \hline
+    \texttt{verified\_\allowbreak{}at} & DATETIME &  & Lần đầu được xác minh \\
+    \hline
+    \texttt{submitted\_\allowbreak{}at} & DATETIME & NOT NULL & Lần gửi (lại) hồ sơ gần nhất; hàng chờ xác minh xếp theo cột này \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+    \texttt{deleted\_\allowbreak{}at} & DATETIME(6) &  & Thời điểm xóa mềm \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item UNIQUE trên slug
+    \item INDEX (status, submitted\_\allowbreak{}at), INDEX registration\_\allowbreak{}number
+    \item FK representative\_\allowbreak{}id và reviewed\_\allowbreak{}by tham chiếu đến users(id)
+    \item Tầng dịch vụ: registration\_\allowbreak{}number không trùng với hồ sơ khác đang pending / needs\_\allowbreak{}info / verified / suspended (hồ sơ bị từ chối không giữ chỗ); mỗi tài khoản đại diện tối đa 3 tổ chức
+    \item Sau khi xác minh, thông tin pháp lý (name, org\_\allowbreak{}type, registration\_\allowbreak{}number, issued\_\allowbreak{}by, document\_\allowbreak{}url, representative\_\allowbreak{}title) bị khóa
+    \item Ma trận xét duyệt: pending $\rightarrow$ verified / needs\_\allowbreak{}info / rejected; needs\_\allowbreak{}info $\rightarrow$ verified / rejected; verified $\leftrightarrow$ suspended; rejected là trạng thái cuối. Quản trị viên không được xét tổ chức mình đại diện
+\end{itemize}
+
+\subsection{STEP\_\allowbreak{}UP\_\allowbreak{}CODES (Mã xác minh bổ sung)}
+
+\textbf{Mục đích:} Mã OTP 6 số gửi qua email để xác minh lại trước các thao tác nhạy cảm, kể cả khi người dùng đang đăng nhập.
+
+{\small
+\begin{longtable}{|P{3.2cm}|P{2.8cm}|P{2.2cm}|p{5.4cm}|}
+    \caption{Thuộc tính của bảng STEP\_\allowbreak{}UP\_\allowbreak{}CODES}
+    \label{tab:step_up_codes} \\
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Thuộc tính} & \textbf{Kiểu dữ liệu} & \textbf{Ràng buộc} & \textbf{Mô tả} \\
+    \hline
+    \endhead
+
+    \texttt{id} & CHAR(36) & PK & Mã định danh duy nhất \\
+    \hline
+    \texttt{user\_\allowbreak{}id} & CHAR(36) & NOT NULL, FK & Người nhận mã \\
+    \hline
+    \texttt{purpose} & VARCHAR(30) & NOT NULL & Thao tác cần xác minh: change\_\allowbreak{}password, refund\_\allowbreak{}request, admin\_\allowbreak{}refund, admin\_\allowbreak{}backup \\
+    \hline
+    \texttt{code\_\allowbreak{}hash} & CHAR(64) & NOT NULL & HMAC-SHA256 của mã với khóa bí mật phía server; mã gốc không được lưu \\
+    \hline
+    \texttt{expires\_\allowbreak{}at} & DATETIME & NOT NULL & Hết hạn sau 10 phút \\
+    \hline
+    \texttt{attempts} & INT & NOT NULL & Số lần nhập sai, mặc định 0, tối đa 5 lần \\
+    \hline
+    \texttt{used\_\allowbreak{}at} & DATETIME &  & Thời điểm đã dùng; NULL là chưa dùng \\
+    \hline
+    \texttt{created\_\allowbreak{}at} &  &  &  \\
+    \hline
+    \texttt{updated\_\allowbreak{}at} & DATETIME(6) & NOT NULL & Thời điểm tạo, cập nhật \\
+    \hline
+\end{longtable}
+}
+
+\textbf{Ràng buộc:}
+\begin{itemize}
+    \item INDEX (user\_\allowbreak{}id, purpose, created\_\allowbreak{}at)
+    \item FK user\_\allowbreak{}id tham chiếu đến users(id), ON DELETE CASCADE
+    \item Gửi lại mã cách nhau tối thiểu 60 giây; mã đúng đổi thành token xác minh ngắn hạn (10 phút) gửi kèm yêu cầu thực hiện thao tác
+\end{itemize}
