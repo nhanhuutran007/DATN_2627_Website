@@ -219,7 +219,9 @@ function statusToDisplay(status: ApiCampaignStatus): CampaignStatus {
       return "Chờ duyệt";
     case "needs_info":
       return "Cần bổ sung";
+    // Đã duyệt nhưng admin chưa kích hoạt: máy chủ chưa nhận tiền ủng hộ (chỉ nhận khi `active`)
     case "approved":
+      return "Sắp mở gây quỹ";
     case "active":
       return "Đang gây quỹ";
     case "rejected":

@@ -2,6 +2,7 @@ import type { ApiCampaignStatus } from "@/lib/api/campaigns";
 
 export type CampaignStatus =
   | "Đang gây quỹ"
+  | "Sắp mở gây quỹ"
   | "Sắp kết thúc"
   | "Mới phát hành"
   | "Đã đạt mục tiêu"

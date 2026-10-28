@@ -26,7 +26,7 @@ const MILLION = 1_000_000;
 
 
 const STATUS_OPTIONS: Record<string, { label: string; statuses: ApiCampaignStatus[] }> = {
-  open: { label: "Đang gây quỹ", statuses: ["approved", "active"] },
+  open: { label: "Đang gây quỹ", statuses: ["active"] },
   success: { label: "Đã đạt mục tiêu", statuses: ["success"] },
   closed: { label: "Đã kết thúc", statuses: ["ended", "failed"] },
 };
