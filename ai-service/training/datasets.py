@@ -1,11 +1,13 @@
 """Deterministic dataset builders shared by offline training and evaluation.
 
-Generates three reproducible CSV datasets under ``data/`` mirroring the feature
+Generates two reproducible CSV datasets under ``data/`` mirroring the feature
 contracts used at inference time:
 
 * ``synthetic_campaigns.csv`` -> success-model features + outcome label
-* ``synthetic_fraud.csv``     -> fraud-model feature matrix + anomaly label
 * ``recommend_events.csv``    -> user-item interaction log for recommender eval
+
+The fraud model is trained only on real labelled data (IEEE-CIS, see
+``notebooks/train_real_data_colab.ipynb``), so there is no synthetic fraud set.
 
 Each generator uses its own NumPy ``default_rng`` seed so whole runs are
 reproducible. Real scraped data can later replace the CSVs (see
@@ -20,22 +22,18 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from app.services.catalog import CATEGORIES, FRAUD_FEATURES, SUCCESS_FEATURES
+from app.services.catalog import CATEGORIES, SUCCESS_FEATURES
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 
 CAMPAIGNS_CSV = DATA_DIR / "synthetic_campaigns.csv"
-FRAUD_CSV = DATA_DIR / "synthetic_fraud.csv"
 EVENTS_CSV = DATA_DIR / "recommend_events.csv"
 
 SEED_CAMPAIGNS = 42
-SEED_FRAUD = 43
 SEED_EVENTS = 44
 
 CAMPAIGN_ROWS = 1000
-FRAUD_ROWS = 2000
-FRAUD_CONTAMINATION = 0.02
 
 EVENT_ROWS = 6000
 USERS = 300
@@ -105,55 +103,6 @@ def generate_campaigns() -> pd.DataFrame:
     return frame
 
 
-def generate_fraud_frame() -> pd.DataFrame:
-    rng = np.random.default_rng(SEED_FRAUD)
-    n = FRAUD_ROWS
-    n_anomaly = int(FRAUD_CONTAMINATION * n)
-
-    normal = pd.DataFrame(
-        {
-            "contribution_count_1h": rng.poisson(0.5, n),
-            "failed_payment_count": rng.poisson(0.08, n),
-            "total_payment_count": rng.poisson(2, n),
-            "device_shared_accounts": rng.poisson(0.2, n),
-            "amount_z_score": rng.normal(0.0, 0.8, n),
-            "ip_country_changes": rng.poisson(0.2, n),
-            "new_account_days": rng.uniform(20.0, 400.0, n),
-            "profile_change_frequency": rng.poisson(0.3, n),
-            "is_anomaly": 0,
-        }
-    )
-    pattern = rng.integers(0, 3, size=n_anomaly)
-    cluster_a = pattern == 0
-    cluster_b = pattern == 1
-    cluster_c = pattern == 2
-    anomaly = pd.DataFrame(
-        {
-            "contribution_count_1h": np.where(
-                cluster_a, rng.uniform(15, 60, n_anomaly), rng.poisson(0.5, n_anomaly)
-            ),
-            "failed_payment_count": np.where(
-                cluster_b, rng.integers(4, 20, n_anomaly), rng.poisson(0.08, n_anomaly)
-            ),
-            "total_payment_count": np.where(
-                cluster_b, rng.integers(3, 25, n_anomaly), rng.poisson(2, n_anomaly)
-            ),
-            "device_shared_accounts": np.where(
-                cluster_c, rng.integers(5, 20, n_anomaly), rng.poisson(0.2, n_anomaly)
-            ),
-            "amount_z_score": rng.normal(3.5, 1.5, n_anomaly),
-            "ip_country_changes": np.where(
-                cluster_c, rng.integers(3, 8, n_anomaly), rng.poisson(0.2, n_anomaly)
-            ),
-            "new_account_days": rng.uniform(0.0, 2.0, n_anomaly),
-            "profile_change_frequency": rng.poisson(0.3, n_anomaly),
-            "is_anomaly": 1,
-        }
-    )
-    frame = pd.concat([normal, anomaly], ignore_index=True)
-    return frame.sample(frac=1.0, random_state=SEED_FRAUD).reset_index(drop=True)
-
-
 def generate_events(campaigns: pd.DataFrame) -> pd.DataFrame:
     """Build a deterministic user-item interaction log.
 
@@ -215,15 +164,6 @@ def load_campaigns_csv(path: Path | None = None) -> pd.DataFrame:
     return frame
 
 
-def load_fraud_csv(path: Path | None = None) -> pd.DataFrame:
-    file = path or FRAUD_CSV
-    if file.is_file():
-        return pd.read_csv(file, encoding="utf-8")
-    frame = generate_fraud_frame()
-    frame.to_csv(file, index=False, encoding="utf-8")
-    return frame
-
-
 def load_events_csv(path: Path | None = None) -> pd.DataFrame:
     file = path or EVENTS_CSV
     if file.is_file():
@@ -236,11 +176,9 @@ def load_events_csv(path: Path | None = None) -> pd.DataFrame:
 def write_missing() -> dict[str, str]:
     """Persist any dataset file that does not exist yet."""
     load_campaigns_csv()
-    load_fraud_csv()
     load_events_csv()
     return {
         "campaigns": str(CAMPAIGNS_CSV),
-        "fraud": str(FRAUD_CSV),
         "events": str(EVENTS_CSV),
     }
 
@@ -248,16 +186,12 @@ def write_missing() -> dict[str, str]:
 def main() -> None:
     write_missing()
     campaigns = load_campaigns_csv()
-    fraud = load_fraud_csv()
     events = load_events_csv()
     print("== Datasets ==")
     print(f"Campaigns : {len(campaigns)} rows -> {CAMPAIGNS_CSV.name}")
-    print(f"Fraud     : {len(fraud)} rows (anomalies="
-          f"{int((fraud['is_anomaly'] == 1).sum())}) -> {FRAUD_CSV.name}")
     print(f"Events    : {len(events)} rows, "
           f"{events['user_id'].nunique()} users -> {EVENTS_CSV.name}")
     print("Contracts: success features", SUCCESS_FEATURES)
-    print("           fraud features  ", FRAUD_FEATURES)
 
 
 if __name__ == "__main__":
