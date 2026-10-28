@@ -5832,6 +5832,16 @@ button {
   }
 }
 
+/* Nội dung đổi theo tab/sắp xếp hoặc vừa tải xong: hiện dần như kết quả lọc thay vì bật ra. */
+.fade-swap {
+  animation: results-fade-in 250ms ease-out both;
+}
+
+/* Danh sách có "Xem thêm": mục mới thêm vào trượt nhẹ lên rồi hiện dần. */
+.list-reveal > * {
+  animation: results-fade-in-up 360ms ease-out both;
+}
+
 .fade-in-image {
   opacity: 0;
   transition: opacity 400ms ease-out, transform 400ms ease;
@@ -5844,12 +5854,15 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .results-enter,
   .results-enter > *,
+  .fade-swap,
+  .list-reveal > *,
   .result-skeleton,
   .skeleton-block {
     animation: none;
   }
 
-  .fade-in-image {
+  .fade-in-image,
+  .story-collapse {
     transition: none;
   }
 }
@@ -7219,6 +7232,7 @@ html:has(dialog:modal) .admin-sidebar {
 .story-collapse {
   position: relative;
   overflow: hidden;
+  transition: max-height 400ms ease-out;
 }
 
 .story-collapse.is-collapsed::after {
@@ -10649,19 +10663,91 @@ html:has(dialog:modal) .admin-sidebar {
 }
 
 .detail-protected {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: -8px 0 0;
   padding-bottom: 16px;
-  color: var(--success);
   border-bottom: 1px solid var(--line);
-  font-size: 0.86rem;
-  font-weight: 600;
 }
 
-.detail-protected svg {
+.protected-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  color: var(--success);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  anchor-name: --protected-badge;
+}
+
+.protected-badge svg {
   flex: none;
+}
+
+.protected-info {
+  display: inline-grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  color: var(--text-2);
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  font-size: 0.66rem;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.protected-badge:hover .protected-info,
+.protected-badge:focus-visible .protected-info {
+  color: var(--success);
+}
+
+/* Ô giải thích: bám dưới nhãn khi trình duyệt hỗ trợ anchor positioning, không thì nằm giữa màn hình. */
+.protected-pop {
+  max-width: min(340px, calc(100vw - 32px));
+  margin: auto;
+  padding: 14px 16px;
+  color: var(--text);
+  border: 1px solid #d8d8d8;
+  border-radius: 16px;
+  background: var(--white);
+  box-shadow: 0 6px 14px rgba(35, 35, 35, 0.1);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  opacity: 0;
+  transition: opacity 200ms ease-out, display 200ms allow-discrete, overlay 200ms allow-discrete;
+}
+
+.protected-pop:popover-open {
+  opacity: 1;
+}
+
+@starting-style {
+  .protected-pop:popover-open {
+    opacity: 0;
+  }
+}
+
+.protected-pop ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+@supports (position-anchor: --a) {
+  .protected-pop {
+    position-anchor: --protected-badge;
+    inset: auto;
+    top: anchor(bottom);
+    left: anchor(left);
+    margin: 8px 0 0;
+    position-try-fallbacks: flip-block;
+  }
 }
 
 /* Các mục cột chính (Cập nhật, Chia sẻ, Người tổ chức, Lời động viên…): ngăn bằng đường kẻ như GoFundMe */
@@ -12453,6 +12539,33 @@ html:has(dialog:modal) .admin-sidebar {
   height: 100%;
   object-fit: cover;
   background: var(--white);
+}
+
+/* Chưa có logo: chữ viết tắt trên nền chuyển sắc theo lĩnh vực, biểu tượng lĩnh vực mờ ở góc. */
+.org-logo-mark {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.35), transparent 55%),
+    linear-gradient(140deg, var(--org-from), var(--org-to));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), 0 2px 6px rgba(35, 35, 35, 0.12);
+}
+
+.org-logo-icon {
+  position: absolute;
+  right: -14%;
+  bottom: -16%;
+  z-index: -1;
+  width: 72%;
+  height: 72%;
+  color: var(--white);
+  opacity: 0.28;
+  transform: rotate(-12deg);
+}
+
+.org-logo-initials {
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
 
 .org-mine-list {

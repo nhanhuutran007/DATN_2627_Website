@@ -172,12 +172,20 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             </span>
           </a>
 
-          <p className="detail-protected">
-            <Icon name="shield" size={16} />
-            {published
-              ? "Ủng hộ được bảo vệ · hồ sơ đã kiểm duyệt, chỉ ghi nhận giao dịch đã xác nhận"
-              : "Chỉ ghi nhận giao dịch đã xác nhận"}
-          </p>
+          {/* Như huy hiệu "Donation protected" của GoFundMe: nhãn ngắn, bấm mới xem giải thích (popover gốc của trình duyệt). */}
+          <div className="detail-protected">
+            <button className="protected-badge" type="button" popoverTarget="ung-ho-duoc-bao-ve">
+              <Icon name="shield" size={16} />
+              {published ? "Ủng hộ được bảo vệ" : "Chỉ ghi nhận giao dịch đã xác nhận"}
+              <span className="protected-info" aria-hidden="true">i</span>
+            </button>
+            <div className="protected-pop" id="ung-ho-duoc-bao-ve" popover="auto">
+              <ul>
+                {published && <li>Hồ sơ dự án đã được Góp Mầm kiểm duyệt trước khi công khai.</li>}
+                <li>Số tiền đã huy động chỉ tính các giao dịch đã được xác nhận.</li>
+              </ul>
+            </div>
+          </div>
 
           {campaign.organization && (
             <Link className="detail-beneficiary" href={`/to-chuc/${encodeURIComponent(campaign.organization.slug)}`}>

@@ -281,7 +281,7 @@ const TOPIC_IMAGES: [RegExp, Campaign["image"]][] = [
   [/am nhac|ca nhac|nghe thuat|le hoi/, "music"],
 ];
 
-function foldVietnamese(text: string): string {
+export function foldVietnamese(text: string): string {
   return text.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/gi, "d").toLowerCase();
 }
 

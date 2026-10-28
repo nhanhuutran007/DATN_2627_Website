@@ -51,7 +51,7 @@ export function AiRecommendations({ fallback = [] }: AiRecommendationsProps) {
               : "Đăng nhập để nhận gợi ý kèm lý do. Hiện đang hiển thị các dự án mới phát hành."}
           </p>
         </div>
-        <div className="card-grid">
+        <div className="card-grid results-enter">
           {spreadCategoryImages(items).map((campaign) => <CampaignCard campaign={campaign} key={campaign.slug} showAiReason />)}
         </div>
       </div>
