@@ -219,7 +219,10 @@ export function ReceiptView({ donationId }: { donationId: string }) {
   return (
     <main className="container receipt-page">
       <div className="receipt-actions no-print">
-        <Link className="button button-ghost button-sm" href="/dashboard#ung-ho-cua-toi">← Khoản ủng hộ của tôi</Link>
+        <Link className="receipt-back" href="/dashboard#ung-ho-cua-toi">
+          <span className="receipt-back-icon" aria-hidden="true"><Icon name="wallet" size={16} /></span>
+          Khoản ủng hộ của tôi
+        </Link>
         <button className="button button-primary button-sm" type="button" onClick={() => window.print()}>
           <Icon name="document" size={16} /> In / Lưu PDF
         </button>

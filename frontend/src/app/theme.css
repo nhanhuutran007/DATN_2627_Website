@@ -397,6 +397,42 @@ h3 {
   margin-bottom: 16px;
 }
 
+/* Lối về "Khoản ủng hộ của tôi": viên thuốc có biểu tượng ví trong vòng tròn màu chủ đạo */
+.receipt-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 16px 4px 4px;
+  color: #232323;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.receipt-back:hover,
+.receipt-back:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 6px 14px rgba(35, 35, 35, 0.1);
+}
+
+.receipt-back-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: var(--white);
+  border-radius: 50%;
+  background: var(--primary);
+  transition: transform 200ms ease;
+}
+
+.receipt-back:hover .receipt-back-icon {
+  transform: scale(1.08);
+}
+
 .receipt-card {
   position: relative;
   padding: 32px;
@@ -1524,18 +1560,122 @@ h3 {
   background: #232323;
 }
 
-/* Vòng cung ảnh (SVG, xem HeroArc): 3 hình quạt dưới nút. Như GoFundMe, vòng cung trải trọn
-   bề ngang màn hình và co giãn theo đó (chiều cao tự tính từ viewBox). */
-.hero-arc {
+/* Dải ảnh dự án đang gây quỹ (xem HeroMarquee): trôi chậm từ phải sang trái, mờ dần ở hai mép,
+   rê chuột/focus để dừng. Mỗi ảnh có lề phải riêng (không dùng gap) để trôi đúng nửa dải là liền mạch. */
+.hero-marquee {
+  --tile-height: clamp(200px, 22vw, 280px);
   width: 100%;
-  margin: clamp(16px, 5vw, 96px) auto 0;
+  margin: clamp(32px, 5vw, 64px) 0 0;
   padding-bottom: clamp(32px, 4vw, 72px);
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
 }
 
-.hero-arc svg {
+.hero-marquee-track {
+  display: flex;
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  animation: hero-marquee var(--marquee-duration, 60s) linear infinite;
+  will-change: transform;
+}
+
+.hero-marquee:hover .hero-marquee-track,
+.hero-marquee:focus-within .hero-marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes hero-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Mọi ảnh cùng một khung 4:3 cho đều mắt */
+.hero-tile {
+  flex: none;
+  width: calc(var(--tile-height) * 4 / 3);
+  height: var(--tile-height);
+  margin-right: 16px;
+}
+
+.hero-tile a {
+  position: relative;
   display: block;
-  width: 100%;
-  height: auto;
+  height: 100%;
+  overflow: hidden;
+  color: var(--white);
+  border-radius: 20px;
+  background: var(--soft);
+  text-align: left;
+}
+
+.hero-tile img {
+  object-fit: cover;
+  transition: transform 600ms ease;
+}
+
+.hero-tile a:hover img,
+.hero-tile a:focus-visible img {
+  transform: scale(1.05);
+}
+
+.hero-tile-caption {
+  position: absolute;
+  inset: auto 0 0;
+  display: grid;
+  gap: 6px;
+  padding: 40px 14px 14px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
+}
+
+.hero-tile-cat {
+  justify-self: start;
+  padding: 2px 8px;
+  color: #232323;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.hero-tile-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.hero-tile-bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.hero-tile-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-marquee {
+    overflow-x: auto;
+  }
+
+  .hero-marquee-track {
+    animation: none;
+  }
 }
 
 @media (max-width: 700px) {

@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { AiRecommendations } from "@/components/ai/AiRecommendations";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
-import { HeroArc } from "@/components/home/HeroArc";
+import { HeroMarquee } from "@/components/home/HeroMarquee";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { CategoryShowcase } from "@/features/discovery/CategoryShowcase";
 import {
@@ -52,13 +52,6 @@ async function loadHome(): Promise<HomeData> {
     };
   }
 }
-
-/** Ảnh vòng cung ở hero (trái · giữa · phải). */
-const heroImages: Parameters<typeof HeroArc>[0]["images"] = [
-  { src: "/images/cover-library.webp", alt: "Học sinh vùng cao trong lớp học ở Bát Xát, Lào Cai" },
-  { src: "/images/cover-mangrove.webp", alt: "Tình nguyện viên trồng cây ngập mặn trên bãi bồi" },
-  { src: "/images/cover-health.webp", alt: "Khám mắt miễn phí cho người dân tại một điểm khám cộng đồng" },
-];
 
 const aboutPoints = [
   "Hồ sơ được kiểm duyệt trước khi phát hành",
@@ -120,7 +113,7 @@ export default async function Home() {
             <Link className="hero-button hero-button-outline" href="/tao-chien-dich">Tạo chiến dịch</Link>
           </div>
         </div>
-        <HeroArc images={heroImages} />
+        <HeroMarquee campaigns={spreadCategoryImages(all)} />
       </section>
 
       {!live && (
