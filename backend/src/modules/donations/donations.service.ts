@@ -26,7 +26,7 @@ import {
 import { AuditService } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { NotificationType } from "../notifications/entities/notification.entity";
-import { NotificationsService } from "../notifications/notifications.service";
+import { donationGroupText, NotificationsService } from "../notifications/notifications.service";
 import { RewardTier } from "../rewards/entities/reward-tier.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import { CreateDonationDto, WebhookDonationDto, type WebhookStatus } from "./dto/donation.dto";
@@ -582,11 +582,12 @@ export class DonationsService {
             {
               userId: campaign.ownerId,
               type: NotificationType.DONATION_RECEIVED,
-              title: "Có khoản ủng hộ mới",
-              message: `Chiến dịch "${campaign.title}" vừa nhận ${amount} (đã xác nhận).`,
+              ...donationGroupText(campaign.title, 1, Number(donation.amount)),
               link: "/dashboard",
               relatedId: campaign.id,
               email: true,
+              // Nhiều khoản liên tiếp gộp thành một thông báo chưa đọc: "Có N khoản ủng hộ mới, tổng …"
+              donationGroup: { campaignTitle: campaign.title, amount: Number(donation.amount) },
             },
           ]
         : []),

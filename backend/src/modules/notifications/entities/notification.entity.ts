@@ -52,4 +52,12 @@ export class Notification extends BaseEntity {
 
   @Column({ name: "related_id", length: 36, nullable: true })
   relatedId?: string;
+
+  /** Số sự kiện đã gộp vào thông báo này (vd. số khoản ủng hộ mới chưa đọc của một chiến dịch). */
+  @Column({ name: "group_count", type: "int", default: 1 })
+  groupCount!: number;
+
+  /** Tổng tiền của các khoản đã gộp; null với thông báo không gộp. */
+  @Column({ name: "group_amount", type: "decimal", precision: 15, scale: 2, nullable: true })
+  groupAmount?: number | null;
 }

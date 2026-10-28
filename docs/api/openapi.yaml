@@ -4464,7 +4464,16 @@ components:
           description: Đường dẫn tương đối trong web để mở khi bấm thông báo
         relatedId: { type: [string, "null"] }
         isRead: { type: boolean }
-        createdAt: { type: string, format: date-time }
+        groupCount:
+          type: integer
+          description: Số khoản ủng hộ mới đã gộp vào thông báo donation_received chưa đọc của cùng chiến dịch (mặc định 1)
+        groupAmount:
+          type: [string, "null"]
+          description: Tổng tiền các khoản đã gộp (số thập phân dạng chuỗi, vd. "470000.00"); null với thông báo không gộp
+        createdAt:
+          type: string
+          format: date-time
+          description: Thời điểm sự kiện mới nhất (thông báo gộp được đưa lên đầu). Thông báo quá 90 ngày bị xóa tự động.
     NotificationPage:
       type: object
       required: [items, total, unread, page, limit]
