@@ -1,15 +1,16 @@
 """Offline training pipeline for the crowdfunding AI service.
 
-Trains LogisticRegression / RandomForest success models and an IsolationForest
-fraud model, evaluates them on a time-ordered split and writes evaluated
-artifacts + metadata into ``models/``. Dataset generation is shared with other
-tools via :mod:`training.datasets` (deterministic synthetic CSVs under
-``data/``; replace them with scraped data later, see ``data/README.md``).
+Trains LogisticRegression / RandomForest success models on the deterministic
+synthetic campaigns (:mod:`training.datasets`), evaluates them on a time-ordered
+split and writes the artifacts + metadata into ``models/``. This is the baseline
+from before real data was used; the models served today come from
+``notebooks/train_real_data_colab.ipynb``, so the script refuses to overwrite them
+unless ``--force`` is given.
 
 Run from the ``ai-service`` directory either as:
 
-    python -m training.train
-    python training/train.py
+    python -m training.train [--force]
+    python training/train.py [--force]
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import IsolationForest, RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     confusion_matrix,
@@ -32,19 +33,15 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from sklearn.preprocessing import StandardScaler
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.services.catalog import FRAUD_FEATURES, SUCCESS_FEATURES  # noqa: E402
+from app.services.catalog import SUCCESS_FEATURES  # noqa: E402
 from training.datasets import (  # noqa: E402
     CAMPAIGNS_CSV,
-    FRAUD_CONTAMINATION,
-    FRAUD_CSV,
     generate_campaigns,
-    generate_fraud_frame,
     write_missing,
 )
 
@@ -180,47 +177,6 @@ def train_success_models() -> dict:
     return metrics
 
 
-def train_fraud_model() -> dict:
-    frame = generate_fraud_frame()
-    FRAUD_CSV.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(FRAUD_CSV, index=False, encoding="utf-8")
-    x = frame[FRAUD_FEATURES].to_numpy(dtype=float)
-    labels = frame["is_anomaly"].to_numpy()
-
-    scaler = StandardScaler()
-    x_scaled = scaler.fit_transform(x)
-    forest = IsolationForest(n_estimators=200, contamination=FRAUD_CONTAMINATION, random_state=SEED)
-    forest.fit(x_scaled)
-    predictions = forest.predict(x_scaled)
-
-    known_anomalies = labels == 1
-    detected = (predictions == -1) & known_anomalies
-    normal_rows = ~known_anomalies
-    false_positives = (predictions == -1) & normal_rows
-
-    metrics = {
-        "model_version": MODEL_VERSION,
-        "model": "isolation_forest",
-        "trained_at": now_iso(),
-        "contamination": FRAUD_CONTAMINATION,
-        "n_estimators": forest.n_estimators,
-        "scaler": "standard_scaler",
-        "rows": int(len(frame)),
-        "known_anomalies": int(known_anomalies.sum()),
-        "detection_rate": round(float(detected.sum() / max(1, known_anomalies.sum())), 6),
-        "false_positive_rate": round(float(false_positives.sum() / max(1, normal_rows.sum())), 6),
-        "features": list(FRAUD_FEATURES),
-        "generation": "synthetic (2% anomalies: high-volume, many-failed, agent clusters)",
-    }
-
-    joblib.dump(forest, MODELS_DIR / "fraud_isolation.pkl")
-    joblib.dump(scaler, MODELS_DIR / "fraud_scaler.pkl")
-    (MODELS_DIR / "fraud_metrics.json").write_text(
-        json.dumps(metrics, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    return metrics
-
-
 def write_success_metadata(metrics: dict) -> None:
     metadata = {
         "model_version": MODEL_VERSION,
@@ -234,7 +190,7 @@ def write_success_metadata(metrics: dict) -> None:
     )
 
 
-def write_model_readme(metrics: dict, fraud_metrics: dict) -> None:
+def write_model_readme(metrics: dict) -> None:
     payload = {
         "model_version": MODEL_VERSION,
         "trained_at": now_iso(),
@@ -242,9 +198,6 @@ def write_model_readme(metrics: dict, fraud_metrics: dict) -> None:
             "success_model": "models/success_model.pkl",
             "success_metrics": "models/success_metrics.json",
             "success_features": "models/success_features.json",
-            "fraud_model": "models/fraud_isolation.pkl",
-            "fraud_scaler": "models/fraud_scaler.pkl",
-            "fraud_metrics": "models/fraud_metrics.json",
         },
         "features": metrics["features"],
         "dataset": metrics["dataset"],
@@ -253,23 +206,32 @@ def write_model_readme(metrics: dict, fraud_metrics: dict) -> None:
             "chosen": metrics["chosen"],
             "models": metrics["models"],
         },
-        "fraud_metrics": {
-            "contamination": fraud_metrics["contamination"],
-            "detection_rate": fraud_metrics["detection_rate"],
-            "false_positive_rate": fraud_metrics["false_positive_rate"],
-        },
     }
     (MODELS_DIR / "README.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
 
+def served_model_version() -> str | None:
+    metadata_path = MODELS_DIR / "success_model.metadata.json"
+    if not metadata_path.is_file():
+        return None
+    version = json.loads(metadata_path.read_text(encoding="utf-8")).get("model_version")
+    return str(version) if version is not None else None
+
+
 def main() -> None:
+    current = served_model_version()
+    if current and current != MODEL_VERSION and "--force" not in sys.argv[1:]:
+        sys.exit(
+            f"models/ đang chứa mô hình {current} (huấn luyện trên dữ liệu thật). "
+            "Script này sẽ ghi đè bằng mô hình học từ dữ liệu tổng hợp; "
+            "thêm --force nếu thật sự muốn."
+        )
     write_missing()
     success_metrics = train_success_models()
-    fraud_metrics = train_fraud_model()
     write_success_metadata(success_metrics)
-    write_model_readme(success_metrics, fraud_metrics)
+    write_model_readme(success_metrics)
 
     lr = success_metrics["models"]["logistic_regression"]
     rf = success_metrics["models"]["random_forest"]
@@ -284,11 +246,8 @@ def main() -> None:
           f"Precision={rf['precision']:.4f} Recall={rf['recall']:.4f}")
     print(f"Model được chọn: {success_metrics['best_model']} "
           f"(ROC-AUC={chosen['roc_auc']:.4f}, F1={chosen['f1']:.4f})")
-    print(f"Dữ liệu fraud: {fraud_metrics['rows']} dòng, anomaly được phát hiện "
-          f"{fraud_metrics['detection_rate'] * 100:.1f}%, "
-          f"false positive {fraud_metrics['false_positive_rate'] * 100:.2f}%")
     print("Đã ghi: models/*.pkl, success_metrics.json, success_features.json, "
-          "success_model.metadata.json, fraud_metrics.json, README.json")
+          "success_model.metadata.json, README.json")
 
 
 if __name__ == "__main__":
