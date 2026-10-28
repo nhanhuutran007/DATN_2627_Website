@@ -11,6 +11,10 @@ export type MyProfile = {
   bio?: string | null;
   phone?: string | null;
   organization?: string | null;
+  /** Liên hệ công khai cho nút "Liên hệ" ở trang dự án. */
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  contactAddress?: string | null;
   createdAt: string;
 };
 
@@ -20,6 +24,9 @@ export type ProfileUpdate = {
   bio: string;
   phone: string;
   organization: string;
+  contactEmail: string;
+  contactPhone: string;
+  contactAddress: string;
 };
 
 export function fetchMyProfile(): Promise<MyProfile> {

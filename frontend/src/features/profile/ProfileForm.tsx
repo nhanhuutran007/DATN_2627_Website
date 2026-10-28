@@ -20,6 +20,7 @@ const ROLE_LABEL: Record<MyProfile["role"], string> = {
 };
 
 const PHONE_PATTERN = /^\+?[0-9 .-]{8,20}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BIO_MAX = 500;
 
 function toForm(profile: MyProfile): ProfileUpdate {
@@ -29,6 +30,9 @@ function toForm(profile: MyProfile): ProfileUpdate {
     bio: profile.bio ?? "",
     phone: profile.phone ?? "",
     organization: profile.organization ?? "",
+    contactEmail: profile.contactEmail ?? "",
+    contactPhone: profile.contactPhone ?? "",
+    contactAddress: profile.contactAddress ?? "",
   };
 }
 
@@ -42,6 +46,9 @@ function validate(form: ProfileUpdate): FieldErrors {
   if (form.phone.trim() && !PHONE_PATTERN.test(form.phone.trim())) errors.phone = "Số điện thoại chưa đúng định dạng (8–20 chữ số).";
   if (form.organization.trim().length > 255) errors.organization = "Tên tổ chức tối đa 255 ký tự.";
   if (form.bio.trim().length > BIO_MAX) errors.bio = `Giới thiệu tối đa ${BIO_MAX} ký tự.`;
+  if (form.contactEmail.trim() && !EMAIL_PATTERN.test(form.contactEmail.trim())) errors.contactEmail = "Email chưa đúng định dạng.";
+  if (form.contactPhone.trim() && !PHONE_PATTERN.test(form.contactPhone.trim())) errors.contactPhone = "Số điện thoại chưa đúng định dạng (8–20 chữ số).";
+  if (form.contactAddress.trim().length > 300) errors.contactAddress = "Địa chỉ tối đa 300 ký tự.";
   return errors;
 }
 
@@ -134,16 +141,21 @@ type ProfileViewProps = {
   aiUser: ReturnType<typeof useAuthUser>;
 };
 
-type EditableField = "name" | "organization" | "phone" | "bio";
+type EditableField = "name" | "organization" | "phone" | "bio" | "contactEmail" | "contactPhone" | "contactAddress";
+
+const PUBLIC_CONTACT_HINT = "Công khai: hiện khi người đã đăng nhập bấm \"Liên hệ\" ở trang dự án của bạn. Để trống nếu không muốn công khai.";
 
 const FIELDS: Record<EditableField, { label: string; empty: string; hint?: string; maxLength: number; autoComplete?: string; type?: string; multiline?: boolean; placeholder?: string }> = {
   name: { label: "Họ tên", empty: "", maxLength: 100, autoComplete: "name", hint: "Hiển thị với cộng đồng khi bạn tạo chiến dịch, ủng hộ hoặc bình luận." },
   organization: { label: "Tổ chức / nhóm", empty: "Chưa có tổ chức", maxLength: 255, autoComplete: "organization", placeholder: "VD: CLB Tình nguyện Xanh" },
   phone: { label: "Số điện thoại", empty: "Chưa có số điện thoại", maxLength: 20, autoComplete: "tel", type: "tel", placeholder: "VD: 0912 345 678", hint: "Riêng tư: chỉ bạn và quản trị viên thấy." },
   bio: { label: "Giới thiệu ngắn", empty: "Thêm vài dòng giới thiệu về bạn", maxLength: BIO_MAX, multiline: true, placeholder: "Bạn là ai, quan tâm tới lĩnh vực nào…" },
+  contactEmail: { label: "Email liên hệ công khai", empty: "Chưa công khai", maxLength: 255, autoComplete: "email", type: "email", placeholder: "VD: lienhe@duan.vn", hint: PUBLIC_CONTACT_HINT },
+  contactPhone: { label: "Điện thoại liên hệ công khai", empty: "Chưa công khai", maxLength: 20, autoComplete: "tel", type: "tel", placeholder: "VD: 0912 345 678", hint: PUBLIC_CONTACT_HINT },
+  contactAddress: { label: "Địa chỉ liên hệ công khai", empty: "Chưa công khai", maxLength: 300, autoComplete: "street-address", placeholder: "VD: 12 Lê Lợi, TP. Huế", hint: PUBLIC_CONTACT_HINT },
 };
 
-const FIELD_ORDER: EditableField[] = ["name", "organization", "phone", "bio"];
+const FIELD_ORDER: EditableField[] = ["name", "organization", "phone", "bio", "contactEmail", "contactPhone", "contactAddress"];
 
 function ProfileView({ profile, onSaved, aiUser }: ProfileViewProps) {
   const router = useRouter();
@@ -175,6 +187,9 @@ function ProfileView({ profile, onSaved, aiUser }: ProfileViewProps) {
         bio: next.bio.trim(),
         phone: next.phone.trim(),
         organization: next.organization.trim(),
+        contactEmail: next.contactEmail.trim(),
+        contactPhone: next.contactPhone.trim(),
+        contactAddress: next.contactAddress.trim(),
       });
       setSaved(toForm(result));
       onSaved(result);

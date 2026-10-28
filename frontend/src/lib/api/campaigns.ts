@@ -130,6 +130,17 @@ export type CampaignQuery = {
   offset?: number;
 };
 
+/** Liên hệ công khai của chiến dịch (nút "Liên hệ"); trường null = người tổ chức chưa công khai. */
+export type CampaignContact = {
+  owner: { name: string; email: string | null; phone: string | null; address: string | null };
+  organization: { name: string; slug: string; email: string; phone: string; address: string; website: string | null } | null;
+};
+
+/** Cần đăng nhập; máy chủ giới hạn 20 lần/phút. */
+export function fetchCampaignContact(campaignId: string): Promise<CampaignContact> {
+  return api.get<CampaignContact>(`/campaigns/${encodeURIComponent(campaignId)}/contact`);
+}
+
 export async function fetchCampaigns(query: CampaignQuery = {}): Promise<CampaignListResponse> {
   const params = toParams(query);
   return api.get<CampaignListResponse>(`/campaigns${params ? `?${params}` : ""}`);
