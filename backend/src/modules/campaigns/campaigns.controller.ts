@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 
+import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.module";
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { NonAdminGuard } from "../auth/guards/non-admin.guard";
@@ -48,6 +49,14 @@ export class CampaignsController {
   @Get("stats")
   stats() {
     return this.campaignsService.getPlatformStats();
+  }
+
+  /** Nút "Liên hệ": phải đăng nhập và giới hạn tần suất để hạn chế dò quét thông tin liên hệ. */
+  @Get(":id/contact")
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 20, windowMs: 60_000, keyPrefix: "campaign-contact" })
+  contact(@Param("id", ParseUUIDPipe) id: string) {
+    return this.campaignsService.getContact(id);
   }
 
   @Get(":id")

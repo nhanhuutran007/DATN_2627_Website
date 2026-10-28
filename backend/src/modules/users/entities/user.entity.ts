@@ -60,6 +60,22 @@ export class User extends BaseEntity {
   @Column({ length: 255, nullable: true })
   organization?: string;
 
+  /**
+   * Liên hệ công khai do chủ dự án tự điền, chỉ hiện khi người đã đăng nhập bấm "Liên hệ" ở trang dự án
+   * (`GET /campaigns/:id/contact`); không kèm trong dữ liệu chiến dịch công khai.
+   */
+  @Expose({ groups: [USER_PRIVATE_GROUP] })
+  @Column({ name: "contact_email", type: "varchar", length: 255, nullable: true })
+  contactEmail?: string | null;
+
+  @Expose({ groups: [USER_PRIVATE_GROUP] })
+  @Column({ name: "contact_phone", type: "varchar", length: 30, nullable: true })
+  contactPhone?: string | null;
+
+  @Expose({ groups: [USER_PRIVATE_GROUP] })
+  @Column({ name: "contact_address", type: "varchar", length: 300, nullable: true })
+  contactAddress?: string | null;
+
   @Column({ name: "email_verified", default: false })
   emailVerified!: boolean;
 

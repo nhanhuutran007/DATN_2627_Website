@@ -2499,6 +2499,51 @@ paths:
           $ref: "#/components/responses/NotFound"
         "429":
           description: Vượt giới hạn tần suất
+  /campaigns/{id}/contact:
+    get:
+      operationId: getCampaignContact
+      summary: Thông tin liên hệ của chiến dịch đã công khai (nút "Liên hệ")
+      description: >-
+        Chỉ gồm liên hệ chủ dự án tự công khai trong Cài đặt (`contactEmail`, `contactPhone`,
+        `contactAddress`; không phải email đăng nhập hay số điện thoại tài khoản) và liên hệ của
+        tổ chức thụ hưởng nếu tổ chức còn `verified`. Trường null = chưa công khai. Phải đăng nhập;
+        rate limit 20 yêu cầu/phút. Chiến dịch chưa công khai trả 404.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Thông tin liên hệ
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [owner, organization]
+                properties:
+                  owner:
+                    type: object
+                    required: [name, email, phone, address]
+                    properties:
+                      name: { type: string }
+                      email: { type: [string, "null"] }
+                      phone: { type: [string, "null"] }
+                      address: { type: [string, "null"] }
+                  organization:
+                    type: [object, "null"]
+                    properties:
+                      name: { type: string }
+                      slug: { type: string }
+                      email: { type: string }
+                      phone: { type: string }
+                      address: { type: string }
+                      website: { type: [string, "null"] }
+        "401":
+          description: Chưa đăng nhập
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          description: Vượt giới hạn tần suất
   /campaigns/{id}/follow:
     get:
       operationId: getCampaignFollowStatus
@@ -3361,6 +3406,16 @@ components:
         organization:
           type: string
           nullable: true
+        contactEmail:
+          type: string
+          nullable: true
+          description: Liên hệ công khai (chỉ có ở API của chính chủ/admin; người khác xem qua `GET /campaigns/{id}/contact`)
+        contactPhone:
+          type: string
+          nullable: true
+        contactAddress:
+          type: string
+          nullable: true
         emailVerified:
           type: boolean
         aiTrackingConsent:
@@ -3392,6 +3447,18 @@ components:
         organization:
           type: string
           maxLength: 255
+        contactEmail:
+          type: string
+          maxLength: 255
+          description: Email liên hệ công khai cho nút "Liên hệ" ở trang dự án; rỗng = không công khai
+        contactPhone:
+          type: string
+          description: Điện thoại liên hệ công khai; rỗng hoặc cùng định dạng với `phone`
+          pattern: "^$|^\\+?[0-9 .-]{8,20}$"
+        contactAddress:
+          type: string
+          maxLength: 300
+          description: Địa chỉ liên hệ công khai; rỗng = không công khai
         avatar:
           type: string
           maxLength: 255

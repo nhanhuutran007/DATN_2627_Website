@@ -12,7 +12,7 @@ import { AuditService, truncateForAudit } from "../../common/audit/audit.service
 import { sanitizeRichText } from "../../common/html/rich-text";
 import { RefundRequest, RefundRequestStatus } from "../finance/entities/refund-request.entity";
 import { NotificationsService } from "../notifications/notifications.service";
-import { OrganizationStatus } from "../organizations/entities/organization.entity";
+import { Organization, OrganizationStatus } from "../organizations/entities/organization.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import { campaignStatusNotifications } from "./campaign-notifications";
 import {
@@ -29,6 +29,12 @@ const PUBLIC_STATUSES = [
   CampaignStatus.SUCCESS,
   CampaignStatus.ENDED,
 ];
+
+/** Thông tin liên hệ của một chiến dịch công khai (nút "Liên hệ"); trường rỗng = chưa công khai. */
+export type CampaignContact = {
+  owner: { name: string; email: string | null; phone: string | null; address: string | null };
+  organization: { name: string; slug: string; email: string; phone: string; address: string; website: string | null } | null;
+};
 
 const OWNER_EDITABLE_STATUSES = [
   CampaignStatus.DRAFT,
@@ -263,6 +269,38 @@ export class CampaignsService {
       throw new NotFoundException("Campaign not found");
     }
     return campaign;
+  }
+
+  /**
+   * Liên hệ của chiến dịch đã công khai: phần chủ dự án tự công khai trong Cài đặt (không phải email đăng nhập
+   * hay số điện thoại tài khoản) và liên hệ của tổ chức thụ hưởng nếu tổ chức còn được xác minh.
+   */
+  async getContact(id: string): Promise<CampaignContact> {
+    const campaign = await this.campaignRepo.findOne({ where: { id }, relations: { owner: true, organization: true } });
+    if (!campaign || !PUBLIC_STATUSES.includes(campaign.status)) {
+      throw new NotFoundException("Campaign not found");
+    }
+    const owner = campaign.owner;
+    const organization = campaign.organization as Organization | null | undefined;
+    return {
+      owner: {
+        name: owner.name,
+        email: owner.contactEmail || null,
+        phone: owner.contactPhone || null,
+        address: owner.contactAddress || null,
+      },
+      organization:
+        organization && organization.status === OrganizationStatus.VERIFIED
+          ? {
+              name: organization.name,
+              slug: organization.slug,
+              email: organization.email,
+              phone: organization.phone,
+              address: organization.address,
+              website: organization.website ?? null,
+            }
+          : null,
+    };
   }
 
   /** Ngày kết thúc phải cách hiện tại ít nhất 1 tháng (cho phép lệch 1 ngày do múi giờ). */

@@ -14,6 +14,7 @@ import { WordsOfSupport } from "@/features/donations/WordsOfSupport";
 import { FollowCampaignButton } from "@/features/follows/FollowCampaignButton";
 import { MilestoneRevisions } from "@/features/progress/MilestoneRevisions";
 import { ProgressTimeline } from "@/features/progress/ProgressTimeline";
+import { ContactOrganizerButton } from "@/features/campaigns/ContactOrganizerButton";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ShareSpread } from "@/features/follows/ShareSpread";
 import { CampaignViewTracker } from "@/features/campaign-stats/CampaignViewTracker";
@@ -211,10 +212,11 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               )}
             </CollapsibleStory>
 
-            {open && published && (
+            {published && (
               <div className="detail-actions">
-                <DonateLink className="button button-primary" href={donateHref}>Ủng hộ</DonateLink>
+                {open && <DonateLink className="button button-primary" href={donateHref}>Ủng hộ</DonateLink>}
                 <ShareCampaignButton campaignId={campaign.slug} title={campaign.title} />
+                <ContactOrganizerButton campaignId={campaign.slug} />
               </div>
             )}
           </section>

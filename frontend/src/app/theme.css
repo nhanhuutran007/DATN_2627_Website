@@ -7284,9 +7284,92 @@ html:has(dialog:modal) .admin-sidebar {
 
 .detail-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   gap: 12px;
   margin-top: 24px;
+}
+
+/* Hộp "Liên hệ người tổ chức" (dùng khung của hộp Chia sẻ nhanh) */
+.contact-sections {
+  display: grid;
+  gap: 20px;
+}
+
+.contact-sections h3 {
+  margin: 0 0 8px;
+}
+
+.contact-sections h3 a {
+  color: inherit;
+}
+
+.contact-sub {
+  margin: -4px 0 10px;
+  color: var(--success);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.contact-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.contact-row-icon {
+  display: grid;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--navy);
+  border-radius: 50%;
+  background: var(--soft);
+}
+
+.contact-row small {
+  display: block;
+  color: var(--text-2);
+  font-size: 0.78rem;
+}
+
+.contact-row a,
+.contact-row b {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.contact-warning {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--text-2);
+  border-radius: 12px;
+  background: var(--soft);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.contact-warning svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--success);
+}
+
+.contact-gate {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
 }
 
 .detail-actions > .button {
