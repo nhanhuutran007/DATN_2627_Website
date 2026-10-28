@@ -1,10 +1,11 @@
 """Fraud-detection service: business rules + optional machine-learning layer.
 
-The ML layer prefers a supervised classifier trained on labelled real transactions
+The ML layer is a supervised classifier trained on labelled real transactions
 (``models/fraud_classifier.pkl``, see ``notebooks/train_real_data_colab.ipynb``); its
 probability is turned into a risk percentile against the training score distribution
 (``models/fraud_score_reference.json``) because fraud is rare and raw probabilities stay
-small. Without those files the legacy IsolationForest + scaler artifacts are used.
+small. Without those files only the business rules score (``method="RULE"``): the old
+IsolationForest fallback was dropped because on real data it ranked no better than chance.
 """
 
 from __future__ import annotations
@@ -23,7 +24,12 @@ from app.core.config import settings
 from app.schemas.fraud import FraudReason, FraudResponse
 from app.services.catalog import FRAUD_FEATURES
 
-ML_SCALE = 10.0
+# Rules keep a graded score for every signal, but only a clearly elevated signal is
+# reported as a reason; otherwise "1 donation in the last hour" would read as
+# "donation frequency too high".
+REASON_MIN_SCORE = 0.3
+# The classifier is named as a reason when it ranks the entity in the riskiest 10%.
+MODEL_REASON_MIN_RISK = 0.9
 
 
 @dataclass(frozen=True)
@@ -41,20 +47,6 @@ def _as_finite(value: object) -> float | None:
     if result is None or not math.isfinite(result):
         return None
     return result
-
-
-@lru_cache(maxsize=8)
-def _load_fraud_artifacts(
-    model_path_str: str, scaler_path_str: str
-) -> tuple[Any | None, Any | None]:
-    try:
-        model = joblib.load(Path(model_path_str))
-        scaler = joblib.load(Path(scaler_path_str))
-        if not hasattr(model, "decision_function") or not hasattr(scaler, "transform"):
-            return None, None
-        return model, scaler
-    except Exception:
-        return None, None
 
 
 @lru_cache(maxsize=8)
@@ -159,17 +151,13 @@ def _apply_rules(features: dict[str, float]) -> list[RuleResult]:
 
 
 class FraudDetectorService:
-    """Combines trusted business rules with an optional anomaly-detection layer."""
+    """Combines trusted business rules with an optional supervised classifier."""
 
     def __init__(
         self,
-        model_path: Path | str | None = None,
-        scaler_path: Path | str | None = None,
         classifier_path: Path | str | None = None,
         reference_path: Path | str | None = None,
     ) -> None:
-        self._model_path = Path(model_path) if model_path else settings.fraud_model_path
-        self._scaler_path = Path(scaler_path) if scaler_path else settings.fraud_scaler_path
         self._classifier_path = (
             Path(classifier_path) if classifier_path else settings.fraud_classifier_path
         )
@@ -182,7 +170,7 @@ class FraudDetectorService:
     ) -> FraudResponse:
         rule_results = _apply_rules(features)
         rule_score = max((result.score for result in rule_results), default=0.0)
-        ml_risk = self._ml_risk(features)
+        ml_risk = self._classifier_risk(features)
 
         if ml_risk is not None:
             ensembled = 0.75 * rule_score + 0.25 * ml_risk
@@ -202,16 +190,22 @@ class FraudDetectorService:
         else:
             level = "LOW"
 
-        # Chỉ luật thực sự kích hoạt (điểm > 0) mới là nguyên nhân
-        reasons = sorted(
-            (
-                FraudReason(group=result.group, label=result.label, weight=round(result.score, 6))
-                for result in rule_results
-                if result.score > 0
-            ),
-            key=lambda reason: reason.weight,
-            reverse=True,
-        )
+        # Chỉ luật có tín hiệu rõ (điểm >= REASON_MIN_SCORE) mới được nêu là nguyên nhân
+        reasons = [
+            FraudReason(group=result.group, label=result.label, weight=round(result.score, 6))
+            for result in rule_results
+            if result.score >= REASON_MIN_SCORE
+        ]
+        if ml_risk is not None and ml_risk >= MODEL_REASON_MIN_RISK:
+            top_percent = max(1, round((1.0 - ml_risk) * 100))
+            reasons.append(
+                FraudReason(
+                    group="ML_CLASSIFIER",
+                    label=f"Mô hình học máy xếp vào nhóm {top_percent}% rủi ro cao nhất",
+                    weight=round(ml_risk, 6),
+                )
+            )
+        reasons.sort(key=lambda reason: reason.weight, reverse=True)
         evidences = {name: value for name, value in features.items() if self._nonzero(name, value)}
 
         return FraudResponse(
@@ -222,12 +216,6 @@ class FraudDetectorService:
             evidences=evidences,
             fallback=fallback,
         )
-
-    def _ml_risk(self, features: dict[str, float]) -> float | None:
-        classifier_risk = self._classifier_risk(features)
-        if classifier_risk is not None:
-            return classifier_risk
-        return self._isolation_risk(features)
 
     def _classifier_risk(self, features: dict[str, float]) -> float | None:
         model, reference = _load_classifier_artifacts(
@@ -250,31 +238,6 @@ class FraudDetectorService:
             # Phân vị rủi ro: giao dịch này rủi ro hơn bao nhiêu phần giao dịch lúc huấn luyện
             rank = float(np.searchsorted(reference, probability, side="right"))
             return max(0.0, min(1.0, rank / reference.size))
-        except Exception:
-            return None
-
-    def _isolation_risk(self, features: dict[str, float]) -> float | None:
-        model, scaler = _load_fraud_artifacts(str(self._model_path), str(self._scaler_path))
-        if model is None:
-            return None
-        try:
-            # Đặc trưng thiếu lấy trung bình tập huấn luyện (trung tính sau chuẩn hóa); điền 0
-            # sẽ khiến vd. new_account_days thiếu bị coi là "tài khoản 0 ngày tuổi" -> bất thường.
-            means = getattr(scaler, "mean_", None)
-            vector = np.asarray(
-                [[
-                    value
-                    if (value := _as_finite(features.get(name))) is not None
-                    else (float(means[index]) if means is not None else 0.0)
-                    for index, name in enumerate(FRAUD_FEATURES)
-                ]],
-                dtype=float,
-            )
-            scaled = scaler.transform(vector)
-            decision = float(np.asarray(model.decision_function(scaled))[0])
-            if not math.isfinite(decision):
-                return None
-            return float(max(0.0, min(1.0, 1.0 / (1.0 + math.exp(decision * ML_SCALE)))))
         except Exception:
             return None
 

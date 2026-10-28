@@ -51,19 +51,15 @@ REFERENCE_HIGH: dict[str, float] = {
     "early_backers": 50.0,
 }
 
-# Heuristic fallback terms: (feature, coefficient, high_scale, note_if_up).
-# The raw feature value is normalized to 0..1 with high_scale; for goal_amount
-# the normalized "distance from huge goal" is used (1 - x / scale).
-HEURISTIC_TERMS: list[tuple[str, float, float, str]] = [
-    ("goal_amount", -0.10, 1_000_000_000.0, "Mục tiêu gây quỹ hợp lý hơn"),
-    ("duration_days", 0.10, 90.0, "Thời gian kêu gọi hợp lý giúp tăng khả năng thành công"),
-    ("profile_score", 0.30, 100.0, "Hồ sơ đầy đủ giúp tăng uy tín"),
-    ("image_count", 0.20, 8.0, "Nhiều hình ảnh giúp dự án hấp dẫn hơn"),
-    ("has_budget_report", 0.10, 1.0, "Báo cáo ngân sách giúp tăng niềm tin nhà đầu tư"),
-    ("has_video", 0.10, 1.0, "Video giới thiệu giúp tăng khả năng thành công"),
-    ("owner_campaign_count", 0.05, 5.0, "Kinh nghiệm tạo dự án giúp tăng khả năng thành công"),
-    ("early_backers", 0.05, 20.0, "Ủng hộ ban đầu tích cực dự báo thành công"),
-]
+# Rule-of-thumb fallback used only when the trained model cannot be loaded. It starts
+# from the base success rate of the training data and shifts the log-odds by
+# hand-set amounts whose directions agree with the trained model (higher goal and
+# longer duration lower the odds) and with common crowdfunding guidance. These are
+# assumptions, not learned weights, so responses are marked ``fallback=True``.
+DEFAULT_BASE_RATE = 0.4
+REFERENCE_GOAL_VND = 100_000_000.0
+REFERENCE_DURATION_DAYS = 30.0
+HEURISTIC_PROBABILITY_BOUNDS = (0.02, 0.98)
 
 
 def _read_json_value(path: Path) -> object | None:
@@ -256,36 +252,22 @@ class PredictorService:
     def _heuristic_response(
         self, features: PredictFeatures, metrics: dict | None
     ) -> PredictResponse:
-        total = 0.0
-        contributions: list[tuple[str, float, str]] = []
-        for name, coefficient, scale, note_up in HEURISTIC_TERMS:
-            try:
-                raw = float(getattr(features, name, 0.0))
-            except (TypeError, ValueError):
-                raw = 0.0
-            if not math.isfinite(raw):
-                raw = 0.0
-            if name == "goal_amount":
-                term = 1.0 - max(0.0, min(raw / scale, 1.0))
-            else:
-                term = max(0.0, min(raw / scale, 1.0))
-            contribution = coefficient * term
-            total += contribution
-            direction = "UP" if contribution >= 0 else "DOWN"
-            note = note_up if direction == "UP" else "Giá trị thấp hơn làm giảm xác suất thành công"
-            contributions.append((name, contribution, note))
+        base_rate = self._base_rate(metrics)
+        terms = self._heuristic_terms(features)
+        log_odds = math.log(base_rate / (1.0 - base_rate)) + sum(adj for _, adj, _ in terms)
+        low, high = HEURISTIC_PROBABILITY_BOUNDS
+        probability = max(low, min(high, 1.0 / (1.0 + math.exp(-log_odds))))
 
-        probability = max(0.0, min(1.0, total))
         factors = [
             Factor(
                 feature=name,
                 label=FEATURE_LABELS.get(name, name),
-                direction="UP" if weight >= 0 else "DOWN",
-                weight=round(weight, 6),
+                direction="UP" if adj > 0 else "DOWN",
+                weight=round(adj, 6),
                 note=note,
             )
-            for name, weight, note in contributions
-            if weight != 0.0
+            for name, adj, note in terms
+            if adj != 0.0
         ]
         factors.sort(key=lambda factor: abs(factor.weight), reverse=True)
         return self._build_response(
@@ -295,6 +277,84 @@ class PredictorService:
             metrics=metrics,
             factors=factors[:TOP_FACTORS],
         )
+
+    @staticmethod
+    def _base_rate(metrics: dict | None) -> float:
+        dataset = metrics.get("dataset") if isinstance(metrics, dict) else None
+        rate = dataset.get("success_rate") if isinstance(dataset, dict) else None
+        try:
+            value = float(rate) if rate is not None else DEFAULT_BASE_RATE
+        except (TypeError, ValueError):
+            value = DEFAULT_BASE_RATE
+        return value if 0.05 <= value <= 0.95 else DEFAULT_BASE_RATE
+
+    @staticmethod
+    def _heuristic_terms(features: PredictFeatures) -> list[tuple[str, float, str]]:
+        """Log-odds shifts per feature: (feature, shift, note for this campaign)."""
+
+        def finite(value: object) -> float:
+            try:
+                result = float(value)
+            except (TypeError, ValueError):
+                return 0.0
+            return result if math.isfinite(result) else 0.0
+
+        def clip(value: float, low: float, high: float) -> float:
+            return max(low, min(high, value))
+
+        terms: list[tuple[str, float, str]] = []
+
+        goal = finite(features.goal_amount)
+        if goal > 0:
+            adj = clip(-0.5 * math.log10(goal / REFERENCE_GOAL_VND), -1.0, 0.75)
+            note = (
+                "Mục tiêu vừa sức so với các dự án tương tự"
+                if adj >= 0
+                else "Mục tiêu lớn làm giảm khả năng đạt đủ"
+            )
+            terms.append(("goal_amount", adj, note))
+
+        duration = finite(features.duration_days)
+        if duration > 0:
+            excess = (duration - REFERENCE_DURATION_DAYS) / REFERENCE_DURATION_DAYS
+            adj = clip(-0.4 * excess, -0.8, 0.2)
+            note = (
+                "Thời gian kêu gọi gọn giúp giữ đà ủng hộ"
+                if adj >= 0
+                else "Kêu gọi quá dài thường làm giảm động lực ủng hộ"
+            )
+            terms.append(("duration_days", adj, note))
+
+        profile = clip(finite(features.profile_score), 0.0, 100.0) / 100.0
+        terms.append((
+            "profile_score",
+            0.6 * (profile - 0.5),
+            "Hồ sơ đầy đủ giúp tăng uy tín" if profile >= 0.5 else "Hồ sơ còn thiếu thông tin",
+        ))
+
+        images = clip(finite(features.image_count), 0.0, 4.0)
+        terms.append((
+            "image_count",
+            0.3 * images / 4.0 - 0.1,
+            "Có ảnh thực tế minh họa dự án" if images >= 2 else "Còn ít hình ảnh minh họa",
+        ))
+
+        if features.has_video:
+            terms.append(("has_video", 0.25, "Có video giới thiệu"))
+        terms.append((
+            "has_budget_report",
+            0.2 if features.has_budget_report else -0.1,
+            "Có kế hoạch ngân sách theo mốc"
+            if features.has_budget_report
+            else "Chưa có kế hoạch ngân sách theo mốc",
+        ))
+        if features.owner_credential_approved:
+            terms.append(("owner_credential_approved", 0.1, "Chủ dự án đã xác minh tài khoản"))
+
+        backers = clip(finite(features.early_backers), 0.0, 10.0)
+        if backers > 0:
+            terms.append(("early_backers", 0.4 * backers / 10.0, "Đã có người ủng hộ ngay từ đầu"))
+        return terms
 
     def _build_response(
         self,

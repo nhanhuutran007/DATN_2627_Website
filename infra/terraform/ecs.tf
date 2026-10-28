@@ -178,7 +178,6 @@ resource "aws_ecs_task_definition" "ai_service" {
     essential = true
     environment = [
       { name = "APP_ENV", value = "production" },
-      { name = "AI_LOAD_MODEL", value = "true" },
       { name = "AI_API_KEY", value = var.ai_api_key },
     ]
     portMappings = [{

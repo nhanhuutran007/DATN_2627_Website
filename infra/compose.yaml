@@ -96,7 +96,6 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-development}
       AI_MODEL_PATH: ${AI_MODEL_PATH:-/app/models/success_model.pkl}
-      AI_LOAD_MODEL: ${AI_LOAD_MODEL:-false}
     ports:
       - "${AI_SERVICE_PORT:-8000}:8000"
     volumes:

@@ -4,16 +4,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.v1.router import api_router
-from app.core.config import settings
-from app.services.model_registry import ModelRegistry
+from app.services.model_status import collect_model_states
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    registry = ModelRegistry(settings.model_path)
-    if settings.load_model:
-        registry.load()
-    app.state.model_registry = registry
+    # Nạp sẵn mọi mô hình lúc khởi động để yêu cầu đầu tiên không phải chờ
+    collect_model_states()
     yield
 
 

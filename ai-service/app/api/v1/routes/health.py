@@ -1,17 +1,18 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 
 from app.schemas.health import HealthResponse
-from app.services.model_registry import ModelRegistry
+from app.services.model_status import collect_model_states
 
 router = APIRouter()
 
 
 @router.get("/health", response_model=HealthResponse)
-def get_health(request: Request) -> HealthResponse:
-    registry: ModelRegistry = request.app.state.model_registry
+def get_health() -> HealthResponse:
+    models = collect_model_states()
     return HealthResponse(
         service="ai-service",
         status="ok",
-        model_status=registry.status,
-        model_version=registry.version,
+        model_status="ready" if all(state.loaded for state in models.values()) else "degraded",
+        model_version=models["success_prediction"].version,
+        models=models,
     )

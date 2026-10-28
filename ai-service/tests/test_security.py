@@ -10,14 +10,10 @@ from app.main import app
 def _settings_with_key(key: str) -> Settings:
     return Settings(
         environment="test",
-        load_model=False,
         model_path=Path("models/success_model.pkl"),
         success_metrics_path=Path("models/success_metrics.json"),
         success_features_path=Path("models/success_features.json"),
-        recommender_index_path=Path("data/synthetic_campaigns.csv"),
         category_similarity_path=Path("models/category_similarity.json"),
-        fraud_model_path=Path("models/fraud_isolation.pkl"),
-        fraud_scaler_path=Path("models/fraud_scaler.pkl"),
         fraud_classifier_path=Path("models/fraud_classifier.pkl"),
         fraud_reference_path=Path("models/fraud_score_reference.json"),
         api_key=key,

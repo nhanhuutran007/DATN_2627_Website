@@ -1,8 +1,9 @@
 export type AiHealth = {
   service: string;
   status: string;
-  model_status: string;
+  model_status: "ready" | "degraded";
   model_version: string | null;
+  models: Record<string, { loaded: boolean; version: string | null; fallback: string }>;
 };
 
 export type CampaignFeature = {
