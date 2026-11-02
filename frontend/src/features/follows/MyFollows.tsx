@@ -80,7 +80,7 @@ export function MyFollows({ items, onRemove }: MyFollowsProps) {
                 </p>
                 <ProgressBar value={Math.min(percent, 100)} label={`Đạt ${percent}% mục tiêu`} />
                 <p className="activity-meta">
-                  <b className="num">{formatVnd(Number(item.campaign.currentAmount))}</b> / {formatVnd(Number(item.campaign.goalAmount))} · {percent}%
+                  <b className="num">{formatVnd(Number(item.campaign.currentAmount))}</b> / {formatVnd(Number(item.campaign.goalAmount))}
                 </p>
               </div>
               <div className="activity-side">

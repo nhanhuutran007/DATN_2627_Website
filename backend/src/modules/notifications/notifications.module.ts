@@ -5,6 +5,7 @@ import { Donation } from "../donations/entities/donation.entity";
 import { CampaignFollow } from "../follows/entities/campaign-follow.entity";
 import { User } from "../users/entities/user.entity";
 import { Notification } from "./entities/notification.entity";
+import { NotificationRetentionService } from "./notification-retention.service";
 import { NotificationsController } from "./notifications.controller";
 import { NotificationsService } from "./notifications.service";
 
@@ -13,7 +14,7 @@ import { NotificationsService } from "./notifications.service";
 @Module({
   imports: [TypeOrmModule.forFeature([Notification, Donation, User, CampaignFollow])],
   controllers: [NotificationsController],
-  providers: [NotificationsService],
+  providers: [NotificationsService, NotificationRetentionService],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

@@ -88,7 +88,7 @@ export function ProgressTimeline({ campaignId, initialSize = PAGE_SIZE, heading,
     const remaining = state.total - state.items.length;
     body = (
       <>
-        <ol className={organizer ? "timeline timeline-posts" : "timeline"}>
+        <ol className={organizer ? "timeline timeline-posts list-reveal" : "timeline list-reveal"}>
           {state.items.map((update) => <TimelineItem key={update.id} update={update} organizer={organizer} />)}
         </ol>
         {remaining > 0 && (

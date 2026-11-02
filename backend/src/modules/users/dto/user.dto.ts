@@ -58,6 +58,26 @@ export class UpdateUserDto {
   @MaxLength(255, { message: "Tên tổ chức tối đa 255 ký tự." })
   organization?: string;
 
+  /** Liên hệ công khai cho nút "Liên hệ" ở trang dự án; rỗng = không công khai. */
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(255, { message: "Email liên hệ tối đa 255 ký tự." })
+  @Matches(/^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: "Email liên hệ không hợp lệ." })
+  contactEmail?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @Matches(/^$|^\+?[0-9 .-]{8,20}$/, { message: "Số điện thoại liên hệ không hợp lệ." })
+  contactPhone?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(300, { message: "Địa chỉ liên hệ tối đa 300 ký tự." })
+  contactAddress?: string;
+
   /** Rỗng = gỡ ảnh đại diện. */
   @IsOptional()
   @ValidateIf((_, value) => value !== "")
