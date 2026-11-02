@@ -1560,15 +1560,33 @@ h3 {
   background: #232323;
 }
 
-/* Dải ảnh dự án đang gây quỹ (xem HeroMarquee): trôi chậm từ phải sang trái, mờ dần ở hai mép,
-   rê chuột/focus để dừng. Mỗi ảnh có lề phải riêng (không dùng gap) để trôi đúng nửa dải là liền mạch. */
+/* Dải ảnh dự án đang gây quỹ (xem HeroMarquee): JS cuộn chậm từ phải sang trái, mờ dần ở hai mép,
+   rê chuột/focus để dừng, nắm kéo hoặc vuốt để lướt. Mỗi ảnh có lề phải riêng (không dùng gap)
+   để cuộn đúng nửa dải là liền mạch. */
 .hero-marquee {
   --tile-height: clamp(200px, 22vw, 280px);
   width: 100%;
   margin: clamp(32px, 5vw, 64px) 0 0;
   padding-bottom: clamp(32px, 4vw, 72px);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  cursor: grab;
   mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.hero-marquee::-webkit-scrollbar {
+  display: none;
+}
+
+.hero-marquee.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.hero-marquee.is-dragging a {
+  cursor: grabbing;
 }
 
 .hero-marquee-track {
@@ -1577,23 +1595,6 @@ h3 {
   margin: 0;
   padding: 0;
   list-style: none;
-  animation: hero-marquee var(--marquee-duration, 60s) linear infinite;
-  will-change: transform;
-}
-
-.hero-marquee:hover .hero-marquee-track,
-.hero-marquee:focus-within .hero-marquee-track {
-  animation-play-state: paused;
-}
-
-@keyframes hero-marquee {
-  from {
-    transform: translateX(0);
-  }
-
-  to {
-    transform: translateX(-50%);
-  }
 }
 
 /* Mọi ảnh cùng một khung 4:3 cho đều mắt */
@@ -1666,16 +1667,6 @@ h3 {
   height: 100%;
   border-radius: inherit;
   background: var(--primary);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-marquee {
-    overflow-x: auto;
-  }
-
-  .hero-marquee-track {
-    animation: none;
-  }
 }
 
 @media (max-width: 700px) {
@@ -9924,9 +9915,101 @@ html:has(dialog:modal) .admin-sidebar {
   margin-top: 8px;
 }
 
+/* Nhóm cài đặt thành thẻ; màn hình rộng xếp 2 cột thẻ cạnh cột tiêu đề/tab để khỏi cuộn dài */
+.account-grid,
+.account-col {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+}
+
+.account-card {
+  padding: 24px 24px 4px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--white);
+}
+
+.account-card-title {
+  margin: 0 0 4px;
+  color: #232323;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.account-card .account-avatar {
+  padding-block: 16px 24px;
+}
+
+.account-card .account-row {
+  padding-block: 20px;
+}
+
+.account-card .account-rows > :last-child {
+  border-bottom: 0;
+}
+
+.account-card .account-foot {
+  margin: 0;
+  padding: 16px 0 20px;
+  border-top: 1px solid var(--line);
+  font-size: 0.92rem;
+}
+
+.account-card .account-foot:first-of-type:nth-child(2) {
+  border-top: 0;
+}
+
+@media (min-width: 900px) {
+  .account-wrap {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 48px;
+    align-items: start;
+    width: min(1180px, 100%);
+  }
+
+  .account-aside {
+    position: sticky;
+    top: 96px;
+  }
+
+  .account-aside .account-tabs {
+    flex-direction: column;
+    align-items: stretch;
+    margin: 24px 0 0;
+  }
+
+  .account-content {
+    min-width: 0;
+    max-width: 880px;
+  }
+
+  .account-card .account-avatar-circle {
+    width: 112px;
+    height: 112px;
+    font-size: 3rem;
+  }
+
+  .account-card .account-avatar-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
+@media (min-width: 1180px) {
+  .account-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 560px) {
   .account-page {
     padding-top: 32px;
+  }
+
+  .account-card {
+    padding: 20px 16px 0;
   }
 
   .account-row {

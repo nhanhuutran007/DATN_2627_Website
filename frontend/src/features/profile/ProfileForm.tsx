@@ -155,7 +155,10 @@ const FIELDS: Record<EditableField, { label: string; empty: string; hint?: strin
   contactAddress: { label: "Địa chỉ liên hệ công khai", empty: "Chưa công khai", maxLength: 300, autoComplete: "street-address", placeholder: "VD: 12 Lê Lợi, TP. Huế", hint: PUBLIC_CONTACT_HINT },
 };
 
-const FIELD_ORDER: EditableField[] = ["name", "organization", "phone", "bio", "contactEmail", "contactPhone", "contactAddress"];
+/** Thông tin cá nhân hiển thị trên hồ sơ. */
+const PERSONAL_FIELDS: EditableField[] = ["name", "organization", "phone", "bio"];
+/** Thông tin liên hệ người ủng hộ thấy trên trang chiến dịch. */
+const CONTACT_FIELDS: EditableField[] = ["contactEmail", "contactPhone", "contactAddress"];
 
 function ProfileView({ profile, onSaved, aiUser }: ProfileViewProps) {
   const router = useRouter();
@@ -277,159 +280,181 @@ function ProfileView({ profile, onSaved, aiUser }: ProfileViewProps) {
     }
   };
 
+  const renderField = (field: EditableField) => {
+    const meta = FIELDS[field];
+    const value = saved[field].trim();
+    const inputId = `account-${field}`;
+    return (
+      <section className="account-row" key={field} aria-labelledby={`${inputId}-label`}>
+        <div className="account-row-main">
+          <h3 id={`${inputId}-label`} className="account-label">{meta.label}</h3>
+          {editing === field ? (
+            <form className="account-edit" onSubmit={saveField} noValidate>
+              <label className="sr-only" htmlFor={inputId}>{meta.label}</label>
+              {meta.multiline ? (
+                <textarea
+                  id={inputId}
+                  rows={4}
+                  value={draft}
+                  maxLength={meta.maxLength}
+                  placeholder={meta.placeholder}
+                  aria-invalid={Boolean(fieldError)}
+                  autoFocus
+                  onChange={(event) => { setDraft(event.target.value); setFieldError(""); }}
+                />
+              ) : (
+                <input
+                  id={inputId}
+                  type={meta.type ?? "text"}
+                  value={draft}
+                  maxLength={meta.maxLength}
+                  autoComplete={meta.autoComplete}
+                  placeholder={meta.placeholder}
+                  aria-invalid={Boolean(fieldError)}
+                  autoFocus
+                  onChange={(event) => { setDraft(event.target.value); setFieldError(""); }}
+                />
+              )}
+              {meta.multiline && <small className="account-hint">{draft.trim().length}/{meta.maxLength}</small>}
+              {meta.hint && <small className="account-hint">{meta.hint}</small>}
+              {fieldError && <small className="field-error" role="alert">{fieldError}</small>}
+              <div className="account-edit-actions">
+                <button className="account-pill" type="button" disabled={busy} onClick={cancelEdit}>Hủy</button>
+                <button className="account-pill account-pill-solid" type="submit" disabled={busy}>{busy ? "Đang lưu…" : "Lưu"}</button>
+              </div>
+            </form>
+          ) : (
+            <p className={`account-value${value ? "" : " is-empty"}`}>{value || meta.empty}</p>
+          )}
+        </div>
+        {editing !== field && (
+          <button className="account-pill" type="button" disabled={busy || (editing !== null)} onClick={() => startEdit(field)}>
+            {value ? "Sửa" : "Thêm"}
+          </button>
+        )}
+      </section>
+    );
+  };
+
   const avatarUrl = saved.avatar ? resolveMediaUrl(saved.avatar) : "";
   const isAdmin = profile.role === "admin";
 
   return (
     <AccountShell active="account">
-      <section className="account-avatar" aria-labelledby="account-avatar-title">
-        <h2 id="account-avatar-title" className="account-label">Ảnh đại diện</h2>
-        <div className="account-avatar-body">
-          <div className={`account-avatar-circle${uploading ? " is-busy" : ""}`}>
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- ảnh người dùng tải lên, đường dẫn động
-              <img src={avatarUrl} alt={`Ảnh đại diện của ${saved.name}`} />
-            ) : (
-              <span aria-hidden="true">{initials(saved.name)}</span>
-            )}
-          </div>
-          <div className="account-avatar-actions">
-            <button className="account-pill" type="button" disabled={uploading || busy} onClick={() => fileRef.current?.click()}>
-              {uploading ? "Đang tải…" : avatarUrl ? "Đổi ảnh" : "Tải ảnh lên"}
-            </button>
-            {avatarUrl && (
-              <button className="account-pill account-pill-danger" type="button" disabled={uploading || busy} onClick={() => void removeAvatar()}>
-                Gỡ ảnh
-              </button>
-            )}
-          </div>
-          <input
-            ref={fileRef}
-            className="sr-only"
-            type="file"
-            accept={ACCEPTED_IMAGE_TYPES.join(",")}
-            tabIndex={-1}
-            aria-hidden="true"
-            onChange={onPickAvatar}
-          />
-        </div>
-      </section>
-
-      <div className="account-rows">
-        {FIELD_ORDER.map((field) => {
-          const meta = FIELDS[field];
-          const value = saved[field].trim();
-          const inputId = `account-${field}`;
-          return (
-            <section className="account-row" key={field} aria-labelledby={`${inputId}-label`}>
-              <div className="account-row-main">
-                <h2 id={`${inputId}-label`} className="account-label">{meta.label}</h2>
-                {editing === field ? (
-                  <form className="account-edit" onSubmit={saveField} noValidate>
-                    <label className="sr-only" htmlFor={inputId}>{meta.label}</label>
-                    {meta.multiline ? (
-                      <textarea
-                        id={inputId}
-                        rows={4}
-                        value={draft}
-                        maxLength={meta.maxLength}
-                        placeholder={meta.placeholder}
-                        aria-invalid={Boolean(fieldError)}
-                        autoFocus
-                        onChange={(event) => { setDraft(event.target.value); setFieldError(""); }}
-                      />
-                    ) : (
-                      <input
-                        id={inputId}
-                        type={meta.type ?? "text"}
-                        value={draft}
-                        maxLength={meta.maxLength}
-                        autoComplete={meta.autoComplete}
-                        placeholder={meta.placeholder}
-                        aria-invalid={Boolean(fieldError)}
-                        autoFocus
-                        onChange={(event) => { setDraft(event.target.value); setFieldError(""); }}
-                      />
-                    )}
-                    {meta.multiline && <small className="account-hint">{draft.trim().length}/{meta.maxLength}</small>}
-                    {meta.hint && <small className="account-hint">{meta.hint}</small>}
-                    {fieldError && <small className="field-error" role="alert">{fieldError}</small>}
-                    <div className="account-edit-actions">
-                      <button className="account-pill" type="button" disabled={busy} onClick={cancelEdit}>Hủy</button>
-                      <button className="account-pill account-pill-solid" type="submit" disabled={busy}>{busy ? "Đang lưu…" : "Lưu"}</button>
-                    </div>
-                  </form>
-                ) : (
-                  <p className={`account-value${value ? "" : " is-empty"}`}>{value || meta.empty}</p>
-                )}
+      <div className="account-grid">
+        <div className="account-col">
+          <div className="account-card">
+            <h2 className="account-card-title">Hồ sơ cá nhân</h2>
+            <section className="account-avatar" aria-labelledby="account-avatar-title">
+              <h3 id="account-avatar-title" className="account-label">Ảnh đại diện</h3>
+              <div className="account-avatar-body">
+                <div className={`account-avatar-circle${uploading ? " is-busy" : ""}`}>
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- ảnh người dùng tải lên, đường dẫn động
+                    <img src={avatarUrl} alt={`Ảnh đại diện của ${saved.name}`} />
+                  ) : (
+                    <span aria-hidden="true">{initials(saved.name)}</span>
+                  )}
+                </div>
+                <div className="account-avatar-actions">
+                  <button className="account-pill" type="button" disabled={uploading || busy} onClick={() => fileRef.current?.click()}>
+                    {uploading ? "Đang tải…" : avatarUrl ? "Đổi ảnh" : "Tải ảnh lên"}
+                  </button>
+                  {avatarUrl && (
+                    <button className="account-pill account-pill-danger" type="button" disabled={uploading || busy} onClick={() => void removeAvatar()}>
+                      Gỡ ảnh
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={fileRef}
+                  className="sr-only"
+                  type="file"
+                  accept={ACCEPTED_IMAGE_TYPES.join(",")}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  onChange={onPickAvatar}
+                />
               </div>
-              {editing !== field && (
-                <button className="account-pill" type="button" disabled={busy || (editing !== null)} onClick={() => startEdit(field)}>
-                  {value ? "Sửa" : "Thêm"}
-                </button>
-              )}
             </section>
-          );
-        })}
+            <div className="account-rows">{PERSONAL_FIELDS.map(renderField)}</div>
+          </div>
+        </div>
 
-        <section className="account-row is-readonly" aria-labelledby="account-email-label">
-          <div className="account-row-main">
-            <h2 id="account-email-label" className="account-label">Email</h2>
-            <p className="account-value">
-              {profile.email}{" "}
-              {profile.emailVerified ? (
-                <span className="tag tag-green">Đã xác minh</span>
-              ) : (
-                <span className="tag tag-amber">Chưa xác minh</span>
+        <div className="account-col">
+          <div className="account-card">
+            <h2 className="account-card-title">Liên hệ công khai</h2>
+            <div className="account-rows">{CONTACT_FIELDS.map(renderField)}</div>
+          </div>
+
+          <div className="account-card">
+            <h2 className="account-card-title">Đăng nhập và bảo mật</h2>
+            <div className="account-rows">
+              <section className="account-row is-readonly" aria-labelledby="account-email-label">
+                <div className="account-row-main">
+                  <h3 id="account-email-label" className="account-label">Email</h3>
+                  <p className="account-value">
+                    {profile.email}{" "}
+                    {profile.emailVerified ? (
+                      <span className="tag tag-green">Đã xác minh</span>
+                    ) : (
+                      <span className="tag tag-amber">Chưa xác minh</span>
+                    )}
+                  </p>
+                  <small className="account-hint">Email dùng để đăng nhập, không đổi được tại đây.</small>
+                </div>
+              </section>
+
+              <section className="account-row is-readonly" aria-labelledby="account-role-label">
+                <div className="account-row-main">
+                  <h3 id="account-role-label" className="account-label">Vai trò</h3>
+                  <p className="account-value">{ROLE_LABEL[profile.role]}</p>
+                  {memberSince(profile.createdAt) && <small className="account-hint">{memberSince(profile.createdAt)}</small>}
+                </div>
+              </section>
+
+              {isAdmin && (
+                <section className="account-row" aria-labelledby="account-admin-label">
+                  <div className="account-row-main">
+                    <h3 id="account-admin-label" className="account-label">Quyền quản trị</h3>
+                    <p className="account-value">Duyệt chiến dịch, xử lý báo cáo vi phạm, hoàn tiền và xem nhật ký kiểm toán.</p>
+                  </div>
+                  <Link className="account-pill" href="/admin">Mở trang quản trị</Link>
+                </section>
               )}
-            </p>
-            <small className="account-hint">Email dùng để đăng nhập, không đổi được tại đây.</small>
-          </div>
-        </section>
 
-        <section className="account-row is-readonly" aria-labelledby="account-role-label">
-          <div className="account-row-main">
-            <h2 id="account-role-label" className="account-label">Vai trò</h2>
-            <p className="account-value">{ROLE_LABEL[profile.role]}</p>
-            {memberSince(profile.createdAt) && <small className="account-hint">{memberSince(profile.createdAt)}</small>}
-          </div>
-        </section>
+              <section className="account-row" aria-labelledby="account-password-label">
+                <div className="account-row-main">
+                  <h3 id="account-password-label" className="account-label">Mật khẩu</h3>
+                  <p className="account-value account-secret" aria-label="Đã đặt mật khẩu">●●●●●●●●●●</p>
+                </div>
+                <Link className="account-pill" href="/doi-mat-khau">Đổi</Link>
+              </section>
 
-        {isAdmin && (
-          <section className="account-row" aria-labelledby="account-admin-label">
-            <div className="account-row-main">
-              <h2 id="account-admin-label" className="account-label">Quyền quản trị</h2>
-              <p className="account-value">Duyệt chiến dịch, xử lý báo cáo vi phạm, hoàn tiền và xem nhật ký kiểm toán.</p>
+              <section className="account-row" aria-labelledby="account-sessions-label">
+                <div className="account-row-main">
+                  <h3 id="account-sessions-label" className="account-label">Phiên đăng nhập</h3>
+                  <p className="account-value">Nghi lộ mật khẩu hoặc đã đăng nhập ở máy lạ? Đăng xuất khỏi mọi thiết bị.</p>
+                </div>
+                <button className="account-pill" type="button" onClick={() => void logoutEverywhere()}>Đăng xuất</button>
+              </section>
             </div>
-            <Link className="account-pill" href="/admin">Mở trang quản trị</Link>
-          </section>
-        )}
-
-        <section className="account-row" aria-labelledby="account-password-label">
-          <div className="account-row-main">
-            <h2 id="account-password-label" className="account-label">Mật khẩu</h2>
-            <p className="account-value account-secret" aria-label="Đã đặt mật khẩu">●●●●●●●●●●</p>
           </div>
-          <Link className="account-pill" href="/doi-mat-khau">Đổi</Link>
-        </section>
 
-        <section className="account-row" aria-labelledby="account-sessions-label">
-          <div className="account-row-main">
-            <h2 id="account-sessions-label" className="account-label">Phiên đăng nhập</h2>
-            <p className="account-value">Nghi lộ mật khẩu hoặc đã đăng nhập ở máy lạ? Đăng xuất khỏi mọi thiết bị.</p>
-          </div>
-          <button className="account-pill" type="button" onClick={() => void logoutEverywhere()}>Đăng xuất</button>
-        </section>
-
-        {aiUser && <AiConsentSettings user={aiUser} />}
+          {(aiUser || !isAdmin) && (
+            <div className="account-card">
+              <h2 className="account-card-title">Quyền riêng tư</h2>
+              {aiUser && <div className="account-rows"><AiConsentSettings user={aiUser} /></div>}
+              {!isAdmin && (
+                <p className="account-foot">
+                  Muốn khóa hoặc xóa tài khoản? Hãy liên hệ quản trị viên Góp Mầm. Xem thêm{" "}
+                  <Link href="/chinh-sach-bao-mat">Chính sách quyền riêng tư</Link>.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-
-      {!isAdmin && (
-        <p className="account-foot">
-          Muốn khóa hoặc xóa tài khoản? Hãy liên hệ quản trị viên Góp Mầm. Xem thêm{" "}
-          <Link href="/chinh-sach-bao-mat">Chính sách quyền riêng tư</Link>.
-        </p>
-      )}
 
       {toast && (
         <div className={`profile-toast ${toast.tone === "ok" ? "is-ok" : "is-error"}`} role={toast.tone === "ok" ? "status" : "alert"}>
