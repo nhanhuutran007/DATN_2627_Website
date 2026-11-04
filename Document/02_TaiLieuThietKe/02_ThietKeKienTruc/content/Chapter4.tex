@@ -60,9 +60,80 @@ Ba tác vụ định kỳ chạy trong process backend bằng \texttt{@nestjs/sc
     \end{tabularx}
 \end{table}
 
+\subsection{Luồng xử lý một yêu cầu từ giao diện tới cơ sở dữ liệu}\label{sec:luong_yeu_cau}
+
+Mọi thao tác của người dùng có ghi dữ liệu (theo dõi dự án, bình luận, ủng hộ, gửi duyệt chiến dịch\ldots) đều đi qua sáu bước như Hình~\ref{fig:luong_yeu_cau}. Bước 1--3 và bước 6 chạy trong trình duyệt; bước 4--5 chạy ở backend. Hai phía chỉ trao đổi với nhau qua HTTP. Riêng thao tác bấm liên kết chỉ đổi trang mà không qua bước 2--5; trang mới tự gọi API để lấy dữ liệu theo cùng các bước này.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{tikzpicture}[
+        font=\small,
+        >=stealth,
+        flowstep/.style={draw=black!70, rounded corners, align=left, minimum height=0.85cm, text width=10.4cm, inner sep=4pt},
+        bstep/.style={flowstep, draw=blue!65!black, fill=blue!7},
+        call/.style={->, draw=black!70}
+    ]
+        \node[flowstep] (s1) at (0,0) {\textbf{1. Component React} -- xử lý \texttt{onClick}/\texttt{onSubmit}, kiểm tra dữ liệu sơ bộ};
+        \node[flowstep] (s2) at (0,-1.25) {\textbf{2. Hàm trong \texttt{lib/api/}} -- soạn yêu cầu: phương thức, địa chỉ, dữ liệu};
+        \node[flowstep] (s3) at (0,-2.5) {\textbf{3. \texttt{apiFetch()}} -- gắn JWT, gửi HTTP, tự làm mới token khi gặp 401};
+        \node[bstep] (s4) at (0,-3.95) {\textbf{4. Controller} -- khớp địa chỉ, guard phân quyền, \texttt{ValidationPipe} kiểm DTO};
+        \node[bstep] (s5) at (0,-5.2) {\textbf{5. Service} -- quy tắc nghiệp vụ, đọc/ghi MySQL qua TypeORM};
+        \node[flowstep] (s6) at (0,-6.65) {\textbf{6. Component React} -- nhận JSON, cập nhật state, giao diện vẽ lại};
+        \draw[call] (s1) -- (s2);
+        \draw[call] (s2) -- (s3);
+        \draw[black!40, dashed] (-6.3,-3.22) -- (-0.3,-3.22);
+        \draw[black!40, dashed] (-6.3,-5.92) -- (-0.3,-5.92);
+        \draw[call] (s3) -- node[right, xshift=2pt] {\footnotesize HTTP \texttt{/api/v1/\ldots}} (s4);
+        \draw[call] (s4) -- (s5);
+        \draw[call] (s5) -- node[right, xshift=2pt] {\footnotesize JSON hoặc mã lỗi} (s6);
+        \node[font=\footnotesize, rotate=90] at (-6.0,-1.25) {Trình duyệt};
+        \node[font=\footnotesize, rotate=90] at (-6.0,-4.57) {Backend};
+        \node[font=\footnotesize, rotate=90] at (-6.0,-6.65) {Trình duyệt};
+    \end{tikzpicture}
+    \caption{Sáu bước xử lý một yêu cầu từ giao diện tới cơ sở dữ liệu}
+    \label{fig:luong_yeu_cau}
+\end{figure}
+
+Bảng~\ref{tab:vi_du_theo_doi} lần theo sáu bước khi người dùng bấm nút \emph{Theo dõi} trên trang chi tiết dự án.
+
+\begin{longtable}{|P{1.0cm}|P{5.0cm}|p{7.6cm}|}
+    \caption{Các bước xử lý khi bấm nút Theo dõi}
+    \label{tab:vi_du_theo_doi} \\
+    \hline
+    \textbf{Bước} & \textbf{File} & \textbf{Xử lý} \\
+    \hline
+    \endfirsthead
+    \hline
+    \textbf{Bước} & \textbf{File} & \textbf{Xử lý} \\
+    \hline
+    \endhead
+    1 & \texttt{frontend/src/features/follows/ FollowCampaignButton.tsx} & Hàm \texttt{toggle} khóa nút, chọn theo dõi hoặc bỏ theo dõi tùy trạng thái hiện tại \\
+    \hline
+    2 & \texttt{frontend/src/lib/api/ follows.ts} & \texttt{followCampaign(id)} tạo yêu cầu \texttt{POST /campaigns/:id/follow} \\
+    \hline
+    3 & \texttt{frontend/src/lib/api.ts} & \texttt{apiFetch()} gắn \texttt{Authorization: Bearer <token>} và gửi tới \texttt{/api/v1/campaigns/:id/follow} \\
+    \hline
+    4 & \texttt{backend/src/modules/follows/ follows.controller.ts} & \texttt{@Post("campaigns/:id/follow")} với \texttt{JwtAuthGuard} (phải đăng nhập), \texttt{NonAdminGuard} (không phải quản trị viên), \texttt{RateLimitGuard} (giới hạn tần suất); \texttt{ParseUUIDPipe} kiểm tra mã dự án \\
+    \hline
+    5 & \texttt{backend/src/modules/follows/ follows.service.ts} & \texttt{follow()} từ chối nếu người dùng là chủ dự án hoặc dự án đã kết thúc; chèn bản ghi vào bảng \texttt{campaign\_follows} bằng \texttt{INSERT IGNORE} để bấm hai lần không lỗi trùng khóa; trả về trạng thái theo dõi và số người theo dõi \\
+    \hline
+    6 & \texttt{FollowCampaignButton.tsx} & \texttt{setStatus(next)} cập nhật state; React vẽ lại nút thành \emph{Đang theo dõi} và số người theo dõi mới. Nếu có lỗi, \texttt{ApiError} được bắt và hiển thị dưới nút \\
+    \hline
+\end{longtable}
+
+Hàm \texttt{apiFetch()} ở bước 3 dùng chung cho mọi yêu cầu nên các hành vi sau áp dụng thống nhất trên toàn hệ thống:
+
+\begin{itemize}
+    \item \textbf{Access token hết hạn:} khi nhận mã 401, hàm dùng refresh token xin cặp token mới đúng một lần rồi gửi lại yêu cầu. Nhiều yêu cầu cùng gặp 401 chỉ dùng chung một lần làm mới. Làm mới thất bại thì xóa phiên đăng nhập.
+    \item \textbf{Thao tác nhạy cảm:} khi backend yêu cầu xác minh bổ sung, hàm xin mã OTP từ người dùng rồi gửi lại yêu cầu kèm mã đó.
+    \item \textbf{Lỗi nghiệp vụ:} các mã lỗi khác được chuyển thành \texttt{ApiError} có mã HTTP và thông báo, để component hiển thị cho người dùng.
+\end{itemize}
+
+Luồng ủng hộ ở Mục~\ref{sec:luong_tai_tro} cũng đi qua đúng sáu bước này. Điểm khác là bước 5 tách thành hai pha: tạo đơn ở trạng thái chờ thanh toán, sau đó chỉ cộng tiền khi cổng thanh toán xác nhận.
+
 \subsection{Luồng nghiệp vụ trọng tâm}
 
-\subsubsection{Tài trợ và xác nhận thanh toán}
+\subsubsection{Tài trợ và xác nhận thanh toán}\label{sec:luong_tai_tro}
 
 Đây là luồng quan trọng nhất về mặt kiến trúc vì liên quan trực tiếp tới tiền. Trình duyệt không bao giờ tự báo thanh toán thành công. Backend chỉ đổi trạng thái giao dịch sau khi xác minh lời gọi từ cổng thanh toán: chữ ký HMAC với ví demo, khóa \texttt{X-Secret-Key} và đối chiếu số tiền với IPN của SePay. Nếu IPN bị lỡ, backend tra cứu lại đơn qua API của SePay. Idempotency key ngăn tạo trùng giao dịch khi người dùng bấm gửi nhiều lần. Trình tự chi tiết được thể hiện trong Hình~\ref{fig:sd_tai_tro}.
 
@@ -123,6 +194,8 @@ Mọi kiểm tra quyền và trạng thái tiền đều nằm ở backend. Các
     Nội bộ & Dịch vụ AI yêu cầu header \texttt{X-AI-Key}, so sánh hằng thời gian; trên AWS chỉ load balancer được gọi vào các task \\
     \hline
     Dữ liệu cá nhân & Không trả \texttt{passwordHash} ra API; ảnh giấy phép tổ chức không lộ ra API công khai; hành vi chỉ được ghi khi người dùng đồng ý, rút lại thì xóa; file thống kê xuất ra đã ẩn danh \\
+    \hline
+    Giao diện & Tham số \texttt{next} sau đăng nhập chỉ nhận đường dẫn nội bộ (\texttt{safeNext()}) để chống chuyển hướng mở; trạng thái thanh toán sau khi quay về từ SePay được tải lại từ máy chủ, không đọc từ URL; việc ẩn nút chỉ phục vụ trải nghiệm, quyền được kiểm tra lại ở backend \\
     \hline
     Truy vết & Nhật ký kiểm toán ghi thời điểm, người thực hiện, giá trị trước và sau; \texttt{X-Request-ID} đi xuyên suốt từ reverse proxy \\
     \hline

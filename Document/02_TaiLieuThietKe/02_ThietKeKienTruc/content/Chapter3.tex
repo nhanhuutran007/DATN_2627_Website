@@ -4,29 +4,131 @@ Mỗi thành phần có vòng đời và Dockerfile riêng. Chỉ backend đư�
 
 \subsection{Frontend}
 
-Frontend dùng Next.js App Router. Trang công khai (trang chủ, danh sách và chi tiết dự án, trang tổ chức) được render phía máy chủ để hỗ trợ SEO, Open Graph, sitemap và JSON-LD; các trang tương tác (tạo chiến dịch, ủng hộ, quản trị) được render phía trình duyệt. Cấu trúc thư mục được trình bày trong Bảng~\ref{tab:frontend}.
+Frontend dùng Next.js App Router. Trang công khai (trang chủ, danh sách và chi tiết dự án, trang tổ chức) được render phía máy chủ để hỗ trợ SEO, Open Graph, sitemap và JSON-LD; các trang tương tác (tạo chiến dịch, ủng hộ, quản trị) được render phía trình duyệt.
+
+\subsubsection{Cấu trúc thư mục}
+
+Mã nguồn frontend nằm trong \texttt{frontend/src/} và chia thành bốn thư mục chính theo vai trò (Bảng~\ref{tab:frontend}).
 
 \begin{table}[htbp]
     \centering
     \small
     \caption{Cấu trúc thư mục frontend}
     \label{tab:frontend}
-    \begin{tabularx}{\textwidth}{|P{3.6cm}|X|}
+    \begin{tabularx}{\textwidth}{|P{3.0cm}|X|P{4.2cm}|}
         \hline
-        \textbf{Thư mục} & \textbf{Vai trò} \\
+        \textbf{Thư mục} & \textbf{Vai trò} & \textbf{Ví dụ} \\
         \hline
-        \texttt{src/app/} & Route theo URL tiếng Việt: \texttt{du-an}, \texttt{tim-kiem}, \texttt{tao-chien-dich}, \texttt{to-chuc}, \texttt{dashboard}, \texttt{admin}\ldots \\
+        \texttt{src/app/} & Định tuyến: mỗi thư mục con chứa \texttt{page.tsx} là một địa chỉ trang (URL tiếng Việt). Thư mục trong ngoặc vuông là phần thay đổi của URL. File ở đây chủ yếu lấy dữ liệu và ghép các thành phần từ \texttt{features/} & \texttt{du-an/[slug]/page.tsx} $\rightarrow$ \texttt{/du-an/<slug>}; \texttt{admin/[section]/} $\rightarrow$ \texttt{/admin/cho-duyet} \\
         \hline
-        \texttt{src/features/} & Mã giao diện theo nghiệp vụ, 21 nhóm: campaigns, donations, progress, organizations, admin\ldots \\
+        \texttt{src/features/} & Chức năng theo nghiệp vụ, 21 nhóm. Mỗi nhóm chứa form, nút, danh sách cùng state và xử lý sự kiện của nghiệp vụ đó & \texttt{donations/DonationPanel.tsx}, \texttt{follows/FollowCampaignButton.tsx} \\
         \hline
-        \texttt{src/components/} & Thành phần giao diện dùng chung \\
+        \texttt{src/components/} & Thành phần giao diện dùng chung, không gắn với một nghiệp vụ & \texttt{layout/SiteHeader.tsx}, \texttt{ui/Icon.tsx} \\
         \hline
-        \texttt{src/lib/} & API client, xác thực, định dạng tiền VND, chính sách mật khẩu \\
+        \texttt{src/lib/} & Mã không có giao diện: hàm gọi API, trạng thái đăng nhập, định dạng tiền VND và ngày, chính sách mật khẩu & \texttt{api.ts}, \texttt{api/donations.ts}, \texttt{auth.ts}, \texttt{format.ts} \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+Thư mục \texttt{src/lib/api/} có một file cho mỗi nhóm API của backend (\texttt{campaigns.ts}, \texttt{donations.ts}, \texttt{follows.ts}\ldots). Mọi file này đều gọi qua một hàm chung \texttt{apiFetch()} trong \texttt{src/lib/api.ts}. Hàm này gắn access token vào header, tự xin token mới khi nhận mã 401, và chuyển lỗi máy chủ thành \texttt{ApiError} để giao diện hiển thị.
+
+Tên nhóm trong \texttt{features/} khớp với tên module của backend, nên từ một chức năng trên giao diện có thể tìm ngay phần xử lý tương ứng ở máy chủ (Bảng~\ref{tab:fe_be_map}).
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Tương ứng giữa thư mục frontend và module backend}
+    \label{tab:fe_be_map}
+    \begin{tabularx}{\textwidth}{|P{2.6cm}|X|P{4.0cm}|}
+        \hline
+        \textbf{Nghiệp vụ} & \textbf{Frontend} & \textbf{Backend} \\
+        \hline
+        Xác thực & \texttt{features/auth/}, \texttt{lib/auth.ts} & \texttt{modules/auth/} \\
+        \hline
+        Chiến dịch & \texttt{features/campaigns/}, \texttt{features/campaign-create/}, \texttt{lib/api/campaigns.ts} & \texttt{modules/campaigns/} \\
+        \hline
+        Ủng hộ & \texttt{features/donations/}, \texttt{lib/api/donations.ts} & \texttt{modules/donations/} \\
+        \hline
+        Theo dõi & \texttt{features/follows/}, \texttt{lib/api/follows.ts} & \texttt{modules/follows/} \\
+        \hline
+        Bình luận & \texttt{features/comments/}, \texttt{lib/api/comments.ts} & \texttt{modules/comments/} \\
+        \hline
+        Tổ chức & \texttt{features/organizations/}, \texttt{lib/api/organizations.ts} & \texttt{modules/organizations/} \\
+        \hline
+        Tài chính & \texttt{features/finance/}, \texttt{lib/api/finance.ts} & \texttt{modules/finance/} \\
+        \hline
+        Quản trị & \texttt{features/admin/}, \texttt{lib/api/admin.ts} & \texttt{modules/admin/} \\
         \hline
     \end{tabularx}
 \end{table}
 
 Khi render phía máy chủ, frontend gọi thẳng backend trong mạng nội bộ qua biến \texttt{API\_INTERNAL\_URL}; trình duyệt gọi qua đường dẫn tương đối \texttt{/api/v1} đi qua reverse proxy.
+
+\subsubsection{Điều hướng và kiểm soát truy cập phía giao diện}
+
+Các trang được nối với nhau theo năm luồng chính (Hình~\ref{fig:dieu_huong}). Đầu header và cuối footer là các điểm vào chung của mọi luồng.
+
+\begin{figure}[htbp]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tikzpicture}[
+        font=\scriptsize,
+        >=stealth,
+        pg/.style={draw=black!70, rounded corners, align=center, minimum height=0.75cm, inner sep=3pt},
+        key/.style={pg, draw=blue!65!black, fill=blue!7},
+        gate/.style={pg, dashed, draw=black!60},
+        call/.style={->, draw=black!70}
+    ]
+        % Luồng ủng hộ
+        \node[pg] (home) at (0,0) {\texttt{/}\\Trang chủ};
+        \node[pg] (list) at (3.2,0.9) {\texttt{/du-an}\\\texttt{/tim-kiem}};
+        \node[key] (detail) at (6.6,0) {\texttt{/du-an/[slug]}\\Chi tiết dự án};
+        \node[key] (donate) at (10.2,0) {\texttt{/du-an/[slug]/ung-ho}\\Form ủng hộ};
+        \node[pg] (receipt) at (13.6,0) {\texttt{/bien-nhan/[id]}\\Biên nhận};
+        \node[gate] (login) at (10.2,-1.8) {\texttt{/dang-nhap?next=\ldots}};
+        \node[pg] (sepay) at (13.6,-1.8) {Trang QR SePay};
+        \draw[call] (home) -- (list);
+        \draw[call] (home) -- node[below] {băng chuyền} (detail);
+        \draw[call] (list) -- (detail);
+        \draw[call] (detail) -- (donate);
+        \draw[call] (donate) -- node[above] {ví demo} (receipt);
+        \draw[call] (donate) -- node[left] {chưa đăng nhập} (login);
+        \draw[call] (login.north east) to[bend right=20] (donate.south east);
+        \draw[call] (donate.east) ++(0,-0.2) -- (sepay.north west);
+        \draw[call] (sepay) -- node[right] {quay về} (receipt);
+
+        % Luồng tạo chiến dịch
+        \node[pg] (guide) at (0,-3.6) {\texttt{/bat-dau-gay-quy}};
+        \node[key] (wizard) at (3.6,-3.6) {\texttt{/tao-chien-dich}\\Wizard 8 bước};
+        \node[pg] (dash) at (7.2,-3.6) {\texttt{/dashboard}};
+        \node[pg] (review) at (10.6,-3.6) {\texttt{/admin/cho-duyet}};
+        \draw[call] (guide) -- (wizard);
+        \draw[call] (wizard) -- node[above] {gửi duyệt} (dash);
+        \draw[call] (dash) -- node[above] {chờ duyệt} (review);
+        \draw[call] (review.north) |- node[pos=0.75, above] {duyệt: công khai} (detail.south |- 0,-2.7) -- (detail.south);
+
+        % Luồng tổ chức
+        \node[pg] (fororg) at (0,-5.4) {\texttt{/danh-cho-to-chuc}};
+        \node[key] (orgreg) at (3.6,-5.4) {\texttt{/to-chuc/dang-ky}};
+        \node[pg] (myorg) at (7.2,-5.4) {\texttt{/to-chuc/cua-toi}};
+        \node[pg] (orgpage) at (10.6,-5.4) {\texttt{/to-chuc/[slug]}};
+        \draw[call] (fororg) -- (orgreg);
+        \draw[call] (orgreg) -- (myorg);
+        \draw[call] (myorg) -- (orgpage);
+    \end{tikzpicture}%
+    }
+    \caption{Sơ đồ điều hướng giữa các trang chính}
+    \label{fig:dieu_huong}
+\end{figure}
+
+Giao diện áp dụng hai quy tắc điều hướng chung cho mọi luồng:
+
+\begin{itemize}
+    \item \textbf{Chuyển sang đăng nhập rồi quay lại:} thao tác cần tài khoản (ủng hộ, theo dõi, bình luận, báo cáo vi phạm, tạo chiến dịch) chuyển người dùng sang \texttt{/dang-nhap?next=<trang hiện tại>}. Đăng nhập xong, người dùng được đưa về đúng trang cũ. Hàm \texttt{safeNext()} chỉ chấp nhận đường dẫn nội bộ bắt đầu bằng \texttt{/} và từ chối \texttt{//host} hay \texttt{https://\ldots}, nhằm chống lỗ hổng chuyển hướng mở (open redirect).
+    \item \textbf{Tài khoản quản trị chỉ làm việc trong \texttt{/admin}:} quản trị viên đăng nhập luôn được đưa vào \texttt{/admin} và bỏ qua tham số \texttt{next}. Khi mở trang dành cho người dùng thường (\texttt{/tao-chien-dich}, \texttt{/dashboard}, \texttt{/to-chuc/dang-ky}, \texttt{/to-chuc/cua-toi}), hook \texttt{useRedirectAdmin()} chuyển họ về \texttt{/admin}. Header của quản trị viên cũng không hiện mục tạo chiến dịch.
+\end{itemize}
+
+Các quy tắc trên chỉ giúp giao diện gọn và đúng ngữ cảnh. Quyền thật sự được kiểm tra lại ở backend bằng guard (Mục~\ref{sec:giao_tiep_bao_mat}): ví dụ \texttt{NonAdminGuard} từ chối yêu cầu ủng hộ hay theo dõi của quản trị viên dù yêu cầu đó được gửi từ đâu.
 
 \subsection{Backend}
 
@@ -55,6 +157,62 @@ Backend NestJS chia theo module nghiệp vụ. Mỗi module tổ chức theo b�
     \caption{Kiến trúc phân lớp bên trong một module backend}
     \label{fig:phan_lop_backend}
 \end{figure}
+
+\subsubsection{Cấu trúc thư mục}
+
+Mã nguồn backend nằm trong \texttt{backend/src/} (Bảng~\ref{tab:backend_dir}). Ngoài \texttt{src/}, thư mục \texttt{backend/database/migrations/} chứa các bước tạo và sửa bảng theo thứ tự, còn \texttt{backend/test/} chứa kiểm thử tự động.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Cấu trúc thư mục backend}
+    \label{tab:backend_dir}
+    \begin{tabularx}{\textwidth}{|P{3.6cm}|X|}
+        \hline
+        \textbf{Thư mục, file} & \textbf{Vai trò} \\
+        \hline
+        \texttt{main.ts} & Điểm khởi động: tạo ứng dụng, đặt tiền tố \texttt{/api/v1}, bật \texttt{ValidationPipe}, helmet, CORS \\
+        \hline
+        \texttt{app.module.ts} & Module gốc, khai báo mọi module nghiệp vụ và kết nối cơ sở dữ liệu \\
+        \hline
+        \texttt{modules/} & 18 module nghiệp vụ (Bảng~\ref{tab:module_backend}) \\
+        \hline
+        \texttt{common/} & Thành phần dùng chung: nhật ký kiểm toán, giới hạn tần suất, decorator, filter, interceptor, validator \\
+        \hline
+        \texttt{integrations/} & Gateway tới dịch vụ bên ngoài: thanh toán, email, lưu trữ, Google, AI (Mục~\ref{sec:tich_hop}) \\
+        \hline
+        \texttt{config/} & Đọc biến môi trường thành cấu hình ứng dụng, cơ sở dữ liệu và AI \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+Mọi module trong \texttt{modules/} theo cùng một khuôn file, ứng với các lớp ở Hình~\ref{fig:phan_lop_backend}. Bảng~\ref{tab:module_files} lấy module \texttt{donations} làm ví dụ.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Các file trong một module backend (ví dụ module \texttt{donations})}
+    \label{tab:module_files}
+    \begin{tabularx}{\textwidth}{|P{4.6cm}|P{2.0cm}|X|}
+        \hline
+        \textbf{File} & \textbf{Lớp} & \textbf{Vai trò} \\
+        \hline
+        \texttt{donations.controller.ts} & Controller & Khai báo địa chỉ API (\texttt{@Post}, \texttt{@Get}), gắn guard phân quyền, nhận DTO đã kiểm tra rồi gọi service \\
+        \hline
+        \texttt{donations.service.ts} & Service & Quy tắc nghiệp vụ: kiểm tra điều kiện, giao dịch cơ sở dữ liệu, ghi nhật ký kiểm toán, gửi thông báo \\
+        \hline
+        \texttt{dto/donation.dto.ts} & DTO & Mô tả dữ liệu đầu vào hợp lệ (kiểu, độ dài, giá trị cho phép) bằng class-validator \\
+        \hline
+        \texttt{entities/donation.entity.ts} & Entity & Ánh xạ bảng \texttt{donations} trong MySQL: cột, kiểu, quan hệ \\
+        \hline
+        \texttt{donations.module.ts} & -- & Gom controller, service, entity và khai báo phụ thuộc với NestJS \\
+        \hline
+        \texttt{sepay-ipn.controller.ts}, \texttt{donation-expiry.service.ts} & Controller, Service & File riêng cho phần đặc thù của module: nhận IPN SePay, tác vụ định kỳ hết hạn đơn chờ \\
+        \hline
+    \end{tabularx}
+\end{table}
+
+Guard dùng chung cho mọi module nằm trong \texttt{modules/auth/guards/}: \texttt{JwtAuthGuard} yêu cầu đăng nhập, \texttt{OptionalJwtAuthGuard} nhận cả khách lẫn người đã đăng nhập, \texttt{NonAdminGuard} từ chối tài khoản quản trị ở các thao tác dành cho người dùng thường, \texttt{RolesGuard} kiểm tra vai trò, \texttt{StepUpGuard} yêu cầu mã OTP trước thao tác nhạy cảm.
 
 \subsubsection{Các module nghiệp vụ}
 
@@ -144,6 +302,36 @@ Dịch vụ AI chỉ làm nhiệm vụ suy luận. Việc huấn luyện chạy 
     \end{tabularx}
 \end{table}
 
+Cấu trúc thư mục của dịch vụ AI được trình bày trong Bảng~\ref{tab:ai_dir}.
+
+\begin{table}[htbp]
+    \centering
+    \small
+    \caption{Cấu trúc thư mục dịch vụ AI}
+    \label{tab:ai_dir}
+    \begin{tabularx}{\textwidth}{|P{3.6cm}|X|}
+        \hline
+        \textbf{Thư mục} & \textbf{Vai trò} \\
+        \hline
+        \texttt{app/main.py} & Điểm khởi động ứng dụng FastAPI \\
+        \hline
+        \texttt{app/api/v1/} & Các endpoint ở Bảng~\ref{tab:ai_endpoint} \\
+        \hline
+        \texttt{app/core/} & Cấu hình và bảo mật, gồm kiểm tra header \texttt{X-AI-Key} (\texttt{security.py}) \\
+        \hline
+        \texttt{app/services/} & Logic suy luận: \texttt{recommender.py} (gợi ý), \texttt{predictor.py} (dự đoán thành công), \texttt{fraud\_detector.py} (gian lận), \texttt{model\_status.py} (trạng thái nạp mô hình) \\
+        \hline
+        \texttt{app/schemas/} & Mô tả dữ liệu vào và ra của từng endpoint \\
+        \hline
+        \texttt{models/} & File mô hình đã huấn luyện (\texttt{.pkl}) và chỉ số đánh giá (\texttt{.json}) \\
+        \hline
+        \texttt{training/}, \texttt{notebooks/} & Mã huấn luyện ngoại tuyến và notebook phân tích \\
+        \hline
+        \texttt{tests/} & Kiểm thử tự động \\
+        \hline
+    \end{tabularx}
+\end{table}
+
 File mô hình \texttt{.pkl} không được đưa vào Git, vì vậy một môi trường mới sẽ chạy bằng luật dự phòng cho tới khi mô hình được huấn luyện lại và đặt vào thư mục \texttt{models/}.
 
 \subsection{Cơ sở dữ liệu và bộ nhớ đệm}
@@ -159,7 +347,7 @@ MySQL 8.4 lưu toàn bộ dữ liệu nghiệp vụ; chi tiết từng bảng đ
 
 Redis 7 chỉ giữ bộ đếm giới hạn tần suất. Mất dữ liệu Redis không làm mất dữ liệu nghiệp vụ.
 
-\subsection{Tích hợp bên ngoài}
+\subsection{Tích hợp bên ngoài}\label{sec:tich_hop}
 
 Mỗi tích hợp nằm trong \texttt{backend/src/integrations/} dưới dạng một interface kèm ít nhất một bản giả lập, nên có thể đổi nhà cung cấp mà không sửa code nghiệp vụ (Bảng~\ref{tab:tich_hop}).
 

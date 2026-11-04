@@ -15,6 +15,9 @@ Phạm vi tài liệu bao gồm toàn bộ mã nguồn trong kho \texttt{DATN\_2
     \item \texttt{backend/}: API nghiệp vụ NestJS, migration và dữ liệu mẫu.
     \item \texttt{ai-service/}: dịch vụ suy luận AI FastAPI và pipeline huấn luyện ngoại tuyến.
     \item \texttt{infra/}: cấu hình Docker Compose, Nginx và Terraform cho AWS.
+    \item \texttt{docs/}: tài liệu kỹ thuật đi kèm mã nguồn (hợp đồng API, ADR, cơ sở dữ liệu, vận hành, kiểm thử).
+    \item \texttt{Document/}: bộ tài liệu đồ án (phân tích, thiết kế, sơ đồ UML, hướng dẫn sử dụng).
+    \item \texttt{scripts/}: lệnh chạy nhanh Node.js, npm và Python trên Windows.
 \end{itemize}
 
 Thiết kế giao diện chi tiết, đặc tả từng bảng dữ liệu và kịch bản của từng use case nằm ở các tài liệu riêng và chỉ được nhắc tới khi cần.
@@ -67,7 +70,7 @@ Các thuật ngữ chuyên môn dùng trong tài liệu được giải thích t
 \begin{itemize}
     \item \textbf{Chương 1 -- Giới thiệu:} mục đích, phạm vi, thuật ngữ và tài liệu liên quan.
     \item \textbf{Chương 2 -- Tổng quan kiến trúc:} mô hình kiến trúc, sơ đồ tổng thể, nguyên tắc thiết kế và công nghệ sử dụng.
-    \item \textbf{Chương 3 -- Thiết kế chi tiết các thành phần:} frontend, backend, dịch vụ AI, cơ sở dữ liệu và các tích hợp bên ngoài.
-    \item \textbf{Chương 4 -- Giao tiếp và bảo mật:} các kênh giao tiếp, tác vụ định kỳ, luồng nghiệp vụ trọng tâm và thiết kế bảo mật.
+    \item \textbf{Chương 3 -- Thiết kế chi tiết các thành phần:} cấu trúc thư mục và vai trò của frontend, backend, dịch vụ AI; điều hướng phía giao diện; cơ sở dữ liệu và các tích hợp bên ngoài.
+    \item \textbf{Chương 4 -- Giao tiếp và bảo mật:} các kênh giao tiếp, tác vụ định kỳ, luồng xử lý một yêu cầu từ giao diện tới cơ sở dữ liệu, luồng nghiệp vụ trọng tâm và thiết kế bảo mật.
     \item \textbf{Chương 5 -- Triển khai, chất lượng và hạn chế:} kiến trúc triển khai trên Docker Compose và AWS, thuộc tính chất lượng, hạn chế và hướng mở rộng.
 \end{itemize}
