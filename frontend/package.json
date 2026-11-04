@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test src/features/support/faq.test.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-react": "11.2.0",

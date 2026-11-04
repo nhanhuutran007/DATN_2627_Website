@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
-import { FAQ_ITEMS, type FaqItem, matchFaq } from "@/features/support/faq";
+import { type FaqItem, matchFaq, VISIBLE_FAQ_ITEMS } from "@/features/support/faq";
+import { useCategories } from "@/lib/api/categories";
 
 /** Độ trễ giả lập "đang trả lời" để câu trả lời không bật ra ngay khi bấm. */
 const REPLY_DELAY_MS = 450;
@@ -17,6 +18,22 @@ type ChatTurn = {
   /** null = không khớp câu hỏi nào, hiện câu trả lời dự phòng. */
   answer: FaqItem | null;
 };
+
+/** Lĩnh vực đang nhận chiến dịch; chỉ tải khi câu trả lời về lĩnh vực được hiển thị. */
+function CategoryLinks({ onPick }: { onPick: () => void }) {
+  const categories = useCategories();
+  return (
+    <ul className="faq-msg-cats">
+      {categories.map((name) => (
+        <li key={name}>
+          <Link className="faq-chip" href={`/du-an?category=${encodeURIComponent(name)}`} onClick={onPick}>
+            {name}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /**
  * Hộp hỏi đáp nhanh ở góc phải dưới: chọn câu hỏi có sẵn hoặc tự gõ câu hỏi, câu trả lời lấy từ
@@ -92,8 +109,8 @@ export function FaqChat() {
   const askedIds = new Set(turns.flatMap((turn) => (turn.answer ? [turn.answer.id] : [])));
   // Câu chưa hỏi lên trước để hàng gợi ý luôn mở đầu bằng câu mới.
   const suggestions = [
-    ...FAQ_ITEMS.filter((item) => !askedIds.has(item.id)),
-    ...FAQ_ITEMS.filter((item) => askedIds.has(item.id)),
+    ...VISIBLE_FAQ_ITEMS.filter((item) => !askedIds.has(item.id)),
+    ...VISIBLE_FAQ_ITEMS.filter((item) => askedIds.has(item.id)),
   ];
 
   return (
@@ -134,6 +151,7 @@ export function FaqChat() {
                   {turn.answer ? (
                     <div className="faq-msg faq-msg-bot">
                       <p>{turn.answer.answer}</p>
+                      {turn.answer.showCategories && <CategoryLinks onPick={() => setOpen(false)} />}
                       {turn.answer.link && (
                         <Link className="faq-msg-link" href={turn.answer.link.href} onClick={() => setOpen(false)}>
                           {turn.answer.link.label} <Icon name="arrow-right" size={14} />
@@ -171,12 +189,12 @@ export function FaqChat() {
                 aria-expanded={showAll}
                 onClick={() => setShowAll((value) => !value)}
               >
-                {showAll ? "Thu gọn" : `Xem tất cả (${FAQ_ITEMS.length})`}
+                {showAll ? "Thu gọn" : `Xem tất cả (${VISIBLE_FAQ_ITEMS.length})`}
               </button>
             </div>
             {showAll ? (
               <ul className="faq-chat-all" aria-labelledby={`${panelId}-goi-y`}>
-                {FAQ_ITEMS.map((item) => (
+                {VISIBLE_FAQ_ITEMS.map((item) => (
                   <li key={item.id}>
                     <button
                       className={askedIds.has(item.id) ? "faq-question is-asked" : "faq-question"}

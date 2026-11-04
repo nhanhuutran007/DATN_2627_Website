@@ -11767,6 +11767,20 @@ html:has(dialog:modal) .admin-sidebar {
   text-decoration: underline;
 }
 
+.faq-msg-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.faq-msg-cats .faq-chip {
+  display: inline-block;
+  text-decoration: none;
+}
+
 .faq-typing {
   display: inline-flex;
   gap: 5px;
