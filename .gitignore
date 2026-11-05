@@ -22,13 +22,9 @@ venv/
 
 # AI data and trained artifacts
 ai-service/data/raw/*
-ai-service/data/processed/*
-ai-service/artifacts/*
 ai-service/models/*.pkl
 ai-service/models/*.joblib
 !ai-service/data/raw/.gitkeep
-!ai-service/data/processed/.gitkeep
-!ai-service/artifacts/README.md
 !ai-service/models/README.md
 # Mô hình dùng khi chạy được commit để máy nào clone về cũng chấm bằng AI (không lùi về luật);
 # mô hình thật tạo bằng ai-service/notebooks/train_real_data_colab.ipynb, cùng phiên bản thư viện

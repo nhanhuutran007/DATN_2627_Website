@@ -1,8 +1,8 @@
 """Shared catalogs: category vocabulary and feature-list contracts.
 
-These constants are the single source of truth for both the offline training
-pipeline (``training/train.py``) and the online inference services, so the
-feature vectors produced at request time always match the training order.
+These constants are the single source of truth for the online inference services and
+mirror the training notebook (``notebooks/train_real_data_colab.ipynb``). The success
+model's actual column order comes from ``models/success_features.json``.
 """
 
 from __future__ import annotations

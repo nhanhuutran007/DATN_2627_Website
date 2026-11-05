@@ -3,6 +3,5 @@ uvicorn==0.52.4
 # Ghim đúng phiên bản đã dùng khi huấn luyện models/*.pkl: khác phiên bản thì joblib.load
 # có thể lỗi và dịch vụ lặng lẽ lùi về luật dự phòng
 scikit-learn==1.9.1
-pandas==3.0.6
 numpy==2.5.4
 joblib==1.6.0
