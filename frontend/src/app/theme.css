@@ -32,10 +32,35 @@ body {
   background: var(--white);
 }
 
+/*
+ * Laptop/PC: hiển thị toàn bộ giao diện ở mức 90% (như zoom 90% của trình duyệt) — Be Vietnam Pro
+ * và Montserrat rộng nét hơn font của GoFundMe nên ở 100% trang trông to. `zoom` co đều cả chữ,
+ * khoảng cách, nút, ảnh; người dùng vẫn tự phóng to/thu nhỏ bằng trình duyệt như bình thường.
+ * Điện thoại/máy tính bảng giữ 100% để chữ đủ lớn.
+ *
+ * Dưới `zoom`, đơn vị vh/dvh cũng bị nhân 0,9 → phần tử cao "cả màn hình" sẽ hụt đáy; các chỗ đó
+ * dùng `var(--vh-unit)` / `var(--dvh-unit)` (= 1vh / 1dvh đã bù zoom) thay cho vh/dvh trực tiếp.
+ */
+:root {
+  --page-zoom: 1;
+  --vh-unit: calc(1vh / var(--page-zoom));
+  --dvh-unit: calc(1dvh / var(--page-zoom));
+}
+
+@media screen and (min-width: 1024px) {
+  :root {
+    --page-zoom: 0.9;
+  }
+
+  html {
+    zoom: var(--page-zoom);
+  }
+}
+
 body {
   color: var(--text);
   font-family: var(--font-text);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.65;
 }
 
@@ -1355,7 +1380,7 @@ h3 {
 }
 
 .gh-drawer {
-  max-height: calc(100dvh - 72px);
+  max-height: calc(calc(100 * var(--dvh-unit)) - 72px);
   overflow-y: auto;
   border-top: 1px solid var(--line);
   background: var(--white);
@@ -3236,43 +3261,11 @@ button {
   color: #b42318;
 }
 
-/* Liên kết phụ ngay dưới ô nhập, vd. "Quên mật khẩu?" */
-.field-aside {
-  margin: -6px 0 0;
-  font-size: 0.88rem;
-  text-align: right;
-}
-
-.field-aside a {
-  color: var(--primary);
-  font-weight: 600;
-}
-
-.check-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.check-list li {
-  display: flex;
-  gap: 8px;
-  padding: 6px 0;
-  color: var(--text-2);
-  font-size: 0.9rem;
-}
-
-.check-list svg {
-  flex: none;
-  margin-top: 4px;
-  color: var(--success);
-}
-
 /* ---------- Đăng nhập / đăng ký ---------- */
 .auth {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  min-height: calc(100vh - 116px);
+  min-height: calc(calc(100 * var(--vh-unit)) - 116px);
 }
 
 .auth-side {
@@ -4277,7 +4270,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  height: 100vh;
+  height: calc(100 * var(--vh-unit));
   overflow-y: auto;
   /* Vẫn cuộn được bằng chuột/cảm ứng nhưng ẩn thanh cuộn */
   scrollbar-width: none;
@@ -5694,7 +5687,7 @@ button {
 
   .admin-sidebar {
     top: 0;
-    height: 100vh;
+    height: calc(100 * var(--vh-unit));
   }
 
   .is-rail .admin-sidebar nav {
@@ -5743,7 +5736,7 @@ button {
     left: 0;
     z-index: 70;
     width: min(280px, 85vw);
-    height: 100vh;
+    height: calc(100 * var(--vh-unit));
     box-shadow: 8px 0 32px rgba(21, 29, 54, 0.3);
   }
 
@@ -6731,7 +6724,7 @@ button {
 /* Hộp thoại theo hệ modal của GoFundMe: không viền màu, bo 24px, bóng nhẹ, nền sau mờ; điện thoại thành tấm trượt từ dưới lên. */
 .app-dialog {
   width: min(520px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
+  max-height: calc(calc(100 * var(--dvh-unit)) - 32px);
   padding: 0;
   border: 0;
   border-radius: 24px;
@@ -6784,7 +6777,7 @@ html:has(dialog:modal) .admin-sidebar {
   dialog.app-dialog {
     width: 100%;
     max-width: 100%;
-    max-height: 90dvh;
+    max-height: calc(90 * var(--dvh-unit));
     margin: auto 0 0;
     border-radius: 24px 24px 0 0;
   }
@@ -7742,7 +7735,7 @@ html:has(dialog:modal) .admin-sidebar {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 100dvh;
+  min-height: calc(100 * var(--dvh-unit));
   padding: 32px 16px;
   overflow: hidden;
   background: var(--white);
@@ -7763,7 +7756,7 @@ html:has(dialog:modal) .admin-sidebar {
   top: -30%;
   left: -18%;
   width: 70vw;
-  height: 85vh;
+  height: calc(85 * var(--vh-unit));
   transform: rotate(-40deg);
 }
 
@@ -7771,7 +7764,7 @@ html:has(dialog:modal) .admin-sidebar {
   right: -22%;
   bottom: -40%;
   width: 72vw;
-  height: 95vh;
+  height: calc(95 * var(--vh-unit));
   transform: rotate(-40deg);
 }
 
@@ -8245,7 +8238,7 @@ html:has(dialog:modal) .admin-sidebar {
 
 .review-dialog {
   width: min(920px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
+  max-height: calc(calc(100 * var(--dvh-unit)) - 32px);
   overflow: hidden;
 }
 
@@ -9206,7 +9199,7 @@ html:has(dialog:modal) .admin-sidebar {
 .create-shell {
   display: grid;
   grid-template-columns: minmax(300px, 34%) 1fr;
-  min-height: 100vh;
+  min-height: calc(100 * var(--vh-unit));
   background: #f4f4f4;
 }
 
@@ -9215,7 +9208,7 @@ html:has(dialog:modal) .admin-sidebar {
   top: 0;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100 * var(--vh-unit));
   padding: 56px 48px 40px 56px;
 }
 
@@ -9261,7 +9254,7 @@ html:has(dialog:modal) .admin-sidebar {
 .create-main {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: calc(100 * var(--vh-unit));
   border-top-left-radius: 56px;
   background: var(--white);
 }
@@ -10509,7 +10502,7 @@ html:has(dialog:modal) .admin-sidebar {
 
 /* Trang ủng hộ /du-an/[id]/ung-ho */
 .donate-page {
-  min-height: 100dvh;
+  min-height: calc(100 * var(--dvh-unit));
   background: var(--soft);
 }
 
@@ -11677,7 +11670,7 @@ html:has(dialog:modal) .admin-sidebar {
   display: flex;
   flex-direction: column;
   width: 360px;
-  height: min(540px, calc(100dvh - 120px));
+  height: min(540px, calc(calc(100 * var(--dvh-unit)) - 120px));
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -12022,7 +12015,7 @@ html:has(dialog:modal) .admin-sidebar {
 
   .faq-chat-panel {
     width: 100%;
-    height: min(560px, calc(100dvh - 104px));
+    height: min(560px, calc(calc(100 * var(--dvh-unit)) - 104px));
   }
 
   .faq-chat-toggle {
