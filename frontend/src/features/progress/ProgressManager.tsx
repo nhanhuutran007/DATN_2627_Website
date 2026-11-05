@@ -25,6 +25,7 @@ import {
 import { formatDay, formatVnd } from "@/lib/format";
 
 import { ProgressTimeline } from "./ProgressTimeline";
+import { TransparencyScoreCard } from "./TransparencyScoreCard";
 
 type Receipt = { mediaId: string; url: string; caption: string };
 
@@ -83,7 +84,7 @@ export function ProgressManager({ campaignId, readOnly = false }: ProgressManage
   const complete = async (milestone: ApiMilestone) => {
     const ok = await dialog.confirm({
       title: "Đánh dấu mốc hoàn thành?",
-      message: <>Người ủng hộ và người theo dõi sẽ nhận thông báo mốc <b>{milestone.title}</b> đã hoàn thành.</>,
+      message: <>Người ủng hộ và người theo dõi sẽ nhận thông báo mốc <b>{milestone.title}</b> đã hoàn thành. Mốc cần có cập nhật kèm ảnh hiện trường hoặc chứng từ.</>,
       confirmLabel: "Đánh dấu hoàn thành",
     });
     if (!ok) return;
@@ -137,6 +138,8 @@ export function ProgressManager({ campaignId, readOnly = false }: ProgressManage
         <div><dt>Đã báo cáo chi</dt><dd className="num">{formatVnd(progress.totalExpense)}</dd></div>
         <div><dt>Chưa giải trình</dt><dd className="num">{formatVnd(remaining)}</dd></div>
       </dl>
+
+      <TransparencyScoreCard score={progress.transparencyScore} />
 
       {notice && (
         <p className={notice.tone === "ok" ? "form-notice" : "form-error"} role={notice.tone === "ok" ? "status" : "alert"}>

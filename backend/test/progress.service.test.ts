@@ -157,8 +157,10 @@ describe("ProgressService", () => {
   let repos: ReturnType<typeof createMockRepos>;
   let audit: ReturnType<typeof makeAuditRecorder>;
   let notifier: ReturnType<typeof makeNotifierRecorder>;
+  let receiptDuplicates: { check: (receipts: unknown[]) => Promise<unknown[]>; flag: (...args: unknown[]) => Promise<void> };
 
   beforeEach(() => {
+    receiptDuplicates = { check: async () => [], flag: async () => undefined };
     repos = createMockRepos();
     audit = makeAuditRecorder();
     notifier = makeNotifierRecorder();
@@ -172,6 +174,7 @@ describe("ProgressService", () => {
       repos.revisionRepo,
       audit.service,
       notifier.service,
+      receiptDuplicates as any,
     );
   });
 
@@ -338,6 +341,32 @@ describe("ProgressService", () => {
   });
 
   describe("completeMilestone", () => {
+    beforeEach(() => {
+      repos.updateRepo.find = async () => [{ id: UPDATE_ID, milestoneId: MILESTONE_ID, imageUrl: "/photo.jpg" }];
+    });
+
+    it("should refuse a milestone with no photo or receipt", async () => {
+      repos.updateRepo.find = async () => [{ id: UPDATE_ID, milestoneId: MILESTONE_ID, content: "Đã xong", attachments: [] }];
+      await rejects(service.completeMilestone(MILESTONE_ID, makeUser()), (err: any) => err.status === 409);
+      equal(repos.mockMilestone.isCompleted, false);
+      equal(notifier.backerNotices.length, 0);
+    });
+
+    it("should accept a receipt as evidence", async () => {
+      repos.updateRepo.find = async () => [{ id: UPDATE_ID, milestoneId: MILESTONE_ID, attachments: [{ id: "a1" }] }];
+      const milestone = await service.completeMilestone(MILESTONE_ID, makeUser());
+      equal(milestone.isCompleted, true);
+    });
+
+    it("should keep the original completion date when pressed again", async () => {
+      const completedAt = new Date("2026-01-02T00:00:00.000Z");
+      repos.mockMilestone.isCompleted = true;
+      repos.mockMilestone.completedAt = completedAt;
+      const milestone = await service.completeMilestone(MILESTONE_ID, makeUser());
+      equal(milestone.completedAt, completedAt);
+      equal(audit.entries.length, 0);
+    });
+
     it("should mark milestone complete", async () => {
       const milestone = await service.completeMilestone(MILESTONE_ID, makeUser());
       equal(milestone.isCompleted, true);
@@ -579,6 +608,36 @@ describe("ProgressService", () => {
       const done = await service.getCampaignProgress(CAMPAIGN_ID, NOW);
       equal(done.milestoneStates[0].state, "completed");
       equal(done.completedMilestones, 1);
+    });
+  });
+
+  describe("transparency score", () => {
+    const NOW = new Date("2026-10-07T00:00:00.000Z");
+
+    it("should stay unrated until a milestone comes due", async () => {
+      repos.mockMilestone.targetDate = new Date("2026-12-01T00:00:00.000Z");
+      const summary = await service.getCampaignProgress(CAMPAIGN_ID, NOW);
+      deepEqual(summary.transparencyScore, { status: "unrated", reason: "too_early" });
+    });
+
+    it("should not rate a campaign that closed without reaching its goal", async () => {
+      repos.mockMilestone.targetDate = new Date("2026-10-01T00:00:00.000Z");
+      repos.mockCampaign.status = CampaignStatus.FAILED;
+      const summary = await service.getCampaignProgress(CAMPAIGN_ID, NOW);
+      deepEqual(summary.transparencyScore, { status: "unrated", reason: "not_reportable" });
+    });
+
+    it("should count only date and budget changes against the plan", async () => {
+      repos.mockMilestone.targetDate = new Date("2026-10-01T00:00:00.000Z");
+      repos.revisionRepo.find = async () => [
+        { id: "r1", newValues: { budget: 6000000 } },
+        { id: "r2", newValues: { title: "Sửa lỗi chính tả" } },
+      ];
+      const summary = await service.getCampaignProgress(CAMPAIGN_ID, NOW);
+      equal(summary.revisionCount, 2);
+      const { transparencyScore: score } = summary;
+      if (score.status !== "rated") throw new Error("expected rated");
+      equal(score.criteria.find((criterion) => criterion.key === "stability")?.ratio, 1 - 1 / 3);
     });
   });
 

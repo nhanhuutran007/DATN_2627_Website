@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindOptionsWhere, In, Like, MoreThan, Repository } from "typeorm";
+import { FindOptionsWhere, In, Like, MoreThan, Not, Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import type { AiFraudResponse } from "../../integrations/ai/ai.types";
@@ -191,6 +191,7 @@ export class RiskAlertService {
     const existing = await this.riskAlertRepo.findOneBy({
       entityType: RiskEntityType.CAMPAIGN,
       entityId: campaign.id,
+      method: Not(RiskMethod.RECEIPT),
       status: RiskAlertStatus.OPEN,
     });
 
@@ -219,6 +220,7 @@ export class RiskAlertService {
 
   private async resolveStaleOpenAlerts(admin: User, keptIds: string[]): Promise<void> {
     const stale = await this.riskAlertRepo.findBy({
+      method: Not(RiskMethod.RECEIPT),
       status: RiskAlertStatus.OPEN,
     });
     for (const candidate of stale) {

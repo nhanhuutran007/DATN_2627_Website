@@ -1278,7 +1278,9 @@ paths:
     post:
       operationId: completeMilestone
       summary: Đánh dấu mốc đã hoàn thành
-      description: Ghi audit `milestone.complete`.
+      description: >-
+        Ghi audit `milestone.complete`. Mốc phải có bài cập nhật kèm ảnh hiện trường hoặc
+        chứng từ, nếu không trả 409. Gọi lại với mốc đã hoàn thành không đổi gì.
       security:
         - bearerAuth: []
       parameters:
@@ -4013,6 +4015,44 @@ components:
         transparency:
           type: string
           enum: [no_plan, on_track, late, late_explained]
+        transparencyScore:
+          type: object
+          required: [status]
+          description: >-
+            Điểm minh bạch 0-100, tính khi đọc. `unrated` khi chiến dịch không ở trạng thái
+            được báo cáo, chưa có kế hoạch, hoặc chưa có mốc đến hạn/hoàn thành. Tiêu chí
+            chưa áp dụng (`ratio` null) không tính vào điểm. Điểm đo mức độ giải trình,
+            không khẳng định chứng từ là thật.
+          properties:
+            status:
+              type: string
+              enum: [rated, unrated]
+            score:
+              type: integer
+              minimum: 0
+              maximum: 100
+              description: Chỉ có khi `status = rated`
+            grade:
+              type: string
+              enum: [high, good, fair, low]
+              description: Chỉ có khi `status = rated`
+            reason:
+              type: string
+              enum: [not_reportable, no_plan, too_early]
+              description: Chỉ có khi `status = unrated`
+            criteria:
+              type: array
+              description: Chỉ có khi `status = rated`
+              items:
+                type: object
+                properties:
+                  key:
+                    type: string
+                    enum: [expense, timeliness, stability, freshness]
+                  label: { type: string }
+                  weight: { type: integer }
+                  ratio: { type: number, nullable: true, minimum: 0, maximum: 1 }
+                  detail: { type: string }
         milestoneStates:
           type: array
           items:
@@ -4308,6 +4348,12 @@ components:
           type: string
         weight:
           type: number
+        images:
+          type: object
+          description: Cặp ảnh để đối chiếu; chỉ có ở cảnh báo chứng từ
+          properties:
+            current: { type: string }
+            matched: { type: string }
     RiskAlert:
       type: object
       properties:
@@ -4329,7 +4375,8 @@ components:
           type: number
         method:
           type: string
-          enum: [ai, rule]
+          enum: [ai, rule, receipt]
+          description: "`receipt`: ảnh chứng từ gần giống ảnh đã dùng; lần quét rủi ro không đóng hay ghi đè"
         reasons:
           type: array
           items:

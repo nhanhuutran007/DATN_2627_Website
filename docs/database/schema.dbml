@@ -98,6 +98,7 @@ Enum risk_alerts_risk_level {
 Enum risk_alerts_method {
   ai
   rule
+  receipt
 }
 
 Enum risk_alerts_status {
@@ -394,11 +395,14 @@ Table media_files {
   size_bytes int [not null]
   purpose media_files_purpose [not null]
   original_name varchar(255)
+  content_hash char(64) [note: 'SHA-256, chỉ ảnh expense_receipt; phát hiện file trùng y hệt']
+  perceptual_hash varchar(512) [note: 'dấu vân hình ảnh, chỉ ảnh expense_receipt; phát hiện ảnh gần giống']
   created_at datetime(6) [not null]
   updated_at datetime(6) [not null]
   deleted_at datetime(6) [note: 'xóa mềm']
   indexes {
     (owner_id, created_at)
+    content_hash
   }
 }
 

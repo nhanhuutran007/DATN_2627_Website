@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
+import { RiskAlert } from "../admin/entities/risk-alert.entity";
 import { Campaign } from "../campaigns/entities/campaign.entity";
 import { Donation } from "../donations/entities/donation.entity";
 import { MediaFile } from "../media/entities/media-file.entity";
@@ -11,6 +12,7 @@ import { Milestone } from "./entities/milestone.entity";
 import { MilestoneOverdueService } from "./milestone-overdue.service";
 import { ProgressController } from "./progress.controller";
 import { ProgressService } from "./progress.service";
+import { ReceiptDuplicateService } from "./receipt-duplicate.service";
 
 @Module({
   imports: [
@@ -22,10 +24,11 @@ import { ProgressService } from "./progress.service";
       Campaign,
       Donation,
       MediaFile,
+      RiskAlert,
     ]),
   ],
   controllers: [ProgressController],
-  providers: [ProgressService, MilestoneOverdueService],
+  providers: [ProgressService, MilestoneOverdueService, ReceiptDuplicateService],
   exports: [ProgressService],
 })
 export class ProgressModule {}

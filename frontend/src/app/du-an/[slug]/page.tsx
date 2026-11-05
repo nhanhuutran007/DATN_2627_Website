@@ -14,6 +14,7 @@ import { WordsOfSupport } from "@/features/donations/WordsOfSupport";
 import { FollowCampaignButton } from "@/features/follows/FollowCampaignButton";
 import { MilestoneRevisions } from "@/features/progress/MilestoneRevisions";
 import { ProgressTimeline } from "@/features/progress/ProgressTimeline";
+import { TransparencyScoreCard } from "@/features/progress/TransparencyScoreCard";
 import { ContactOrganizerButton } from "@/features/campaigns/ContactOrganizerButton";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ShareSpread } from "@/features/follows/ShareSpread";
@@ -31,6 +32,7 @@ import {
   fetchCampaignProgress,
   MILESTONE_STATE_LABEL,
   MILESTONE_STATE_TONE,
+  TRANSPARENCY_GRADE_LABEL,
   TRANSPARENCY_LABEL,
   type CampaignProgress,
 } from "@/lib/api/progress";
@@ -121,6 +123,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   const donateHref = `/du-an/${encodeURIComponent(campaign.slug)}/ung-ho`;
   const ownerInitial = campaign.owner.charAt(0).toUpperCase();
   const stateById = new Map((progress?.milestoneStates ?? []).map((item) => [item.id, item.state]));
+  const transparencyScore = progress?.transparencyScore;
 
   const crumbs = [{ href: "/", label: "Trang chủ" }, { href: "/du-an", label: "Dự án" }, { label: campaign.category }];
   const breadcrumbJsonLd = {
@@ -291,6 +294,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
 
           <section className="detail-section" aria-labelledby="ke-hoach">
             <h2 id="ke-hoach">Kế hoạch và ngân sách</h2>
+            {transparencyScore && <TransparencyScoreCard id="minh-bach" score={transparencyScore} />}
             <ul className="plan-facts">
               <li>
                 <span>Tiến độ</span>
@@ -414,6 +418,13 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   className="button button-dark button-block button-lg"
                 />
               </div>
+            )}
+            {transparencyScore?.status === "rated" && (
+              <a className={`fund-transparency fund-transparency-${transparencyScore.grade}`} href="#minh-bach">
+                <Icon name="shield" size={16} />
+                <span>Điểm minh bạch <b>{transparencyScore.score}/100</b></span>
+                <small>{TRANSPARENCY_GRADE_LABEL[transparencyScore.grade]}</small>
+              </a>
             )}
             {/* key theo số lượt ủng hộ: tải lại khi trang làm mới sau một khoản ủng hộ mới. */}
             {published && <DonorHighlights key={campaign.backers} campaignId={campaign.slug} />}

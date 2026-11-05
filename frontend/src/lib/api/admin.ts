@@ -181,12 +181,14 @@ export type ModerateDecision = Extract<
 
 export type RiskLevel = "high" | "medium" | "low";
 export type RiskStatus = "open" | "resolved" | "dismissed";
-export type RiskMethod = "ai" | "rule";
+export type RiskMethod = "ai" | "rule" | "receipt";
 
 export type RiskReason = {
   group: string;
   label: string;
   weight: number;
+  /** Cặp ảnh để đối chiếu; chỉ có ở cảnh báo chứng từ. */
+  images?: { current: string; matched: string };
 };
 
 export type AdminRiskAlert = {

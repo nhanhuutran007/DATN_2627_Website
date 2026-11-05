@@ -106,15 +106,21 @@ function makeService(opts: {
   const saved: RiskAlert[] = [];
   const created: RiskAlert[] = [];
   const finalAlerts: RiskAlert[] = [];
+  const scanWheres: unknown[] = [];
 
   const riskAlertRepo: any = {
-    findOneBy: async ({ id, entityId }: { id?: string; entityId?: string }) => {
+    findOneBy: async (where: { id?: string }) => {
+      const { id } = where;
+      scanWheres.push(where);
       if (id !== undefined) {
         return finalAlerts.find((alert) => alert.id === id) ?? null;
       }
       return opts.existingOpen ?? null;
     },
-    findBy: async () => opts.openAlerts ?? [],
+    findBy: async (where: unknown) => {
+      scanWheres.push(where);
+      return opts.openAlerts ?? [];
+    },
     create: (dto: any) => {
       const alert = { ...makeAlert(), ...dto, id: `uuid-${created.length + 1}` };
       created.push(alert);
@@ -140,6 +146,7 @@ function makeService(opts: {
     created,
     finalAlerts,
     riskAlertRepo,
+    scanWheres,
   };
 }
 
@@ -193,6 +200,20 @@ describe("RiskAlertService", () => {
       equal(created[0].method, RiskMethod.RULE);
       equal(created[0].level, RiskAlertLevel.HIGH);
       equal(created[0].reasons.length, 2);
+    });
+
+    it("should leave receipt alerts out of the scan", async () => {
+      const { service, scanWheres } = makeService({
+        aiResult: () => ({ available: false, entityType: "CAMPAIGN", entityId: CAMPAIGN_ID }),
+        donation: { total: 10, failed: 3, recent: 5, amounts: [1000, 100000] },
+      });
+
+      await service.generateWarnings(user);
+      equal(scanWheres.length, 2);
+      for (const where of scanWheres as { method: { type: string; value: unknown } }[]) {
+        equal(where.method.type, "not");
+        equal(where.method.value, RiskMethod.RECEIPT);
+      }
     });
 
     it("should skip campaigns with a LOW score", async () => {

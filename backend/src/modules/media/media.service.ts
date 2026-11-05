@@ -16,6 +16,7 @@ import { STORAGE_KEY_PATTERN, type StorageGateway } from "../../integrations/sto
 import { type User, UserRole } from "../users/entities/user.entity";
 import type { UploadedImageResponse } from "./dto/media.dto";
 import { MediaFile, MediaPurpose } from "./entities/media-file.entity";
+import { fingerprintImage } from "./image-fingerprint";
 import { MAX_IMAGE_BYTES, detectImageType, sanitizeOriginalName } from "./image-type";
 
 /** Tiền tố URL công khai của file; khớp `GET /media/:folder/:file`. */
@@ -66,6 +67,8 @@ export class MediaService {
       throw new BadRequestException("Chỉ chấp nhận ảnh JPEG, PNG hoặc WebP.");
     }
 
+    const fingerprint = purpose === MediaPurpose.EXPENSE_RECEIPT ? await fingerprintImage(file.buffer) : undefined;
+
     const storageKey = `${FOLDER_BY_PURPOSE[purpose]}/${randomUUID()}.${type.extension}`;
     await this.storage.put(storageKey, file.buffer, type.mimeType);
 
@@ -81,6 +84,7 @@ export class MediaService {
         sizeBytes: file.size,
         purpose,
         originalName,
+        ...fingerprint,
       }),
     );
 

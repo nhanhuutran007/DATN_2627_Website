@@ -276,12 +276,15 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `size_bytes` (INT, NOT NULL): Dung lượng
 - `purpose` (ENUM: campaign_image / progress_image / avatar / expense_receipt / refund_proof / organization_logo / organization_document, NOT NULL): Mục đích sử dụng; `expense_receipt` lưu trong thư mục `receipts/`; `refund_proof` chỉ quản trị viên tải lên; `organization_document` là ảnh giấy phép, chỉ người đại diện và quản trị viên xem
 - `original_name` (VARCHAR(255)): Tên file gốc (chỉ để hiển thị)
+- `content_hash` (CHAR(64)): SHA-256 của ảnh, chỉ có ở `expense_receipt`; chặn đính kèm file trùng y hệt chứng từ đã dùng
+- `perceptual_hash` (VARCHAR(512)): Dấu vân hình ảnh, chỉ có ở `expense_receipt`; ảnh gần giống tạo cảnh báo rủi ro để quản trị viên đối chiếu
 - `deleted_at` (DATETIME(6)): Xóa mềm
 
 **Ràng buộc**:
 
 - UNIQUE trên `storage_key`
 - INDEX (`owner_id`, `created_at`)
+- INDEX (`content_hash`)
 - FK `owner_id` tham chiếu `users(id)`
 
 ### 2.14. DONATIONS (Khoản ủng hộ)
@@ -415,7 +418,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `entity_name` (VARCHAR(255), NOT NULL): Tên đối tượng tại thời điểm cảnh báo
 - `risk_level` (ENUM: low / medium / high, NOT NULL): Mặc định `medium`
 - `risk_score` (FLOAT, NOT NULL): Điểm rủi ro, mặc định 0
-- `method` (ENUM: ai / rule, NOT NULL): Cách phát hiện, mặc định `ai`
+- `method` (ENUM: ai / rule / receipt, NOT NULL): Cách phát hiện, mặc định `ai`; `receipt` là cảnh báo chứng từ gần giống, lần quét rủi ro không đóng hay ghi đè
 - `reasons` (JSON, NOT NULL): Danh sách lý do (nhóm, nhãn, trọng số)
 - `evidences` (JSON, NOT NULL): Các chỉ số làm bằng chứng
 - `status` (ENUM: open / resolved / dismissed, NOT NULL): Mặc định `open`

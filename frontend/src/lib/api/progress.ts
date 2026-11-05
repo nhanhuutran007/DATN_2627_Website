@@ -29,6 +29,23 @@ export type MilestoneState = "completed" | "on_track" | "overdue" | "overdue_exp
 /** Tóm tắt minh bạch của chiến dịch. */
 export type TransparencyStatus = "no_plan" | "on_track" | "late" | "late_explained";
 
+export type TransparencyGrade = "high" | "good" | "fair" | "low";
+export type TransparencyUnratedReason = "not_reportable" | "no_plan" | "too_early";
+
+export type TransparencyCriterion = {
+  key: string;
+  label: string;
+  weight: number;
+  /** Mức đạt 0-1; null khi chưa áp dụng. */
+  ratio: number | null;
+  detail: string;
+};
+
+/** Điểm minh bạch 0-100 (server tính). */
+export type TransparencyScore =
+  | { status: "rated"; score: number; grade: TransparencyGrade; criteria: TransparencyCriterion[] }
+  | { status: "unrated"; reason: TransparencyUnratedReason };
+
 export type CampaignProgress = {
   totalMilestones: number;
   completedMilestones: number;
@@ -40,6 +57,7 @@ export type CampaignProgress = {
   lastUpdateAt: string | null;
   revisionCount: number;
   transparency: TransparencyStatus;
+  transparencyScore: TransparencyScore;
   milestoneStates: { id: string; state: MilestoneState }[];
 };
 
@@ -63,6 +81,26 @@ export const TRANSPARENCY_LABEL: Record<TransparencyStatus, string> = {
   on_track: "Đúng tiến độ",
   late: "Chậm tiến độ, chưa giải trình",
   late_explained: "Chậm tiến độ, đã giải trình",
+};
+
+export const TRANSPARENCY_GRADE_LABEL: Record<TransparencyGrade, string> = {
+  high: "Rất minh bạch",
+  good: "Minh bạch tốt",
+  fair: "Cần giải trình thêm",
+  low: "Thiếu giải trình",
+};
+
+export const TRANSPARENCY_GRADE_TONE: Record<TransparencyGrade, string> = {
+  high: "tag-green",
+  good: "tag-green",
+  fair: "tag-amber",
+  low: "tag-red",
+};
+
+export const TRANSPARENCY_UNRATED_LABEL: Record<TransparencyUnratedReason, string> = {
+  not_reportable: "Chưa chấm: chiến dịch chưa phát hành hoặc đã khép lại mà không đạt mục tiêu.",
+  no_plan: "Chưa chấm: chủ dự án chưa công bố kế hoạch theo mốc.",
+  too_early: "Chưa chấm: chưa có mốc nào đến hạn hoặc hoàn thành.",
 };
 
 export type MilestoneRevisionValues = {

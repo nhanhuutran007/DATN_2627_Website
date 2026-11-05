@@ -29,6 +29,8 @@ import { MilestoneRevision, type MilestoneRevisionValues } from "./entities/mile
 import { Milestone } from "./entities/milestone.entity";
 import { MilestoneUpdateAttachment } from "./entities/milestone-update-attachment.entity";
 import { MilestoneUpdate } from "./entities/milestone-update.entity";
+import { ReceiptDuplicateService } from "./receipt-duplicate.service";
+import { computeTransparencyScore, type TransparencyScore } from "./transparency-score";
 
 const LOCKED_STATUSES = [
   CampaignStatus.SUCCESS,
@@ -71,6 +73,7 @@ export type CampaignProgressResult = {
   lastUpdateAt: Date | null;
   revisionCount: number;
   transparency: TransparencyStatus;
+  transparencyScore: TransparencyScore;
   milestoneStates: { id: string; state: MilestoneState }[];
 };
 
@@ -89,6 +92,11 @@ function normalizeField(field: RevisionField, value: unknown): string | number |
   if (field === "targetDate") return toIsoOrNull(value);
   if (field === "budget") return Number(value);
   return String(value);
+}
+
+/** Bằng chứng của một mốc: bài cập nhật có ảnh hiện trường hoặc chứng từ. */
+function hasEvidence(update: MilestoneUpdate): boolean {
+  return Boolean(update.imageUrl) || (update.attachments?.length ?? 0) > 0;
 }
 
 function formatDateVi(value: string | null | undefined): string {
@@ -120,6 +128,7 @@ export class ProgressService {
     private readonly revisionRepo: Repository<MilestoneRevision>,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
+    private readonly receiptDuplicates: ReceiptDuplicateService,
   ) {}
 
   async findCampaignMilestones(
@@ -314,8 +323,18 @@ export class ProgressService {
     const campaign = await this.getCampaign(milestone.campaignId);
     this.assertCanManage(campaign, user);
     await this.assertReportable(campaign);
+    if (milestone.isCompleted) return milestone;
 
-    const wasCompleted = milestone.isCompleted;
+    const updates = await this.milestoneUpdateRepo.find({
+      where: { milestoneId: id },
+      relations: { attachments: true },
+    });
+    if (!updates.some(hasEvidence)) {
+      throw new ConflictException(
+        "Cần đăng cập nhật kèm ảnh hiện trường hoặc chứng từ cho mốc này trước khi đánh dấu hoàn thành.",
+      );
+    }
+
     milestone.isCompleted = true;
     milestone.completedAt = new Date();
     const saved = await this.milestoneRepo.save(milestone);
@@ -326,19 +345,17 @@ export class ProgressService {
       entityId: saved.id,
       newValues: { isCompleted: true, completedAt: saved.completedAt },
     });
-    if (!wasCompleted) {
-      await this.notificationsService.notifyCampaignBackers(
-        campaign.id,
-        {
-          type: NotificationType.MILESTONE_COMPLETED,
-          title: "Dự án bạn ủng hộ vừa hoàn thành một mốc",
-          message: `Chiến dịch "${campaign.title}" đã hoàn thành mốc "${saved.title}".`,
-          link: `/du-an/${campaign.id}`,
-          relatedId: saved.id,
-        },
-        [campaign.ownerId],
-      );
-    }
+    await this.notificationsService.notifyCampaignBackers(
+      campaign.id,
+      {
+        type: NotificationType.MILESTONE_COMPLETED,
+        title: "Dự án bạn ủng hộ vừa hoàn thành một mốc",
+        message: `Chiến dịch "${campaign.title}" đã hoàn thành mốc "${saved.title}".`,
+        link: `/du-an/${campaign.id}`,
+        relatedId: saved.id,
+      },
+      [campaign.ownerId],
+    );
     return saved;
   }
 
@@ -361,6 +378,7 @@ export class ProgressService {
       await this.assertExpenseWithinRaised(campaign.id, expense);
     }
     const receipts = await this.resolveReceipts(receiptInputs, user);
+    const nearDuplicates = await this.receiptDuplicates.check(receipts);
 
     const update = this.milestoneUpdateRepo.create({
       milestoneId,
@@ -370,6 +388,7 @@ export class ProgressService {
       attachments: receipts,
     });
     const saved = await this.milestoneUpdateRepo.save(update);
+    await this.receiptDuplicates.flag(campaign, nearDuplicates);
     await this.auditService.record({
       userId: user.id,
       action: "milestone_update.create",
@@ -447,13 +466,19 @@ export class ProgressService {
     );
 
     const milestoneIds = milestones.map((milestone) => milestone.id);
-    const [updates, revisionCount] =
+    const [updates, revisions] =
       milestoneIds.length > 0
         ? await Promise.all([
-            this.milestoneUpdateRepo.find({ where: { milestoneId: In(milestoneIds) } }),
-            this.revisionRepo.count({ where: { milestoneId: In(milestoneIds) } }),
+            this.milestoneUpdateRepo.find({
+              where: { milestoneId: In(milestoneIds) },
+              relations: { attachments: true },
+            }),
+            this.revisionRepo.find({
+              where: { milestoneId: In(milestoneIds) },
+              select: { id: true, newValues: true },
+            }),
           ])
-        : [[] as MilestoneUpdate[], 0];
+        : [[] as MilestoneUpdate[], [] as MilestoneRevision[]];
     const totalExpense = updates.reduce(
       (total, update) => total + Number(update.expenseAmount ?? 0),
       0,
@@ -472,17 +497,41 @@ export class ProgressService {
       return created && (!latest || created > latest) ? created : latest;
     }, null);
 
+    const totalRaised = Number(raised ?? 0);
+    const reportable =
+      REPORTABLE_STATUSES.includes(campaign.status) &&
+      !(await closedWithoutReachingGoal(campaign, this.donationRepo));
+    const transparencyScore = computeTransparencyScore({
+      reportable,
+      milestones: milestones.map((milestone, index) => ({
+        state: milestoneStates[index].state,
+        budget: milestone.budget,
+        targetDate: milestone.targetDate,
+        completedAt: milestone.completedAt,
+        hasEvidence: updates.some((update) => update.milestoneId === milestone.id && hasEvidence(update)),
+      })),
+      totalExpense,
+      totalRaised,
+      lastUpdateAt,
+      startDate: campaign.startDate,
+      scheduleChanges: revisions.filter(
+        ({ newValues }) => "targetDate" in newValues || "budget" in newValues,
+      ).length,
+      now,
+    });
+
     return {
       totalMilestones: milestones.length,
       completedMilestones: milestones.filter((milestone) => milestone.isCompleted).length,
       overdueMilestones: overdue + explained,
       totalBudget,
       totalExpense,
-      totalRaised: Number(raised ?? 0),
+      totalRaised,
       backerCount: campaign.backerCount,
       lastUpdateAt,
-      revisionCount,
+      revisionCount: revisions.length,
       transparency,
+      transparencyScore,
       milestoneStates,
     };
   }

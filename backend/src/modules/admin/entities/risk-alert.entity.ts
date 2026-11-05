@@ -22,12 +22,16 @@ export enum RiskAlertStatus {
 export enum RiskMethod {
   AI = "ai",
   RULE = "rule",
+  /** Do kiểm tra chứng từ tạo, không thuộc lần quét nên lần quét không được đóng hay ghi đè. */
+  RECEIPT = "receipt",
 }
 
 export type RiskReason = {
   group: string;
   label: string;
   weight: number;
+  /** Cặp ảnh để admin đối chiếu; chỉ có ở cảnh báo chứng từ. */
+  images?: { current: string; matched: string };
 };
 
 @Entity("risk_alerts")

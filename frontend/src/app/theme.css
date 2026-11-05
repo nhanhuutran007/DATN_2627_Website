@@ -13749,3 +13749,134 @@ html:has(dialog:modal) .admin-sidebar {
     height: 42px;
   }
 }
+
+/* ---------- Điểm minh bạch ---------- */
+.fund-transparency {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: var(--success-soft);
+  border-radius: var(--radius);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.fund-transparency svg {
+  color: var(--success);
+  flex: none;
+}
+
+.fund-transparency-fair {
+  background: #fff3dc;
+}
+
+.fund-transparency-fair svg {
+  color: #8a5300;
+}
+
+.fund-transparency-low {
+  background: #fdecea;
+}
+
+.fund-transparency-low svg {
+  color: #b42318;
+}
+
+.risk-receipts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.risk-receipts a {
+  display: grid;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.risk-receipts img {
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.fund-transparency small {
+  margin-left: auto;
+  color: var(--text-2);
+}
+
+.transparency-card {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  scroll-margin-top: 96px;
+}
+
+.transparency-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.transparency-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.transparency-score {
+  margin: 0 auto 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.transparency-score b {
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: 28px;
+}
+
+.transparency-criteria {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.transparency-criteria li {
+  display: grid;
+  gap: 4px;
+}
+
+.transparency-criteria small {
+  color: var(--text-2);
+}
+
+.transparency-criterion-name {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.transparency-bar {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  background: var(--soft);
+  border-radius: 999px;
+}
+
+.transparency-bar span {
+  display: block;
+  height: 100%;
+  background: var(--success);
+}

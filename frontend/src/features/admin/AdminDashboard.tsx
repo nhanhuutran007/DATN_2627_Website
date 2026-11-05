@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment, useEffect, useState } from "react";
@@ -49,7 +50,7 @@ import {
   type ModerateDecision,
   type RiskStatus,
 } from "@/lib/api/admin";
-import { logoutRequest } from "@/lib/api";
+import { logoutRequest, resolveMediaUrl } from "@/lib/api";
 import type { ApiCampaignStatus } from "@/lib/api/campaigns";
 import { fetchAdminCategories } from "@/lib/api/categories";
 import { syncSepayDonation } from "@/lib/api/donations";
@@ -243,8 +244,17 @@ function evidenceSummary(evidences: Record<string, number>): string {
   if (evidences.amount_z_score) {
     parts.push(`z = ${evidences.amount_z_score}`);
   }
+  if (evidences.near_duplicate_receipts) {
+    parts.push(`${evidences.near_duplicate_receipts} ảnh chứng từ gần giống ảnh đã dùng`);
+  }
   return parts.length > 0 ? parts.join(" · ") : "chưa có dữ liệu chi tiết";
 }
+
+const RISK_METHOD_TEXT: Record<AdminRiskAlert["method"], string> = {
+  ai: "Chấm điểm bằng luật + mô hình học máy",
+  rule: "Chỉ chấm bằng luật (mô hình AI không khả dụng)",
+  receipt: "Kiểm tra ảnh chứng từ, cần người đối chiếu",
+};
 
 const NARROW_QUERY = "(max-width: 960px)";
 const NOTICE_TIMEOUT_MS = 6000;
@@ -1601,6 +1611,7 @@ export function AdminDashboard() {
                 <option value="">Mọi phương pháp</option>
                 <option value="ai">Luật + mô hình học máy</option>
                 <option value="rule">Chỉ luật (dự phòng)</option>
+                <option value="receipt">Kiểm tra chứng từ</option>
               </select>
               <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
               {(riskFilter.q || riskFilter.level || riskFilter.entityType || riskFilter.method) && (
@@ -1630,9 +1641,21 @@ export function AdminDashboard() {
                           <button className="link-inline" type="button" title="Xem thông tin tài khoản" onClick={() => setViewingUserId(alert.entityId)}>{alert.entityName}</button>
                         )}
                       </h3>
-                      <p>{alert.entityId.slice(0, 8).toUpperCase()} · {riskEntityLabel(alert)} · Điểm rủi ro <b>{alert.score.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> · {alert.method === "ai" ? "Chấm điểm bằng luật + mô hình học máy" : "Chỉ chấm bằng luật (mô hình AI không khả dụng)"}</p>
+                      <p>{alert.entityId.slice(0, 8).toUpperCase()} · {riskEntityLabel(alert)} · Điểm rủi ro <b>{alert.score.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b> · {RISK_METHOD_TEXT[alert.method]}</p>
                       <small><b>Nguyên nhân:</b> {riskReasonSummary(alert)}</small>
                       <small><b>Bằng chứng:</b> {evidenceSummary(alert.evidences)}</small>
+                      {alert.reasons.map((reason) => reason.images && (
+                        <div className="risk-receipts" key={reason.images.current}>
+                          <a href={resolveMediaUrl(reason.images.current)} target="_blank" rel="noreferrer">
+                            <Image src={resolveMediaUrl(reason.images.current)} alt="Ảnh chứng từ mới" width={96} height={128} unoptimized />
+                            Ảnh mới
+                          </a>
+                          <a href={resolveMediaUrl(reason.images.matched)} target="_blank" rel="noreferrer">
+                            <Image src={resolveMediaUrl(reason.images.matched)} alt="Ảnh chứng từ đã dùng" width={96} height={128} unoptimized />
+                            Ảnh đã dùng
+                          </a>
+                        </div>
+                      ))}
                     </div>
                     <div>{riskActions(alert)}</div>
                   </article>

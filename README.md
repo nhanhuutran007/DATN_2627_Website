@@ -492,6 +492,8 @@ DATN_2627_Website/
 - Thông báo trong ứng dụng và email, bình luận/hỏi đáp có kiểm duyệt, theo dõi dự án, mức quà tặng, hoàn tiền và đối soát, tải ảnh lên; dữ liệu hành vi cho AI chỉ thu thập khi người dùng đồng ý.
 - Thanh toán thật qua cổng SePay (QR chuyển khoản, IPN, đối soát khi mất IPN) và quy trình hoàn tiền thủ công có mã chuyển khoản thật cho các khoản này.
 - Giải trình sử dụng quỹ bằng chứng từ chi tiêu, theo dõi chậm tiến độ và lịch sử thay đổi kế hoạch công khai.
+- Điểm minh bạch 0-100 cho từng chiến dịch, kèm giải thích theo tiêu chí, tính từ dữ liệu giải trình công khai.
+- Chống dùng lại chứng từ: chặn ảnh trùng y hệt, ảnh gần giống tạo cảnh báo để quản trị viên đối chiếu.
 - Công cụ quản trị nội dung: dự án nổi bật, lĩnh vực, xuất thống kê ẩn danh, nhật ký kiểm toán có bộ lọc, sao lưu và khôi phục dữ liệu.
 - Tổ chức xã hội đăng ký và được quản trị viên xác minh; cộng đồng gây quỹ cho tổ chức đã xác minh, trang tổ chức công khai số tiền đã huy động.
 - Đăng nhập bằng Google (tùy chọn), luồng đăng nhập/đăng ký theo email và chính sách mật khẩu thống nhất giữa trình duyệt và máy chủ.
