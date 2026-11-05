@@ -142,7 +142,8 @@ export class RiskAlertService {
 
     const [items, total] = await this.riskAlertRepo.findAndCount({
       where,
-      order: { createdAt: "DESC" },
+      // Mỗi lần quét tạo cảnh báo cùng thời điểm: xếp theo điểm để rủi ro cao nhất lên đầu hàng chờ.
+      order: { score: "DESC", createdAt: "DESC" },
       skip: offset,
       take: limit,
     });
