@@ -1,14 +1,15 @@
 import { equal, ok, rejects } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
-import { NotFoundException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common";
 
 import {
   LOGIN_LOCK_MINUTES,
   MAX_LOGIN_ATTEMPTS,
+  USER_HISTORY_REFERENCES,
   UsersService,
 } from "../src/modules/users/users.service";
-import { UserRole } from "../src/modules/users/entities/user.entity";
+import { UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
 import { makeAuditRecorder } from "./helpers/audit";
 
 const ADMIN_ID = "123e4567-e89b-12d3-a456-426614174099";
@@ -124,14 +125,17 @@ describe("UsersService", () => {
   });
 
   describe("updateRole", () => {
+    const target = () => ({
+      id: "123",
+      name: "Old",
+      email: "test@example.com",
+      passwordHash: "hash",
+      role: UserRole.USER,
+      status: UserStatus.ACTIVE,
+    });
+
     it("should update user role", async () => {
-      userRepo.findOneBy = async () => ({
-        id: "123",
-        name: "Old",
-        email: "test@example.com",
-        passwordHash: "hash",
-        role: UserRole.USER,
-      });
+      userRepo.findOneBy = async () => target();
       userRepo.save = async (u: any) => u;
 
       const result = await usersService.updateRole("123", { role: UserRole.ADMIN }, makeAdmin());
@@ -141,21 +145,81 @@ describe("UsersService", () => {
       equal(audit.entries[0].oldValues?.role, UserRole.USER);
       equal(audit.entries[0].newValues?.role, UserRole.ADMIN);
     });
+
+    it("should forbid admins from changing their own role", async () => {
+      await rejects(
+        usersService.updateRole(ADMIN_ID, { role: UserRole.USER }, makeAdmin()),
+        ForbiddenException,
+      );
+      equal(audit.entries.length, 0);
+    });
+
+    it("should not grant admin to a banned account", async () => {
+      userRepo.findOneBy = async () => ({ ...target(), status: UserStatus.BANNED });
+      await rejects(usersService.updateRole("123", { role: UserRole.ADMIN }, makeAdmin()), ConflictException);
+    });
+
+    it("should skip saving and auditing when the role is unchanged", async () => {
+      userRepo.findOneBy = async () => target();
+      userRepo.save = async () => {
+        throw new Error("should not save");
+      };
+      const result = await usersService.updateRole("123", { role: UserRole.USER }, makeAdmin());
+      equal(result.role, UserRole.USER);
+      equal(audit.entries.length, 0);
+    });
   });
 
   describe("remove", () => {
-    it("should remove a user", async () => {
-      userRepo.findOneBy = async () => ({
-        id: "123",
-        email: "test@example.com",
-        role: UserRole.USER,
-      });
-      userRepo.remove = async () => undefined;
+    /** Giả lập transaction: `counts` là số bản ghi lịch sử theo "bảng.cột". */
+    function withTransaction(counts: Record<string, number> = {}) {
+      const calls = { queries: [] as string[], deleted: [] as any[] };
+      const manager = {
+        query: async (sql: string) => {
+          calls.queries.push(sql);
+          const match = /FROM `(\w+)` WHERE `(\w+)`/.exec(sql);
+          return [{ n: match ? counts[`${match[1]}.${match[2]}`] ?? 0 : 0 }];
+        },
+        delete: async (_entity: unknown, where: any) => {
+          calls.deleted.push(where);
+        },
+      };
+      userRepo.manager = { transaction: async (fn: any) => fn(manager) };
+      return calls;
+    }
+
+    it("should remove a user without history and clean up side tables", async () => {
+      userRepo.findOneBy = async () => ({ id: "123", email: "test@example.com", role: UserRole.USER });
+      const calls = withTransaction();
 
       await usersService.remove("123", makeAdmin());
+      equal(calls.queries.filter((sql) => sql.startsWith("SELECT")).length, USER_HISTORY_REFERENCES.length);
+      ok(calls.queries.some((sql) => sql.startsWith("DELETE FROM `notifications`")));
+      ok(calls.queries.some((sql) => sql.startsWith("DELETE FROM `behavior_events`")));
+      equal(calls.deleted[0].id, "123");
       equal(audit.entries.length, 1);
       equal(audit.entries[0].action, "user.delete");
       equal(audit.entries[0].entityId, "123");
+    });
+
+    it("should refuse to delete an account with donations or content", async () => {
+      userRepo.findOneBy = async () => ({ id: "123", email: "test@example.com", role: UserRole.USER });
+      const calls = withTransaction({ "donations.user_id": 3, "campaign_comments.user_id": 1 });
+
+      await rejects(usersService.remove("123", makeAdmin()), (err: any) => {
+        ok(err instanceof ConflictException);
+        ok(String(err.message).includes("giao dịch ủng hộ"));
+        ok(String(err.message).includes("bình luận"));
+        return true;
+      });
+      equal(calls.deleted.length, 0);
+      equal(audit.entries.length, 0);
+    });
+
+    it("should refuse to delete self or another admin", async () => {
+      await rejects(usersService.remove(ADMIN_ID, makeAdmin()), ForbiddenException);
+      userRepo.findOneBy = async () => ({ id: "456", email: "a2@example.com", role: UserRole.ADMIN });
+      await rejects(usersService.remove("456", makeAdmin()), ConflictException);
     });
 
     it("should throw NotFoundException when user not found", async () => {

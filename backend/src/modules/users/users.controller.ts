@@ -11,7 +11,9 @@ import {
   UseGuards,
 } from "@nestjs/common";
 
+import { StepUpPurpose } from "../auth/entities/step-up-code.entity";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RequireStepUp, StepUpGuard } from "../auth/guards/step-up.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
@@ -61,8 +63,11 @@ export class UsersController {
     return this.usersService.update(id, dto, currentUser);
   }
 
+  /** Đổi vai trò (kể cả cấp/thu quyền admin): cần OTP như các thao tác admin nhạy cảm khác. */
   @Patch(":id/role")
   @Roles(UserRole.ADMIN)
+  @UseGuards(StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ADMIN_USERS)
   updateRole(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: UpdateRoleDto,
@@ -71,8 +76,11 @@ export class UsersController {
     return this.usersService.updateRole(id, dto, currentUser);
   }
 
+  /** Chỉ xóa được tài khoản chưa có hoạt động; tài khoản đã có lịch sử thì khóa thay vì xóa. */
   @Delete(":id")
   @Roles(UserRole.ADMIN)
+  @UseGuards(StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ADMIN_USERS)
   remove(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() currentUser: User) {
     return this.usersService.remove(id, currentUser);
   }

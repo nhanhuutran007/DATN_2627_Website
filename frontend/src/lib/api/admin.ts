@@ -176,7 +176,7 @@ export type AuditLogQuery = {
 
 export type ModerateDecision = Extract<
   ApiCampaignStatus,
-  "approved" | "active" | "rejected" | "needs_info" | "ended"
+  "approved" | "active" | "rejected" | "needs_info" | "paused" | "ended"
 >;
 
 export type RiskLevel = "high" | "medium" | "low";
@@ -310,6 +310,16 @@ export async function setUserStatus(
   reason?: string,
 ): Promise<AdminUser> {
   return api.patch<AdminUser>(`/admin/users/${encodeURIComponent(id)}/status`, { status, reason });
+}
+
+/** Đổi vai trò tài khoản (cần OTP — `apiFetch` tự mở hộp nhập mã). */
+export function setUserRole(id: string, role: AdminUser["role"]): Promise<AdminUser> {
+  return api.patch<AdminUser>(`/users/${encodeURIComponent(id)}/role`, { role });
+}
+
+/** Xóa hẳn tài khoản chưa có hoạt động (cần OTP); server trả 409 nếu đã có lịch sử. */
+export function deleteUser(id: string): Promise<void> {
+  return api.del<void>(`/users/${encodeURIComponent(id)}`);
 }
 
 export async function fetchAuditLogs(query: AuditLogQuery = {}): Promise<AuditLogList> {

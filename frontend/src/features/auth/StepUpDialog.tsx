@@ -25,6 +25,7 @@ const ACTION_LABELS: Record<string, string> = {
   refund_request: "gửi yêu cầu hoàn tiền",
   admin_refund: "xử lý hoàn tiền",
   admin_backup: "sao lưu hoặc khôi phục dữ liệu",
+  admin_users: "đổi vai trò hoặc xóa tài khoản",
 };
 
 const RESEND_SECONDS = 60;

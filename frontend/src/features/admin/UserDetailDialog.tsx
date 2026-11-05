@@ -10,18 +10,40 @@ import {
   USER_ROLE_LABEL,
   USER_STATUS_LABEL,
 } from "@/features/admin/labels";
+import { useDialog } from "@/components/ui/DialogProvider";
 import { resolveMediaUrl } from "@/lib/api";
-import { fetchAdminUserDetail, type AdminUserDetail } from "@/lib/api/admin";
+import {
+  deleteUser,
+  fetchAdminUserDetail,
+  setUserRole,
+  type AdminUserDetail,
+  type AdminUserRole,
+} from "@/lib/api/admin";
 import type { ApiCampaignStatus } from "@/lib/api/campaigns";
 
 const money = (value: number | string | null | undefined) => `${Number(value ?? 0).toLocaleString("vi-VN")} ₫`;
 const date = (value?: string | null) => (value ? new Date(value).toLocaleDateString("vi-VN") : "—");
 
+const ROLE_OPTIONS: AdminUserRole[] = ["user", "campaign_owner", "admin"];
+
+type UserDetailDialogProps = {
+  userId: string;
+  onClose: () => void;
+  /** Tài khoản admin đang đăng nhập: không tự đổi vai trò/xóa chính mình. */
+  currentUserId?: string;
+  /** Gọi sau khi đổi vai trò hoặc xóa để trang tải lại danh sách. */
+  onChanged?: (change: "role" | "deleted") => void;
+};
+
 /** Thông tin một tài khoản (vd. chủ dự án) để admin đánh giá trước khi duyệt. */
-export function UserDetailDialog({ userId, onClose }: { userId: string; onClose: () => void }) {
+export function UserDetailDialog({ userId, onClose, currentUserId, onChanged }: UserDetailDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const dialog = useDialog();
   const [detail, setDetail] = useState<AdminUserDetail | null>(null);
   const [error, setError] = useState("");
+  const [role, setRole] = useState<AdminUserRole | "">("");
+  const [busy, setBusy] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{ tone: "error" | "success"; text: string } | null>(null);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -31,7 +53,11 @@ export function UserDetailDialog({ userId, onClose }: { userId: string; onClose:
   useEffect(() => {
     let cancelled = false;
     fetchAdminUserDetail(userId)
-      .then((loaded) => !cancelled && setDetail(loaded))
+      .then((loaded) => {
+        if (cancelled) return;
+        setDetail(loaded);
+        setRole(loaded.user.role);
+      })
       .catch((err) => !cancelled && setError(err instanceof Error ? err.message : "Không tải được thông tin người dùng."));
     return () => {
       cancelled = true;
@@ -40,6 +66,71 @@ export function UserDetailDialog({ userId, onClose }: { userId: string; onClose:
 
   const user = detail?.user;
   const byStatus = Object.entries(detail?.campaigns.byStatus ?? {}) as Array<[ApiCampaignStatus, number]>;
+  const isSelf = Boolean(currentUserId && currentUserId === userId);
+  // Tài khoản đã có chiến dịch/ủng hộ thì server không cho xóa: báo trước thay vì để bấm rồi lỗi.
+  const hasHistory = Boolean(detail && (detail.campaigns.total > 0 || detail.donations.count > 0));
+
+  async function handleSaveRole() {
+    if (!user || !role || role === user.role) return;
+    const granting = role === "admin";
+    const revoking = user.role === "admin";
+    const confirmed = await dialog.confirm({
+      title: granting ? "Cấp quyền quản trị" : "Đổi vai trò tài khoản",
+      message: (
+        <>
+          <b>{user.name}</b>: {USER_ROLE_LABEL[user.role]} → <b>{USER_ROLE_LABEL[role]}</b>.{" "}
+          {granting
+            ? "Tài khoản này sẽ duyệt chiến dịch, hoàn tiền và xem dữ liệu cá nhân của mọi người dùng."
+            : revoking
+              ? "Tài khoản sẽ mất toàn bộ quyền quản trị ngay lập tức."
+              : "Thay đổi có hiệu lực ngay."}{" "}
+          Cần nhập mã xác minh gửi qua email.
+        </>
+      ),
+      confirmLabel: granting ? "Cấp quyền" : "Đổi vai trò",
+      tone: granting || revoking ? "danger" : "default",
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    setActionMessage(null);
+    try {
+      const updated = await setUserRole(user.id, role);
+      setDetail((current) => (current ? { ...current, user: { ...current.user, role: updated.role } } : current));
+      setActionMessage({ tone: "success", text: `Đã đổi vai trò thành ${USER_ROLE_LABEL[updated.role]}.` });
+      onChanged?.("role");
+    } catch (err) {
+      setRole(user.role);
+      setActionMessage({ tone: "error", text: err instanceof Error ? err.message : "Không đổi được vai trò." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!user) return;
+    const confirmed = await dialog.confirm({
+      title: "Xóa tài khoản",
+      message: (
+        <>
+          Xóa vĩnh viễn tài khoản <b>{user.name}</b> ({user.email}). Chỉ áp dụng cho tài khoản chưa có hoạt động;
+          thao tác không hoàn tác được và cần nhập mã xác minh gửi qua email.
+        </>
+      ),
+      confirmLabel: "Xóa tài khoản",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    setActionMessage(null);
+    try {
+      await deleteUser(user.id);
+      onChanged?.("deleted");
+      onClose();
+    } catch (err) {
+      setActionMessage({ tone: "error", text: err instanceof Error ? err.message : "Không xóa được tài khoản." });
+      setBusy(false);
+    }
+  }
 
   return (
     <dialog
@@ -167,6 +258,67 @@ export function UserDetailDialog({ userId, onClose }: { userId: string; onClose:
           </>
         )}
       </div>
+
+      {user && (
+        <footer className="review-foot user-manage-foot">
+          {isSelf ? (
+            <span className="table-muted">Đây là tài khoản của bạn: nhờ quản trị viên khác đổi vai trò.</span>
+          ) : (
+            <>
+              <div className="user-manage-role">
+                <label htmlFor="user-role-select">Vai trò</label>
+                <select
+                  id="user-role-select"
+                  value={role}
+                  disabled={busy}
+                  onChange={(event) => setRole(event.target.value as AdminUserRole)}
+                >
+                  {ROLE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{USER_ROLE_LABEL[option]}</option>
+                  ))}
+                </select>
+                <button
+                  className="button button-outline button-sm"
+                  type="button"
+                  disabled={busy || !role || role === user.role}
+                  onClick={handleSaveRole}
+                >
+                  Lưu vai trò
+                </button>
+              </div>
+              <div className="admin-actions">
+                <button
+                  type="button"
+                  disabled={busy || hasHistory || user.role === "admin"}
+                  title={
+                    user.role === "admin"
+                      ? "Thu quyền quản trị trước khi xóa"
+                      : hasHistory
+                        ? "Tài khoản đã có chiến dịch hoặc giao dịch: hãy khóa thay vì xóa để giữ lịch sử"
+                        : undefined
+                  }
+                  onClick={handleDelete}
+                >
+                  Xóa tài khoản
+                </button>
+              </div>
+            </>
+          )}
+          {actionMessage && (
+            <p
+              className={actionMessage.tone === "error" ? "form-error user-manage-message" : "hint user-manage-message"}
+              role={actionMessage.tone === "error" ? "alert" : "status"}
+            >
+              {actionMessage.text}
+            </p>
+          )}
+          {!isSelf && hasHistory && user.role !== "admin" && (
+            <p className="table-muted user-manage-message">
+              Tài khoản đã có chiến dịch hoặc giao dịch nên không xóa được — dùng “Khóa tài khoản” để giữ lịch sử.
+            </p>
+          )}
+        </footer>
+      )}
     </dialog>
   );
 }

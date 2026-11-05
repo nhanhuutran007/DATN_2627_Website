@@ -1,11 +1,34 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { BehaviorEvent } from "../ai/entities/behavior-event.entity";
 import { CreateUserDto, UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
-import { User, UserRole } from "./entities/user.entity";
+import { User, UserRole, UserStatus } from "./entities/user.entity";
+
+/**
+ * Các cột khóa ngoại (không cascade) trỏ về users mang lịch sử cần giữ: còn bản ghi
+ * nào thì không được xóa tài khoản. Tên bảng/cột cố định trong mã, không lấy từ input.
+ */
+export const USER_HISTORY_REFERENCES: ReadonlyArray<{ table: string; column: string; label: string }> = [
+  { table: "campaigns", column: "owner_id", label: "chiến dịch" },
+  { table: "donations", column: "user_id", label: "giao dịch ủng hộ" },
+  { table: "refund_requests", column: "user_id", label: "yêu cầu hoàn tiền" },
+  { table: "campaign_comments", column: "user_id", label: "bình luận" },
+  { table: "reports", column: "reporter_id", label: "báo cáo vi phạm" },
+  { table: "organizations", column: "representative_id", label: "hồ sơ tổ chức" },
+  { table: "media_files", column: "owner_id", label: "ảnh tải lên" },
+  { table: "reports", column: "resolved_by", label: "thao tác kiểm duyệt" },
+  { table: "risk_alerts", column: "resolved_by", label: "thao tác kiểm duyệt" },
+  { table: "campaign_comments", column: "hidden_by", label: "thao tác kiểm duyệt" },
+  { table: "refund_requests", column: "reviewed_by", label: "thao tác kiểm duyệt" },
+  { table: "organizations", column: "reviewed_by", label: "thao tác kiểm duyệt" },
+  { table: "milestone_revisions", column: "changed_by", label: "lịch sử chỉnh sửa kế hoạch" },
+];
+
+/** Bảng phụ (thông báo, hành vi cho gợi ý AI) xóa kèm tài khoản. */
+export const USER_DISPOSABLE_TABLES: ReadonlyArray<string> = ["notifications", "behavior_events"];
 
 export const MAX_LOGIN_ATTEMPTS = 5;
 export const LOGIN_LOCK_MINUTES = 15;
@@ -84,9 +107,20 @@ export class UsersService {
   }
 
   async updateRole(id: string, dto: UpdateRoleDto, currentUser: User): Promise<User> {
+    // Không tự đổi vai trò: tránh admin tự hạ quyền (mất admin cuối cùng) hay tự nâng.
+    // Vì người thao tác luôn là admin khác, hệ thống luôn còn ít nhất một admin.
+    if (id === currentUser.id) {
+      throw new ForbiddenException("Không thể tự đổi vai trò của chính mình.");
+    }
     const user = await this.findById(id);
     if (!user) {
       throw new NotFoundException("User not found");
+    }
+    if (user.role === dto.role) {
+      return user;
+    }
+    if (dto.role === UserRole.ADMIN && user.status !== UserStatus.ACTIVE) {
+      throw new ConflictException("Chỉ cấp quyền quản trị cho tài khoản đang hoạt động.");
     }
 
     const previousRole = user.role;
@@ -103,14 +137,46 @@ export class UsersService {
     return saved;
   }
 
+  /**
+   * Xóa hẳn tài khoản — chỉ cho tài khoản chưa để lại lịch sử (vd. đăng ký nhầm, spam
+   * chưa hoạt động). Tài khoản đã có giao dịch/nội dung/thao tác kiểm duyệt phải khóa
+   * thay vì xóa để giữ sổ cái và nhật ký kiểm toán (khóa ngoại cũng không cho xóa).
+   */
   async remove(id: string, currentUser: User): Promise<void> {
+    if (id === currentUser.id) {
+      throw new ForbiddenException("Không thể tự xóa tài khoản của chính mình.");
+    }
     const user = await this.findById(id);
     if (!user) {
       throw new NotFoundException("User not found");
     }
+    if (user.role === UserRole.ADMIN) {
+      throw new ConflictException("Thu quyền quản trị của tài khoản này trước khi xóa.");
+    }
 
     const snapshot = { email: user.email, role: user.role, status: user.status };
-    await this.userRepo.remove(user);
+    await this.userRepo.manager.transaction(async (manager) => {
+      const blockers: string[] = [];
+      for (const ref of USER_HISTORY_REFERENCES) {
+        const rows: Array<{ n: number | string }> = await manager.query(
+          `SELECT COUNT(*) AS n FROM \`${ref.table}\` WHERE \`${ref.column}\` = ?`,
+          [id],
+        );
+        if (Number(rows[0]?.n ?? 0) > 0 && !blockers.includes(ref.label)) {
+          blockers.push(ref.label);
+        }
+      }
+      if (blockers.length > 0) {
+        throw new ConflictException(
+          `Không xóa được: tài khoản đã có ${blockers.join(", ")}. Hãy khóa tài khoản thay vì xóa để giữ lịch sử.`,
+        );
+      }
+      // Dữ liệu phụ không phải lịch sử, khóa ngoại không cascade: dọn trước khi xóa.
+      for (const table of USER_DISPOSABLE_TABLES) {
+        await manager.query(`DELETE FROM \`${table}\` WHERE \`user_id\` = ?`, [id]);
+      }
+      await manager.delete(User, { id });
+    });
     await this.auditService.record({
       userId: currentUser.id,
       action: "user.delete",

@@ -8478,6 +8478,39 @@ html:has(dialog:modal) .admin-sidebar {
   font-size: 0.88rem;
 }
 
+/* Hộp thông tin tài khoản: đổi vai trò bên trái, xóa bên phải, thông báo xuống dòng riêng */
+.user-manage-role {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-manage-role label {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.user-manage-role select {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #c8c8c8;
+  border-radius: 10px;
+  background: var(--white);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.user-manage-foot .admin-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.user-manage-message {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 /* Trang quản trị trên điện thoại: dải icon sidebar chiếm 64px nên nội dung xếp 1 cột */
 .filter-button {
   max-width: 100%;
