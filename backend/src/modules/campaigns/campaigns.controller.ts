@@ -14,10 +14,12 @@ import {
 import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.module";
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
 import { NonAdminGuard } from "../auth/guards/non-admin.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { CategoriesService } from "../categories/categories.service";
 import { OrganizationsService } from "../organizations/organizations.service";
-import { User } from "../users/entities/user.entity";
+import { User, UserRole } from "../users/entities/user.entity";
 import { CampaignsService } from "./campaigns.service";
 import {
   CampaignQueryDto,
@@ -93,7 +95,8 @@ export class CampaignsController {
   }
 
   @Patch(":id/moderate")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   moderate(
     @Param("id", ParseUUIDPipe) id: string,
     @Body() dto: ModerateCampaignDto,

@@ -7,7 +7,7 @@ import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredic
 import { resolveMediaUrl } from "@/lib/api";
 import type { AdminCampaign } from "@/lib/api/admin";
 import { fetchCampaign, type ApiCampaign } from "@/lib/api/campaigns";
-import { fetchRewardTiers, type RewardTier } from "@/lib/api/rewards";
+import { fetchManagedRewardTiers, type RewardTier } from "@/lib/api/rewards";
 import { looksLikeHtml } from "@/lib/rich-text";
 
 type Props = {
@@ -74,11 +74,13 @@ export function CampaignReviewDialog({ campaign, statusLabel, actions, onClose }
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([fetchCampaign(campaign.id), fetchRewardTiers(campaign.id).catch(() => [])])
+    // Endpoint công khai trả 404 khi chiến dịch chưa phát hành (đang chờ duyệt),
+    // nên admin đọc qua /manage và chỉ hiện các mức đang bật như người ủng hộ sẽ thấy.
+    Promise.all([fetchCampaign(campaign.id), fetchManagedRewardTiers(campaign.id).catch(() => [])])
       .then(([loaded, loadedTiers]) => {
         if (cancelled) return;
         setDetail(loaded);
-        setTiers(loadedTiers);
+        setTiers(loadedTiers.filter((tier) => tier.isActive));
       })
       .catch((err) => !cancelled && setError(err instanceof Error ? err.message : "Không tải được hồ sơ chiến dịch."));
     return () => {
@@ -124,7 +126,7 @@ export function CampaignReviewDialog({ campaign, statusLabel, actions, onClose }
               <div><dt>Địa điểm</dt><dd>{detail.location ?? "—"}</dd></div>
               <div><dt>Mục tiêu</dt><dd>{money(detail.goalAmount)}</dd></div>
               <div><dt>Bắt đầu – kết thúc</dt><dd>{date(detail.startDate)} – {date(detail.endDate)}</dd></div>
-              <div><dt>Gửi lúc</dt><dd>{date(detail.updatedAt ?? detail.createdAt)}</dd></div>
+              <div><dt>Gửi lúc</dt><dd>{date(detail.submittedAt ?? detail.updatedAt ?? detail.createdAt)}</dd></div>
             </dl>
 
             {detail.rejectionReason && (

@@ -415,7 +415,7 @@ export function AdminDashboard() {
       try {
         const [ov, camps, dons, usrs, riskList, reportList, commentList] = await Promise.all([
           fetchAdminOverview(),
-          fetchAdminCampaigns({ status: "pending", limit: PAGE_SIZE }),
+          fetchAdminCampaigns({ status: "pending", sort: "submitted", limit: PAGE_SIZE }),
           fetchAdminDonations({ status: "completed", limit: PAGE_SIZE }),
           fetchAdminUsers({ limit: PAGE_SIZE }),
           fetchAdminRisks({ status: "open", limit: PAGE_SIZE }),
@@ -616,7 +616,36 @@ export function AdminDashboard() {
   async function handleModerate(campaign: AdminCampaign, status: ModerateDecision) {
     const needsReason = status === "needs_info" || status === "rejected";
     let reason: string | undefined;
-    if (needsReason) {
+    if (status === "paused") {
+      const result = await dialog.prompt({
+        title: "Tạm dừng chiến dịch",
+        message: (
+          <>
+            Chiến dịch <b>{campaign.title}</b> sẽ ngừng nhận ủng hộ cho tới khi được cho tiếp tục.
+            Chủ dự án và người ủng hộ nhận thông báo kèm lý do.
+          </>
+        ),
+        label: "Lý do tạm dừng (công khai cho chủ dự án và người ủng hộ)",
+        placeholder: "VD: Đang xác minh chứng từ chi tiêu theo báo cáo của cộng đồng…",
+        maxLength: 1000,
+        confirmLabel: "Tạm dừng",
+        tone: "danger",
+      });
+      if (!result) return;
+      reason = result.value;
+    } else if (status === "ended") {
+      const confirmed = await dialog.confirm({
+        title: "Kết thúc chiến dịch",
+        message: (
+          <>
+            Chiến dịch <b>{campaign.title}</b> sẽ đóng hẳn và không nhận thêm ủng hộ. Thao tác không hoàn tác được.
+          </>
+        ),
+        confirmLabel: "Kết thúc chiến dịch",
+        tone: "danger",
+      });
+      if (!confirmed) return;
+    } else if (needsReason) {
       const asking = status === "needs_info";
       const result = await dialog.prompt({
         title: asking ? "Yêu cầu bổ sung hồ sơ" : "Từ chối chiến dịch",
@@ -665,6 +694,8 @@ export function AdminDashboard() {
       ]);
       showNotice(`Đã cập nhật trạng thái chiến dịch "${campaign.title}".`);
     } catch (err) {
+      // Thông báo lỗi nằm ở trang, bị modal hồ sơ che mất: đóng hồ sơ để admin thấy lỗi.
+      setReviewing(null);
       showActionError(err, "Không cập nhật được chiến dịch");
     } finally {
       setBusy(null);
@@ -1119,29 +1150,41 @@ export function AdminDashboard() {
           <button className="approve" type="button" disabled={disabled} onClick={() => handleModerate(campaign, "active")}>
             Kích hoạt
           </button>
-          <button type="button" disabled={disabled} onClick={() => handleModerate(campaign, "needs_info")}>
-            Bổ sung
-          </button>
         </div>
       );
     }
+    // Server chỉ cho needs_info quay lại pending khi chủ dự án sửa và gửi duyệt lại
+    // (MODERATE_TRANSITIONS), nên admin không có thao tác ở trạng thái này.
     if (campaign.status === "needs_info") {
-      return (
-        <div className="admin-actions">
-          <button className="approve" type="button" disabled={disabled} onClick={() => handleModerate(campaign, "approved")}>
-            Duyệt lại
-          </button>
-          <button type="button" disabled={disabled} onClick={() => handleModerate(campaign, "rejected")}>
-            Từ chối
-          </button>
-        </div>
-      );
+      return <span className="table-muted">Chờ chủ dự án bổ sung và gửi duyệt lại</span>;
     }
     if (campaign.status === "paused") {
       return (
         <div className="admin-actions">
           <button className="approve" type="button" disabled={disabled} onClick={() => handleModerate(campaign, "active")}>
             Cho tiếp tục
+          </button>
+        </div>
+      );
+    }
+    // Khớp MODERATE_TRANSITIONS ở server: active → paused | ended; success/failed → ended.
+    if (campaign.status === "active") {
+      return (
+        <div className="admin-actions">
+          <button type="button" disabled={disabled} onClick={() => handleModerate(campaign, "paused")}>
+            Tạm dừng
+          </button>
+          <button type="button" disabled={disabled} onClick={() => handleModerate(campaign, "ended")}>
+            Kết thúc
+          </button>
+        </div>
+      );
+    }
+    if (campaign.status === "success" || campaign.status === "failed") {
+      return (
+        <div className="admin-actions">
+          <button type="button" disabled={disabled} onClick={() => handleModerate(campaign, "ended")}>
+            Đóng chiến dịch
           </button>
         </div>
       );
@@ -1394,6 +1437,9 @@ export function AdminDashboard() {
                 <option value="draft">Bản nháp</option>
                 <option value="active">Đang gây quỹ</option>
                 <option value="paused">Tạm dừng</option>
+                <option value="success">Đạt mục tiêu</option>
+                <option value="failed">Không đạt mục tiêu</option>
+                <option value="ended">Đã kết thúc</option>
                 <option value="">Tất cả trạng thái</option>
               </select>
               <select
@@ -1531,7 +1577,15 @@ export function AdminDashboard() {
           )}
 
           {viewingUserId && (
-            <UserDetailDialog userId={viewingUserId} onClose={() => setViewingUserId(null)} />
+            <UserDetailDialog
+              userId={viewingUserId}
+              currentUserId={user?.id}
+              onClose={() => setViewingUserId(null)}
+              onChanged={(change) => {
+                void Promise.all([loadUsers(userFilter, userPaging.page), reloadOverview()]);
+                if (change === "deleted") showNotice("Đã xóa tài khoản.");
+              }}
+            />
           )}
 
           {reviewing && (

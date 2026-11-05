@@ -29,7 +29,8 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   "auth.google.register": "Đăng ký bằng Google",
   "auth.google.link": "Liên kết tài khoản Google",
   "auth.login.failed": "Đăng nhập sai",
-  "auth.login.blocked": "Chặn đăng nhập (sai nhiều lần)",
+  // Ghi cả khi tài khoản bị khóa (reason=banned) lẫn khi khóa tạm do sai nhiều lần (reason=locked).
+  "auth.login.blocked": "Chặn đăng nhập (tài khoản bị khóa)",
   "auth.logout": "Đăng xuất",
   "auth.logout_all": "Đăng xuất mọi thiết bị",
   "auth.refresh.reuse_detected": "Phát hiện dùng lại phiên cũ",
