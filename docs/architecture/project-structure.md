@@ -21,12 +21,11 @@ Repository dùng mô hình monorepo, nhưng mỗi dịch vụ vẫn có vòng đ
 │   │   ├── integrations/     AI, thanh toán, email và lưu trữ tệp
 │   │   └── modules/          Module nghiệp vụ độc lập
 │   └── test/                 Kiểm thử tích hợp/e2e
-├── ai-service/               FastAPI inference và huấn luyện ngoại tuyến
-│   ├── app/                  API, cấu hình, schema và model registry
-│   ├── data/                 Dữ liệu raw/processed không đưa vào Git
-│   ├── models/               Model .pkl/.joblib không nạp từ nguồn lạ
-│   ├── artifacts/            Metrics, metadata và báo cáo đánh giá
-│   ├── training/             Pipeline huấn luyện tái lập được
+├── ai-service/               FastAPI inference; huấn luyện bằng notebook Colab
+│   ├── app/                  API, cấu hình, schema và dịch vụ suy luận
+│   ├── notebooks/            Notebook huấn luyện trên dữ liệu công khai thật
+│   ├── data/                 Hướng dẫn dữ liệu; data/raw không đưa vào Git
+│   ├── models/               Model .pkl + metrics/metadata (chỉ nạp file của dự án)
 │   └── tests/                Kiểm thử hợp đồng AI
 ├── infra/                    Docker Compose và Nginx
 └── docs/                     Kiến trúc, API, dữ liệu, vận hành và kiểm thử
