@@ -1,5 +1,8 @@
 [
   "category_id",
   "goal_amount",
-  "duration_days"
+  "duration_days",
+  "name_words",
+  "launch_month",
+  "launch_weekday"
 ]

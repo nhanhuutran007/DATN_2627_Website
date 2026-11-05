@@ -8,7 +8,7 @@ import { fetchCampaignPrediction, type AiFactor, type AiPredictData } from "@/li
 /** Gợi ý hành động cho chủ dự án ứng với yếu tố đang kéo khả năng thành công xuống. */
 const IMPROVEMENT_TIPS: Record<string, string> = {
   goal_amount: "Cân nhắc mục tiêu vừa sức, hoặc chia thành nhiều giai đoạn.",
-  duration_days: "Chọn thời gian kêu gọi hợp lý (thường 30–60 ngày).",
+  duration_days: "Rút ngắn thời gian kêu gọi: khoảng 30 ngày thường hiệu quả hơn 60 ngày.",
   profile_score: "Hoàn thiện hồ sơ cá nhân: ảnh đại diện, giới thiệu, thông tin liên hệ.",
   content_length: "Bổ sung mô tả chi tiết: vấn đề, giải pháp, đội ngũ, cách dùng tiền.",
   story_word_count: "Kể câu chuyện cụ thể hơn về người hưởng lợi và tác động.",
@@ -18,7 +18,55 @@ const IMPROVEMENT_TIPS: Record<string, string> = {
   owner_credential_approved: "Xác minh email và thông tin tài khoản.",
   early_views: "Chia sẻ chiến dịch tới cộng đồng để tăng lượt xem ban đầu.",
   early_backers: "Mời người quen ủng hộ sớm để tạo đà.",
+  name_words: "Đặt tên chiến dịch rõ ràng: nói được gây quỹ cho ai và để làm gì.",
+  launch_month: "Cân nhắc dời tháng bắt đầu: theo dữ liệu tham khảo, thời điểm này kém thuận lợi hơn trung bình.",
+  launch_weekday: "Cân nhắc đổi ngày bắt đầu trong tuần: ngày đã chọn kém thuận lợi hơn trung bình.",
 };
+
+/** Tên ngắn của đặc trưng mô hình dùng, để ghi chú "chỉ dựa trên …" khớp đúng mô hình đang chạy. */
+const FEATURE_SHORT_NAMES: Record<string, string> = {
+  category_id: "lĩnh vực",
+  goal_amount: "mục tiêu",
+  duration_days: "thời gian kêu gọi",
+  name_words: "độ dài tên",
+  launch_month: "tháng bắt đầu",
+  launch_weekday: "ngày bắt đầu trong tuần",
+};
+
+/** "lĩnh vực, mục tiêu và thời gian kêu gọi" — lấy từ `metrics.features` của mô hình đang chạy. */
+export function modelFeatureSummary(metrics: AiPredictData["metrics"]): string {
+  const raw = metrics?.features;
+  const names = (Array.isArray(raw) ? raw : ["category_id", "goal_amount", "duration_days"])
+    .filter((name): name is string => typeof name === "string")
+    .map((name) => FEATURE_SHORT_NAMES[name] ?? name);
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} và ${names[names.length - 1]}`;
+}
+
+/** Tỷ lệ dự án đạt mục tiêu trong dữ liệu huấn luyện khi metrics không gửi kèm (Kickstarter ≈ 40%). */
+const DEFAULT_BASE_RATE = 0.4;
+
+type RelativeLevel = { label: string; tone: "good" | "neutral" | "low" };
+
+/** Tỷ lệ nền thật của dữ liệu huấn luyện (`metrics.dataset.success_rate`), nếu dịch vụ AI gửi kèm. */
+export function baseSuccessRate(metrics: AiPredictData["metrics"]): number {
+  const dataset = metrics?.dataset;
+  const rate =
+    dataset && typeof dataset === "object" ? (dataset as Record<string, unknown>).success_rate : undefined;
+  return typeof rate === "number" && rate >= 0.05 && rate <= 0.95 ? rate : DEFAULT_BASE_RATE;
+}
+
+/**
+ * So xác suất với mặt bằng chung thay vì đọc như "đậu/rớt": dữ liệu huấn luyện chỉ ~40% dự án
+ * đạt mục tiêu và mô hình 3 đặc trưng ít khi cho số cực cao, nên 50% đã là khá tốt.
+ */
+export function relativeLevel(probability: number, baseRate: number): RelativeLevel {
+  const diff = probability - baseRate;
+  if (diff >= 0.15) return { label: "Thuộc nhóm tốt", tone: "good" };
+  if (diff >= 0.05) return { label: "Cao hơn mặt bằng", tone: "good" };
+  if (diff > -0.05) return { label: "Ngang mặt bằng", tone: "neutral" };
+  return { label: "Thấp hơn mặt bằng", tone: "low" };
+}
 
 type State =
   | { status: "loading" }
@@ -92,6 +140,8 @@ export function CampaignPredictionCard({ campaignId, variant }: CampaignPredicti
 function PredictionBody({ data, variant }: { data: AiPredictData; variant: "owner" | "admin" }) {
   const factors = data.factors.slice(0, variant === "admin" ? 3 : 5);
   const tips = variant === "owner" ? improvementTips(data.factors) : [];
+  const base = baseSuccessRate(data.metrics);
+  const level = relativeLevel(data.probability, base);
 
   return (
     <>
@@ -103,6 +153,10 @@ function PredictionBody({ data, variant }: { data: AiPredictData; variant: "owne
       <p className="model-figure">
         <span className="num">{Math.round(data.probability * 100)}%</span>
         <span>khả năng đạt mục tiêu</span>
+      </p>
+      <p className="prediction-level">
+        <span className={`prediction-level-tag is-${level.tone}`}>{level.label}</span>
+        <span>Mặt bằng chung: khoảng {Math.round(base * 100)}% dự án đạt mục tiêu</span>
       </p>
       {factors.length > 0 && (
         <ul className="model-factors">
@@ -131,7 +185,7 @@ function PredictionBody({ data, variant }: { data: AiPredictData; variant: "owne
         {" "}
         {data.fallback
           ? "Công thức kinh nghiệm xuất phát từ tỷ lệ thành công chung, không phải kết quả học máy."
-          : `Mô hình ${data.model ?? "dự đoán"} học từ dữ liệu gây quỹ thực tế (Kickstarter), chỉ dựa trên lĩnh vực, mục tiêu và thời gian kêu gọi.`}
+          : `Mô hình ${data.model ?? "dự đoán"} học từ dữ liệu gây quỹ thực tế (Kickstarter), chỉ dựa trên ${modelFeatureSummary(data.metrics)}.`}
       </p>
     </>
   );

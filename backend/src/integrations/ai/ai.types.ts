@@ -71,6 +71,12 @@ export type AiPredictFeatures = {
   hasBudgetReport: boolean;
   earlyViews: number;
   earlyBackers: number;
+  /** Số từ trong tên chiến dịch. */
+  nameWords: number;
+  /** Tháng bắt đầu gây quỹ theo giờ Việt Nam (1–12). */
+  launchMonth: number;
+  /** Thứ bắt đầu theo giờ Việt Nam, 0 = thứ Hai … 6 = Chủ nhật (như pandas `dt.weekday` lúc huấn luyện). */
+  launchWeekday: number;
 };
 
 export type AiPredictRequest = {

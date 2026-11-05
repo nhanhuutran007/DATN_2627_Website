@@ -2885,6 +2885,39 @@ h3 {
   font-size: 0.88rem;
 }
 
+/* Mức tương đối so với tỷ lệ đạt mục tiêu chung của dữ liệu huấn luyện (xem CampaignPredictionCard) */
+.prediction-level {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: -2px 0 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.prediction-level-tag {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.prediction-level-tag.is-good {
+  background: #e7f6ec;
+  color: var(--success);
+}
+
+.prediction-level-tag.is-neutral {
+  background: var(--soft);
+  color: var(--text-2);
+}
+
+.prediction-level-tag.is-low {
+  background: #fdf1e3;
+  color: #a1560b;
+}
+
 .model-factors .up {
   color: var(--success);
   font-weight: 600;

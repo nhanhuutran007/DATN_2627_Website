@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -31,7 +32,20 @@ FEATURE_LABELS: dict[str, str] = {
     "has_budget_report": "Có báo cáo ngân sách",
     "early_views": "Lượt xem ban đầu",
     "early_backers": "Ủng hộ viên ban đầu",
+    "name_words": "Độ dài tên chiến dịch",
+    "launch_month": "Tháng bắt đầu gây quỹ",
+    "launch_weekday": "Ngày trong tuần bắt đầu",
 }
+
+# Đặc trưng dạng vòng: "giá trị cao/thấp" không có nghĩa (tháng 12 không "lớn hơn" tháng 1), nên
+# hướng tác động = xác suất ở giá trị của chiến dịch so với trung bình trên mọi giá trị.
+CYCLIC_FEATURES: dict[str, tuple[int, ...]] = {
+    "launch_month": tuple(range(1, 13)),
+    "launch_weekday": tuple(range(7)),
+}
+
+# Ngày bắt đầu mặc định khi không gửi kèm (chiến dịch chưa chọn ngày): hôm nay theo giờ Việt Nam.
+VIETNAM_UTC_OFFSET = timedelta(hours=7)
 
 # Reference "high" value per feature used for RF directional attribution when the
 # stored correlation from training is unavailable.
@@ -49,6 +63,7 @@ REFERENCE_HIGH: dict[str, float] = {
     "has_budget_report": 1.0,
     "early_views": 5000.0,
     "early_backers": 50.0,
+    "name_words": 15.0,
 }
 
 # Rule-of-thumb fallback used only when the trained model cannot be loaded. It starts
@@ -164,9 +179,21 @@ class PredictorService:
             "has_budget_report": float(features.has_budget_report),
             "early_views": float(features.early_views),
             "early_backers": float(features.early_backers),
+            "name_words": float(features.name_words),
+            **self._launch_calendar(features),
         }
         names = trained_features if trained_features else SUCCESS_FEATURES
         return [source.get(name, 0.0) for name in names]
+
+    @staticmethod
+    def _launch_calendar(features: PredictFeatures) -> dict[str, float]:
+        """Tháng/thứ bắt đầu; thiếu thì lấy hôm nay theo giờ Việt Nam (0 = thứ Hai, như pandas)."""
+        today = datetime.now(UTC) + VIETNAM_UTC_OFFSET
+        month = features.launch_month if features.launch_month is not None else today.month
+        weekday = (
+            features.launch_weekday if features.launch_weekday is not None else today.weekday()
+        )
+        return {"launch_month": float(month), "launch_weekday": float(weekday)}
 
     def _explain(
         self,
@@ -190,11 +217,18 @@ class PredictorService:
             if not math.isfinite(weight):
                 continue
             direction = self._direction(model, vector, names, name, weight, stored_corr, model_name)
-            note = (
-                "Giá trị cao làm tăng xác suất thành công"
-                if direction == "UP"
-                else "Giá trị cao làm giảm xác suất thành công"
-            )
+            if name in CYCLIC_FEATURES:
+                note = (
+                    "Thời điểm bắt đầu này thuận lợi hơn trung bình"
+                    if direction == "UP"
+                    else "Thời điểm bắt đầu này kém thuận lợi hơn trung bình"
+                )
+            else:
+                note = (
+                    "Giá trị cao làm tăng xác suất thành công"
+                    if direction == "UP"
+                    else "Giá trị cao làm giảm xác suất thành công"
+                )
             factors.append(
                 Factor(
                     feature=name,
@@ -218,6 +252,8 @@ class PredictorService:
         stored_corr: dict | None,
         model_name: str,
     ) -> str:
+        if name in CYCLIC_FEATURES:
+            return self._cyclic_direction(model, vector, names, name)
         if model_name.startswith("LogisticRegression"):
             return "UP" if weight >= 0 else "DOWN"
         if isinstance(stored_corr, dict) and name in stored_corr:
@@ -230,6 +266,22 @@ class PredictorService:
                 except (TypeError, ValueError):
                     pass
         return self._perturb_direction(model, vector, names, name)
+
+    def _cyclic_direction(
+        self, model: Any, vector: list[float], names: list[str], name: str
+    ) -> str:
+        """Tháng/thứ của chiến dịch so với trung bình mọi giá trị (phần khác giữ nguyên)."""
+        try:
+            index = names.index(name)
+            grid = np.tile(np.asarray(vector, dtype=float), (len(CYCLIC_FEATURES[name]), 1))
+            grid[:, index] = CYCLIC_FEATURES[name]
+            average = float(np.mean(np.asarray(model.predict_proba(grid))[:, 1]))
+            actual = float(np.asarray(model.predict_proba(np.asarray([vector], dtype=float)))[0][1])
+            if math.isfinite(actual - average):
+                return "UP" if actual >= average else "DOWN"
+        except Exception:
+            pass
+        return "UP"
 
     def _perturb_direction(
         self, model: Any, vector: list[float], names: list[str], name: str

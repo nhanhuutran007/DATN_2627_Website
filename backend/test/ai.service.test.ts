@@ -9,7 +9,7 @@ import type {
   AiRecommendRequest,
   AiRecommendResponse,
 } from "../src/integrations/ai/ai.types";
-import { AiService } from "../src/modules/ai/ai.service";
+import { AiService, aiCategoryId, countWords, launchCalendar } from "../src/modules/ai/ai.service";
 import { BehaviorEventType } from "../src/modules/ai/entities/behavior-event.entity";
 import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import { DonationStatus } from "../src/modules/donations/entities/donation.entity";
@@ -140,6 +140,52 @@ function createRepos() {
   return { campaignRepo, donationRepo, userRepo, eventRepo, viewDailyRepo };
 }
 
+describe("aiCategoryId", () => {
+  it("maps the platform's category names to the prediction model's ids", () => {
+    equal(aiCategoryId("Môi trường"), 0);
+    equal(aiCategoryId("Khởi nghiệp"), 1);
+    equal(aiCategoryId("Giáo dục"), 2);
+    equal(aiCategoryId("Y tế"), 3);
+    equal(aiCategoryId("Văn hóa"), 4);
+    equal(aiCategoryId("Công nghệ"), 5);
+  });
+
+  it("matches renamed categories by accent-insensitive keywords", () => {
+    // Trước đây hai tên này không khớp nên rơi về 0 (Môi trường) — nhóm thấp nhất của mô hình.
+    equal(aiCategoryId("Văn hóa nghệ thuật"), 4);
+    equal(aiCategoryId("Nông nghiệp"), 1);
+    equal(aiCategoryId("  VĂN HOÁ  "), 4);
+    equal(aiCategoryId("Chăm sóc sức khỏe"), 3);
+  });
+
+  it("falls back to the default id for unknown or empty categories", () => {
+    equal(aiCategoryId("Thể thao"), 0);
+    equal(aiCategoryId(""), 0);
+    equal(aiCategoryId(undefined), 0);
+  });
+});
+
+describe("prediction calendar features", () => {
+  it("counts words like Python's str.split()", () => {
+    equal(countWords("Mô hình nuôi ong"), 4);
+    equal(countWords("  nhiều   khoảng\ttrắng \n "), 3);
+    equal(countWords(""), 0);
+    equal(countWords(undefined), 0);
+  });
+
+  it("uses the Vietnam date with Monday = 0 like pandas dt.weekday", () => {
+    deepEqual(launchCalendar("2026-11-08"), { launchMonth: 11, launchWeekday: 6 }); // Chủ nhật
+    // 18:30 UTC ngày 31/12 đã là 01:30 ngày 01/01 (thứ Sáu) ở Việt Nam
+    deepEqual(launchCalendar(new Date("2026-12-31T18:30:00Z")), { launchMonth: 1, launchWeekday: 4 });
+  });
+
+  it("falls back to today for a missing or invalid start date", () => {
+    const value = launchCalendar("not-a-date");
+    ok(value.launchMonth >= 1 && value.launchMonth <= 12);
+    ok(value.launchWeekday >= 0 && value.launchWeekday <= 6);
+  });
+});
+
 describe("AiService", () => {
   let service: AiService;
   let gateway: FakeAiGateway;
@@ -224,6 +270,19 @@ describe("AiService", () => {
       equal(features.imageCount, 3);
       equal(features.storyWordCount, 6);
       equal(features.contentLength, "Xin chào cộng đồng Cảm ơn".length);
+    });
+
+    it("should send title length and launch month/weekday for the 2026.11 model", async () => {
+      repos.campaignRepo.findOne = async () =>
+        makeCampaign({ title: "  Mô hình nuôi ong   cho hộ nghèo ", startDate: "2026-11-02" as any });
+
+      await service.predict({ campaignId: CAMPAIGN_ID });
+
+      const features = gateway.lastPredict?.features;
+      ok(features);
+      equal(features.nameWords, 7);
+      equal(features.launchMonth, 11);
+      equal(features.launchWeekday, 0); // 02/11/2026 là thứ Hai
     });
 
     it("should report unavailable when the AI service is down", async () => {

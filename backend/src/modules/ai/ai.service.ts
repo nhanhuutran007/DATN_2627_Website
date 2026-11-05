@@ -36,14 +36,42 @@ const PUBLIC_STATUSES = [
   CampaignStatus.ENDED,
 ];
 
-const CATEGORY_IDS: Record<string, number> = {
-  "Môi trường": 0,
-  "Khởi nghiệp": 1,
-  "Giáo dục": 2,
-  "Y tế": 3,
-  "Văn hóa": 4,
-  "Công nghệ": 5,
-};
+/**
+ * Mã lĩnh vực của mô hình dự đoán (khớp `CATEGORY_IDS` trong ai-service/app/services/catalog.py):
+ * 0 Môi trường, 1 Khởi nghiệp, 2 Giáo dục, 3 Y tế, 4 Văn hóa, 5 Công nghệ.
+ * Lĩnh vực do admin đặt tên tự do (vd. "Văn hóa nghệ thuật", "Nông nghiệp") nên dò theo từ khóa
+ * không dấu thay vì so khớp nguyên tên. Nông nghiệp vào nhóm Khởi nghiệp vì lúc huấn luyện
+ * Food/Crafts/Fashion của Kickstarter được gộp vào nhóm này.
+ */
+const AI_CATEGORY_RULES: ReadonlyArray<{ id: number; keywords: readonly string[] }> = [
+  { id: 3, keywords: ["y te", "suc khoe", "benh"] },
+  { id: 2, keywords: ["giao duc", "hoc bong", "truong hoc"] },
+  { id: 5, keywords: ["cong nghe", "ky thuat so", "phan mem"] },
+  { id: 4, keywords: ["van hoa", "nghe thuat", "am nhac", "dien anh"] },
+  { id: 1, keywords: ["khoi nghiep", "nong nghiep", "kinh doanh", "thu cong", "thuc pham"] },
+  { id: 0, keywords: ["moi truong"] },
+];
+/** Không khớp lĩnh vực nào: giữ mã 0 như trước (Môi trường). */
+const AI_CATEGORY_DEFAULT = 0;
+
+function foldVietnamese(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Lĩnh vực của nền tảng → mã lĩnh vực gửi cho mô hình dự đoán. */
+export function aiCategoryId(category: string | null | undefined): number {
+  const folded = foldVietnamese(category ?? "");
+  if (!folded) return AI_CATEGORY_DEFAULT;
+  const rule = AI_CATEGORY_RULES.find((candidate) => candidate.keywords.some((keyword) => folded.includes(keyword)));
+  return rule ? rule.id : AI_CATEGORY_DEFAULT;
+}
 
 const EVENT_TYPE_MAP: Record<BehaviorEventType, AiUserEvent["eventType"]> = {
   [BehaviorEventType.VIEW]: "VIEW",
@@ -55,6 +83,27 @@ const EVENT_TYPE_MAP: Record<BehaviorEventType, AiUserEvent["eventType"]> = {
 const DAY_MS = 86_400_000;
 /** "Ban đầu" trong đặc trưng dự đoán = 7 ngày đầu gây quỹ (tổng hiện tại sẽ làm mô hình tự trả lời). */
 const EARLY_WINDOW_DAYS = 7;
+
+const VIETNAM_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+/** Số từ trong tên chiến dịch (đặc trưng `name_words`, như `name.split()` lúc huấn luyện). */
+export function countWords(text: string | null | undefined): number {
+  return (text ?? "").trim().split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * Tháng (1–12) và thứ (0 = thứ Hai … 6 = Chủ nhật) của ngày bắt đầu theo giờ Việt Nam — khớp
+ * `launched.dt.month` / `launched.dt.weekday` lúc huấn luyện. Ngày lỗi thì dùng hôm nay.
+ */
+export function launchCalendar(start: Date | string | null | undefined): {
+  launchMonth: number;
+  launchWeekday: number;
+} {
+  const parsed = start ? new Date(start) : new Date();
+  const date = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  const local = new Date(date.getTime() + VIETNAM_OFFSET_MS);
+  return { launchMonth: local.getUTCMonth() + 1, launchWeekday: (local.getUTCDay() + 6) % 7 };
+}
 
 function utcDay(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -322,7 +371,7 @@ export class AiService {
     const inlineImages = html.match(/<img\b/gi)?.length ?? 0;
 
     return {
-      categoryId: CATEGORY_IDS[campaign.category] ?? 0,
+      categoryId: aiCategoryId(campaign.category),
       goalAmount: Number(campaign.goalAmount) || 0,
       durationDays: this.daysBetween(campaign.startDate, campaign.endDate),
       profileScore: this.profileScore(campaign),
@@ -335,6 +384,8 @@ export class AiService {
       hasBudgetReport: milestones.some((milestone) => milestone.budget != null),
       earlyViews: earlyViewDays.reduce((sum, day) => sum + day.views, 0),
       earlyBackers,
+      nameWords: countWords(campaign.title),
+      ...launchCalendar(campaign.startDate),
     };
   }
 

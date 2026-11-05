@@ -73,6 +73,84 @@ def test_predict_uses_trained_feature_subset(tmp_path) -> None:
     assert {factor.feature for factor in response.factors} <= set(names)
 
 
+CALENDAR_FEATURES = [
+    "category_id",
+    "goal_amount",
+    "duration_days",
+    "name_words",
+    "launch_month",
+    "launch_weekday",
+]
+
+
+def _calendar_model_service(tmp_path) -> PredictorService:
+    """Mô hình 6 đặc trưng (như notebook 2026.11): thành công khi bắt đầu tháng 11–12."""
+    import json
+
+    import joblib
+    import numpy as np
+    from sklearn.ensemble import RandomForestClassifier
+
+    rng = np.random.default_rng(1)
+    n = 600
+    x = np.column_stack(
+        [
+            rng.integers(0, 6, n),
+            rng.uniform(1e6, 5e8, n),
+            rng.integers(7, 90, n),
+            rng.integers(1, 15, n),
+            rng.integers(1, 13, n),
+            rng.integers(0, 7, n),
+        ]
+    )
+    y = (x[:, 4] >= 11).astype(int)
+    model = RandomForestClassifier(n_estimators=20, random_state=0).fit(x, y)
+    joblib.dump(model, tmp_path / "success_model.pkl")
+    (tmp_path / "success_features.json").write_text(json.dumps(CALENDAR_FEATURES), encoding="utf-8")
+    return PredictorService(
+        model_path=tmp_path / "success_model.pkl",
+        features_path=tmp_path / "success_features.json",
+        metrics_path=tmp_path / "missing_metrics.json",
+    )
+
+
+def test_vector_follows_trained_order_with_calendar_features() -> None:
+    service = PredictorService()
+    features = PredictFeatures(
+        category_id=4, goal_amount=10_000_000, duration_days=20,
+        name_words=7, launch_month=11, launch_weekday=1,
+    )
+
+    vector = service._feature_vector(features, CALENDAR_FEATURES)
+
+    assert vector == [4.0, 10_000_000.0, 20.0, 7.0, 11.0, 1.0]
+
+
+def test_missing_launch_date_defaults_to_today() -> None:
+    service = PredictorService()
+
+    vector = service._feature_vector(PredictFeatures(), ["launch_month", "launch_weekday"])
+
+    assert 1 <= vector[0] <= 12
+    assert 0 <= vector[1] <= 6
+
+
+def test_cyclic_feature_direction_compares_with_average(tmp_path) -> None:
+    service = _calendar_model_service(tmp_path)
+    base = {"category_id": 2, "goal_amount": 50_000_000, "duration_days": 30, "name_words": 6}
+
+    good = service.predict(PredictFeatures(launch_month=12, launch_weekday=2, **base))
+    bad = service.predict(PredictFeatures(launch_month=3, launch_weekday=2, **base))
+
+    assert good.fallback is False
+    assert good.probability > bad.probability
+    month_good = next(f for f in good.factors if f.feature == "launch_month")
+    month_bad = next(f for f in bad.factors if f.feature == "launch_month")
+    assert month_good.direction == "UP"
+    assert month_bad.direction == "DOWN"
+    assert "thuận lợi" in month_good.note
+
+
 def _fallback_service() -> PredictorService:
     return PredictorService(
         model_path="definitely/missing/success_model.pkl",

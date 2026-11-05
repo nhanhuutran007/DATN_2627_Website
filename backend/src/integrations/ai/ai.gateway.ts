@@ -95,6 +95,9 @@ type WirePredictRequest = {
     has_budget_report: boolean;
     early_views: number;
     early_backers: number;
+    name_words: number;
+    launch_month: number;
+    launch_weekday: number;
   };
 };
 
@@ -175,6 +178,9 @@ export class HttpAiGateway implements AiGateway {
         has_budget_report: payload.features.hasBudgetReport,
         early_views: payload.features.earlyViews,
         early_backers: payload.features.earlyBackers,
+        name_words: payload.features.nameWords,
+        launch_month: payload.features.launchMonth,
+        launch_weekday: payload.features.launchWeekday,
       },
     };
     return this.request<WirePredictResponse>("/api/v1/predict", { payload: wire });

@@ -19,6 +19,14 @@ class PredictFeatures(BaseModel):
     has_budget_report: bool = False
     early_views: int = 0
     early_backers: int = 0
+    # Có cả trong Kickstarter lẫn nền tảng ngay khi tạo chiến dịch (mô hình 2026.11 trở đi dùng):
+    name_words: int = Field(0, ge=0, description="Số từ trong tên chiến dịch")
+    launch_month: int | None = Field(
+        None, ge=1, le=12, description="Tháng bắt đầu gây quỹ (1–12); thiếu thì lấy tháng hiện tại"
+    )
+    launch_weekday: int | None = Field(
+        None, ge=0, le=6, description="Thứ bắt đầu (0 = thứ Hai … 6 = Chủ nhật); thiếu: hôm nay"
+    )
 
 
 class PredictRequest(BaseModel):
