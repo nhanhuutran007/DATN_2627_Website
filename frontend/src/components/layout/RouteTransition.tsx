@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { isSettingsTabSwitch } from "@/features/profile/AccountShell";
+
 /** Lớp phủ hiện tối thiểu chừng này mỗi lần chuyển trang, để nội dung mới hiện ra mượt hơn. */
 const MIN_VISIBLE_MS = 1000;
 /** Bấm link nhưng trang không đổi (link bị chặn, lỗi mạng) thì tự tắt sau chừng này. */
@@ -18,7 +20,9 @@ function isPageLink(event: MouseEvent): boolean {
   if (anchor.target && anchor.target !== "_self") return false;
   if (anchor.hasAttribute("download")) return false;
   const url = new URL(anchor.href, window.location.href);
-  return url.origin === window.location.origin && url.pathname !== window.location.pathname;
+  if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return false;
+  // Đổi tab trong trang Cài đặt: layout giữ nguyên, nội dung tự hiện dần — không che bằng lớp phủ.
+  return !isSettingsTabSwitch(window.location.pathname, url.pathname);
 }
 
 /** Hiệu ứng tải 3 chấm khi chuyển trang (bấm link hoặc điều hướng bằng code). */
@@ -34,9 +38,11 @@ export function RouteTransition() {
   // Đặt state ngay trong lúc render để lớp phủ được commit cùng lần với trang mới, không để trang mới lộ ra trước.
   if (seenPath !== pathname) {
     setSeenPath(pathname);
-    setVisible(true);
-    setArrived(true);
-    setLeaving(false);
+    if (!isSettingsTabSwitch(seenPath, pathname)) {
+      setVisible(true);
+      setArrived(true);
+      setLeaving(false);
+    }
   }
 
   useEffect(() => {

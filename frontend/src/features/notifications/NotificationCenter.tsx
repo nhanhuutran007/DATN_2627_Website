@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Icon, type IconName } from "@/components/ui/Icon";
-import { AccountShell } from "@/features/profile/AccountShell";
 import { useAuthUser } from "@/lib/auth";
 import { timeAgo } from "@/lib/time";
 import {
@@ -191,7 +190,7 @@ export function NotificationCenter() {
   };
 
   return (
-    <AccountShell active="notifications">
+    <>
       <section className="account-intro" aria-labelledby="notification-title">
         <h2 id="notification-title">Không bỏ lỡ cập nhật nào</h2>
         <p>
@@ -265,6 +264,6 @@ export function NotificationCenter() {
           <button className="account-pill" type="button" onClick={loadMore}>Xem thêm</button>
         </div>
       )}
-    </AccountShell>
+    </>
   );
 }

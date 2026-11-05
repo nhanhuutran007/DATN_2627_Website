@@ -57,7 +57,7 @@ export function AiConsentSettings({ user }: { user: AuthUser }) {
   return (
     <section className="account-row" aria-labelledby="ai-consent-settings">
       <div className="account-row-main">
-        <h3 id="ai-consent-settings" className="account-label">Gợi ý cá nhân hóa</h3>
+        <h2 id="ai-consent-settings" className="account-label">Gợi ý cá nhân hóa</h2>
         <p className="account-value" id="ai-consent-desc">
           Khi bật, các dự án bạn xem được ghi nhận để gợi ý dự án phù hợp hơn. Tắt đi sẽ xóa lịch sử đã ghi; gợi ý khi
           đó dựa trên độ phổ biến chung.
