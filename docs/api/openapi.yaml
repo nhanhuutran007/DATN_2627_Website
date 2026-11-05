@@ -248,7 +248,7 @@ paths:
               properties:
                 purpose:
                   type: string
-                  enum: [change_password, refund_request, admin_refund]
+                  enum: [change_password, refund_request, admin_refund, admin_backup, admin_users]
       responses:
         "200":
           description: Đã gửi mã
@@ -548,8 +548,13 @@ paths:
           $ref: "#/components/responses/NotFound"
     delete:
       operationId: deleteUser
-      summary: Xóa người dùng (chỉ admin)
-      description: Ghi audit `user.delete` (không log mật khẩu).
+      x-step-up-purpose: admin_users  # cần header X-Step-Up-Token, xem /auth/step-up/verify
+      summary: Xóa người dùng chưa có hoạt động (chỉ admin)
+      description: >-
+        Chỉ xóa được tài khoản chưa để lại lịch sử (chiến dịch, giao dịch, yêu cầu hoàn, bình luận,
+        báo cáo, hồ sơ tổ chức, ảnh tải lên, thao tác kiểm duyệt); còn lịch sử thì trả 409 — dùng khóa
+        tài khoản (`PATCH /admin/users/{id}/status`). Không tự xóa mình, không xóa admin (thu quyền
+        trước). Thông báo và hành vi gợi ý AI xóa kèm. Ghi audit `user.delete` (không log mật khẩu).
       security:
         - bearerAuth: []
       parameters:
@@ -558,14 +563,20 @@ paths:
         "200":
           description: Xóa thành công
         "403":
-          $ref: "#/components/responses/Forbidden"
+          description: Không phải admin, tự xóa mình, hoặc thiếu step-up token (`code: step_up_required`)
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: Tài khoản là admin hoặc đã có lịch sử hoạt động
   /users/{id}/role:
     patch:
       operationId: updateUserRole
+      x-step-up-purpose: admin_users  # cần header X-Step-Up-Token, xem /auth/step-up/verify
       summary: Cập nhật vai trò người dùng (chỉ admin)
-      description: Ghi audit `user.role.update`.
+      description: >-
+        Không tự đổi vai trò của mình (403) nên hệ thống luôn còn ít nhất một admin; chỉ cấp quyền
+        admin cho tài khoản đang hoạt động (409); vai trò không đổi thì trả về nguyên trạng, không
+        ghi audit. Ghi audit `user.role.update`.
       security:
         - bearerAuth: []
       parameters:
@@ -790,9 +801,13 @@ paths:
       operationId: moderateCampaign
       summary: Admin duyệt/từ chối/tạm dừng/kết thúc chiến dịch
       description: >-
-        Chỉ admin. Bắt buộc theo ma trận chuyển trạng thái (vd. không thể
-        chuyển `draft` → `ended`); bắt buộc `reason` khi chuyển sang
-        `rejected`, `needs_info` hoặc `paused`. Ghi audit `campaign.moderate`.
+        Chỉ admin (kiểm tra vai trò trước khi xác thực body). Ma trận chuyển trạng thái:
+        `pending` → `approved`|`rejected`|`needs_info`; `approved` → `active`;
+        `active` → `paused`|`ended`; `paused` → `active`; `success`|`failed` → `ended`
+        (`failed` → `ended` bị chặn khi còn yêu cầu hoàn tiền chờ xử lý). `needs_info` chỉ quay
+        lại `pending` khi chủ dự án gửi duyệt lại. Chuyển khác trả 409. Bắt buộc `reason` khi
+        chuyển sang `rejected`, `needs_info` hoặc `paused`. Admin không duyệt chiến dịch của
+        chính mình. Ghi audit `campaign.moderate`.
       security:
         - bearerAuth: []
       parameters:
@@ -1613,6 +1628,7 @@ paths:
     get:
       operationId: adminListRisks
       summary: Danh sách cảnh báo rủi ro AI
+      description: Xếp theo điểm rủi ro giảm dần, rồi mới nhất trước.
       security:
         - bearerAuth: []
       parameters:
