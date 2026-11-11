@@ -8,7 +8,7 @@ import { fetchCampaignPrediction, type AiFactor, type AiPredictData } from "@/li
 /** Gợi ý hành động cho chủ dự án ứng với yếu tố đang kéo khả năng thành công xuống. */
 const IMPROVEMENT_TIPS: Record<string, string> = {
   goal_amount: "Cân nhắc mục tiêu vừa sức, hoặc chia thành nhiều giai đoạn.",
-  duration_days: "Rút ngắn thời gian kêu gọi: khoảng 30 ngày thường hiệu quả hơn 60 ngày.",
+  duration_days: "Cân nhắc lại thời gian kêu gọi: theo dữ liệu tham khảo, đợt 2–4 tuần thường hiệu quả hơn đợt kéo dài.",
   profile_score: "Hoàn thiện hồ sơ cá nhân: ảnh đại diện, giới thiệu, thông tin liên hệ.",
   content_length: "Bổ sung mô tả chi tiết: vấn đề, giải pháp, đội ngũ, cách dùng tiền.",
   story_word_count: "Kể câu chuyện cụ thể hơn về người hưởng lợi và tác động.",
@@ -161,15 +161,19 @@ function PredictionBody({ data, variant }: { data: AiPredictData; variant: "owne
       {factors.length > 0 && (
         <ul className="model-factors">
           {factors.map((factor) => (
-            <li key={factor.feature}>
+            <li key={factor.feature} title={factor.note}>
               <span>{factor.label}</span>
               <span className={factor.direction === "UP" ? "up" : "down"}>
                 {factor.direction === "UP" ? "tăng khả năng" : "giảm khả năng"}
+                {impactPoints(factor, data.fallback)}
               </span>
             </li>
           ))}
         </ul>
       )}
+      {(data.caveats ?? []).map((caveat) => (
+        <p className="hint" role="note" key={caveat}>{caveat}</p>
+      ))}
       {tips.length > 0 && (
         <div className="prediction-tips">
           <h4>Có thể cải thiện</h4>
@@ -189,6 +193,17 @@ function PredictionBody({ data, variant }: { data: AiPredictData; variant: "owne
       </p>
     </>
   );
+}
+
+/**
+ * " (+5 điểm)": mô hình thật trả `weight` là chênh lệch xác suất của chính chiến dịch này so với
+ * mặt bằng. Công thức dự phòng trả trọng số theo thang khác nên không quy ra điểm phần trăm.
+ */
+export function impactPoints(factor: AiFactor, fallback: boolean): string {
+  if (fallback || !Number.isFinite(factor.weight) || Math.abs(factor.weight) > 1) return "";
+  const points = Math.round(Math.abs(factor.weight) * 100);
+  if (points < 1) return "";
+  return ` (${factor.direction === "UP" ? "+" : "−"}${points} điểm)`;
 }
 
 function improvementTips(factors: AiFactor[]): string[] {

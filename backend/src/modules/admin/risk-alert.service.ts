@@ -4,7 +4,7 @@ import { FindOptionsWhere, In, Like, MoreThan, Not, Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import type { AiFraudResponse } from "../../integrations/ai/ai.types";
-import { AiService } from "../ai/ai.service";
+import { AiService, logAmountZScore, maxDonationsPerDonor } from "../ai/ai.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import {
   Donation,
@@ -241,26 +241,31 @@ export class RiskAlertService {
   }> {
     const lastHour = new Date(Date.now() - HOUR_MS);
 
-    const [total, failed, recent] = await Promise.all([
+    const [total, failed, recentDonations, completed] = await Promise.all([
       this.donationRepo.count({ where: { campaignId } }),
       this.donationRepo.count({
         where: { campaignId, status: DonationStatus.FAILED },
       }),
-      this.donationRepo.count({
+      this.donationRepo.find({
         where: { campaignId, createdAt: MoreThan(lastHour) },
+        select: { id: true, userId: true },
+      }),
+      this.donationRepo.find({
+        where: { campaignId, status: DonationStatus.COMPLETED },
+        select: { id: true, amount: true },
       }),
     ]);
-
-    const completed = await this.donationRepo.find({
-      where: { campaignId, status: DonationStatus.COMPLETED },
-      select: { amount: true },
-    });
-    const amounts = completed.map((donation) => Number(donation.amount) || 0);
-    const zScore = this.amountZScore(amounts);
+    // Cùng cách tính với đặc trưng gửi sang dịch vụ AI: theo từng tài khoản, số tiền trên log
+    const recent = maxDonationsPerDonor(recentDonations);
+    const zScore = logAmountZScore(completed.map((donation) => Number(donation.amount) || 0));
 
     const reasons: RiskReason[] = [];
     if (recent >= 3) {
-      reasons.push({ group: "frequency", label: "Nhiều giao dịch trong thời gian ngắn", weight: 0.4 });
+      reasons.push({
+        group: "frequency",
+        label: "Một tài khoản ủng hộ nhiều lần trong thời gian ngắn",
+        weight: 0.4,
+      });
     }
     if (failed >= 2) {
       reasons.push({ group: "payment", label: "Tỷ lệ thanh toán thất bại cao", weight: 0.35 });
@@ -292,16 +297,6 @@ export class RiskAlertService {
           : RiskAlertLevel.LOW;
 
     return { level, score, reasons, evidences };
-  }
-
-  private amountZScore(amounts: number[]): number {
-    if (amounts.length < 2) return 0;
-    const mean = amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length;
-    const variance =
-      amounts.reduce((sum, amount) => sum + (amount - mean) ** 2, 0) / amounts.length;
-    const std = Math.sqrt(variance);
-    if (!Number.isFinite(std) || std <= 0) return 0;
-    return Math.max(...amounts.map((amount) => (amount - mean) / std));
   }
 }
 

@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Between, In, MoreThan, Repository } from "typeorm";
+import { Between, MoreThan, Repository } from "typeorm";
 
 import { AiGateway } from "../../integrations/ai/ai.gateway";
 import type {
@@ -29,12 +29,38 @@ import {
 } from "./dto/ai.dto";
 import { BehaviorEvent, BehaviorEventType } from "./entities/behavior-event.entity";
 
-const PUBLIC_STATUSES = [
-  CampaignStatus.APPROVED,
-  CampaignStatus.ACTIVE,
-  CampaignStatus.SUCCESS,
-  CampaignStatus.ENDED,
-];
+/**
+ * Số chiến dịch đưa cho bộ gợi ý xếp hạng. Lấy rộng hơn số cần hiển thị: nếu chỉ lấy vài chiến
+ * dịch đông người ủng hộ nhất thì lĩnh vực người dùng quan tâm có thể không có mặt để mà gợi ý.
+ */
+const RECOMMEND_POOL_SIZE = 60;
+/** Số sự kiện gần nhất dùng làm lịch sử quan tâm. */
+const HISTORY_LIMIT = 50;
+
+/** Số giao dịch nhiều nhất mà cùng một tài khoản tạo ra trong danh sách (đặc trưng tốc độ giao dịch). */
+export function maxDonationsPerDonor(donations: ReadonlyArray<{ userId?: string | null }>): number {
+  const counts = new Map<string, number>();
+  for (const donation of donations) {
+    const key = donation.userId ?? "";
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return Math.max(0, ...counts.values());
+}
+
+/**
+ * Độ lệch (z-score) của khoản lớn nhất so với các khoản của cùng chiến dịch, tính trên log số
+ * tiền: số tiền ủng hộ lệch phải rất mạnh (đa số nhỏ, vài khoản lớn hợp lệ) nên tính trên số
+ * tiền thô sẽ gắn cờ oan mọi khoản hào phóng.
+ */
+export function logAmountZScore(amounts: readonly number[]): number {
+  const logs = amounts.filter((amount) => Number.isFinite(amount) && amount > 0).map((amount) => Math.log(amount));
+  if (logs.length < 2) return 0;
+  const mean = logs.reduce((sum, value) => sum + value, 0) / logs.length;
+  const variance = logs.reduce((sum, value) => sum + (value - mean) ** 2, 0) / logs.length;
+  const std = Math.sqrt(variance);
+  if (!Number.isFinite(std) || std <= 0) return 0;
+  return Number(((Math.max(...logs) - mean) / std).toFixed(6));
+}
 
 /**
  * Mã lĩnh vực của mô hình dự đoán (khớp `CATEGORY_IDS` trong ai-service/app/services/catalog.py):
@@ -161,7 +187,10 @@ export class AiService {
   async recommend(dto: RecommendAiDto, user?: User): Promise<RecommendResult> {
     const limit = dto.limit ?? 10;
     const excludeIds = dto.excludeIds ?? [];
-    const candidates = await this.loadCandidates(Math.min(limit * 3, 60));
+    // Không gợi ý cho người dùng chính chiến dịch của họ
+    const candidates = (await this.loadCandidates()).filter(
+      (campaign) => !user || campaign.ownerId !== user.id,
+    );
 
     if (candidates.length === 0) {
       return { available: true, source: "COLD_START", items: [], detail: "Không có chiến dịch để gợi ý" };
@@ -300,42 +329,62 @@ export class AiService {
     return { recorded: true, eventId: saved.id };
   }
 
-  private async loadCandidates(limit: number): Promise<Campaign[]> {
+  /**
+   * Chỉ chiến dịch đang nhận ủng hộ: gợi ý một chiến dịch đã kết thúc hay chưa mở thì người
+   * dùng bấm vào cũng không ủng hộ được.
+   */
+  private async loadCandidates(): Promise<Campaign[]> {
     return this.campaignRepo.find({
-      where: { status: In(PUBLIC_STATUSES) },
+      where: { status: CampaignStatus.ACTIVE, endDate: MoreThan(new Date()) },
       relations: { owner: true, milestones: true },
       order: { backerCount: "DESC" },
-      take: Math.max(1, limit),
+      take: RECOMMEND_POOL_SIZE,
     });
   }
 
+  /** Lịch sử quan tâm, mới nhất trước (bộ gợi ý giảm trọng số theo vị trí trong danh sách). */
   private async buildHistory(user: User): Promise<AiUserEvent[]> {
-    const events = await this.eventRepo.find({
-      where: { userId: user.id },
-      order: { createdAt: "DESC" },
-      take: 50,
-    });
+    const [events, donations] = await Promise.all([
+      this.eventRepo.find({
+        where: { userId: user.id },
+        order: { createdAt: "DESC" },
+        take: HISTORY_LIMIT,
+      }),
+      this.donationRepo.find({
+        where: { userId: user.id, status: DonationStatus.COMPLETED },
+        relations: { campaign: true },
+        order: { createdAt: "DESC" },
+        take: HISTORY_LIMIT,
+      }),
+    ]);
 
-    const history: AiUserEvent[] = events.map((event) => ({
-      campaignId: event.campaignId,
-      eventType: EVENT_TYPE_MAP[event.eventType],
-      category: event.category,
+    const timed: Array<{ at: number; event: AiUserEvent }> = events.map((event) => ({
+      at: timeOf(event.createdAt),
+      event: {
+        campaignId: event.campaignId,
+        eventType: EVENT_TYPE_MAP[event.eventType],
+        category: event.category,
+      },
     }));
 
-    const donations = await this.donationRepo.find({
-      where: { userId: user.id, status: DonationStatus.COMPLETED },
-      relations: { campaign: true },
-      order: { createdAt: "DESC" },
-      take: 50,
-    });
-
+    // Khoản ủng hộ đã được ghi thành sự kiện CONTRIBUTE thì không cộng lần hai
+    const contributed = new Set(
+      timed.filter((item) => item.event.eventType === "CONTRIBUTE").map((item) => item.event.campaignId),
+    );
     for (const donation of donations) {
       const category = donation.campaign?.category;
-      if (!category) continue;
-      history.push({ campaignId: donation.campaignId, eventType: "CONTRIBUTE", category });
+      if (!category || contributed.has(donation.campaignId)) continue;
+      contributed.add(donation.campaignId);
+      timed.push({
+        at: timeOf(donation.createdAt),
+        event: { campaignId: donation.campaignId, eventType: "CONTRIBUTE", category },
+      });
     }
 
-    return history;
+    return timed
+      .sort((a, b) => b.at - a.at)
+      .slice(0, HISTORY_LIMIT)
+      .map((item) => item.event);
   }
 
   private derivePreferences(history: AiUserEvent[]): string[] {
@@ -394,16 +443,18 @@ export class AiService {
   private async buildCampaignFraudFeatures(campaignId: string): Promise<Record<string, number>> {
     const lastHour = new Date(Date.now() - 60 * 60 * 1000);
 
-    const [total, failed, recent] = await Promise.all([
+    const [total, failed, recentDonations, completed] = await Promise.all([
       this.donationRepo.count({ where: { campaignId } }),
       this.donationRepo.count({ where: { campaignId, status: DonationStatus.FAILED } }),
-      this.donationRepo.count({ where: { campaignId, createdAt: MoreThan(lastHour) } }),
+      this.donationRepo.find({
+        where: { campaignId, createdAt: MoreThan(lastHour) },
+        select: { id: true, userId: true },
+      }),
+      this.donationRepo.find({
+        where: { campaignId, status: DonationStatus.COMPLETED },
+        select: { id: true, amount: true },
+      }),
     ]);
-
-    const completed = await this.donationRepo.find({
-      where: { campaignId, status: DonationStatus.COMPLETED },
-      select: { amount: true },
-    });
     const amounts = completed.map((donation) => Number(donation.amount) || 0);
 
     // Tuổi tài khoản chủ dự án; không biết thì bỏ hẳn đặc trưng (gửi 0 sẽ bị luật coi là
@@ -415,10 +466,12 @@ export class AiService {
     const ownerCreatedAt = campaign?.owner?.createdAt;
 
     return {
-      contribution_count_1h: recent,
+      // Số giao dịch của MỘT tài khoản trong 1 giờ (như lúc huấn luyện), không phải của cả chiến
+      // dịch: chiến dịch được nhiều người ủng hộ cùng lúc là tín hiệu tốt, không phải gian lận.
+      contribution_count_1h: maxDonationsPerDonor(recentDonations),
       failed_payment_count: failed,
       total_payment_count: total,
-      amount_z_score: this.amountZScore(amounts),
+      amount_z_score: logAmountZScore(amounts),
       ...(ownerCreatedAt
         ? {
             new_account_days: Math.max(
@@ -454,18 +507,6 @@ export class AiService {
         Math.floor((Date.now() - new Date(user.createdAt).getTime()) / DAY_MS),
       ),
     };
-  }
-
-  private amountZScore(amounts: number[]): number {
-    if (amounts.length < 2) return 0;
-    const mean = amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length;
-    const variance =
-      amounts.reduce((sum, amount) => sum + (amount - mean) ** 2, 0) / amounts.length;
-    const std = Math.sqrt(variance);
-    if (!Number.isFinite(std) || std <= 0) return 0;
-    return Number(
-      Math.max(...amounts.map((amount) => (amount - mean) / std)).toFixed(6),
-    );
   }
 
   private attachRecommendItems(
@@ -549,6 +590,11 @@ export class AiService {
       .filter((word) => word.length >= 3 && !stopWords.has(word));
     return [...new Set(tokens)].slice(0, 10);
   }
+}
+
+function timeOf(value: Date | string | null | undefined): number {
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
 }
 
 function errorMessage(error: unknown): string {

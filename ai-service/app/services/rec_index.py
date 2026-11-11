@@ -15,7 +15,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.core.config import settings
-from app.services.catalog import CATEGORIES
+from app.services.catalog import CATEGORIES, canonical_category
 
 
 class RecIndex:
@@ -51,8 +51,13 @@ class RecIndex:
             return None
 
     def similarity(self, a: str, b: str) -> float:
+        """Similarity of two platform categories (free-form names map to the canonical groups)."""
         if not a or not b:
             return 0.0
+        if a == b:
+            return 1.0
+        # Tên lĩnh vực trên nền tảng có thể khác tên nhóm chuẩn ("Văn hóa nghệ thuật" ~ "Văn hóa")
+        a, b = canonical_category(a) or a, canonical_category(b) or b
         if a == b:
             return 1.0
         row = self._sim.get(a)

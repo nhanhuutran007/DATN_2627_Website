@@ -143,3 +143,36 @@ def test_learned_similarity_explains_cross_category_items() -> None:
     assert reasons["camp-103"] == (
         "Người ủng hộ lĩnh vực Giáo dục cũng thường ủng hộ lĩnh vực Công nghệ"
     )
+
+
+def test_free_form_category_names_use_learned_similarity() -> None:
+    # Quản trị viên đặt tên lĩnh vực tự do: vẫn phải tra được độ tương đồng của nhóm chuẩn.
+    from app.services.catalog import canonical_category
+    from app.services.rec_index import get_index
+
+    assert canonical_category("Văn hóa nghệ thuật") == "Văn hóa"
+    assert canonical_category("Nông nghiệp sạch") == "Khởi nghiệp"
+    assert canonical_category("Y tế cộng đồng") == "Y tế"
+    assert canonical_category("Thể thao") is None
+
+    index = get_index()
+    assert index.similarity("Giáo dục & học bổng", "Công nghệ số") == index.similarity(
+        "Giáo dục", "Công nghệ"
+    )
+    assert index.similarity("Giáo dục & học bổng", "Giáo dục") == 1.0
+    assert index.similarity("Thể thao", "Giáo dục") == 0.0
+
+
+def test_long_history_does_not_drown_out_other_signals() -> None:
+    # 40 lượt ủng hộ cùng lĩnh vực: điểm vẫn nằm trong thang 0–1, không tăng theo số sự kiện.
+    service = RecommenderService()
+    history = [
+        UserEvent(campaign_id=f"camp-{n}", event_type="CONTRIBUTE", category="Giáo dục")
+        for n in range(40)
+    ]
+    response = service.recommend(
+        RecommendRequest(user_id="user-7", history=history, candidates=_candidates())
+    )
+
+    assert response.items[0].campaign_id == "camp-101"
+    assert all(0.0 <= item.score <= 1.0 for item in response.items)

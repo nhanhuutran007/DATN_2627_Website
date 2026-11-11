@@ -9,7 +9,14 @@ import type {
   AiRecommendRequest,
   AiRecommendResponse,
 } from "../src/integrations/ai/ai.types";
-import { AiService, aiCategoryId, countWords, launchCalendar } from "../src/modules/ai/ai.service";
+import {
+  AiService,
+  aiCategoryId,
+  countWords,
+  launchCalendar,
+  logAmountZScore,
+  maxDonationsPerDonor,
+} from "../src/modules/ai/ai.service";
 import { BehaviorEventType } from "../src/modules/ai/entities/behavior-event.entity";
 import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import { DonationStatus } from "../src/modules/donations/entities/donation.entity";
@@ -17,6 +24,7 @@ import { UserRole, UserStatus } from "../src/modules/users/entities/user.entity"
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";
 const CAMPAIGN_ID = "33333333-3333-3333-3333-333333333333";
+const VIEWER_ID = "22222222-2222-2222-2222-222222222222";
 
 function makeCampaign(overrides = {}) {
   return {
@@ -223,10 +231,13 @@ describe("AiService", () => {
     });
 
     it("should build history from behavior events for a consenting user", async () => {
-      const result = await service.recommend({ limit: 5 }, makeUser({ aiTrackingConsent: true }));
+      const result = await service.recommend(
+        { limit: 5 },
+        makeUser({ id: VIEWER_ID, aiTrackingConsent: true }),
+      );
       ok(result.available);
       equal(result.items.length, 1);
-      equal(gateway.lastRecommend?.userId, USER_ID);
+      equal(gateway.lastRecommend?.userId, VIEWER_ID);
       ok((gateway.lastRecommend?.history.length ?? 0) > 0);
     });
 
@@ -234,10 +245,77 @@ describe("AiService", () => {
       repos.eventRepo.find = async () => {
         throw new Error("history must not be read without consent");
       };
-      const result = await service.recommend({ limit: 5 }, makeUser());
+      const result = await service.recommend({ limit: 5 }, makeUser({ id: VIEWER_ID }));
       ok(result.available);
       equal(gateway.lastRecommend?.userId, null);
       equal(gateway.lastRecommend?.history.length, 0);
+    });
+
+    it("should only rank campaigns that are still accepting donations", async () => {
+      let where: any;
+      repos.campaignRepo.find = async (opts: any) => {
+        where = opts.where;
+        return [makeCampaign()];
+      };
+
+      await service.recommend({ limit: 3 });
+
+      equal(where.status, CampaignStatus.ACTIVE);
+      ok(where.endDate, "expired campaigns must be filtered out");
+    });
+
+    it("should not recommend the viewer's own campaigns", async () => {
+      const result = await service.recommend({ limit: 5 }, makeUser());
+
+      equal(result.items.length, 0);
+      equal(gateway.lastRecommend, null);
+    });
+
+    it("should send history newest first without double-counting a donation", async () => {
+      const OTHER_CAMPAIGN = "44444444-4444-4444-4444-444444444444";
+      repos.eventRepo.find = async () => [
+        {
+          campaignId: CAMPAIGN_ID,
+          eventType: BehaviorEventType.CONTRIBUTE,
+          category: "Giáo dục",
+          createdAt: new Date("2026-11-01T00:00:00Z"),
+        },
+      ];
+      repos.donationRepo.find = async () => [
+        // Đã có sự kiện CONTRIBUTE cho chiến dịch này -> không cộng lần hai
+        { campaignId: CAMPAIGN_ID, campaign: makeCampaign(), createdAt: new Date("2026-11-01T00:00:00Z") },
+        {
+          campaignId: OTHER_CAMPAIGN,
+          campaign: makeCampaign({ id: OTHER_CAMPAIGN, category: "Y tế" }),
+          createdAt: new Date("2026-11-05T00:00:00Z"),
+        },
+      ];
+
+      await service.recommend({ limit: 5 }, makeUser({ id: VIEWER_ID, aiTrackingConsent: true }));
+
+      deepEqual(
+        gateway.lastRecommend?.history.map((event) => event.campaignId),
+        [OTHER_CAMPAIGN, CAMPAIGN_ID],
+      );
+    });
+  });
+
+  describe("fraud feature helpers", () => {
+    it("counts the busiest single account, not the whole campaign", () => {
+      equal(maxDonationsPerDonor([]), 0);
+      // 6 người khác nhau ủng hộ trong 1 giờ: chiến dịch đang được quan tâm, không phải dồn dập
+      equal(maxDonationsPerDonor(["a", "b", "c", "d", "e", "f"].map((userId) => ({ userId }))), 1);
+      equal(maxDonationsPerDonor([{ userId: "a" }, { userId: "a" }, { userId: "b" }, { userId: "a" }]), 3);
+    });
+
+    it("scores amount outliers on the log scale", () => {
+      equal(logAmountZScore([]), 0);
+      equal(logAmountZScore([100_000]), 0);
+      equal(logAmountZScore([100_000, 100_000, 100_000]), 0);
+      const varied = [50_000, 100_000, 200_000, 500_000, 100_000, 50_000, 200_000, 1_000_000, 100_000, 300_000];
+      // Một khoản 5 triệu giữa các khoản 50 nghìn–1 triệu: đáng chú ý nhưng chưa tới ngưỡng 3
+      const z = logAmountZScore([...varied, 5_000_000]);
+      ok(z > 2 && z < 3, `z = ${z}`);
     });
   });
 

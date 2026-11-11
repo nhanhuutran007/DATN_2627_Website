@@ -185,3 +185,44 @@ def test_fallback_starts_from_base_success_rate() -> None:
     # Không có tín hiệu nào lệch khỏi mốc: xác suất gần tỷ lệ thành công nền (40%)
     assert abs(response.probability - 0.4) < 0.05
     assert response.fallback is True
+
+
+def test_factors_describe_this_campaign_not_a_global_trend() -> None:
+    # Cùng mô hình thật: mục tiêu nhỏ phải được ghi là đang giúp, mục tiêu rất lớn là đang kéo xuống
+    # (trước đây "Mục tiêu gây quỹ" luôn báo giảm khả năng cho mọi chiến dịch).
+    service = PredictorService()
+    base = {"category_id": 4, "duration_days": 30, "name_words": 7, "launch_month": 11,
+            "launch_weekday": 0}
+
+    small = service.predict(PredictFeatures(goal_amount=5_000_000, **base))
+    huge = service.predict(PredictFeatures(goal_amount=2_000_000_000, **base))
+
+    assert small.fallback is False
+    goal_small = next(f for f in small.factors if f.feature == "goal_amount")
+    goal_huge = next(f for f in huge.factors if f.feature == "goal_amount")
+    assert goal_small.direction == "UP" and goal_small.weight > 0
+    assert goal_huge.direction == "DOWN" and goal_huge.weight < 0
+    # Trọng số là chênh lệch xác suất nên luôn nằm trong [-1, 1] và xếp theo độ lớn
+    weights = [abs(f.weight) for f in small.factors]
+    assert weights == sorted(weights, reverse=True)
+    assert all(abs(f.weight) <= 1.0 for f in small.factors)
+
+
+def test_category_without_training_samples_is_averaged_over_trained_ones() -> None:
+    # Kickstarter không có Môi trường (0) / Y tế (3): không được chấm như lĩnh vực có mã số kề bên.
+    service = PredictorService()
+    base = {"goal_amount": 50_000_000, "duration_days": 30, "name_words": 7, "launch_month": 11,
+            "launch_weekday": 0}
+
+    by_category = {
+        category_id: service.predict(PredictFeatures(category_id=category_id, **base))
+        for category_id in range(6)
+    }
+    trained = [by_category[index].probability for index in (1, 2, 4, 5)]
+
+    for untrained in (0, 3):
+        response = by_category[untrained]
+        assert abs(response.probability - sum(trained) / len(trained)) < 1e-4
+        assert response.caveats
+        assert all(f.feature != "category_id" for f in response.factors)
+    assert by_category[4].caveats == []

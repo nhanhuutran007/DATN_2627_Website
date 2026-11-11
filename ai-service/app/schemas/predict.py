@@ -50,3 +50,5 @@ class PredictResponse(BaseModel):
     fallback: bool
     metrics: dict | None
     factors: list[Factor] = Field(default_factory=list)
+    # Lưu ý riêng cho lần ước lượng này (vd. lĩnh vực không có trong dữ liệu huấn luyện)
+    caveats: list[str] = Field(default_factory=list)

@@ -109,6 +109,7 @@ type WirePredictResponse = {
   fallback: boolean;
   metrics: Record<string, unknown> | null;
   factors: AiFactor[];
+  caveats?: string[];
 };
 
 type WireFraudRequest = {

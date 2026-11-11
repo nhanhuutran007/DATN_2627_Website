@@ -14,7 +14,7 @@ import numpy as np
 
 from app.core.config import settings
 from app.schemas.predict import Factor, PredictFeatures, PredictResponse
-from app.services.catalog import SUCCESS_FEATURES
+from app.services.catalog import CATEGORIES, CATEGORY_IDS, SUCCESS_FEATURES
 
 TOP_FACTORS = 6
 
@@ -37,34 +37,71 @@ FEATURE_LABELS: dict[str, str] = {
     "launch_weekday": "Ngày trong tuần bắt đầu",
 }
 
-# Đặc trưng dạng vòng: "giá trị cao/thấp" không có nghĩa (tháng 12 không "lớn hơn" tháng 1), nên
-# hướng tác động = xác suất ở giá trị của chiến dịch so với trung bình trên mọi giá trị.
-CYCLIC_FEATURES: dict[str, tuple[int, ...]] = {
-    "launch_month": tuple(range(1, 13)),
-    "launch_weekday": tuple(range(7)),
+# Giải thích theo từng chiến dịch ("what-if"): với mỗi đặc trưng, so xác suất ở giá trị của chiến
+# dịch với xác suất trung bình khi thay giá trị đó bằng các mức thường gặp dưới đây (phần còn lại
+# giữ nguyên). Chênh lệch dương = giá trị hiện tại đang giúp, âm = đang kéo xuống. Cách này đúng
+# cả với đặc trưng không đơn điệu (lĩnh vực, tháng, độ dài tên) — hướng "tương quan chung" trước
+# đây báo y hệt cho mọi chiến dịch, kể cả khi mục tiêu rất nhỏ hay tên chỉ có 2 từ.
+REFERENCE_GRIDS: dict[str, tuple[float, ...]] = {
+    "category_id": tuple(float(index) for index in range(len(CATEGORIES))),
+    "goal_amount": (5e6, 1e7, 2e7, 5e7, 1e8, 2e8, 5e8, 1e9),
+    "duration_days": (7.0, 14.0, 21.0, 30.0, 45.0, 60.0, 90.0),
+    "profile_score": (20.0, 40.0, 60.0, 80.0, 100.0),
+    "content_length": (500.0, 2000.0, 5000.0, 10000.0),
+    "image_count": (0.0, 1.0, 2.0, 4.0, 8.0),
+    "has_video": (0.0, 1.0),
+    "story_word_count": (100.0, 400.0, 1000.0, 2000.0),
+    "owner_campaign_count": (1.0, 2.0, 3.0, 5.0),
+    "owner_credential_approved": (0.0, 1.0),
+    "has_budget_report": (0.0, 1.0),
+    "early_views": (0.0, 100.0, 500.0, 2000.0),
+    "early_backers": (0.0, 5.0, 20.0, 50.0),
+    "name_words": tuple(float(count) for count in range(1, 13)),
+    "launch_month": tuple(float(month) for month in range(1, 13)),
+    "launch_weekday": tuple(float(day) for day in range(7)),
 }
+
+# Ghi chú (giúp, kéo xuống) cho từng đặc trưng; đặc trưng khác dùng DEFAULT_FACTOR_NOTES.
+FACTOR_NOTES: dict[str, tuple[str, str]] = {
+    "category_id": (
+        "Lĩnh vực này có tỷ lệ đạt mục tiêu cao hơn các lĩnh vực khác",
+        "Lĩnh vực này có tỷ lệ đạt mục tiêu thấp hơn các lĩnh vực khác",
+    ),
+    "goal_amount": (
+        "Mức mục tiêu này dễ đạt hơn mặt bằng chung",
+        "Mức mục tiêu này khó đạt hơn mặt bằng chung",
+    ),
+    "duration_days": (
+        "Thời gian kêu gọi này thuận lợi hơn mặt bằng chung",
+        "Thời gian kêu gọi này kém thuận lợi hơn mặt bằng chung",
+    ),
+    "name_words": (
+        "Độ dài tên chiến dịch đang hợp lý",
+        "Tên chiến dịch quá ngắn hoặc quá dài so với các dự án đạt mục tiêu",
+    ),
+    "launch_month": (
+        "Thời điểm bắt đầu này thuận lợi hơn trung bình",
+        "Thời điểm bắt đầu này kém thuận lợi hơn trung bình",
+    ),
+    "launch_weekday": (
+        "Thời điểm bắt đầu này thuận lợi hơn trung bình",
+        "Thời điểm bắt đầu này kém thuận lợi hơn trung bình",
+    ),
+}
+DEFAULT_FACTOR_NOTES = (
+    "Giá trị hiện tại làm tăng khả năng đạt mục tiêu",
+    "Giá trị hiện tại làm giảm khả năng đạt mục tiêu",
+)
+# Chênh lệch nhỏ hơn nửa điểm phần trăm coi như không ảnh hưởng, không nêu thành yếu tố.
+MIN_FACTOR_IMPACT = 0.005
+
+UNTRAINED_CATEGORY_CAVEAT = (
+    "Dữ liệu huấn luyện không có lĩnh vực này nên ước lượng lấy trung bình trên các lĩnh vực "
+    "mô hình đã học."
+)
 
 # Ngày bắt đầu mặc định khi không gửi kèm (chiến dịch chưa chọn ngày): hôm nay theo giờ Việt Nam.
 VIETNAM_UTC_OFFSET = timedelta(hours=7)
-
-# Reference "high" value per feature used for RF directional attribution when the
-# stored correlation from training is unavailable.
-REFERENCE_HIGH: dict[str, float] = {
-    "category_id": 5.0,
-    "goal_amount": 1_000_000_000.0,
-    "duration_days": 90.0,
-    "profile_score": 100.0,
-    "content_length": 20000.0,
-    "image_count": 8.0,
-    "has_video": 1.0,
-    "story_word_count": 5000.0,
-    "owner_campaign_count": 5.0,
-    "owner_credential_approved": 1.0,
-    "has_budget_report": 1.0,
-    "early_views": 5000.0,
-    "early_backers": 50.0,
-    "name_words": 15.0,
-}
 
 # Rule-of-thumb fallback used only when the trained model cannot be loaded. It starts
 # from the base success rate of the training data and shifts the log-odds by
@@ -140,27 +177,74 @@ class PredictorService:
         )
         metrics = _load_metrics(str(self._metrics_path))
 
+        names = trained_features if trained_features else SUCCESS_FEATURES
         vector = self._feature_vector(features, trained_features)
 
         if model is not None:
             try:
-                probabilities = np.asarray(model.predict_proba(np.asarray([vector], dtype=float)))
-                probability = float(probabilities[0][1])
+                trained_ids = self._trained_category_ids(metrics)
+                probability = float(self._probabilities(model, [vector], names, trained_ids)[0])
                 if not math.isfinite(probability):
                     raise ValueError("non-finite probability")
                 probability = max(0.0, min(1.0, probability))
-                factors = self._explain(model, vector, trained_features, metrics)
+                factors = self._explain(model, vector, names, trained_ids, probability)
+                untrained = (
+                    bool(trained_ids)
+                    and "category_id" in names
+                    and vector[names.index("category_id")] not in trained_ids
+                )
                 return self._build_response(
                     probability=probability,
                     model=version or type(model).__name__,
                     fallback=False,
                     metrics=metrics,
                     factors=factors,
+                    caveats=[UNTRAINED_CATEGORY_CAVEAT] if untrained else [],
                 )
             except Exception:
                 pass
 
         return self._heuristic_response(features, metrics)
+
+    @staticmethod
+    def _trained_category_ids(metrics: dict | None) -> tuple[float, ...]:
+        """Category ids that had training samples (empty = unknown, treat every id as trained)."""
+        dataset = metrics.get("dataset") if isinstance(metrics, dict) else None
+        mapping = dataset.get("category_mapping") if isinstance(dataset, dict) else None
+        if not isinstance(mapping, dict):
+            return ()
+        ids = {CATEGORY_IDS[name] for name in mapping.values() if name in CATEGORY_IDS}
+        return tuple(float(index) for index in sorted(ids))
+
+    @staticmethod
+    def _probabilities(
+        model: Any, rows: Any, names: list[str], trained_ids: tuple[float, ...]
+    ) -> np.ndarray:
+        """Success probability per row.
+
+        ``category_id`` is an integer code, so a tree model silently scores a category it never
+        saw (Môi trường, Y tế in the Kickstarter data) like its numeric neighbour. Such rows are
+        scored as the average over the categories the model did learn instead.
+        """
+        matrix = np.asarray(rows, dtype=float)
+
+        def positive(batch: np.ndarray) -> np.ndarray:
+            return np.asarray(model.predict_proba(batch), dtype=float)[:, 1]
+
+        if not trained_ids or "category_id" not in names:
+            return positive(matrix)
+        column = names.index("category_id")
+        unseen = ~np.isin(matrix[:, column], trained_ids)
+        if not unseen.any():
+            return positive(matrix)
+
+        result = np.empty(len(matrix), dtype=float)
+        if (~unseen).any():
+            result[~unseen] = positive(matrix[~unseen])
+        expanded = np.repeat(matrix[unseen], len(trained_ids), axis=0)
+        expanded[:, column] = np.tile(trained_ids, int(unseen.sum()))
+        result[unseen] = positive(expanded).reshape(-1, len(trained_ids)).mean(axis=1)
+        return result
 
     def _feature_vector(
         self, features: PredictFeatures, trained_features: list[str] | None
@@ -199,107 +283,45 @@ class PredictorService:
         self,
         model: Any,
         vector: list[float],
-        trained_features: list[str] | None,
-        metrics: dict | None,
+        names: list[str],
+        trained_ids: tuple[float, ...],
+        probability: float,
     ) -> list[Factor]:
-        names = trained_features if trained_features else SUCCESS_FEATURES
-        if hasattr(model, "coef_"):
-            weights = [float(value) for value in np.asarray(model.coef_).reshape(-1)]
-        elif hasattr(model, "feature_importances_"):
-            weights = [float(value) for value in np.asarray(model.feature_importances_).reshape(-1)]
-        else:
-            weights = [0.0] * len(names)
+        """Per-campaign factors: how much each feature's *current value* moves the probability.
 
-        stored_corr = metrics.get("feature_impact") if isinstance(metrics, dict) else None
-        model_name = type(model).__name__
+        ``weight`` is the change in probability (−1…1) against the average over the feature's
+        reference values, everything else unchanged; the list is ordered by absolute impact.
+        """
+        actual = np.asarray(vector, dtype=float)
         factors: list[Factor] = []
-        for name, weight in zip(names, weights, strict=False):
-            if not math.isfinite(weight):
+        for index, name in enumerate(names):
+            grid = REFERENCE_GRIDS.get(name)
+            if name == "category_id" and trained_ids:
+                grid = trained_ids
+            if not grid:
                 continue
-            direction = self._direction(model, vector, names, name, weight, stored_corr, model_name)
-            if name in CYCLIC_FEATURES:
-                note = (
-                    "Thời điểm bắt đầu này thuận lợi hơn trung bình"
-                    if direction == "UP"
-                    else "Thời điểm bắt đầu này kém thuận lợi hơn trung bình"
-                )
-            else:
-                note = (
-                    "Giá trị cao làm tăng xác suất thành công"
-                    if direction == "UP"
-                    else "Giá trị cao làm giảm xác suất thành công"
-                )
+            try:
+                rows = np.tile(actual, (len(grid), 1))
+                rows[:, index] = grid
+                reference = float(np.mean(self._probabilities(model, rows, names, trained_ids)))
+            except Exception:
+                continue
+            impact = probability - reference
+            if not math.isfinite(impact) or abs(impact) < MIN_FACTOR_IMPACT:
+                continue
+            helps, hurts = FACTOR_NOTES.get(name, DEFAULT_FACTOR_NOTES)
             factors.append(
                 Factor(
                     feature=name,
                     label=FEATURE_LABELS.get(name, name),
-                    direction=direction,
-                    weight=round(float(weight), 6),
-                    note=note,
+                    direction="UP" if impact > 0 else "DOWN",
+                    weight=round(impact, 6),
+                    note=helps if impact > 0 else hurts,
                 )
             )
 
         factors.sort(key=lambda factor: abs(factor.weight), reverse=True)
         return factors[:TOP_FACTORS]
-
-    def _direction(
-        self,
-        model: Any,
-        vector: list[float],
-        names: list[str],
-        name: str,
-        weight: float,
-        stored_corr: dict | None,
-        model_name: str,
-    ) -> str:
-        if name in CYCLIC_FEATURES:
-            return self._cyclic_direction(model, vector, names, name)
-        if model_name.startswith("LogisticRegression"):
-            return "UP" if weight >= 0 else "DOWN"
-        if isinstance(stored_corr, dict) and name in stored_corr:
-            entry = stored_corr[name]
-            if isinstance(entry, dict) and entry.get("corr") is not None:
-                try:
-                    corr = float(entry["corr"])
-                    if math.isfinite(corr) and corr != 0.0:
-                        return "UP" if corr > 0 else "DOWN"
-                except (TypeError, ValueError):
-                    pass
-        return self._perturb_direction(model, vector, names, name)
-
-    def _cyclic_direction(
-        self, model: Any, vector: list[float], names: list[str], name: str
-    ) -> str:
-        """Tháng/thứ của chiến dịch so với trung bình mọi giá trị (phần khác giữ nguyên)."""
-        try:
-            index = names.index(name)
-            grid = np.tile(np.asarray(vector, dtype=float), (len(CYCLIC_FEATURES[name]), 1))
-            grid[:, index] = CYCLIC_FEATURES[name]
-            average = float(np.mean(np.asarray(model.predict_proba(grid))[:, 1]))
-            actual = float(np.asarray(model.predict_proba(np.asarray([vector], dtype=float)))[0][1])
-            if math.isfinite(actual - average):
-                return "UP" if actual >= average else "DOWN"
-        except Exception:
-            pass
-        return "UP"
-
-    def _perturb_direction(
-        self, model: Any, vector: list[float], names: list[str], name: str
-    ) -> str:
-        try:
-            index = names.index(name)
-            lo = np.asarray(vector, dtype=float).copy()
-            hi = np.asarray(vector, dtype=float).copy()
-            lo[index] = 0.0
-            hi[index] = REFERENCE_HIGH.get(name, float(vector[index]) + 1.0)
-            base = float(np.asarray(model.predict_proba(lo.reshape(1, -1)))[0][1])
-            high_pred = float(np.asarray(model.predict_proba(hi.reshape(1, -1)))[0][1])
-            delta = high_pred - base
-            if math.isfinite(delta) and delta != 0.0:
-                return "UP" if delta > 0 else "DOWN"
-        except Exception:
-            pass
-        return "UP"
 
     def _heuristic_response(
         self, features: PredictFeatures, metrics: dict | None
@@ -415,10 +437,12 @@ class PredictorService:
         fallback: bool,
         metrics: dict | None,
         factors: list[Factor],
+        caveats: list[str] | None = None,
     ) -> PredictResponse:
         prediction = "LIKELY" if probability >= 0.5 else "UNLIKELY"
         confidence = round(2.0 * abs(probability - 0.5), 6)
         return PredictResponse(
+            caveats=caveats or [],
             probability=round(probability, 6),
             prediction=prediction,
             confidence=confidence,

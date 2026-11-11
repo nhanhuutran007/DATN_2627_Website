@@ -233,7 +233,7 @@ function formatTimestamp(): string {
 function evidenceSummary(evidences: Record<string, number>): string {
   const parts: string[] = [];
   if (evidences.contribution_count_1h) {
-    parts.push(`${evidences.contribution_count_1h} giao dịch trong 1 giờ`);
+    parts.push(`${evidences.contribution_count_1h} giao dịch từ cùng một tài khoản trong 1 giờ`);
   }
   if (evidences.failed_payment_count) {
     parts.push(`${evidences.failed_payment_count} thanh toán thất bại`);

@@ -100,6 +100,8 @@ export type AiPredictResponse = {
   fallback: boolean;
   metrics: Record<string, unknown> | null;
   factors: AiFactor[];
+  /** Lưu ý riêng cho lần ước lượng này (vd. lĩnh vực không có trong dữ liệu huấn luyện). */
+  caveats?: string[];
 };
 
 export type AiFraudEntityType = "USER" | "CAMPAIGN" | "CONTRIBUTION" | "TRANSACTION";
@@ -123,4 +125,4 @@ export type AiFraudResponse = {
   reasons: AiFraudReason[];
   evidences: Record<string, number>;
   fallback: boolean;
-};
+};

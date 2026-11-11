@@ -96,11 +96,13 @@ function makeService(opts: {
   const donationRepo: any = {
     count: async ({ where }: { where: any }) => {
       if (where?.status === DonationStatus.FAILED) return donation.failed ?? 0;
-      if (where?.createdAt) return donation.recent ?? 0;
       return donation.total ?? 0;
     },
-    find: async () =>
-      (donation.amounts ?? []).map((amount) => ({ amount })),
+    // `recent` = số giao dịch trong 1 giờ của cùng một tài khoản
+    find: async ({ where }: { where: any }) =>
+      where?.createdAt
+        ? Array.from({ length: donation.recent ?? 0 }, () => ({ userId: "donor-1" }))
+        : (donation.amounts ?? []).map((amount) => ({ amount })),
   };
 
   const saved: RiskAlert[] = [];

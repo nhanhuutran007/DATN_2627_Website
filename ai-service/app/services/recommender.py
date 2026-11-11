@@ -68,7 +68,7 @@ class RecommenderService:
         max_days = max((_to_float(c.days_left) for c in candidates), default=0.0)
 
         items: list[RecommendItem] = []
-        collab_used = False
+        collab_ids: set[str] = set()
 
         for candidate in candidates:
             if candidate.campaign_id in exclude:
@@ -82,12 +82,14 @@ class RecommenderService:
                 )
                 items.append(scored)
                 if used_collab:
-                    collab_used = True
+                    collab_ids.add(candidate.campaign_id)
             except Exception:
                 continue
 
         items.sort(key=lambda item: item.score, reverse=True)
         items = items[:_TOP_N]
+        # Chỉ ghi nguồn "cộng đồng" khi độ tương đồng học được thật sự góp vào mục được trả về
+        collab_used = any(item.campaign_id in collab_ids for item in items)
 
         if history and collab_used:
             source = "COLLABORATIVE"
@@ -124,7 +126,12 @@ class RecommenderService:
             weight = EVENT_WEIGHTS.get(event.event_type, 1.0) * _decay(position)
             if event.category:
                 vec[event.category] = vec.get(event.category, 0.0) + weight
-        return vec
+        # Chuẩn hóa về 0–1 (lĩnh vực quan tâm nhất = 1): không chuẩn hóa thì người có lịch sử dài
+        # nhận điểm lĩnh vực lớn gấp chục lần các thành phần khác và độ phổ biến mất tác dụng.
+        peak = max(vec.values(), default=0.0)
+        if peak <= 0.0 or not math.isfinite(peak):
+            return {}
+        return {category: weight / peak for category, weight in vec.items()}
 
     def _score_candidate(
         self,
