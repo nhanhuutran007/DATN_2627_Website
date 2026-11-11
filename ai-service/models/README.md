@@ -25,8 +25,15 @@ Thiếu file nào thì dịch vụ không lỗi mà lùi về phương án dự 
 Không dùng `pledged`, `backers`, `usd_pledged*` (kết quả cuối kỳ, rò rỉ nhãn) và `country`/`is_us`
 (Góp Mầm luôn ở Việt Nam). Backend luôn gửi đủ 6 trường; `ai-service` đọc thứ tự cột từ
 `success_features.json` và tra theo tên, nên chạy được với cả mô hình 3 lẫn 6 đặc trưng — thay file
-là xong, không cần sửa code. Tháng/thứ là đặc trưng dạng vòng: phần giải thích so xác suất ở giá trị
-của chiến dịch với trung bình mọi tháng/thứ ("thuận lợi hơn/kém hơn trung bình") thay vì "giá trị cao".
+là xong, không cần sửa code.
+
+**Giải thích theo từng chiến dịch** (`_explain` trong `app/services/predictor.py`): với mỗi đặc
+trưng, so xác suất ở giá trị của chính chiến dịch với xác suất trung bình khi thay giá trị đó bằng
+các mức thường gặp (`REFERENCE_GRIDS`), phần còn lại giữ nguyên. Chênh lệch dương = giá trị hiện
+tại đang giúp, âm = đang kéo xuống; `weight` của mỗi yếu tố chính là chênh lệch xác suất đó (giao
+diện hiện thành "+5 điểm" / "−8 điểm") và yếu tố lệch dưới 0,5 điểm không được nêu. Cách cũ lấy
+hướng từ tương quan chung với nhãn nên báo y hệt cho mọi chiến dịch (mục tiêu luôn "giảm", tên
+luôn "tăng") — sai với đặc trưng không đơn điệu như lĩnh vực, độ dài tên, tháng/thứ.
 
 **Kết quả `2026.11-real.2`** (tập test 66.335 dự án ra mắt sau cùng): ROC-AUC **0,708** (bộ 3 đặc trưng
 cũ, cùng thuật toán và cách chia: 0,685 → **+0,023**), PR-AUC 0,605, Brier 0,213 (cũ 0,219), kiểm
@@ -60,8 +67,27 @@ như ngưỡng đậu/rớt 50%.
 
 Lĩnh vực của nền tảng được quy về 6 mã của mô hình theo từ khóa không dấu (`aiCategoryId` trong
 `backend/src/modules/ai/ai.service.ts`): "Văn hóa nghệ thuật" → Văn hóa, "Nông nghiệp" → Khởi nghiệp
-(lúc huấn luyện Food/Crafts/Fashion được gộp vào nhóm này). Môi trường và Y tế không có mẫu trong
-Kickstarter nên mô hình cho kết quả giống Khởi nghiệp và Giáo dục.
+(lúc huấn luyện Food/Crafts/Fashion được gộp vào nhóm này). Bộ gợi ý dùng cùng bảng từ khóa
+(`canonical_category` trong `app/services/catalog.py`) để tra độ tương đồng lĩnh vực.
+
+Môi trường và Y tế không có mẫu trong Kickstarter. Vì `category_id` là mã số nguyên, mô hình cây
+sẽ âm thầm chấm hai lĩnh vực này như lĩnh vực có mã kề bên (Môi trường như Khởi nghiệp — nhóm
+thấp nhất, Y tế như Giáo dục). Để tránh sai lệch đó, `ai-service` chấm chúng bằng **trung bình
+trên các lĩnh vực mô hình đã học** (đọc từ `dataset.category_mapping`), không nêu lĩnh vực thành
+yếu tố ảnh hưởng và trả kèm `caveats` để giao diện ghi rõ.
+
+## Dữ liệu chấm rủi ro ở cấp chiến dịch
+
+Mô hình gian lận học trên đặc trưng của **một khách hàng** (IEEE-CIS). Khi quét một chiến dịch,
+backend (`buildCampaignFraudFeatures`) giữ đúng nghĩa đó ở những chỗ quan trọng:
+
+- `contribution_count_1h` = số giao dịch nhiều nhất của **cùng một tài khoản** vào chiến dịch
+  trong 1 giờ. Đếm cả chiến dịch thì chiến dịch được chia sẻ rộng (6 người ủng hộ trong một giờ)
+  sẽ bị gắn cờ rủi ro cao.
+- `amount_z_score` = độ lệch của khoản lớn nhất tính trên **log số tiền**. Số tiền ủng hộ lệch
+  phải mạnh nên tính trên số tiền thô sẽ gắn cờ oan các khoản hào phóng hợp lệ.
+- `total_payment_count`, `failed_payment_count` là tổng của chiến dịch (phục vụ luật tỷ lệ thất
+  bại); đây là điểm còn lệch so với lúc huấn luyện, nên mô hình chỉ chiếm 25% điểm.
 
 ## Phương án dự phòng
 

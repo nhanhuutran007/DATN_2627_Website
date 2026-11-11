@@ -4186,8 +4186,16 @@ components:
               additionalProperties: true
             factors:
               type: array
+              description: >-
+                Yếu tố ảnh hưởng của riêng chiến dịch này, xếp theo độ lớn. Với mô hình học máy,
+                `weight` là chênh lệch xác suất (−1…1) so với mặt bằng các giá trị thường gặp.
               items:
                 $ref: "#/components/schemas/AiPredictFactor"
+            caveats:
+              type: array
+              description: Lưu ý riêng cho lần ước lượng (vd. lĩnh vực không có trong dữ liệu huấn luyện)
+              items:
+                type: string
     FraudRequest:
       type: object
       description: Cần ít nhất một trong `campaignId` hoặc `userId`
