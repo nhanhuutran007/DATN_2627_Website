@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { jsonLdString } from "@/lib/json-ld";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { CollapsibleStory } from "@/components/campaign/CollapsibleStory";
 import { ProgressRing } from "@/components/campaign/ProgressRing";
@@ -149,7 +150,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           ))}
         </nav>
         <h1 className="detail-title">{campaign.title}</h1>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbJsonLd) }} />
       </div>
 
       <div className="container detail-layout">

@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { jsonLdString } from "@/lib/json-ld";
+
 type Crumb = { href?: string; label: string };
 
 type PageBannerProps = {
@@ -46,7 +48,7 @@ export function PageBanner({ title, crumbs, image, children }: PageBannerProps) 
         <h1>{title}</h1>
         {children}
       </div>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(jsonLd) }} />
     </section>
   );
 }

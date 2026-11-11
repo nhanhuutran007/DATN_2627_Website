@@ -1,6 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { jsonLdString } from "@/lib/json-ld";
+
 import { AiRecommendations } from "@/components/ai/AiRecommendations";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { HeroMarquee } from "@/components/home/HeroMarquee";
@@ -98,7 +100,7 @@ export default async function Home() {
 
   return (
     <main>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(organizationLd) }} />
 
       <section className="hero" aria-labelledby="hero-title">
         <div className="container hero-inner">
