@@ -29,7 +29,14 @@ services:
     ports:
       - "3000:3000"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3000/api/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--spider",
+          "http://127.0.0.1:3000/api/health",
+        ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -59,7 +66,7 @@ services:
       SEPAY_SECRET_KEY: ${SEPAY_SECRET_KEY:-}
       SEPAY_IPN_SECRET: ${SEPAY_IPN_SECRET:-}
       # Đăng nhập Google (để trống = ẩn nút Google)
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_ID: 69370430860-ctpq4a1k1adggkt6687d373c2b2bo5ck.apps.googleusercontent.com
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
       # Gốc URL frontend để tạo link trong email (vd. đặt lại mật khẩu)
       FRONTEND_URL: ${SITE_URL:-http://localhost:8080}
@@ -85,7 +92,14 @@ services:
       ai-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:4000/api/v1/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--spider",
+          "http://127.0.0.1:4000/api/v1/health",
+        ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -124,7 +138,11 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
