@@ -12,6 +12,7 @@
     "start:prod": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "tsc -p tsconfig.test.json && node --test .test-dist/test/*.test.js",
+    "test:coverage": "tsc -p tsconfig.test.json && node --test --experimental-test-coverage --test-coverage-exclude=.test-dist/test/** --test-coverage-exclude=test/** .test-dist/test/*.test.js",
     "test:watch": "node --test --watch .test-dist/test/*.test.js",
     "migration:run": "typeorm-ts-node-commonjs -d typeorm.config.ts migration:run",
     "migration:revert": "typeorm-ts-node-commonjs -d typeorm.config.ts migration:revert",
