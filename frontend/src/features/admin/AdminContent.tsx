@@ -13,7 +13,9 @@ function errorText(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
 }
 
-const isoDay = (date: Date) => date.toISOString().slice(0, 10);
+/** Ngày theo lịch địa phương dạng yyyy-mm-dd (toISOString lệch ngày trước 7h sáng giờ VN). */
+const isoDay = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 /** Quản trị nội dung: danh mục lĩnh vực và xuất thống kê ẩn danh. */
 export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (category: string) => void }) {

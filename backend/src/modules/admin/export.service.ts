@@ -8,7 +8,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { Campaign } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
 import { toCsv } from "../finance/csv";
-import { resolveRange } from "../finance/finance.service";
+import { resolveRange, vnDay } from "../finance/finance.service";
 import { MilestoneUpdate } from "../progress/entities/milestone-update.entity";
 import { Milestone } from "../progress/entities/milestone.entity";
 import type { User } from "../users/entities/user.entity";
@@ -18,11 +18,6 @@ export type CsvFile = { filename: string; content: string; rows: number };
 /** Mã giả danh chủ dự án: đối chiếu được giữa các lần xuất nhưng không lộ danh tính. */
 export function ownerPseudonym(ownerId: string): string {
   return `CDA-${createHash("sha256").update(`owner:${ownerId}`).digest("hex").slice(0, 10).toUpperCase()}`;
-}
-
-/** Ngày theo giờ Việt Nam (UTC+7), `yyyy-mm-dd` — thống kê theo ngày làm việc địa phương. */
-function vnDay(date: Date): string {
-  return new Date(date.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
 }
 
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
@@ -95,7 +90,7 @@ export class ExportService {
       entity: "export",
       newValues: { kind: "campaigns", rows: rows.length },
     });
-    return { filename: `thong-ke-chien-dich_${isoDay(now)}.csv`, content: toCsv(header, rows), rows: rows.length };
+    return { filename: `thong-ke-chien-dich_${vnDay(now)}.csv`, content: toCsv(header, rows), rows: rows.length };
   }
 
   /** Ủng hộ theo ngày (giờ VN) × lĩnh vực trong khoảng [from, to]; mặc định 30 ngày gần nhất. */
@@ -146,7 +141,7 @@ export class ExportService {
       newValues: { kind: "donations-daily", from: from.toISOString(), to: to.toISOString(), rows: rows.length },
     });
     return {
-      filename: `ung-ho-theo-ngay_${isoDay(from)}_${isoDay(to)}.csv`,
+      filename: `ung-ho-theo-ngay_${vnDay(from)}_${vnDay(to)}.csv`,
       content: toCsv(header, rows),
       rows: rows.length,
     };

@@ -73,11 +73,19 @@ export function pseudonym(userId: string): string {
   return `NUH-${createHash("sha256").update(userId).digest("hex").slice(0, 10).toUpperCase()}`;
 }
 
-/** Khoảng ngày [from 00:00, to 23:59:59.999] (UTC); mặc định 30 ngày gần nhất. */
+/** Ngày theo giờ Việt Nam (UTC+7), `yyyy-mm-dd`. */
+export function vnDay(date: Date): string {
+  return new Date(date.getTime() + 7 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Khoảng ngày [from 00:00, to 23:59:59.999] theo giờ Việt Nam (UTC+7) — khớp với
+ * ngày người quản trị chọn trên lịch; mặc định 30 ngày gần nhất.
+ */
 export function resolveRange(query: { from?: string; to?: string }, now = new Date()): { from: Date; to: Date } {
-  const to = query.to ? new Date(`${query.to.slice(0, 10)}T23:59:59.999Z`) : now;
+  const to = query.to ? new Date(`${query.to.slice(0, 10)}T23:59:59.999+07:00`) : now;
   const from = query.from
-    ? new Date(`${query.from.slice(0, 10)}T00:00:00.000Z`)
+    ? new Date(`${query.from.slice(0, 10)}T00:00:00.000+07:00`)
     : new Date(to.getTime() - 30 * DAY_MS);
   return { from, to };
 }
@@ -495,8 +503,8 @@ export class FinanceService {
       { completedCount: 0, completedAmount: 0, refundedCount: 0, refundedAmount: 0, netAmount: 0 },
     );
     return {
-      from: from.toISOString(),
-      to: to.toISOString(),
+      from: vnDay(from),
+      to: vnDay(to),
       totals,
       campaigns: rows,
       mismatches: rows.filter((r) => r.mismatch).length,
@@ -531,8 +539,7 @@ export class FinanceService {
       entity: "donation",
       newValues: { from: from.toISOString(), to: to.toISOString(), campaignId: query.campaignId ?? null, rows: rows.length },
     });
-    const day = (date: Date) => date.toISOString().slice(0, 10);
-    return { filename: `doi-soat_${day(from)}_${day(to)}.csv`, content: toCsv(header, rows), rows: rows.length };
+    return { filename: `doi-soat_${vnDay(from)}_${vnDay(to)}.csv`, content: toCsv(header, rows), rows: rows.length };
   }
 
   /**
@@ -568,7 +575,7 @@ export class FinanceService {
       entity: "refund_request",
       newValues: { status: query.status ?? null, rows: rows.length },
     });
-    const day = now.toISOString().slice(0, 10);
+    const day = vnDay(now);
     return { filename: `hoan-tien_${query.status ?? "tat-ca"}_${day}.csv`, content: toCsv(header, rows), rows: rows.length };
   }
 }

@@ -59,8 +59,9 @@ describe("csv", () => {
 
   it("khoảng ngày bao trọn ngày cuối; mặc định 30 ngày", () => {
     const r = resolveRange({ from: "2026-10-01", to: "2026-10-01" });
-    equal(r.from.toISOString(), "2026-10-01T00:00:00.000Z");
-    equal(r.to.toISOString(), "2026-10-01T23:59:59.999Z");
+    // Ngày tính theo giờ Việt Nam (UTC+7)
+    equal(r.from.toISOString(), "2026-09-30T17:00:00.000Z");
+    equal(r.to.toISOString(), "2026-10-01T16:59:59.999Z");
     const now = new Date("2026-10-31T00:00:00Z");
     equal(Math.round((now.getTime() - resolveRange({}, now).from.getTime()) / DAY), 30);
   });
