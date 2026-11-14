@@ -1,9 +1,82 @@
-# Testing
+# Kiểm thử
 
-Scaffold chỉ có health endpoints và kiểm tra khói tối thiểu. Khi phát triển từng vertical slice, bổ sung:
+Tài liệu này mô tả các tầng kiểm thử đang có, cách chạy và những phần chưa tự động hóa.
 
-- Backend unit test cho validation, quyền, ownership và state transition.
-- Backend integration test với migration và database thật trong container.
-- Frontend component/integration test cho loading, empty, success và failure states.
-- AI contract test cho feature schema, model version, timeout và fallback.
-- End-to-end test cho luồng chủ dự án → xét duyệt → phát hành → tài trợ → báo cáo tiến độ.
+## Tổng quan
+
+| Tầng | Công cụ | Vị trí | Phạm vi |
+| --- | --- | --- | --- |
+| Unit test backend | `node --test` (biên dịch bằng `tsc`) | `backend/test/*.test.ts` | Nghiệp vụ của từng service với repository giả lập: xác thực, phân quyền, vòng đời chiến dịch, giao dịch, webhook, hoàn tiền, tiến độ, kiểm duyệt, tổ chức, quản trị, thông báo, AI proxy |
+| Unit test frontend | `node --test` | `frontend/src/features/support/faq.test.mjs` | Khớp câu hỏi của hộp hỗ trợ |
+| Test AI service | `pytest` | `ai-service/tests/` | Hợp đồng API gợi ý, dự đoán, phát hiện gian lận, health, bảo mật, phương án dự phòng |
+| Kiểm tra tĩnh | TypeScript, ESLint, Ruff | toàn bộ mã nguồn | Kiểu dữ liệu và quy ước mã |
+| Smoke test | Docker Compose + Nginx | `infra/compose.yaml` | Sáu dịch vụ chạy cùng nhau, các trang và API chính phản hồi |
+| Kiểm thử thủ công | Trình duyệt | theo kịch bản bên dưới | Luồng đầu-cuối và giao diện |
+
+Kết quả lần chạy ngày 14/11/2026: backend 534 test, frontend 36 test, AI service 34 test, tất cả đều đạt; ESLint và Ruff không báo lỗi.
+
+## Cách chạy
+
+```powershell
+.\scripts\npm-local.cmd run check          # typecheck + lint + unit test (backend và frontend)
+.\scripts\npm-local.cmd run build          # build backend và frontend
+.\scripts\python-ai.cmd -m pytest -q ai-service
+.\scripts\python-ai.cmd -m ruff check ai-service
+```
+
+Chạy riêng từng phần:
+
+```powershell
+cd backend;  ..\scripts\npm-local.cmd run test     # chỉ unit test backend
+cd frontend; ..\scripts\npm-local.cmd run test     # chỉ unit test frontend
+```
+
+Unit test backend không cần cơ sở dữ liệu: repository, cổng thanh toán, email và dịch vụ AI đều được thay bằng bản giả lập.
+
+## Unit test backend theo module
+
+| Nhóm | File test |
+| --- | --- |
+| Xác thực và phiên | `auth.service`, `step-up.service`, `password-policy`, `password-reset.service`, `email-verification.service`, `optional-jwt-auth.guard`, `non-admin.guard` |
+| Người dùng | `users.service`, `user-profile-dto`, `user-serialization` |
+| Chiến dịch | `campaigns.service`, `campaign-expiry.service`, `campaign-stats.service`, `campaign-contact`, `content-management`, `rich-text` |
+| Tài trợ và thanh toán | `donations.service`, `donation-lifecycle`, `donation-ledger`, `sepay` |
+| Tài chính | `finance.service`, `rewards.service` |
+| Tiến độ và minh bạch | `progress.service`, `milestone-overdue.service`, `transparency-score`, `receipt-duplicate` |
+| Tương tác | `comments.service`, `follows.service`, `notifications.service`, `notification-grouping` |
+| Kiểm duyệt và quản trị | `moderation.service`, `admin.service`, `risk-alert.service`, `audit.service`, `backup.service` |
+| Tổ chức | `organizations.service` |
+| AI | `ai.service` |
+| Hạ tầng | `rate-limiter.service`, `redis.module`, `database-config`, `entity-column-names`, `media.service`, `email.gateway`, `health-controller` |
+
+## Smoke test trên Docker Compose
+
+```powershell
+docker compose -f infra/compose.yaml up -d --build
+docker compose -f infra/compose.yaml ps        # cả 6 dịch vụ phải ở trạng thái healthy
+```
+
+Sau đó kiểm tra qua Nginx tại `http://localhost:8080`:
+
+- `GET /api/v1/health` trả `status: ok`.
+- Các trang `/`, `/du-an`, `/tim-kiem`, `/to-chuc`, `/dang-nhap` trả mã 200; đường dẫn không tồn tại trả 404.
+- `GET /api/v1/admin/users` khi chưa đăng nhập trả 401.
+
+## Kịch bản đầu-cuối (thủ công)
+
+Dùng dữ liệu seed (`npm run seed`, mật khẩu chung `Test@123`):
+
+1. Chủ dự án (`owner2@gopmam.com`) tạo chiến dịch qua trình hướng dẫn và gửi duyệt.
+2. Quản trị viên (`admin@gopmam.com`) duyệt hồ sơ rồi kích hoạt.
+3. Người ủng hộ (`user1@gopmam.com`) ủng hộ bằng ví demo, xem biên nhận.
+4. Gửi webhook thanh toán có chữ ký đúng và chữ ký sai bằng `npm run sign-webhook` (backend) để kiểm tra xác minh HMAC và chống gửi lặp.
+5. Chủ dự án đăng cập nhật tiến độ kèm khoản chi và chứng từ; người ủng hộ nhận thông báo.
+6. Người ủng hộ yêu cầu hoàn tiền (cần mã OTP qua email); quản trị viên duyệt.
+7. Quản trị viên xem cảnh báo rủi ro, nhật ký kiểm toán và xuất thống kê.
+
+## Chưa tự động hóa
+
+- Kiểm thử đầu-cuối bằng trình duyệt hiện làm thủ công theo kịch bản trên, chưa có bộ chạy tự động.
+- Chưa có integration test chạy với MySQL thật; migration và truy vấn được kiểm tra qua smoke test trên Docker Compose.
+- Chưa đo độ phủ mã (coverage) nên không nêu con số độ phủ.
+- Frontend mới có unit test cho hộp hỗ trợ; các form và trang khác được kiểm tra thủ công.
