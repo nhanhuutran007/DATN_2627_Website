@@ -410,7 +410,10 @@ cd backend
 .\scripts\npm-local.cmd run build          # build backend và frontend
 .\scripts\python-ai.cmd -m pytest -q ai-service
 .\scripts\python-ai.cmd -m ruff check ai-service
+cd backend; ..\scripts\npm-local.cmd run test:coverage   # unit test backend kèm độ phủ mã
 ```
+
+Lần chạy ngày 14/11/2026: backend 534 test, frontend 36 test, AI service 34 test, tất cả đều đạt. Độ phủ của unit test backend là 89,1% dòng lệnh, 79,3% nhánh và 83,3% hàm, tính trên các file được test nạp vào (service, guard, DTO); phần lớn controller được kiểm tra qua smoke test và kịch bản đầu-cuối nên không nằm trong phép đo này.
 
 Kịch bản kiểm thử đầu-cuối (E2E) theo luồng _đăng ký chủ dự án → nộp hồ sơ → xét duyệt → phát hành → nhận tài trợ → cập nhật tiến độ_ đang được hoàn thiện. Xem thêm [`docs/testing/`](docs/testing/README.md).
 
@@ -500,8 +503,11 @@ DATN_2627_Website/
 - Refresh token xoay vòng có phát hiện dùng lại; mã OTP qua email cho thao tác nhạy cảm (đổi mật khẩu, hoàn tiền).
 - Giao diện người dùng được thiết kế lại theo hướng tối giản, tập trung vào thao tác ủng hộ và thông tin minh bạch: thẻ dự án gọn, "Trang của tôi" tổng hợp tác động của người ủng hộ, các trang tổ chức và gây quỹ cho tổ chức.
 - Hệ thống chạy thống nhất bằng Docker Compose; hạ tầng AWS mô tả bằng Terraform; API mô tả đầy đủ bằng OpenAPI.
+- Mô hình dự đoán được huấn luyện lại với 6 đặc trưng (bản `2026.11-real.2`), giải thích yếu tố ảnh hưởng theo từng chiến dịch; gợi ý chỉ lấy chiến dịch đang gây quỹ; tín hiệu gian lận tính theo từng tài khoản.
+- Báo cáo đối soát và các file xuất tính ranh giới ngày theo giờ Việt Nam; có trang 404 và trang báo lỗi riêng; dữ liệu mẫu đủ mốc tiến độ, khoản chi và chứng từ để trình diễn.
+- Unit test backend đạt độ phủ 89% dòng lệnh trên các file nghiệp vụ được kiểm thử.
 
-_Cập nhật lần cuối: 27/10/2026._
+_Cập nhật lần cuối: 14/11/2026._
 
 ### 15.2. Hạn chế
 

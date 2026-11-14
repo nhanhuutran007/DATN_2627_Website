@@ -49,6 +49,22 @@ Unit test backend không cần cơ sở dữ liệu: repository, cổng thanh to
 | AI | `ai.service` |
 | Hạ tầng | `rate-limiter.service`, `redis.module`, `database-config`, `entity-column-names`, `media.service`, `email.gateway`, `health-controller` |
 
+## Độ phủ mã (backend)
+
+```powershell
+cd backend; ..\scripts\npm-local.cmd run test:coverage
+```
+
+Lệnh dùng bộ đo có sẵn của Node (`--experimental-test-coverage`), không cần thêm thư viện. Kết quả lần chạy ngày 14/11/2026:
+
+| Chỉ số | Giá trị |
+| --- | --- |
+| Dòng lệnh | 89,10% |
+| Nhánh | 79,26% |
+| Hàm | 83,25% |
+
+Cách đọc con số này: bộ đo chỉ tính những file được unit test nạp vào (90 trên 151 file trong `backend/src`), chủ yếu là service, guard, DTO và các hàm nghiệp vụ. Phần lớn controller (20 trên 22) và các file khai báo module không nằm trong phép đo vì unit test gọi thẳng service; các lớp này được kiểm tra qua smoke test và kịch bản đầu-cuối. Những file có độ phủ thấp nhất là phần chạm hạ tầng thật: `backup.service` (33%), `redis.provider` (41%), `storage.gateway` (48%).
+
 ## Smoke test trên Docker Compose
 
 ```powershell
@@ -78,5 +94,5 @@ Dùng dữ liệu seed (`npm run seed`, mật khẩu chung `Test@123`):
 
 - Kiểm thử đầu-cuối bằng trình duyệt hiện làm thủ công theo kịch bản trên, chưa có bộ chạy tự động.
 - Chưa có integration test chạy với MySQL thật; migration và truy vấn được kiểm tra qua smoke test trên Docker Compose.
-- Chưa đo độ phủ mã (coverage) nên không nêu con số độ phủ.
+- Độ phủ mới đo cho unit test backend (xem mục "Độ phủ mã"); frontend và AI service chưa đo.
 - Frontend mới có unit test cho hộp hỗ trợ; các form và trang khác được kiểm tra thủ công.
