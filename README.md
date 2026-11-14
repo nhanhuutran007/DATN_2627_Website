@@ -373,7 +373,8 @@ cd backend
 cd ..
 # Seed (chỉ chạy khi DB chưa có người dùng): 12 tài khoản mẫu, mật khẩu chung Test@123
 #   admin@gopmam.com · owner1..3@gopmam.com (chủ dự án) · user1..8@gopmam.com (người ủng hộ)
-#   25 chiến dịch (6 lĩnh vực, đủ trạng thái), ~650 giao dịch trải 6–7 tháng, lượt xem theo ngày, mốc, theo dõi
+#   25 chiến dịch (6 lĩnh vực, đủ trạng thái), ~600 giao dịch trải 6–7 tháng, lượt xem theo ngày, theo dõi
+#   7 chiến dịch có kế hoạch theo mốc kèm bài cập nhật, khoản chi và chứng từ mẫu; lời động viên, hỏi đáp
 #   4 tổ chức mẫu (3 đã xác minh, 1 chờ xác minh; số giấy phép là dữ liệu giả), 8 chiến dịch gây quỹ cho tổ chức
 
 # 4. Chạy ba dịch vụ (mỗi lệnh một terminal)

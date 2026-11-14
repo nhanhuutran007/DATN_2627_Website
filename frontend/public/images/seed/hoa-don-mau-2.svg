@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" font-family="Arial, Helvetica, sans-serif">
+  <rect width="600" height="800" fill="#ffffff"/>
+  <rect x="20" y="20" width="560" height="760" fill="none" stroke="#c9ced6" stroke-width="2"/>
+  <text x="300" y="80" text-anchor="middle" font-size="28" font-weight="700" fill="#1f2a44">BIÊN BẢN GIAO NHẬN</text>
+  <text x="300" y="110" text-anchor="middle" font-size="15" fill="#c2410c">Chứng từ minh họa – dữ liệu mẫu</text>
+  <line x1="50" y1="135" x2="550" y2="135" stroke="#c9ced6"/>
+  <text x="50" y="170" font-size="15" fill="#374151">Bên giao: Cửa hàng Vật tư Mẫu</text>
+  <text x="50" y="198" font-size="15" fill="#374151">Bên nhận: Ban điều phối dự án và đại diện địa phương</text>
+  <text x="50" y="226" font-size="15" fill="#374151">Số biên bản: MAU-BB-0001</text>
+  <rect x="50" y="260" width="500" height="36" fill="#f3f4f6"/>
+  <text x="62" y="284" font-size="14" font-weight="700" fill="#1f2a44">Hạng mục bàn giao</text>
+  <text x="538" y="284" text-anchor="end" font-size="14" font-weight="700" fill="#1f2a44">Tình trạng</text>
+  <text x="62" y="328" font-size="14" fill="#374151">Vật tư, thiết bị theo hóa đơn kèm theo</text>
+  <text x="538" y="328" text-anchor="end" font-size="14" fill="#374151">Đủ, đúng chủng loại</text>
+  <line x1="50" y1="346" x2="550" y2="346" stroke="#e5e7eb"/>
+  <text x="62" y="378" font-size="14" fill="#374151">Hồ sơ, hướng dẫn sử dụng</text>
+  <text x="538" y="378" text-anchor="end" font-size="14" fill="#374151">Đã nhận</text>
+  <line x1="50" y1="396" x2="550" y2="396" stroke="#e5e7eb"/>
+  <text x="62" y="440" font-size="15" fill="#374151">Hai bên thống nhất nội dung giao nhận nêu trên.</text>
+  <text x="130" y="560" text-anchor="middle" font-size="14" fill="#374151">Đại diện bên giao</text>
+  <text x="470" y="560" text-anchor="middle" font-size="14" fill="#374151">Đại diện bên nhận</text>
+  <text x="130" y="640" text-anchor="middle" font-size="13" fill="#9ca3af">(đã ký)</text>
+  <text x="470" y="640" text-anchor="middle" font-size="13" fill="#9ca3af">(đã ký)</text>
+  <text x="300" y="745" text-anchor="middle" font-size="13" fill="#9ca3af">Góp Mầm · ảnh chứng từ dùng cho dữ liệu trình diễn</text>
+</svg>

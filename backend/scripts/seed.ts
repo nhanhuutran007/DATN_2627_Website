@@ -10,9 +10,12 @@ import {
   DonationStatus,
 } from "../src/modules/donations/entities/donation.entity";
 import { CampaignFollow } from "../src/modules/follows/entities/campaign-follow.entity";
-import { CampaignComment, CommentStatus } from "../src/modules/comments/entities/campaign-comment.entity";
+import { CampaignComment, CommentKind, CommentStatus } from "../src/modules/comments/entities/campaign-comment.entity";
+import { MediaFile, MediaPurpose } from "../src/modules/media/entities/media-file.entity";
 import { Report, ReportReason, ReportStatus } from "../src/modules/moderation/entities/report.entity";
 import { Milestone } from "../src/modules/progress/entities/milestone.entity";
+import { MilestoneUpdate } from "../src/modules/progress/entities/milestone-update.entity";
+import { MilestoneUpdateAttachment } from "../src/modules/progress/entities/milestone-update-attachment.entity";
 import {
   Organization,
   OrganizationStatus,
@@ -105,13 +108,13 @@ const CAMPAIGNS: CampaignSeed[] = [
   { title: "Hỗ trợ nông dân trồng rau sạch hữu cơ", description: "Giúp 100 hộ nông dân chuyển đổi sang canh tác hữu cơ: tập huấn kỹ thuật, nhà màng và kết nối đầu ra với bếp ăn trường học.", category: "Nông nghiệp", location: "Lâm Đồng", owner: 1, goal: 80 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 25, durationDays: 75, fundedRatio: 0.34, conversion: 0.03 },
   { title: "Ứng dụng luyện tiếng Anh cho học sinh tiểu học", description: "Ứng dụng học tiếng Anh có trợ lý phát âm, miễn phí cho 30 trường tiểu học vùng khó khăn trong năm đầu.", category: "Công nghệ", location: "Hà Nội", owner: 1, goal: 120 * M, status: CampaignStatus.PENDING, startedDaysAgo: 2, durationDays: 60, fundedRatio: 0, conversion: 0 },
   { title: "Phòng khám lưu động cho người cao tuổi", description: "Xe khám lưu động định kỳ hằng tháng tại 12 xã, khám mắt, đo huyết áp và cấp thuốc cơ bản cho người cao tuổi neo đơn.", category: "Y tế", location: "Nghệ An", owner: 0, goal: 300 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 55, durationDays: 90, fundedRatio: 0.61, conversion: 0.04, organization: 2 },
-  { title: "Trồng 10.000 cây ngập mặn chắn sóng", description: "Phục hồi rừng ngập mặn ven biển cùng học sinh và ngư dân địa phương, theo dõi tỷ lệ cây sống sau 6 và 12 tháng.", category: "Môi trường", location: "Cần Thơ", owner: 2, goal: 150 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 30, durationDays: 35, fundedRatio: 0.78, conversion: 0.06, organization: 1 },
+  { title: "Trồng 10.000 cây ngập mặn chắn sóng", description: "Phục hồi rừng ngập mặn ven biển cùng học sinh và ngư dân địa phương, theo dõi tỷ lệ cây sống sau 6 và 12 tháng.", category: "Môi trường", location: "Cần Thơ", owner: 2, goal: 150 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 30, durationDays: 45, fundedRatio: 0.78, conversion: 0.06, organization: 1 },
   { title: "Xưởng tái chế nhựa thành gạch lát", description: "Xưởng nhỏ ép nhựa phế thải thành gạch lát vỉa hè, tạo việc làm cho 15 lao động và giảm rác nhựa ra kênh rạch.", category: "Khởi nghiệp", location: "TP. Hồ Chí Minh", owner: 2, goal: 450 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 20, durationDays: 80, fundedRatio: 0.18, conversion: 0.02 },
-  { title: "Bếp ăn bán trú cho học sinh dân tộc", description: "Cải tạo bếp và duy trì bữa trưa đủ chất cho 180 học sinh bán trú trong một năm học.", category: "Giáo dục", location: "Sơn La", owner: 0, goal: 90 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 50, durationDays: 55, fundedRatio: 0.87, conversion: 0.07, organization: 0 },
+  { title: "Bếp ăn bán trú cho học sinh dân tộc", description: "Cải tạo bếp và duy trì bữa trưa đủ chất cho 180 học sinh bán trú trong một năm học.", category: "Giáo dục", location: "Sơn La", owner: 0, goal: 90 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 50, durationDays: 64, fundedRatio: 0.87, conversion: 0.07, organization: 0 },
   { title: "Nền tảng kết nối tình nguyện viên y tế", description: "Website giúp phòng khám từ thiện đăng nhu cầu và tình nguyện viên y tế đăng ký ca trực, có xác minh chứng chỉ hành nghề.", category: "Công nghệ", location: "Đà Nẵng", owner: 1, goal: 200 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 12, durationDays: 60, fundedRatio: 0.09, conversion: 0.015 },
-  { title: "Giếng nước sạch cho bản vùng biên", description: "Khoan 4 giếng và lắp hệ thống lọc cho 3 bản thường xuyên thiếu nước sạch vào mùa khô.", category: "Y tế", location: "Sơn La", owner: 0, goal: 60 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 28, durationDays: 33, fundedRatio: 0.71, conversion: 0.05, organization: 2 },
+  { title: "Giếng nước sạch cho bản vùng biên", description: "Khoan 4 giếng và lắp hệ thống lọc cho 3 bản thường xuyên thiếu nước sạch vào mùa khô.", category: "Y tế", location: "Sơn La", owner: 0, goal: 60 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 28, durationDays: 40, fundedRatio: 0.71, conversion: 0.05, organization: 2 },
   { title: "Vườn ươm doanh nghiệp xã hội cho sinh viên", description: "Chương trình 12 tuần hỗ trợ 10 nhóm sinh viên xây dựng mô hình kinh doanh có tác động xã hội, kèm vốn mồi.", category: "Khởi nghiệp", location: "Huế", owner: 2, goal: 1500 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 15, durationDays: 90, fundedRatio: 0.05, conversion: 0.01 },
-  { title: "Hệ thống tưới tiết kiệm cho vườn cà phê", description: "Lắp tưới nhỏ giọt dùng năng lượng mặt trời cho 40 hộ trồng cà phê, giảm 40% lượng nước tưới mùa khô.", category: "Nông nghiệp", location: "Đắk Lắk", owner: 1, goal: 250 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 45, durationDays: 50, fundedRatio: 0.52, conversion: 0.035 },
+  { title: "Hệ thống tưới tiết kiệm cho vườn cà phê", description: "Lắp tưới nhỏ giọt dùng năng lượng mặt trời cho 40 hộ trồng cà phê, giảm 40% lượng nước tưới mùa khô.", category: "Nông nghiệp", location: "Đắk Lắk", owner: 1, goal: 250 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 45, durationDays: 60, fundedRatio: 0.52, conversion: 0.035 },
   { title: "Lớp học bơi miễn phí phòng đuối nước", description: "Dạy bơi an toàn cho 600 trẻ em vùng sông nước trong mùa hè, có huấn luyện viên và bể bơi di động.", category: "Giáo dục", location: "Quảng Nam", owner: 0, goal: 40 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 8, durationDays: 45, fundedRatio: 0.26, conversion: 0.04, organization: 0 },
   { title: "Thùng rác phân loại cho trường học", description: "Trang bị thùng rác phân loại và chương trình thi đua tái chế cho 25 trường tiểu học nội thành.", category: "Môi trường", location: "Hà Nội", owner: 2, goal: 30 * M, status: CampaignStatus.APPROVED, startedDaysAgo: -3, durationDays: 40, fundedRatio: 0, conversion: 0 },
   { title: "Máy lọc không khí cho phòng điều trị nhi", description: "Trang bị máy lọc không khí cho 8 phòng điều trị hô hấp nhi khoa của bệnh viện huyện.", category: "Y tế", location: "Hà Nội", owner: 0, goal: 70 * M, status: CampaignStatus.PAUSED, startedDaysAgo: 35, durationDays: 60, fundedRatio: 0.44, conversion: 0.03, rejectionReason: "Tạm dừng để chủ dự án bổ sung báo giá thiết bị từ nhà cung cấp." },
@@ -125,7 +128,7 @@ const CAMPAIGNS: CampaignSeed[] = [
   { title: "Mô hình nuôi ong lấy mật cho hộ nghèo", description: "Cấp 200 thùng ong giống và tập huấn kỹ thuật cho 40 hộ nghèo, bao tiêu đầu ra mật ong.", category: "Nông nghiệp", location: "Nghệ An", owner: 1, goal: 110 * M, status: CampaignStatus.PENDING, startedDaysAgo: 1, durationDays: 60, fundedRatio: 0, conversion: 0 },
   { title: "Tủ thuốc cộng đồng cho xã đảo", description: "Duy trì tủ thuốc thiết yếu và lớp sơ cứu cho người dân xã đảo trong 12 tháng.", category: "Y tế", location: "Quảng Nam", owner: 0, goal: 45 * M, status: CampaignStatus.NEEDS_INFO, startedDaysAgo: 4, durationDays: 50, fundedRatio: 0, conversion: 0, rejectionReason: "Vui lòng bổ sung xác nhận của trạm y tế xã về danh mục thuốc." },
   { title: "Robot giáo dục STEM cho trường làng", description: "Bộ robot lắp ghép và giáo án STEM cho 10 trường tiểu học, tập huấn giáo viên hai buổi.", category: "Công nghệ", location: "Đắk Lắk", owner: 2, goal: 85 * M, status: CampaignStatus.DRAFT, startedDaysAgo: 0, durationDays: 60, fundedRatio: 0, conversion: 0 },
-  { title: "Vườn rau thủy canh trên sân thượng trường học", description: "Vườn thủy canh trên sân thượng làm nơi học sinh thực hành, rau dùng cho bếp ăn bán trú.", category: "Nông nghiệp", location: "TP. Hồ Chí Minh", owner: 2, goal: 20 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 18, durationDays: 22, fundedRatio: 0.95, conversion: 0.09 },
+  { title: "Vườn rau thủy canh trên sân thượng trường học", description: "Vườn thủy canh trên sân thượng làm nơi học sinh thực hành, rau dùng cho bếp ăn bán trú.", category: "Nông nghiệp", location: "TP. Hồ Chí Minh", owner: 2, goal: 20 * M, status: CampaignStatus.ACTIVE, startedDaysAgo: 18, durationDays: 28, fundedRatio: 0.95, conversion: 0.09 },
 ];
 
 /** Chỉ các trạng thái đã phát hành mới nhận giao dịch và lượt xem. */
@@ -138,6 +141,45 @@ const PUBLISHED = [
 ];
 
 const AMOUNTS = [100_000, 200_000, 200_000, 300_000, 500_000, 500_000, 1_000_000, 1_500_000, 2_000_000, 3_000_000, 5_000_000];
+
+/** Lời động viên công khai gắn vào một phần các khoản ủng hộ thành công. */
+const SUPPORT_MESSAGES = [
+  "Chúc dự án sớm đạt mục tiêu, mình sẽ chia sẻ cho bạn bè cùng ủng hộ.",
+  "Góp một phần nhỏ, mong bà con sớm được hưởng lợi từ dự án.",
+  "Cảm ơn nhóm đã làm việc rất minh bạch, mình theo dõi từng bài cập nhật.",
+  "Mong nhóm giữ sức khỏe và hoàn thành đúng kế hoạch nhé!",
+  "Một việc làm ý nghĩa. Chúc dự án lan tỏa tới nhiều người hơn nữa.",
+  "Ủng hộ hết mình! Mong được thấy hình ảnh nghiệm thu trong thời gian tới.",
+  "Cả nhà mình cùng góp, chúc các em có điều kiện học tập tốt hơn.",
+  "Đã đọc kỹ kế hoạch và chứng từ chi, rất yên tâm khi ủng hộ.",
+];
+
+// Chiến dịch có kế hoạch theo mốc. Mốc đã hoàn thành đều có bài cập nhật kèm khoản chi
+// và chứng từ, để trang dự án có đủ nhật ký, sổ chi và điểm minh bạch khi trình diễn.
+const MILESTONE_CAMPAIGNS = [0, 1, 3, 4, 6, 14, 15];
+
+/** Ảnh hiện trường cho bài cập nhật (ảnh minh họa có sẵn của frontend). */
+const UPDATE_PHOTOS: Record<number, string> = {
+  0: "/images/cover-library.webp",
+  1: "/images/cover-vegetable.webp",
+  3: "/images/cover-clinic.webp",
+  4: "/images/cover-mangrove.webp",
+  6: "/images/cover-meal.webp",
+  14: "/images/cover-graduate.webp",
+  15: "/images/cover-bridge.webp",
+};
+
+/** Ảnh chứng từ mẫu (ghi rõ "dữ liệu mẫu") đặt sẵn trong `frontend/public/images/seed/`. */
+const RECEIPT_SAMPLES = [
+  { url: "/images/seed/hoa-don-mau-1.svg", caption: "Hóa đơn nhà cung cấp" },
+  { url: "/images/seed/hoa-don-mau-2.svg", caption: "Biên bản giao nhận" },
+];
+
+const UPDATE_CONTENTS = [
+  "Đã khảo sát thực địa, lấy ba báo giá và chốt nhà cung cấp có giá tốt nhất. Khoản chi dưới đây gồm tiền đặt cọc và chi phí đi lại, chứng từ đính kèm.",
+  "Giai đoạn 1 đã triển khai xong, khối lượng nghiệm thu đạt đúng kế hoạch. Nhóm đã thanh toán đợt chính cho nhà cung cấp theo hóa đơn đính kèm.",
+  "Dự án đã hoàn thiện và bàn giao cho địa phương. Đây là khoản thanh toán cuối cùng cùng biên bản quyết toán; cảm ơn mọi người đã đồng hành.",
+];
 
 async function seed() {
   await dataSource.initialize();
@@ -161,11 +203,11 @@ async function seed() {
 
   const admin = makeUser({ name: "Administrator", email: "admin@gopmam.com", role: UserRole.ADMIN });
   const owners = [
-    makeUser({ name: "Nguyen Van A", email: "owner1@gopmam.com", role: UserRole.CAMPAIGN_OWNER, bio: "Điều phối dự án cộng đồng vùng cao", organization: "Trung tâm Phát triển Cộng đồng" }),
-    makeUser({ name: "Tran Thi B", email: "owner2@gopmam.com", role: UserRole.CAMPAIGN_OWNER, bio: "Nhà sáng lập khởi nghiệp nông nghiệp – công nghệ", organization: "GreenTech Startup" }),
-    makeUser({ name: "Pham Minh D", email: "owner3@gopmam.com", role: UserRole.CAMPAIGN_OWNER, bio: "Kỹ sư môi trường, tình nguyện viên lâu năm", organization: "Nhóm Xanh Miền Trung" }),
+    makeUser({ name: "Nguyễn Văn An", email: "owner1@gopmam.com", role: UserRole.CAMPAIGN_OWNER, bio: "Điều phối dự án cộng đồng vùng cao", organization: "Trung tâm Phát triển Cộng đồng" }),
+    makeUser({ name: "Trần Thị Bích", email: "owner2@gopmam.com", role: UserRole.CAMPAIGN_OWNER, bio: "Nhà sáng lập khởi nghiệp nông nghiệp – công nghệ", organization: "GreenTech Startup" }),
+    makeUser({ name: "Phạm Minh Đức", email: "owner3@gopmam.com", role: UserRole.CAMPAIGN_OWNER, bio: "Kỹ sư môi trường, tình nguyện viên lâu năm", organization: "Nhóm Xanh Miền Trung" }),
   ];
-  const donorNames = ["Le Van C", "Hoang Thu E", "Vu Quoc F", "Dang Mai G", "Bui Anh H", "Do Khanh I", "Ngo Lan K", "Trinh Bao L"];
+  const donorNames = ["Lê Văn Cường", "Hoàng Thu Hà", "Vũ Quốc Huy", "Đặng Mai Giang", "Bùi Anh Hào", "Đỗ Khánh Linh", "Ngô Lan Khuê", "Trịnh Bảo Long"];
   const donors = donorNames.map((name, index) =>
     makeUser({ name, email: `user${index + 1}@gopmam.com`, role: UserRole.USER }),
   );
@@ -239,6 +281,8 @@ async function seed() {
       transactionId: `TX-SEED-${String(txSeq).padStart(6, "0")}`,
       idempotencyKey: `seed-${txSeq}-${campaign.id.slice(0, 8)}`,
       isAnonymous: random() < 0.25,
+      // Khoảng 1/5 khoản thành công để lại lời động viên công khai.
+      message: status === DonationStatus.COMPLETED && random() < 0.2 ? pick(SUPPORT_MESSAGES) : undefined,
       completedAt: status === DonationStatus.COMPLETED ? createdAt : undefined,
       createdAt,
       updatedAt: createdAt,
@@ -313,7 +357,7 @@ async function seed() {
   // Kế hoạch theo mốc cho vài chiến dịch đang/đã chạy (minh bạch tiến độ).
   const milestoneRepo = dataSource.getRepository(Milestone);
   const milestoneRows: Array<Partial<Milestone>> = [];
-  [0, 3, 4, 6, 14, 15].forEach((index) => {
+  MILESTONE_CAMPAIGNS.forEach((index) => {
     const seedRow = CAMPAIGNS[index];
     const campaign = campaigns[index];
     const finished = seedRow.status === CampaignStatus.SUCCESS;
@@ -334,7 +378,70 @@ async function seed() {
       });
     });
   });
-  await milestoneRepo.save(milestoneRows);
+  const milestones = await milestoneRepo.save(milestoneRows.map((row) => milestoneRepo.create(row)));
+
+  // Nhật ký tiến độ: mỗi mốc đã hoàn thành có một bài cập nhật kèm khoản chi và chứng từ.
+  // Tổng chi mỗi chiến dịch = 60% ngân sách các mốc đã xong, luôn nhỏ hơn số đã huy động.
+  const mediaRepo = dataSource.getRepository(MediaFile);
+  const updateRepo = dataSource.getRepository(MilestoneUpdate);
+  const attachmentRepo = dataSource.getRepository(MilestoneUpdateAttachment);
+  let updateCount = 0;
+  let receiptSeq = 0;
+  for (const milestone of milestones) {
+    if (!milestone.isCompleted) continue;
+    const campaignIndex = campaigns.findIndex((campaign) => campaign.id === milestone.campaignId);
+    const postedAt = milestone.completedAt ?? at(1);
+    const update = await updateRepo.save(
+      updateRepo.create({
+        milestoneId: milestone.id,
+        content: UPDATE_CONTENTS[milestone.sortOrder] ?? UPDATE_CONTENTS[0],
+        imageUrl: UPDATE_PHOTOS[campaignIndex],
+        expenseAmount: Math.round((Number(milestone.budget ?? 0) * 0.6) / 100_000) * 100_000,
+        createdAt: postedAt,
+        updatedAt: postedAt,
+      }),
+    );
+    updateCount += 1;
+    for (const [order, sample] of RECEIPT_SAMPLES.entries()) {
+      receiptSeq += 1;
+      const media = await mediaRepo.save(
+        mediaRepo.create({
+          ownerId: campaigns[campaignIndex].ownerId,
+          storageKey: `seed/receipt-${String(receiptSeq).padStart(4, "0")}.svg`,
+          mimeType: "image/svg+xml",
+          sizeBytes: 2048,
+          purpose: MediaPurpose.EXPENSE_RECEIPT,
+          originalName: `${sample.caption}.svg`,
+          createdAt: postedAt,
+        }),
+      );
+      await attachmentRepo.save(
+        attachmentRepo.create({
+          milestoneUpdateId: update.id,
+          mediaFileId: media.id,
+          url: sample.url,
+          caption: sample.caption,
+          sortOrder: order,
+          createdAt: postedAt,
+        }),
+      );
+    }
+  }
+  // Chiến dịch trình diễn (rau sạch hữu cơ): thêm một bài báo tin gần đây cho mốc đang làm.
+  const showcase = campaigns[1];
+  const showcaseNext = milestones.find((row) => row.campaignId === showcase.id && !row.isCompleted);
+  if (showcaseNext) {
+    await updateRepo.save(
+      updateRepo.create({
+        milestoneId: showcaseNext.id,
+        content: "Lớp tập huấn kỹ thuật canh tác hữu cơ đầu tiên đã có 42 hộ tham gia. Khung nhà màng dự kiến về tới xã trong tuần sau; nhóm sẽ đăng hóa đơn ngay khi thanh toán.",
+        imageUrl: "/images/cover-farm.webp",
+        createdAt: at(2, 16),
+        updatedAt: at(2, 16),
+      }),
+    );
+    updateCount += 1;
+  }
 
   // Theo dõi: người ủng hộ theo dõi một vài chiến dịch đang gây quỹ.
   const followRows: Array<Partial<CampaignFollow>> = [];
@@ -365,6 +472,23 @@ async function seed() {
       createdAt: at(4, 10),
     }),
   ]);
+  // Hỏi đáp trên chiến dịch trình diễn: câu hỏi của người ủng hộ và trả lời của chủ dự án.
+  const qaSeeds = [
+    { asker: 1, daysAgo: 9, question: "Rau sau khi thu hoạch sẽ được bán cho đơn vị nào, đã có cam kết bao tiêu chưa?", answer: "Nhóm đã ký biên bản ghi nhớ với 4 bếp ăn trường học trong huyện. Hợp đồng chính thức sẽ được đăng trong nhật ký tiến độ khi ký xong." },
+    { asker: 4, daysAgo: 5, question: "Nếu không đạt đủ mục tiêu thì số tiền đã góp được xử lý thế nào?", answer: "Theo quy định của Góp Mầm, chiến dịch không đạt mục tiêu thì người ủng hộ được yêu cầu hoàn tiền. Nhóm cũng cam kết báo cáo chi tiết mọi khoản đã chi." },
+  ];
+  for (const row of qaSeeds) {
+    const question = await commentRepo.save(
+      commentRepo.create({ campaignId: showcase.id, userId: donors[row.asker].id, kind: CommentKind.QUESTION, content: row.question, status: CommentStatus.VISIBLE, createdAt: at(row.daysAgo, 10) }),
+    );
+    await commentRepo.save(
+      commentRepo.create({ campaignId: showcase.id, userId: showcase.ownerId, parentId: question.id, kind: CommentKind.COMMENT, content: row.answer, status: CommentStatus.VISIBLE, createdAt: at(row.daysAgo, 15) }),
+    );
+  }
+  await commentRepo.save(
+    commentRepo.create({ campaignId: showcase.id, userId: donors[6].id, kind: CommentKind.COMMENT, content: "Mình ở Đà Lạt, sẵn sàng hỗ trợ nhóm một buổi tập huấn về ủ phân hữu cơ nếu cần.", status: CommentStatus.VISIBLE, createdAt: at(3, 19) }),
+  );
+
   const reportRepo = dataSource.getRepository(Report);
   const reportRows = [
     { campaignId: activeCampaigns[1].id, reporterId: donors[1].id, reason: ReportReason.FRAUD, status: ReportStatus.PENDING, createdAt: at(1, 15),
@@ -374,9 +498,11 @@ async function seed() {
     { campaignId: activeCampaigns[2].id, reporterId: donors[3].id, reason: ReportReason.MISINFORMATION, status: ReportStatus.REVIEWING, createdAt: at(3, 9),
       description: "Số học sinh hưởng lợi nêu trong mô tả không khớp với số liệu trường đã công bố trên trang thông tin của xã." },
     { campaignId: activeCampaigns[3].id, reporterId: donors[4].id, reason: ReportReason.INAPPROPRIATE, status: ReportStatus.DISMISSED, createdAt: at(9, 14),
+      description: "Ảnh đại diện của chiến dịch có hình trẻ em, tôi cho rằng không phù hợp để đăng công khai.",
       adminNotes: "Đã đối chiếu: hình ảnh do chủ dự án tự chụp tại địa phương, không có nội dung phản cảm. Không vi phạm.",
       resolvedBy: admin.id, resolvedAt: at(8, 10) },
     { campaignId: activeCampaigns[1].id, reporterId: donors[6].id, reason: ReportReason.OTHER, status: ReportStatus.RESOLVED, createdAt: at(15, 11),
+      description: "Chiến dịch đã báo hoàn thành mốc 1 nhưng chưa thấy hóa đơn, chứng từ chi tiêu nào được đăng.",
       adminNotes: "Chủ dự án chưa đăng chứng từ chi cho mốc 1. Đã yêu cầu bổ sung; chủ dự án đã cập nhật hóa đơn sau 2 ngày.",
       resolvedBy: admin.id, resolvedAt: at(13, 16) },
   ];
@@ -386,7 +512,7 @@ async function seed() {
   console.log(
     `Seeded: ${1 + owners.length + donors.length} users, ${organizations.length} organizations, ${campaigns.length} campaigns, ` +
       `${donationRows.length} donations (${completedCount} completed), ${viewRows.length} daily view rows, ` +
-      `${milestoneRows.length} milestones, ${followRows.length} follows, ${reportRows.length} reports. Password: ${SEED_PASSWORD}`,
+      `${milestoneRows.length} milestones, ${updateCount} progress updates, ${followRows.length} follows, ${reportRows.length} reports. Password: ${SEED_PASSWORD}`,
   );
   await dataSource.destroy();
   console.log("Done!");
