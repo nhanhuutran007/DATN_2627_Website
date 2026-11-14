@@ -13154,3 +13154,38 @@ html:has(dialog:modal) .admin-sidebar {
   height: 100%;
   background: var(--success);
 }
+
+/* Trang báo lỗi (404 và lỗi ngoài dự kiến) */
+.status-page {
+  display: grid;
+  min-height: calc(60 * var(--vh-unit));
+  padding: 64px 0;
+  place-items: center;
+  text-align: center;
+}
+
+.status-page .status-code {
+  margin: 0 0 8px;
+  color: var(--primary);
+  font-size: clamp(56px, 12vw, 96px);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.status-page h1 {
+  margin: 0 0 12px;
+  font-size: clamp(22px, 4vw, 30px);
+}
+
+.status-page p {
+  max-width: 520px;
+  margin: 0 auto 24px;
+  color: var(--muted);
+}
+
+.status-page .status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
