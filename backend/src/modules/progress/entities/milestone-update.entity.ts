@@ -1,6 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
+import type { Milestone } from "./milestone.entity";
 import { MilestoneUpdateAttachment } from "./milestone-update-attachment.entity";
 
 @Entity("milestone_updates")
@@ -10,7 +11,7 @@ export class MilestoneUpdate extends BaseEntity {
 
   @ManyToOne("Milestone", "updates")
   @JoinColumn({ name: "milestone_id" })
-  milestone!: any;
+  milestone!: Milestone;
 
   @Column({ type: "text" })
   content!: string;

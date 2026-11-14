@@ -1,6 +1,9 @@
 import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
+import type { Campaign } from "../../campaigns/entities/campaign.entity";
+import type { RewardTier } from "../../rewards/entities/reward-tier.entity";
+import type { User } from "../../users/entities/user.entity";
 
 export enum DonationStatus {
   PENDING = "pending",
@@ -25,14 +28,14 @@ export class Donation extends BaseEntity {
 
   @ManyToOne("User", "donations")
   @JoinColumn({ name: "user_id" })
-  user!: any;
+  user!: User;
 
   @Column({ name: "campaign_id" })
   campaignId!: string;
 
   @ManyToOne("Campaign", "donations")
   @JoinColumn({ name: "campaign_id" })
-  campaign!: any;
+  campaign!: Campaign;
 
   /** Mức quà người ủng hộ chọn (null nếu ủng hộ không nhận quà). */
   @Column({ name: "reward_tier_id", type: "varchar", nullable: true })
@@ -40,7 +43,7 @@ export class Donation extends BaseEntity {
 
   @ManyToOne("RewardTier")
   @JoinColumn({ name: "reward_tier_id" })
-  rewardTier?: any;
+  rewardTier?: RewardTier | null;
 
   @Column({
     type: "decimal",

@@ -1,6 +1,9 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
+import type { Donation } from "../../donations/entities/donation.entity";
+import type { Milestone } from "../../progress/entities/milestone.entity";
+import type { User } from "../../users/entities/user.entity";
 
 export enum CampaignStatus {
   DRAFT = "draft",
@@ -32,7 +35,7 @@ export class Campaign extends BaseEntity {
 
   @ManyToOne("User", "campaigns")
   @JoinColumn({ name: "owner_id" })
-  owner!: any;
+  owner!: User;
 
   /** Tổ chức thụ hưởng (đã xác minh); NULL = chiến dịch gây quỹ cá nhân. */
   @Column({ name: "organization_id", type: "char", length: 36, nullable: true })
@@ -98,8 +101,8 @@ export class Campaign extends BaseEntity {
   rejectionReason?: string;
 
   @OneToMany("Donation", "campaign")
-  donations!: any[];
+  donations!: Donation[];
 
   @OneToMany("Milestone", "campaign")
-  milestones!: any[];
+  milestones!: Milestone[];
 }

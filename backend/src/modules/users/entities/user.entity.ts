@@ -2,6 +2,8 @@ import { Exclude, Expose } from "class-transformer";
 import { Column, Entity, OneToMany } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
+import type { Campaign } from "../../campaigns/entities/campaign.entity";
+import type { Donation } from "../../donations/entities/donation.entity";
 
 /**
  * Nhóm serialize cho dữ liệu liên hệ (email, số điện thoại). Chỉ controller
@@ -108,8 +110,8 @@ export class User extends BaseEntity {
   aiConsentUpdatedAt?: Date | null;
 
   @OneToMany("Campaign", "owner")
-  campaigns!: any[];
+  campaigns!: Campaign[];
 
   @OneToMany("Donation", "user")
-  donations!: any[];
+  donations!: Donation[];
 }

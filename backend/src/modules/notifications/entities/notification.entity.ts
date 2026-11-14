@@ -1,6 +1,7 @@
 import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 
 import { BaseEntity } from "../../../common/base.entity";
+import type { User } from "../../users/entities/user.entity";
 
 export enum NotificationType {
   CAMPAIGN_APPROVED = "campaign_approved",
@@ -32,7 +33,7 @@ export class Notification extends BaseEntity {
 
   @ManyToOne("User")
   @JoinColumn({ name: "user_id" })
-  user!: any;
+  user!: User;
 
   @Column({ type: "enum", enum: NotificationType })
   type!: NotificationType;
