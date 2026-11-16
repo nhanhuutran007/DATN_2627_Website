@@ -16,6 +16,7 @@ import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { NonAdminGuard } from "../auth/guards/non-admin.guard";
+import { OptionalJwtAuthGuard } from "../auth/guards/optional-jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { CategoriesService } from "../categories/categories.service";
 import { OrganizationsService } from "../organizations/organizations.service";
@@ -61,9 +62,11 @@ export class CampaignsController {
     return this.campaignsService.getContact(id);
   }
 
+  /** Đăng nhập tùy chọn: chiến dịch chưa phát hành chỉ chủ dự án và admin xem được. */
   @Get(":id")
-  findOne(@Param("id", ParseUUIDPipe) id: string) {
-    return this.campaignsService.findById(id);
+  @UseGuards(OptionalJwtAuthGuard)
+  findOne(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user?: User | null) {
+    return this.campaignsService.findVisible(id, user ?? null);
   }
 
   @Post()

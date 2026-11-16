@@ -17,6 +17,7 @@ import { MilestoneRevisions } from "@/features/progress/MilestoneRevisions";
 import { ProgressTimeline } from "@/features/progress/ProgressTimeline";
 import { TransparencyScoreCard } from "@/features/progress/TransparencyScoreCard";
 import { ContactOrganizerButton } from "@/features/campaigns/ContactOrganizerButton";
+import { UnpublishedCampaignPreview } from "@/features/campaigns/UnpublishedCampaignPreview";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ShareSpread } from "@/features/follows/ShareSpread";
 import { CampaignViewTracker } from "@/features/campaign-stats/CampaignViewTracker";
@@ -106,6 +107,8 @@ export async function generateMetadata({ params }: CampaignDetailPageProps): Pro
 export default async function CampaignDetailPage({ params }: CampaignDetailPageProps) {
   const { slug } = await params;
   const loaded = await loadCampaign(slug);
+  // Hồ sơ chưa phát hành: API chỉ trả cho chủ dự án/admin, bản xem trước tải lại ở trình duyệt kèm token.
+  if (!loaded && isLiveId(slug)) return <UnpublishedCampaignPreview id={slug} />;
   if (!loaded) notFound();
 
   const { campaign, live } = loaded;

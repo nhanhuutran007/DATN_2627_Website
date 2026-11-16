@@ -30,6 +30,14 @@ const PUBLIC_STATUSES = [
   CampaignStatus.ENDED,
 ];
 
+/** Hồ sơ chưa qua xét duyệt: không công khai chi tiết cho người ngoài. */
+const UNPUBLISHED_STATUSES = [
+  CampaignStatus.DRAFT,
+  CampaignStatus.PENDING,
+  CampaignStatus.NEEDS_INFO,
+  CampaignStatus.REJECTED,
+];
+
 /** Thông tin liên hệ của một chiến dịch công khai (nút "Liên hệ"); trường rỗng = chưa công khai. */
 export type CampaignContact = {
   owner: { name: string; email: string | null; phone: string | null; address: string | null };
@@ -266,6 +274,19 @@ export class CampaignsService {
       relations: { owner: true, milestones: true, organization: true },
     });
     if (!campaign) {
+      throw new NotFoundException("Campaign not found");
+    }
+    return campaign;
+  }
+
+  /**
+   * Chi tiết cho `GET /campaigns/:id`: hồ sơ chưa phát hành (nháp, chờ duyệt, cần bổ sung, bị từ chối)
+   * chỉ chủ dự án và admin xem được; người khác nhận 404 như không tồn tại để không lộ nội dung.
+   */
+  async findVisible(id: string, viewer: Pick<User, "id" | "role"> | null): Promise<Campaign> {
+    const campaign = await this.findById(id);
+    const privileged = viewer !== null && (viewer.id === campaign.ownerId || viewer.role === UserRole.ADMIN);
+    if (UNPUBLISHED_STATUSES.includes(campaign.status) && !privileged) {
       throw new NotFoundException("Campaign not found");
     }
     return campaign;

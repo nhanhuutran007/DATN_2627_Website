@@ -306,6 +306,43 @@ describe("CampaignsService", () => {
     });
   });
 
+  describe("findVisible", () => {
+    const ID = "123e4567-e89b-12d3-a456-426614174000";
+    const OWNER_ID = "123e4567-e89b-12d3-a456-426614174001";
+    const STRANGER = makeUser(UserRole.USER, "123e4567-e89b-12d3-a456-426614174777");
+    const expect404 = (promise: Promise<unknown>) =>
+      promise.then(
+        () => {
+          throw new Error("should have thrown");
+        },
+        (err) => equal(err.status, 404),
+      );
+
+    for (const status of [CampaignStatus.DRAFT, CampaignStatus.PENDING, CampaignStatus.NEEDS_INFO, CampaignStatus.REJECTED]) {
+      it(`should hide a ${status} campaign from guests and other users`, async () => {
+        const campaign = await repo.findOne();
+        repo.findOne = async () => ({ ...campaign, status });
+        await expect404(campaignsService.findVisible(ID, null));
+        await expect404(campaignsService.findVisible(ID, STRANGER));
+      });
+    }
+
+    it("should show an unpublished campaign to its owner and to admins", async () => {
+      const owner = await campaignsService.findVisible(ID, makeUser(UserRole.CAMPAIGN_OWNER, OWNER_ID));
+      equal(owner.status, CampaignStatus.DRAFT);
+      const admin = await campaignsService.findVisible(ID, makeUser(UserRole.ADMIN, ADMIN_ID));
+      equal(admin.id, ID);
+    });
+
+    for (const status of [CampaignStatus.ACTIVE, CampaignStatus.PAUSED, CampaignStatus.FAILED, CampaignStatus.ENDED]) {
+      it(`should show a ${status} campaign to everyone`, async () => {
+        const campaign = await repo.findOne();
+        repo.findOne = async () => ({ ...campaign, status });
+        equal((await campaignsService.findVisible(ID, null)).status, status);
+      });
+    }
+  });
+
   describe("submitForReview", () => {
     it("should move a draft campaign to pending", async () => {
       repo.findOne = async () => ({
