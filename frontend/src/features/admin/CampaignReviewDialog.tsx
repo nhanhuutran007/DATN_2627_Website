@@ -172,7 +172,7 @@ export function CampaignReviewDialog({ campaign, statusLabel, actions, onClose }
                           <td>{m.title}</td>
                           <td className="nowrap">{date(m.targetDate)}</td>
                           <td className="num">{m.budget ? money(m.budget) : "—"}</td>
-                          <td>{m.description || "—"}</td>
+                          <td className="pre-line">{m.description || "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -197,7 +197,7 @@ export function CampaignReviewDialog({ campaign, statusLabel, actions, onClose }
                     <li key={tier.id}>
                       <b>{tier.title}</b> · từ {money(tier.minAmount)}
                       {tier.quantityLimit !== null && ` · giới hạn ${tier.quantityLimit}`}
-                      {tier.description && <small>{tier.description}</small>}
+                      {tier.description && <small className="pre-line">{tier.description}</small>}
                     </li>
                   ))}
                 </ul>

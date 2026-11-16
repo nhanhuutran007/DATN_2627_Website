@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { CampaignWizard } from "@/features/campaign-create/CampaignWizard";
 import { api } from "@/lib/api";
+import { isLiveId } from "@/lib/format";
 import { fetchOrganization, toPicked, type PickedOrganization } from "@/lib/api/organizations";
 
 export const metadata: Metadata = {
@@ -11,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 type CreateCampaignPageProps = {
-  searchParams: Promise<{ "linh-vuc"?: string | string[]; "to-chuc"?: string | string[] }>;
+  searchParams: Promise<{ "linh-vuc"?: string | string[]; "to-chuc"?: string | string[]; sua?: string | string[] }>;
 };
 
 /** Chỉ nhận lĩnh vực đang mở (theo `GET /categories`), tránh chọn sẵn giá trị tùy ý từ URL. */
@@ -38,13 +39,19 @@ async function resolveOrganization(value: string | string[] | undefined): Promis
 /** Trang toàn màn hình (không header/footer, xem ChromeGate), bố cục theo trang tạo gây quỹ của GoFundMe. */
 export default async function CreateCampaignPage({ searchParams }: CreateCampaignPageProps) {
   const params = await searchParams;
+  const edit = params.sua;
   const [initialCategory, initialOrganization] = await Promise.all([
     resolveCategory(params["linh-vuc"]),
     resolveOrganization(params["to-chuc"]),
   ]);
   return (
     <main>
-      <CampaignWizard initialCategory={initialCategory} initialOrganization={initialOrganization} />
+      <CampaignWizard
+        initialCategory={initialCategory}
+        initialOrganization={initialOrganization}
+        // `?sua=<id>`: hồ sơ do trình duyệt nạp kèm token; quyền sửa kiểm tra ở máy chủ.
+        editId={typeof edit === "string" && isLiveId(edit) ? edit : undefined}
+      />
     </main>
   );
 }

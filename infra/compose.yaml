@@ -66,7 +66,8 @@ services:
       SEPAY_SECRET_KEY: ${SEPAY_SECRET_KEY:-}
       SEPAY_IPN_SECRET: ${SEPAY_IPN_SECRET:-}
       # Đăng nhập Google (để trống = ẩn nút Google)
-      GOOGLE_CLIENT_ID: 69370430860-ctpq4a1k1adggkt6687d373c2b2bo5ck.apps.googleusercontent.com
+      # Mặc định dùng client ID của nhóm; đặt GOOGLE_CLIENT_ID= (rỗng) trong .env để ẩn nút Google
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID-69370430860-ctpq4a1k1adggkt6687d373c2b2bo5ck.apps.googleusercontent.com}
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
       # Gốc URL frontend để tạo link trong email (vd. đặt lại mật khẩu)
       FRONTEND_URL: ${SITE_URL:-http://localhost:8080}

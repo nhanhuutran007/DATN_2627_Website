@@ -32,7 +32,8 @@ type HomeData = {
 async function loadHome(): Promise<HomeData> {
   try {
     const [featured, all, newest, stats] = await Promise.all([
-      fetchCampaigns({ sort: "featured", limit: 3 }),
+      // Admin chọn tối đa 6 dự án nổi bật (`MAX_FEATURED` ở backend): hiện đủ cả 6.
+      fetchCampaigns({ sort: "featured", limit: 6 }),
       fetchCampaigns({ sort: "latest", limit: 24 }),
       fetchCampaigns({ sort: "newest", limit: 3 }),
       fetchPlatformStats().catch(() => null),

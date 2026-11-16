@@ -64,13 +64,17 @@ type OwnerCampaignsProps = {
   reload: () => Promise<void>;
 };
 
+type PanelKind = "stats" | "progress" | "rewards";
+type OpenPanel = { id: string; kind: PanelKind };
+
 /** Khu vực chủ dự án: số liệu tổng, danh sách chiến dịch và việc cần làm. */
 export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
   const dialog = useDialog();
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [rewardsOpen, setRewardsOpen] = useState<string | null>(null);
-  const [statsOpen, setStatsOpen] = useState<string | null>(null);
-  const [progressOpen, setProgressOpen] = useState<string | null>(null);
+  // Mỗi lúc chỉ mở một bảng (Số liệu/Tiến độ/Mức quà) của một chiến dịch: mở bảng khác thì bảng cũ đóng lại.
+  const [panel, setPanel] = useState<OpenPanel | null>(null);
+  const isOpen = (id: string, kind: PanelKind) => panel?.id === id && panel.kind === kind;
+  const toggle = (id: string, kind: PanelKind) => setPanel((current) => (current?.id === id && current.kind === kind ? null : { id, kind }));
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
 
   const totals = useMemo(() => campaigns.reduce(
@@ -168,6 +172,11 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
               <div className="own-actions">
                 <Link className="button button-outline button-sm" href={`/du-an/${c.id}`}>Xem</Link>
                 {editable && (
+                  <Link className="button button-outline button-sm" href={`/tao-chien-dich?sua=${c.id}`}>
+                    Sửa
+                  </Link>
+                )}
+                {editable && (
                   <button className="button button-primary button-sm" type="button" disabled={busyId === c.id} onClick={() => act(c, "submit")}>
                     Gửi duyệt
                   </button>
@@ -181,8 +190,8 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
                   <button
                     className="button button-ghost button-sm"
                     type="button"
-                    aria-expanded={statsOpen === c.id}
-                    onClick={() => setStatsOpen((id) => (id === c.id ? null : c.id))}
+                    aria-expanded={isOpen(c.id, "stats")}
+                    onClick={() => toggle(c.id, "stats")}
                   >
                     Số liệu
                   </button>
@@ -191,8 +200,8 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
                   <button
                     className="button button-ghost button-sm"
                     type="button"
-                    aria-expanded={progressOpen === c.id}
-                    onClick={() => setProgressOpen((id) => (id === c.id ? null : c.id))}
+                    aria-expanded={isOpen(c.id, "progress")}
+                    onClick={() => toggle(c.id, "progress")}
                   >
                     Tiến độ
                   </button>
@@ -200,15 +209,15 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
                 <button
                   className="button button-ghost button-sm"
                   type="button"
-                  aria-expanded={rewardsOpen === c.id}
-                  onClick={() => setRewardsOpen((id) => (id === c.id ? null : c.id))}
+                  aria-expanded={isOpen(c.id, "rewards")}
+                  onClick={() => toggle(c.id, "rewards")}
                 >
                   Mức quà
                 </button>
               </div>
-              {statsOpen === c.id && <CampaignStatsPanel campaignId={c.id} />}
-              {progressOpen === c.id && <ProgressManager campaignId={c.id} readOnly={c.status === "failed"} />}
-              {rewardsOpen === c.id && (
+              {isOpen(c.id, "stats") && <CampaignStatsPanel campaignId={c.id} />}
+              {isOpen(c.id, "progress") && <ProgressManager campaignId={c.id} readOnly={c.status === "failed"} />}
+              {isOpen(c.id, "rewards") && (
                 <RewardManager campaignId={c.id} closed={["success", "failed", "cancelled", "ended"].includes(c.status)} />
               )}
             </li>

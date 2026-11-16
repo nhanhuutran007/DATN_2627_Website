@@ -4,16 +4,31 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Icon } from "@/components/ui/Icon";
-import { useAuthUser, useRedirectAdmin } from "@/lib/auth";
+import { useAuthUser, useIsAdmin } from "@/lib/auth";
 import { OrganizationForm } from "./OrganizationForm";
 
 /** Trang gửi hồ sơ đăng ký tổ chức (người đại diện). */
 export function OrganizationRegister() {
   const user = useAuthUser();
-  const redirecting = useRedirectAdmin();
+  const isAdmin = useIsAdmin();
   const router = useRouter();
 
-  if (redirecting) return null;
+  // Trước đây tài khoản quản trị bị đưa thẳng về /admin không lời giải thích (TC_ORG_006): nói rõ lý do.
+  if (isAdmin) {
+    return (
+      <main className="container gate">
+        <span className="gate-icon"><Icon name="shield" size={28} /></span>
+        <h1>Tài khoản quản trị không đăng ký tổ chức</h1>
+        <p>
+          Tài khoản quản trị chỉ dùng để xét duyệt, nên không gửi hồ sơ tổ chức và không tự xét tổ chức mình đại diện.
+          Hãy dùng một tài khoản người dùng thường để đăng ký.
+        </p>
+        <div className="gate-actions">
+          <Link className="button button-primary" href="/admin/to-chuc">Về mục Xác minh tổ chức</Link>
+        </div>
+      </main>
+    );
+  }
 
   if (!user) {
     return (

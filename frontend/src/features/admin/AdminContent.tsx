@@ -252,6 +252,9 @@ export function StatsExport() {
       <p className="risk-footnote">
         <Icon name="shield" size={15} /> File chỉ chứa số liệu tổng hợp: không tên, email, số điện thoại hay danh tính người ủng hộ; chủ dự án được giả danh (mã CDA-…). Mỗi lần xuất được ghi nhật ký kiểm toán.
       </p>
+      <p className="risk-footnote">
+        <Icon name="clock" size={15} /> Ngày ghi dạng năm-tháng-ngày theo giờ Việt Nam. Mở bằng Excel mà cột ngày hiện <code>#####</code> là do cột hẹp: bấm đúp vào mép tiêu đề cột để nới rộng.
+      </p>
     </section>
   );
 }

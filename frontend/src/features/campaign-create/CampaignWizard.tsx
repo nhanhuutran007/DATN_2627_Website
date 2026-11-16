@@ -22,8 +22,11 @@ import {
 import { ApiError } from "@/lib/api";
 import {
   createCampaign,
+  fetchCampaign,
   submitCampaign,
   updateCampaign,
+  type ApiCampaign,
+  type ApiCampaignStatus,
   type CreateCampaignPayload,
 } from "@/lib/api/campaigns";
 import { useCategories } from "@/lib/api/categories";
@@ -33,7 +36,7 @@ import {
   deleteMilestone,
   type CreateMilestonePayload,
 } from "@/lib/api/progress";
-import { createRewardTier, deleteRewardTier } from "@/lib/api/rewards";
+import { createRewardTier, deleteRewardTier, fetchManagedRewardTiers, type RewardTier } from "@/lib/api/rewards";
 import { useAuthUser, useRedirectAdmin } from "@/lib/auth";
 
 /** Mỗi bước một chủ đề như GoFundMe: tiêu đề + lời dẫn hiện ở cột trái, câu hỏi ở cột phải. */
@@ -153,16 +156,70 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+const BUDGET_HEADING = "<h3>Kế hoạch sử dụng vốn</h3>";
+const RISKS_HEADING = "<h3>Rủi ro và phương án ứng phó</h3>";
+
+/** Chủ dự án chỉ sửa được hồ sơ chưa gửi, cần bổ sung hoặc bị từ chối (khớp `OWNER_EDITABLE_STATUSES` ở backend). */
+const EDITABLE_STATUSES: ApiCampaignStatus[] = ["draft", "needs_info", "rejected"];
+
+/** Tách mô tả đã lưu (xem `toPayload`) lại thành các ô của form: mô tả ngắn, câu chuyện, dự toán, rủi ro. */
+function splitDescription(html: string): Pick<Draft, "summary" | "story" | "budget" | "risks"> {
+  let rest = html.trim();
+  const take = (heading: string) => {
+    const index = rest.lastIndexOf(heading);
+    if (index < 0) return "";
+    const part = rest.slice(index + heading.length).trim();
+    rest = rest.slice(0, index).trim();
+    return part;
+  };
+  const risks = take(RISKS_HEADING);
+  const budget = take(BUDGET_HEADING);
+  let summary = "";
+  const first = /^<p>([^<]*)<\/p>/.exec(rest);
+  if (first) {
+    summary = htmlToText(first[1]);
+    rest = rest.slice(first[0].length).trim();
+  }
+  return { summary, story: rest, budget, risks };
+}
+
+function toDraftMilestones(campaign: ApiCampaign): DraftMilestone[] {
+  return [...(campaign.milestones ?? [])]
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    .map((m) => ({
+      title: m.title,
+      deadline: m.targetDate ? toDateInput(new Date(m.targetDate)) : "",
+      budget: m.budget ? String(Number(m.budget)) : "",
+      output: m.description ?? "",
+    }));
+}
+
+function toDraftTiers(tiers: RewardTier[]): DraftTier[] {
+  return [...tiers]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((t) => ({
+      title: t.title,
+      description: t.description,
+      minAmount: String(Number(t.minAmount)),
+      limit: t.quantityLimit ? String(t.quantityLimit) : "",
+      delivery: t.estimatedDelivery ? t.estimatedDelivery.slice(0, 10) : "",
+    }));
+}
+
 type CampaignWizardProps = {
   /** Lĩnh vực chọn sẵn (từ trang "Bắt đầu gây quỹ"), server đã kiểm tra là lĩnh vực đang nhận dự án. */
   initialCategory?: string;
   /** Tổ chức chọn sẵn (từ trang tổ chức, `?to-chuc=`), server đã kiểm tra là tổ chức đã xác minh. */
   initialOrganization?: PickedOrganization;
+  /** `?sua=<id>`: mở lại hồ sơ đã lưu (bản nháp, cần bổ sung, bị từ chối) để sửa rồi gửi duyệt lại. */
+  editId?: string;
 };
 
 type Beneficiary = "self" | "organization";
 
-export function CampaignWizard({ initialCategory, initialOrganization }: CampaignWizardProps) {
+type EditState = "none" | "loading" | "ready" | "error";
+
+export function CampaignWizard({ initialCategory, initialOrganization, editId }: CampaignWizardProps) {
   const router = useRouter();
   const user = useAuthUser();
   const redirecting = useRedirectAdmin();
@@ -200,6 +257,63 @@ export function CampaignWizard({ initialCategory, initialOrganization }: Campaig
   const [organization, setOrganization] = useState<PickedOrganization | null>(initialOrganization ?? null);
   // Chỉ gắn tổ chức khi đang chọn "Một tổ chức đã xác minh".
   const pickedOrganization = beneficiary === "organization" ? organization : null;
+  const [editState, setEditState] = useState<EditState>(editId ? "loading" : "none");
+  const [reviewNote, setReviewNote] = useState("");
+  const userId = user?.id;
+  const loginPath = editId ? `/dang-nhap?next=${encodeURIComponent(`/tao-chien-dich?sua=${editId}`)}` : "/dang-nhap?next=/tao-chien-dich";
+
+  // Sửa hồ sơ đã lưu: nạp lại toàn bộ form, mốc và mức quà; các lần lưu sau thay thế đúng bản ghi cũ.
+  useEffect(() => {
+    if (!editId || !userId) return;
+    let cancelled = false;
+    Promise.all([fetchCampaign(editId), fetchManagedRewardTiers(editId)])
+      .then(([campaign, rewardTiers]) => {
+        if (cancelled) return;
+        if (campaign.ownerId !== userId || !EDITABLE_STATUSES.includes(campaign.status)) {
+          setError("Hồ sơ này không sửa được: chỉ sửa bản nháp, hồ sơ cần bổ sung hoặc bị từ chối của chính bạn.");
+          setEditState("error");
+          return;
+        }
+        setDraft({
+          title: campaign.title,
+          category: campaign.category,
+          // Tỉnh cũ không còn trong danh sách 34 tỉnh/thành: để trống để người dùng chọn lại (không tự nhảy sang tỉnh khác).
+          location: campaign.location && (PROVINCES as readonly string[]).includes(campaign.location) ? campaign.location : "",
+          target: String(Number(campaign.goalAmount)),
+          deadline: campaign.endDate ? toDateInput(new Date(campaign.endDate)) : "",
+          imageUrl: campaign.imageUrl ?? "",
+          ...splitDescription(campaign.description),
+        });
+        const loadedMilestones = toDraftMilestones(campaign);
+        if (loadedMilestones.length > 0) setMilestones(loadedMilestones);
+        setSavedMilestoneIds((campaign.milestones ?? []).map((m) => m.id));
+        const loadedTiers = toDraftTiers(rewardTiers);
+        setTiers(loadedTiers.length > 0 ? loadedTiers : [{ ...emptyTier }]);
+        setSavedTierIds(rewardTiers.map((t) => t.id));
+        if (campaign.organization) {
+          setBeneficiary("organization");
+          setOrganization({
+            id: campaign.organization.id,
+            slug: campaign.organization.slug,
+            name: campaign.organization.name,
+            logoUrl: campaign.organization.logoUrl ?? null,
+          });
+        } else {
+          setBeneficiary("self");
+        }
+        setCampaignId(campaign.id);
+        setReviewNote(campaign.status === "draft" ? "" : campaign.rejectionReason ?? "");
+        setEditState("ready");
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setError(messageFor(err));
+        setEditState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editId, userId]);
 
   const plannedBudget = milestones.reduce((sum, m) => sum + (Number(m.budget) || 0), 0);
   const target = Number(draft.target) || 0;
@@ -338,7 +452,7 @@ export function CampaignWizard({ initialCategory, initialOrganization }: Campaig
 
   const requireLogin = () => {
     if (user) return false;
-    router.push("/dang-nhap?next=/tao-chien-dich");
+    router.push(loginPath);
     return true;
   };
 
@@ -424,7 +538,7 @@ export function CampaignWizard({ initialCategory, initialOrganization }: Campaig
           {user ? (
             <Link href="/dashboard">Trang quản lý</Link>
           ) : (
-            <Link href="/dang-nhap?next=/tao-chien-dich">Đăng nhập</Link>
+            <Link href={loginPath}>Đăng nhập</Link>
           )}
         </div>
 
@@ -438,12 +552,32 @@ export function CampaignWizard({ initialCategory, initialOrganization }: Campaig
               <Link className="button button-outline" href={`/du-an/${campaignId}`}>Xem hồ sơ</Link>
             </div>
           </div>
+        ) : editId && editState !== "ready" ? (
+          <div className="create-body" aria-live="polite">
+            {!user ? (
+              <p className="create-login-hint">
+                Vui lòng <Link href={loginPath}>đăng nhập</Link> để sửa hồ sơ chiến dịch của bạn.
+              </p>
+            ) : editState === "error" ? (
+              <>
+                <p className="form-error" role="alert">{error}</p>
+                <Link className="button button-outline" href="/dashboard">Về trang quản lý</Link>
+              </>
+            ) : (
+              <p>Đang tải hồ sơ…</p>
+            )}
+          </div>
         ) : (
           <form ref={formRef} className="create-form" tabIndex={-1} onSubmit={submit} noValidate aria-label={STEPS[step].title}>
             <div className="create-body">
+              {reviewNote && step === STEP_BASICS && (
+                <p className="form-notice" role="status">
+                  <b>Quản trị viên yêu cầu:</b> {reviewNote} Sửa các mục liên quan rồi gửi duyệt lại ở bước cuối.
+                </p>
+              )}
               {!user && step === STEP_BASICS && (
                 <p className="create-login-hint">
-                  Bạn có thể soạn trước; cần <Link href="/dang-nhap?next=/tao-chien-dich">đăng nhập</Link> để lưu nháp hoặc gửi duyệt.
+                  Bạn có thể soạn trước; cần <Link href={loginPath}>đăng nhập</Link> để lưu nháp hoặc gửi duyệt.
                 </p>
               )}
 
@@ -599,7 +733,7 @@ export function CampaignWizard({ initialCategory, initialOrganization }: Campaig
                         </label>
                         <label className="field field-span-4">
                           <span>Kết quả đầu ra</span>
-                          <input value={milestone.output} placeholder="Sản phẩm hoặc chỉ số có thể kiểm chứng" onChange={(e) => updateMilestone(index, "output", e.target.value)} />
+                          <textarea rows={3} value={milestone.output} placeholder="Sản phẩm hoặc chỉ số có thể kiểm chứng (mỗi ý một dòng)" onChange={(e) => updateMilestone(index, "output", e.target.value)} />
                         </label>
                       </div>
                       {milestones.length > 1 && (

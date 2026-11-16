@@ -70,7 +70,7 @@ export function RewardTiersEditor({ tiers, onChange }: Props) {
             </label>
             <label className="field field-span-3">
               <span>Mô tả phần quà</span>
-              <input value={tier.description} maxLength={1000} placeholder="Quà gồm những gì, gửi bằng cách nào" onChange={(e) => set(index, "description", e.target.value)} />
+              <textarea rows={2} value={tier.description} maxLength={1000} placeholder="Quà gồm những gì, gửi bằng cách nào (mỗi ý một dòng)" onChange={(e) => set(index, "description", e.target.value)} />
             </label>
             <label className="field">
               <span>Dự kiến gửi quà</span>

@@ -20,8 +20,6 @@ export function ownerPseudonym(ownerId: string): string {
   return `CDA-${createHash("sha256").update(`owner:${ownerId}`).digest("hex").slice(0, 10).toUpperCase()}`;
 }
 
-const isoDay = (date: Date) => date.toISOString().slice(0, 10);
-
 /**
  * Xuất thống kê cho báo cáo/đối tác: chỉ số liệu tổng hợp, không có tên, email,
  * số điện thoại hay danh tính người ủng hộ; chủ dự án được giả danh. Mỗi lần
@@ -80,7 +78,8 @@ export class ExportService {
         campaign.isFeatured ? "co" : "khong", ownerPseudonym(campaign.ownerId),
         goal, raised, goal > 0 ? Math.round((raised / goal) * 1000) / 10 : 0, campaign.backerCount, campaign.viewCount,
         item.total, item.done, item.expense,
-        isoDay(campaign.createdAt), isoDay(campaign.startDate), isoDay(campaign.endDate),
+        // Ngày theo giờ Việt Nam (trước đây theo UTC nên chiến dịch tạo trước 7 giờ sáng bị lùi một ngày).
+        vnDay(campaign.createdAt), vnDay(campaign.startDate), vnDay(campaign.endDate),
       ];
     });
 

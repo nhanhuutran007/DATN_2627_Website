@@ -253,6 +253,10 @@ export function LoginForm() {
               {busy ? "Đang kiểm tra…" : "Tiếp tục"}
             </button>
           </form>
+          <p className="signin-alt">
+            Chưa có tài khoản?{" "}
+            <Link href={next === "/" ? "/dang-ky" : `/dang-ky?next=${encodeURIComponent(next)}`}>Đăng ký</Link>
+          </p>
         </>
       )}
 

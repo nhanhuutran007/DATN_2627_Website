@@ -28,6 +28,7 @@ import {
   Underline,
   type Editor,
   type EditorConfig,
+  type ViewDocumentClipboardInputEvent,
 } from "ckeditor5";
 import viTranslations from "ckeditor5/translations/vi.js";
 import "ckeditor5/ckeditor5.css";
@@ -50,6 +51,32 @@ function MediaUploadAdapter(editor: Editor) {
   });
 }
 
+/** Thẻ không phải nội dung: CKEditor không hiểu nên giữ lại phần chữ bên trong thành đoạn văn. */
+const NON_CONTENT_BLOCKS = /<(style|script|title|template)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+const NON_CONTENT_VOID = /<(meta|link|base)\b[^>]*>/gi;
+
+/** Bỏ CSS/script đi kèm HTML được dán (từ trang web, Word, trợ lý chat…) trước khi CKEditor chuyển thành nội dung. */
+function stripNonContentHtml(html: string): string {
+  return html.replace(NON_CONTENT_BLOCKS, "").replace(NON_CONTENT_VOID, "");
+}
+
+/**
+ * Dán nội dung kèm thẻ `<style>` từng làm cả khối CSS hiện thành chữ trong "Kế hoạch sử dụng vốn"
+ * (TC_CAMP_010). Làm sạch HTML ở bước `clipboardInput`, trước khi CKEditor chuyển sang view.
+ */
+function StripPastedStyles(editor: Editor) {
+  editor.editing.view.document.on<ViewDocumentClipboardInputEvent>(
+    "clipboardInput",
+    (_event, data) => {
+      const html = data.dataTransfer.getData("text/html");
+      if (!html) return;
+      const cleaned = stripNonContentHtml(html);
+      if (cleaned !== html) data.content = cleaned;
+    },
+    { priority: "high" },
+  );
+}
+
 const CONFIG: EditorConfig = {
   licenseKey: "GPL",
   language: "vi",
@@ -59,7 +86,7 @@ const CONFIG: EditorConfig = {
     List, BlockQuote, Table, TableToolbar, PasteFromOffice,
     Image, ImageUpload, ImageInsert, AutoImage, ImageCaption, ImageStyle, ImageToolbar,
   ],
-  extraPlugins: [MediaUploadAdapter],
+  extraPlugins: [MediaUploadAdapter, StripPastedStyles],
   toolbar: {
     items: [
       "undo", "redo", "|", "heading", "|", "bold", "italic", "underline", "strikethrough", "|",

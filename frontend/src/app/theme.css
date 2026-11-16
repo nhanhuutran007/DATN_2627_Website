@@ -13189,3 +13189,145 @@ html:has(dialog:modal) .admin-sidebar {
   gap: 12px;
   justify-content: center;
 }
+
+/* Xem trước hồ sơ chưa phát hành (chỉ chủ dự án/admin) */
+.preview-page {
+  max-width: 760px;
+  padding: 40px 16px 64px;
+}
+
+.preview-page h1 {
+  margin: 16px 0 8px;
+  font-size: clamp(24px, 4vw, 34px);
+}
+
+.preview-banner,
+.preview-note {
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+.preview-meta {
+  margin: 0 0 20px;
+  color: var(--muted);
+}
+
+.preview-cover {
+  display: block;
+  width: 100%;
+  max-height: calc(60 * var(--vh-unit));
+  margin-bottom: 20px;
+  border-radius: 16px;
+  object-fit: cover;
+}
+
+.preview-story {
+  margin-bottom: 28px;
+  white-space: pre-line;
+  line-height: 1.65;
+}
+
+.preview-page .status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Văn bản thuần nhiều dòng (kết quả đầu ra của mốc, mô tả quà): giữ xuống dòng người dùng nhập */
+.pre-line {
+  white-space: pre-line;
+}
+
+/* Đăng nhập: lối sang trang đăng ký cho người chưa có tài khoản */
+.signin-alt {
+  margin: 20px 0 0;
+  color: var(--muted);
+  text-align: center;
+}
+
+.signin-alt a {
+  color: var(--ink, inherit);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* Thông tin người nhận quà ở form ủng hộ (chỉ khi chọn mức quà) */
+.reward-recipient {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+.reward-recipient-note,
+.reward-recipient-address {
+  grid-column: 1 / -1;
+}
+
+.reward-recipient-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 560px) {
+  .reward-recipient {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Trang Liên hệ hỗ trợ và form quản trị tương ứng */
+.support-channels {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.support-channels li {
+  display: grid;
+  grid-template-columns: 24px 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+
+.support-channels li > span {
+  color: var(--muted);
+}
+
+.support-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.support-form-wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .support-channels li {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .support-channels li > :last-child {
+    grid-column: 2;
+  }
+
+  .support-form {
+    grid-template-columns: 1fr;
+  }
+}
