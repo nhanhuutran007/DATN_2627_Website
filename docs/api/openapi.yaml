@@ -563,7 +563,7 @@ paths:
         "200":
           description: Xóa thành công
         "403":
-          description: Không phải admin, tự xóa mình, hoặc thiếu step-up token (`code: step_up_required`)
+          description: "Không phải admin, tự xóa mình, hoặc thiếu step-up token (`code: step_up_required`)"
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
@@ -716,6 +716,12 @@ paths:
     get:
       operationId: getCampaignById
       summary: Chi tiết chiến dịch
+      description: >-
+        Đăng nhập tùy chọn. Hồ sơ chưa phát hành (`draft`, `pending`, `needs_info`, `rejected`) chỉ
+        chủ dự án và admin xem được; người khác (kể cả khách) nhận 404 như không tồn tại.
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/IdPath"
       responses:
@@ -1942,6 +1948,61 @@ paths:
           description: Thiếu lý do
         "409":
           description: Chuyển trạng thái không hợp lệ
+  /support-contact:
+    get:
+      operationId: getSupportContact
+      summary: Thông tin liên hệ hỗ trợ của nền tảng (công khai)
+      description: Trường rỗng = chưa công bố. Hiển thị ở trang /lien-he, header, footer.
+      responses:
+        "200":
+          description: Liên hệ hỗ trợ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportContact"
+  /admin/support-contact:
+    get:
+      operationId: adminGetSupportContact
+      summary: Xem thông tin liên hệ hỗ trợ (chỉ admin)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Liên hệ hỗ trợ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportContact"
+    patch:
+      operationId: adminUpdateSupportContact
+      summary: Cập nhật thông tin liên hệ hỗ trợ (chỉ admin)
+      description: Trường không gửi giữ nguyên; gửi chuỗi rỗng để ẩn. Ghi audit `admin.support_contact.update`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, maxLength: 120 }
+                phone: { type: string, pattern: "^$|^\\+?[0-9 .-]{8,20}$" }
+                address: { type: string, maxLength: 300 }
+                workingHours: { type: string, maxLength: 120 }
+                socialUrl: { type: string, maxLength: 255, description: "Rỗng hoặc https://…" }
+                note: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Đã lưu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportContact"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /admin/categories:
     get:
       operationId: adminListCategories
@@ -2887,7 +2948,9 @@ paths:
     get:
       operationId: listRewardClaims
       summary: Người nhận quà để chủ dự án chuẩn bị gửi (chỉ khoản đã xác nhận)
-      description: Người ủng hộ chọn ẩn danh hiển thị "Ẩn danh"; không trả thông tin thanh toán.
+      description: >-
+        Người ủng hộ chọn ẩn danh hiển thị "Ẩn danh"; không trả thông tin thanh toán. Mỗi dòng có
+        `recipient` (`name`, `phone`, `address`) do người ủng hộ khai lúc chọn quà, `null` với khoản cũ.
       security:
         - bearerAuth: []
       parameters:
@@ -3785,6 +3848,16 @@ components:
         createdAt:
           type: string
           format: date-time
+    SupportContact:
+      type: object
+      properties:
+        email: { type: string }
+        phone: { type: string }
+        address: { type: string }
+        workingHours: { type: string }
+        socialUrl: { type: string }
+        note: { type: string }
+        updatedAt: { type: string, format: date-time, nullable: true }
     CreateDonationRequest:
       type: object
       required: [campaignId, amount, paymentMethod, idempotencyKey]
@@ -3814,6 +3887,24 @@ components:
             Mức quà chọn kèm. Số tiền phải ≥ `minAmount` (400), mức phải đang nhận và còn suất
             (409). Suất chỉ bị trừ khi thanh toán được xác nhận; nếu hết suất đúng lúc đó khoản
             ủng hộ vẫn được ghi nhận nhưng không kèm quà (`rewardTierId` = null).
+        rewardRecipient:
+          type: object
+          description: >-
+            Bắt buộc khi có `rewardTierId` (400 nếu thiếu). Lưu ở bảng `reward_recipients`, chỉ trả
+            qua `GET /campaigns/{id}/reward-claims` cho chủ dự án/admin.
+          required: [name, phone, address]
+          properties:
+            name:
+              type: string
+              minLength: 2
+              maxLength: 120
+            phone:
+              type: string
+              pattern: "^\\+?[0-9 .-]{8,20}$"
+            address:
+              type: string
+              minLength: 10
+              maxLength: 300
     WebhookDonationRequest:
       type: object
       required: [donationId, status, timestamp]
