@@ -17,6 +17,7 @@ import { FinanceModule } from "./modules/finance/finance.module";
 import { FollowsModule } from "./modules/follows/follows.module";
 import { HealthModule } from "./modules/health/health.module";
 import { MediaModule } from "./modules/media/media.module";
+import { SupportModule } from "./modules/support/support.module";
 import { ModerationModule } from "./modules/moderation/moderation.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
@@ -50,6 +51,7 @@ import { UsersModule } from "./modules/users/users.module";
     MediaModule,
     NotificationsModule,
     HealthModule,
+    SupportModule,
   ],
 })
 export class AppModule {}

@@ -41,6 +41,7 @@ export const ADMIN_SECTION_GROUPS: AdminSectionGroup[] = [
     sections: [
       { slug: "nguoi-dung", label: "Người dùng", title: "Người dùng", icon: "users" },
       { slug: "danh-muc", label: "Lĩnh vực", title: "Lĩnh vực", icon: "tag" },
+      { slug: "lien-he", label: "Liên hệ hỗ trợ", title: "Thông tin liên hệ hỗ trợ", icon: "mail" },
       { slug: "sao-luu", label: "Sao lưu dữ liệu", title: "Sao lưu & khôi phục dữ liệu", icon: "database" },
       { slug: "nhat-ky-kiem-toan", label: "Nhật ký kiểm toán", title: "Nhật ký kiểm toán", icon: "clock" },
     ],

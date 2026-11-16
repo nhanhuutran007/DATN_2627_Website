@@ -30,6 +30,7 @@ function givenName(name: string): string {
 const ABOUT_LINKS: MenuLink[] = [
   { href: "/#quy-trinh", label: "Cách hoạt động", hint: "Từ tạo hồ sơ đến báo cáo chi tiêu" },
   { href: "/#minh-bach", label: "Cam kết minh bạch", hint: "Kiểm duyệt, sổ cái, chứng từ" },
+  { href: "/lien-he", label: "Liên hệ hỗ trợ", hint: "Email, hotline của Góp Mầm" },
   { href: "/nguon-anh", label: "Nguồn ảnh" },
 ];
 

@@ -89,6 +89,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   "backup.export": "Tải bản sao lưu",
   "backup.restore": "Khôi phục dữ liệu",
   "admin.export": "Xuất thống kê",
+  "admin.support_contact.update": "Cập nhật liên hệ hỗ trợ",
 };
 
 export const AUDIT_ENTITY_LABEL: Record<string, string> = {

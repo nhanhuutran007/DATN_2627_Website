@@ -40,7 +40,7 @@ export default function PrivacyPolicyPage() {
         title="Chính sách quyền riêng tư"
         crumbs={[{ href: "/", label: "Trang chủ" }, { label: "Chính sách quyền riêng tư" }]}
       >
-        <p className="page-banner-lead">Cập nhật ngày 15/10/2026.</p>
+        <p className="page-banner-lead">Cập nhật ngày 17/11/2026.</p>
       </PageBanner>
       <div className="container block-tight policy">
         <section>
@@ -104,6 +104,15 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section>
+          <h2>Thông tin nhận quà</h2>
+          <p>
+            Khi chọn một mức quà, bạn cung cấp họ tên, số điện thoại và địa chỉ người nhận. Thông tin này chỉ chủ dự án
+            đó và quản trị viên xem được để gửi quà, kể cả khi bạn ủng hộ ẩn danh; nó không xuất hiện trên sổ cái hay
+            trang dự án.
+          </p>
+        </section>
+
+        <section>
           <h2>Gợi ý dự án theo sở thích</h2>
           <p>
             Góp Mầm chỉ ghi nhận các dự án bạn xem để gợi ý cá nhân hóa khi bạn đã đăng nhập và bấm đồng ý. Bạn có thể
@@ -125,7 +134,7 @@ export default function PrivacyPolicyPage() {
             <li>Xem và sửa thông tin cá nhân trong <Link href="/ho-so">Cài đặt tài khoản</Link>.</li>
             <li>Rút lại đồng ý gợi ý cá nhân hóa trong <Link href="/dashboard">Trang quản lý</Link>.</li>
             <li>Xóa dữ liệu Góp Mầm trên trình duyệt bằng cách đăng xuất hoặc xóa dữ liệu trang web trong cài đặt trình duyệt.</li>
-            <li>Yêu cầu khóa hoặc xóa tài khoản bằng cách liên hệ quản trị viên Góp Mầm.</li>
+            <li>Yêu cầu khóa hoặc xóa tài khoản qua kênh trên trang <Link href="/lien-he">Liên hệ hỗ trợ</Link>.</li>
           </ul>
         </section>
       </div>

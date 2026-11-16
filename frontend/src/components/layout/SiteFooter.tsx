@@ -34,6 +34,7 @@ const COLUMNS: Array<{ id: string; title: string; links: FooterLink[] }> = [
     links: [
       { href: "/#quy-trinh", label: "Cách hoạt động" },
       { href: "/#minh-bach", label: "Cam kết minh bạch" },
+      { href: "/lien-he", label: "Liên hệ hỗ trợ" },
       { href: "/nguon-anh", label: "Nguồn ảnh" },
       { href: "/chinh-sach-bao-mat", label: "Quyền riêng tư" },
     ],

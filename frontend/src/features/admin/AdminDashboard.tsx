@@ -12,6 +12,7 @@ import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { CategoryManager, StatsExport } from "@/features/admin/AdminContent";
 import { BackupManager } from "@/features/admin/BackupManager";
+import { SupportContactManager } from "@/features/admin/SupportContactManager";
 import { OrganizationReview } from "@/features/admin/OrganizationReview";
 import { AdminFinance } from "@/features/admin/AdminFinance";
 import { CampaignReviewDialog } from "@/features/admin/CampaignReviewDialog";
@@ -2212,6 +2213,7 @@ export function AdminDashboard() {
             />
           )}
           {view === "sao-luu" && <BackupManager />}
+          {view === "lien-he" && <SupportContactManager />}
           {view === "to-chuc" && <OrganizationReview />}
 
           {view === "nhat-ky-kiem-toan" && (
