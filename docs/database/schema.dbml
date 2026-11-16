@@ -1,4 +1,4 @@
-// Góp Mầm — schema MySQL 8 (khớp migration tới 1790000000012).
+// Góp Mầm — schema MySQL 8 (khớp migration tới 1790000000017).
 // Dán vào https://dbdiagram.io để vẽ ERD vật lý, hoặc xuất PNG/PDF cho báo cáo.
 
 Project gop_mam {
@@ -395,7 +395,7 @@ Table media_files {
   size_bytes int [not null]
   purpose media_files_purpose [not null]
   original_name varchar(255)
-  content_hash char(64) [note: 'SHA-256, chỉ ảnh expense_receipt; phát hiện file trùng y hệt']
+  content_hash char(64) [note: 'SHA-256 của ảnh expense_receipt và organization_document; phát hiện file trùng y hệt']
   perceptual_hash varchar(512) [note: 'dấu vân hình ảnh, chỉ ảnh expense_receipt; phát hiện ảnh gần giống']
   created_at datetime(6) [not null]
   updated_at datetime(6) [not null]
@@ -435,6 +435,16 @@ Table donations {
     campaign_id
     (status, created_at)
   }
+}
+
+Table reward_recipients {
+  donation_id char(36) [pk, ref: - donations.id, note: 'ON DELETE CASCADE; một khoản ủng hộ tối đa một người nhận']
+  recipient_name varchar(120) [not null]
+  phone varchar(20) [not null]
+  address varchar(300) [not null]
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+  Note: 'Bắt buộc khi khoản ủng hộ chọn mức quà; chỉ trả qua GET /campaigns/:id/reward-claims cho chủ dự án/admin'
 }
 
 Table refund_requests {
@@ -584,6 +594,14 @@ Table audit_logs {
   updated_at datetime(6) [not null]
 }
 
+Table platform_settings {
+  setting_key varchar(64) [pk, note: 'vd. support_contact']
+  value text [not null, note: 'JSON dạng văn bản']
+  updated_by char(36) [ref: > users.id, note: 'ON DELETE SET NULL']
+  created_at datetime(6) [not null]
+  updated_at datetime(6) [not null]
+}
+
 TableGroup tai_khoan {
   users
   email_verification_tokens
@@ -606,6 +624,7 @@ TableGroup chien_dich {
 TableGroup giao_dich {
   donations
   refund_requests
+  reward_recipients
 }
 TableGroup cong_dong {
   campaign_comments
@@ -619,4 +638,5 @@ TableGroup he_thong {
   behavior_events
   notifications
   audit_logs
+  platform_settings
 }

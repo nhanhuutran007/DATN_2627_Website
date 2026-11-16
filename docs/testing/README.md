@@ -6,14 +6,14 @@ Tài liệu này mô tả các tầng kiểm thử đang có, cách chạy và n
 
 | Tầng | Công cụ | Vị trí | Phạm vi |
 | --- | --- | --- | --- |
-| Unit test backend | `node --test` (biên dịch bằng `tsc`) | `backend/test/*.test.ts` | Nghiệp vụ của từng service với repository giả lập: xác thực, phân quyền, vòng đời chiến dịch, giao dịch, webhook, hoàn tiền, tiến độ, kiểm duyệt, tổ chức, quản trị, thông báo, AI proxy |
+| Unit test backend | `node --test` (biên dịch bằng `tsc`) | `backend/test/*.test.ts` | Nghiệp vụ của từng service với repository giả lập: xác thực, phân quyền, vòng đời chiến dịch, giao dịch, webhook, hoàn tiền, tiến độ, kiểm duyệt, tổ chức, quản trị, thông báo, liên hệ hỗ trợ, AI proxy |
 | Unit test frontend | `node --test` | `frontend/src/features/support/faq.test.mjs` | Khớp câu hỏi của hộp hỗ trợ |
 | Test AI service | `pytest` | `ai-service/tests/` | Hợp đồng API gợi ý, dự đoán, phát hiện gian lận, health, bảo mật, phương án dự phòng |
 | Kiểm tra tĩnh | TypeScript, ESLint, Ruff | toàn bộ mã nguồn | Kiểu dữ liệu và quy ước mã |
 | Smoke test | Docker Compose + Nginx | `infra/compose.yaml` | Sáu dịch vụ chạy cùng nhau, các trang và API chính phản hồi |
-| Kiểm thử thủ công | Trình duyệt | theo kịch bản bên dưới | Luồng đầu-cuối và giao diện |
+| Kiểm thử thủ công | Trình duyệt | [`TESTCASE_GOPMAM.xlsx`](../../TESTCASE_GOPMAM.xlsx) và kịch bản bên dưới | 198 test case theo 14 nhóm module: chức năng, phân quyền, bảo mật, giao diện, tích hợp, phi chức năng |
 
-Kết quả lần chạy ngày 14/11/2026: backend 534 test, frontend 36 test, AI service 34 test, tất cả đều đạt; ESLint và Ruff không báo lỗi.
+Kết quả lần chạy ngày 17/11/2026: backend 554 test, frontend 36 test, AI service 34 test, tất cả đều đạt; ESLint, TypeScript và Ruff không báo lỗi.
 
 ## Cách chạy
 
@@ -44,7 +44,7 @@ Unit test backend không cần cơ sở dữ liệu: repository, cổng thanh to
 | Tài chính | `finance.service`, `rewards.service` |
 | Tiến độ và minh bạch | `progress.service`, `milestone-overdue.service`, `transparency-score`, `receipt-duplicate` |
 | Tương tác | `comments.service`, `follows.service`, `notifications.service`, `notification-grouping` |
-| Kiểm duyệt và quản trị | `moderation.service`, `admin.service`, `risk-alert.service`, `audit.service`, `backup.service` |
+| Kiểm duyệt và quản trị | `moderation.service`, `admin.service`, `risk-alert.service`, `audit.service`, `backup.service`, `support.service` |
 | Tổ chức | `organizations.service` |
 | AI | `ai.service` |
 | Hạ tầng | `rate-limiter.service`, `redis.module`, `database-config`, `entity-column-names`, `media.service`, `email.gateway`, `health-controller` |
@@ -89,6 +89,23 @@ Dùng dữ liệu seed (`npm run seed`, mật khẩu chung `Test@123`):
 5. Chủ dự án đăng cập nhật tiến độ kèm khoản chi và chứng từ; người ủng hộ nhận thông báo.
 6. Người ủng hộ yêu cầu hoàn tiền (cần mã OTP qua email); quản trị viên duyệt.
 7. Quản trị viên xem cảnh báo rủi ro, nhật ký kiểm toán và xuất thống kê.
+
+## Bộ test case thủ công
+
+File [`TESTCASE_GOPMAM.xlsx`](../../TESTCASE_GOPMAM.xlsx) ở gốc repo gồm 198 test case chia 14 sheet theo module, sheet `ThongKe` tự tính số Pass/Fail/Blocked/Not Run và sheet `BaoCaoLoi` để ghi lỗi. Người kiểm thử điền các cột J–Q (kết quả thực tế, trạng thái, mức độ lỗi, người/ngày/môi trường kiểm thử, ghi chú).
+
+Đợt 14–16/11/2026 trên Docker Compose local: đã chạy 171/198 test case (86,4%), 164 Pass, 5 Fail, 2 Blocked; nhóm 09 (bình luận, theo dõi, thông báo) và 10 (kiểm duyệt) chưa chạy. Ngày 17/11/2026 đã sửa cả 5 Fail và các góp ý ghi trong những test case Pass; các test case đó được ghi "(Đã fix 17/11)" ở cột Ghi chú, trạng thái giữ nguyên để người kiểm thử chạy lại:
+
+| Test case | Nội dung sửa |
+| --- | --- |
+| `TC_NFR_011` | `GET /campaigns/:id` trả 404 cho hồ sơ chưa phát hành nếu người xem không phải chủ dự án/admin |
+| `TC_CAMP_011` | Nút Sửa cho hồ sơ cần bổ sung/bị từ chối/bản nháp, mở lại trình tạo chiến dịch với dữ liệu cũ |
+| `TC_CAMP_020` | Trang chủ hiện đủ 6 dự án nổi bật |
+| `TC_DON_010` | Nút Hủy giao dịch không bị khóa khi đang mở lại trang thanh toán |
+| `TC_ORG_002` | Chặn hai hồ sơ tổ chức dùng cùng ảnh giấy phép |
+| `TC_DON_007` | Bắt buộc thông tin người nhận quà khi chọn quà |
+| `TC_CAMP_016` | Trang Liên hệ hỗ trợ do admin cập nhật |
+| `TC_CAMP_010`, `TC_PROG_004`, `TC_AUTH_001`, `TC_ORG_006`, `TC_ADMIN_009`, `TC_AUTH_013` | Lọc CSS khi dán, ô nhiều dòng, bảng quản lý không chồng nhau, nút Đăng ký, giải thích cho admin, ngày CSV theo giờ Việt Nam, ẩn được nút Google |
 
 ## Chưa tự động hóa
 

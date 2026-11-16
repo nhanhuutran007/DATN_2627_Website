@@ -1,6 +1,6 @@
 # Database Design
 
-Schema MySQL 8 gồm **24 bảng** (khớp migration tới `1790000000012`). Định nghĩa cột đầy đủ ở [`schema.dbml`](./schema.dbml) (dán vào dbdiagram.io để vẽ ERD vật lý); đặc tả chi tiết từng thực thể và quan hệ ở [`dac-ta-erd.md`](./dac-ta-erd.md).
+Schema MySQL 8 gồm **26 bảng** (khớp migration tới `1790000000017`). Định nghĩa cột đầy đủ ở [`schema.dbml`](./schema.dbml) (dán vào dbdiagram.io để vẽ ERD vật lý); đặc tả chi tiết từng thực thể và quan hệ ở [`dac-ta-erd.md`](./dac-ta-erd.md).
 
 ## ERD Overview
 
@@ -40,6 +40,7 @@ erDiagram
     media_files ||--o| milestone_update_attachments : "là chứng từ"
     reward_tiers |o--o{ donations : "được chọn"
     donations ||--o{ refund_requests : "có"
+    donations ||--o| reward_recipients : "gửi quà tới"
     campaign_comments |o--o{ campaign_comments : "trả lời"
     campaign_comments |o--o{ reports : "bị báo cáo"
 
@@ -232,6 +233,17 @@ erDiagram
         char36 user_id FK
         datetime expires_at
     }
+    reward_recipients {
+        char36 donation_id PK
+        varchar recipient_name
+        varchar phone
+        varchar address
+    }
+    platform_settings {
+        varchar setting_key PK
+        text value
+        char36 updated_by FK
+    }
     audit_logs {
         char36 id PK
         varchar user_id
@@ -264,6 +276,7 @@ Sơ đồ chỉ hiện các cột chính; `created_at`/`updated_at` có ở mọ
 | | `media_files` | Ảnh tải lên (chiến dịch, tiến độ, avatar, chứng từ) |
 | Giao dịch | `donations` | Giao dịch ủng hộ; `idempotency_key` chống ghi trùng, `transfer_code` đối chiếu chuyển khoản |
 | | `refund_requests` | Yêu cầu hoàn tiền do admin duyệt (kèm tài khoản nhận nếu hoàn thủ công) |
+| | `reward_recipients` | Người nhận quà (họ tên, SĐT, địa chỉ) của khoản ủng hộ có chọn quà; tách bảng để không lộ qua API giao dịch, chỉ chủ dự án/admin xem |
 | Cộng đồng | `campaign_comments` | Bình luận/hỏi đáp, trả lời 1 cấp |
 | | `campaign_follows` | Theo dõi chiến dịch (N-N users–campaigns) |
 | Kiểm duyệt & rủi ro | `reports` | Báo cáo vi phạm chiến dịch hoặc bình luận |
@@ -271,6 +284,7 @@ Sơ đồ chỉ hiện các cột chính; `created_at`/`updated_at` có ở mọ
 | AI | `behavior_events` | Hành vi xem/theo dõi/ủng hộ/bấm từ kết quả tìm kiếm (chỉ ghi khi đồng ý) |
 | Hệ thống | `notifications` | Thông báo trong ứng dụng |
 | | `audit_logs` | Nhật ký thay đổi quan trọng |
+| | `platform_settings` | Cấu hình do admin chỉnh trên giao diện (khóa → JSON), hiện có `support_contact` cho trang Liên hệ hỗ trợ |
 
 ## Principles
 

@@ -1,10 +1,10 @@
 # ĐẶC TẢ ERD — NỀN TẢNG GÂY QUỸ CỘNG ĐỒNG GÓP MẦM
 
-> Bản nháp theo cấu trúc tài liệu đặc tả ERD mẫu của khoa. Nguồn: các file `backend/src/**/entities/*.entity.ts` và migration trong `backend/database/migrations/` (tới `1790000000012`). Hình ERD vật lý vẽ từ [`schema.dbml`](./schema.dbml), sơ đồ tổng quan ở [`erd.md`](./erd.md).
+> Bản nháp theo cấu trúc tài liệu đặc tả ERD mẫu của khoa. Nguồn: các file `backend/src/**/entities/*.entity.ts` và migration trong `backend/database/migrations/` (tới `1790000000017`). Hình ERD vật lý vẽ từ [`schema.dbml`](./schema.dbml), sơ đồ tổng quan ở [`erd.md`](./erd.md).
 
 ## CHƯƠNG 1. TỔNG QUAN HỆ THỐNG
 
-Góp Mầm là nền tảng gây quỹ cộng đồng cho dự án xã hội và khởi nghiệp. Cơ sở dữ liệu quản lý toàn bộ quy trình: đăng ký tài khoản, tạo và kiểm duyệt chiến dịch, ủng hộ trực tuyến kèm mức quà, cập nhật tiến độ giải ngân kèm chứng từ chi tiêu, theo dõi chậm tiến độ và lịch sử thay đổi kế hoạch, hoàn tiền, tương tác cộng đồng (bình luận, theo dõi), quản trị nội dung (danh mục, dự án nổi bật), thống kê lượt xem, kiểm duyệt vi phạm, phát hiện gian lận bằng AI, thông báo, xác minh tổ chức thụ hưởng và xác minh bổ sung bằng mã OTP cho thao tác nhạy cảm. Hệ thống gồm **24 thực thể**, **37 mối quan hệ có khóa ngoại** và 5 tham chiếu logic không có khóa ngoại.
+Góp Mầm là nền tảng gây quỹ cộng đồng cho dự án xã hội và khởi nghiệp. Cơ sở dữ liệu quản lý toàn bộ quy trình: đăng ký tài khoản, tạo và kiểm duyệt chiến dịch, ủng hộ trực tuyến kèm mức quà, cập nhật tiến độ giải ngân kèm chứng từ chi tiêu, theo dõi chậm tiến độ và lịch sử thay đổi kế hoạch, hoàn tiền, tương tác cộng đồng (bình luận, theo dõi), quản trị nội dung (danh mục, dự án nổi bật), thống kê lượt xem, kiểm duyệt vi phạm, phát hiện gian lận bằng AI, thông báo, xác minh tổ chức thụ hưởng, xác minh bổ sung bằng mã OTP cho thao tác nhạy cảm, thông tin gửi quà và cấu hình liên hệ hỗ trợ do quản trị viên cập nhật. Hệ thống gồm **26 thực thể**, **39 mối quan hệ có khóa ngoại** và 5 tham chiếu logic không có khóa ngoại.
 
 Hệ quản trị: MySQL 8 (tương thích MariaDB), engine InnoDB. Schema chỉ thay đổi qua migration TypeORM có thứ tự và có rollback.
 
@@ -276,7 +276,7 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - `size_bytes` (INT, NOT NULL): Dung lượng
 - `purpose` (ENUM: campaign_image / progress_image / avatar / expense_receipt / refund_proof / organization_logo / organization_document, NOT NULL): Mục đích sử dụng; `expense_receipt` lưu trong thư mục `receipts/`; `refund_proof` chỉ quản trị viên tải lên; `organization_document` là ảnh giấy phép, chỉ người đại diện và quản trị viên xem
 - `original_name` (VARCHAR(255)): Tên file gốc (chỉ để hiển thị)
-- `content_hash` (CHAR(64)): SHA-256 của ảnh, chỉ có ở `expense_receipt`; chặn đính kèm file trùng y hệt chứng từ đã dùng
+- `content_hash` (CHAR(64)): SHA-256 của ảnh, có ở `expense_receipt` (chặn đính kèm file trùng y hệt chứng từ đã dùng) và `organization_document` (chặn hai hồ sơ tổ chức còn hiệu lực dùng cùng ảnh giấy phép)
 - `perceptual_hash` (VARCHAR(512)): Dấu vân hình ảnh, chỉ có ở `expense_receipt`; ảnh gần giống tạo cảnh báo rủi ro để quản trị viên đối chiếu
 - `deleted_at` (DATETIME(6)): Xóa mềm
 
@@ -541,9 +541,39 @@ Quy ước chung cho mọi bảng (không nhắc lại ở từng mục):
 - FK `user_id` tham chiếu `users(id)` ON DELETE CASCADE
 - Gửi lại mã cách nhau tối thiểu 60 giây; mã đúng đổi thành token xác minh ngắn hạn (10 phút) gửi kèm yêu cầu thực hiện thao tác
 
+### 2.25. REWARD_RECIPIENTS (Người nhận quà)
+
+**Mục đích**: Lưu thông tin gửi quà của khoản ủng hộ có chọn mức quà. Tách khỏi `donations` để dữ liệu cá nhân không đi theo các API giao dịch và sổ cái; chỉ danh sách người nhận quà của chủ dự án và quản trị viên đọc tới.
+
+**Thuộc tính**:
+
+- `donation_id` (CHAR(36), PK, FK): Khoản ủng hộ
+- `recipient_name` (VARCHAR(120), NOT NULL): Họ tên người nhận
+- `phone` (VARCHAR(20), NOT NULL): Số điện thoại
+- `address` (VARCHAR(300), NOT NULL): Địa chỉ nhận quà
+- `created_at`, `updated_at`
+
+**Ràng buộc**:
+
+- FK `donation_id` tham chiếu `donations(id)` ON DELETE CASCADE
+- Bắt buộc khi khoản ủng hộ có `reward_tier_id` (kiểm tra ở tầng dịch vụ)
+
+### 2.26. PLATFORM_SETTINGS (Cấu hình nền tảng)
+
+**Mục đích**: Cấu hình quản trị viên chỉnh trên giao diện, không cần sửa mã hay biến môi trường. Hiện có khóa `support_contact` (email, hotline, địa chỉ, giờ làm việc, mạng xã hội, ghi chú) cho trang Liên hệ hỗ trợ.
+
+**Thuộc tính**:
+
+- `setting_key` (VARCHAR(64), PK): Tên cấu hình
+- `value` (TEXT, NOT NULL): Giá trị JSON dạng văn bản; giá trị hỏng được đọc như rỗng
+- `updated_by` (CHAR(36), FK): Quản trị viên lưu gần nhất
+- `created_at`, `updated_at`
+
+**Ràng buộc**: FK `updated_by` tham chiếu `users(id)` ON DELETE SET NULL; mỗi lần lưu ghi `audit_logs` (`admin.support_contact.update`).
+
 ## CHƯƠNG 3. MỐI QUAN HỆ (RELATIONSHIPS)
 
-Các quan hệ dưới đây là 1-N (trừ 3.31 là 1-1) và đều có ràng buộc FOREIGN KEY trong CSDL. "Bắt buộc" nghĩa là cột FK là NOT NULL.
+Các quan hệ dưới đây là 1-N (trừ 3.31 và 3.38 là 1-1) và đều có ràng buộc FOREIGN KEY trong CSDL. "Bắt buộc" nghĩa là cột FK là NOT NULL.
 
 | # | Quan hệ | Tên quan hệ | Khóa ngoại | Bắt buộc | Mô tả |
 | --- | --- | --- | --- | --- | --- |
@@ -584,6 +614,8 @@ Các quan hệ dưới đây là 1-N (trừ 3.31 là 1-1) và đều có ràng b
 | 3.35 | USERS – ORGANIZATIONS (người duyệt) | xác minh | `organizations.reviewed_by → users.id` | Không | Một quản trị viên xét duyệt nhiều tổ chức |
 | 3.36 | ORGANIZATIONS – CAMPAIGNS | thụ hưởng | `campaigns.organization_id → organizations.id` | Không | Một tổ chức đã xác minh được nhiều chiến dịch gây quỹ thay; chiến dịch có thể không gắn tổ chức |
 | 3.37 | USERS – STEP_UP_CODES | xác minh OTP | `step_up_codes.user_id → users.id` (CASCADE) | Có | Mỗi lần yêu cầu thao tác nhạy cảm tạo một mã mới |
+| 3.38 | DONATIONS – REWARD_RECIPIENTS | gửi quà tới | `reward_recipients.donation_id → donations.id` (PK, CASCADE) | Có | Quan hệ **1-1 (tùy chọn phía khoản ủng hộ)**: chỉ khoản có chọn quà mới có người nhận |
+| 3.39 | USERS – PLATFORM_SETTINGS | cập nhật | `platform_settings.updated_by → users.id` (SET NULL) | Không | Một quản trị viên cập nhật nhiều mục cấu hình |
 
 **Quan hệ N-N**: USERS – CAMPAIGNS (theo dõi) được tách thành hai quan hệ 1-N qua bảng trung gian `campaign_follows` (3.15, 3.16) với UNIQUE (`user_id`, `campaign_id`). Tương tự, `donations` có thể xem là bảng liên kết N-N USERS – CAMPAIGNS kèm thuộc tính giao dịch.
 
@@ -673,8 +705,8 @@ Các quan hệ dưới đây là 1-N (trừ 3.31 là 1-1) và đều có ràng b
 
 Cơ sở dữ liệu Góp Mầm được thiết kế với:
 
-- **24 thực thể** chia 6 nhóm: tài khoản, chiến dịch và tiến độ, giao dịch, cộng đồng, kiểm duyệt và rủi ro, AI và hệ thống
-- **37 mối quan hệ có khóa ngoại** (36 quan hệ 1-N, 1 quan hệ 1-1) và 5 tham chiếu logic, bảo đảm toàn vẹn dữ liệu
+- **26 thực thể** chia 6 nhóm: tài khoản, chiến dịch và tiến độ, giao dịch, cộng đồng, kiểm duyệt và rủi ro, AI và hệ thống
+- **39 mối quan hệ có khóa ngoại** (37 quan hệ 1-N, 2 quan hệ 1-1) và 5 tham chiếu logic, bảo đảm toàn vẹn dữ liệu
 - **Minh bạch giải ngân** nhờ chứng từ chi tiêu gắn với từng bài cập nhật, nhắc mốc quá hạn và lịch sử thay đổi kế hoạch công khai
 - **An toàn giao dịch** nhờ idempotency key, unique constraint, CHECK constraint và nhật ký kiểm toán
 - **Khả năng mở rộng** qua migration có thứ tự và có rollback, cho phép bổ sung loại thông báo, trạng thái và mô-đun AI mà không phá vỡ dữ liệu cũ
