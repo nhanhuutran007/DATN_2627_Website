@@ -22,6 +22,8 @@ import { MAX_IMAGE_BYTES, detectImageType, sanitizeOriginalName } from "./image-
 /** Tiền tố URL công khai của file; khớp `GET /media/:folder/:file`. */
 export const MEDIA_URL_PREFIX = "/api/v1/media/";
 
+const FINGERPRINTED_PURPOSES = [MediaPurpose.EXPENSE_RECEIPT, MediaPurpose.ORGANIZATION_DOCUMENT];
+
 const FOLDER_BY_PURPOSE: Record<MediaPurpose, string> = {
   [MediaPurpose.CAMPAIGN_IMAGE]: "campaigns",
   [MediaPurpose.PROGRESS_IMAGE]: "progress",
@@ -67,7 +69,8 @@ export class MediaService {
       throw new BadRequestException("Chỉ chấp nhận ảnh JPEG, PNG hoặc WebP.");
     }
 
-    const fingerprint = purpose === MediaPurpose.EXPENSE_RECEIPT ? await fingerprintImage(file.buffer) : undefined;
+    // Dấu vân ảnh: chứng từ chi tiêu (chống dùng lại) và ảnh giấy phép tổ chức (chống trùng hồ sơ).
+    const fingerprint = FINGERPRINTED_PURPOSES.includes(purpose) ? await fingerprintImage(file.buffer) : undefined;
 
     const storageKey = `${FOLDER_BY_PURPOSE[purpose]}/${randomUUID()}.${type.extension}`;
     await this.storage.put(storageKey, file.buffer, type.mimeType);

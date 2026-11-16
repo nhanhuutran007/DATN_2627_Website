@@ -37,6 +37,8 @@ const baseDto = () => ({
   representativeTitle: "Giám đốc quỹ",
 });
 
+const docUrl = (name: string) => `/api/v1/media/org-documents/${name}.jpg`;
+
 /** Repo giả lưu trong bộ nhớ, đủ các hàm service dùng. */
 function makeRepo(rows: any[]) {
   const matches = (row: any, where: any) =>
@@ -80,13 +82,20 @@ describe("OrganizationsService", () => {
   let audit: ReturnType<typeof makeAuditRecorder>;
   let notified: any[];
   let service: OrganizationsService;
+  let mediaRows: Array<{ id: string; storageKey: string; contentHash: string | null; purpose: string }>;
 
   beforeEach(() => {
     repo = makeRepo([]);
+    mediaRows = [];
     audit = makeAuditRecorder();
     notified = [];
     const notifications: any = { notify: async (input: any) => notified.push(input) };
-    service = new OrganizationsService(repo as any, {} as any, audit.service, notifications);
+    const mediaRepo: any = {
+      findOne: async ({ where }: any) => mediaRows.find((row) => row.storageKey === where.storageKey) ?? null,
+      find: async ({ where }: any) =>
+        mediaRows.filter((row) => row.contentHash === where.contentHash && row.purpose === where.purpose),
+    };
+    service = new OrganizationsService(repo as any, {} as any, mediaRepo, audit.service, notifications);
   });
 
   it("should register a pending organization with a slug and audit it", async () => {
@@ -100,7 +109,7 @@ describe("OrganizationsService", () => {
 
   it("should give a duplicate name a numbered slug", async () => {
     await service.create(baseDto(), REP);
-    const second = await service.create({ ...baseDto(), registrationNumber: "456/QĐ" }, OTHER);
+    const second = await service.create({ ...baseDto(), registrationNumber: "456/QĐ", documentUrl: docUrl("b") }, OTHER);
     equal(second.slug, "quy-bao-tro-tre-em-dong-nai-2");
   });
 
@@ -118,9 +127,47 @@ describe("OrganizationsService", () => {
 
   it("should cap organizations per representative", async () => {
     for (let i = 0; i < MAX_ORGANIZATIONS_PER_USER; i += 1) {
-      await service.create({ ...baseDto(), registrationNumber: `R-${i}` }, REP);
+      await service.create({ ...baseDto(), registrationNumber: `R-${i}`, documentUrl: docUrl(`c${i}`) }, REP);
     }
     await expectStatus(service.create({ ...baseDto(), registrationNumber: "R-x" }, REP), 409);
+  });
+
+  describe("license image (TC_ORG_002)", () => {
+    it("should refuse reusing the same license image URL for another live application", async () => {
+      await service.create(baseDto(), REP);
+      await expectStatus(service.create({ ...baseDto(), registrationNumber: "999/QĐ" }, OTHER), 409);
+    });
+
+    it("should refuse a re-uploaded copy of the same license image (same content hash)", async () => {
+      mediaRows.push(
+        { id: "m1", storageKey: "org-documents/a.jpg", contentHash: "h".repeat(64), purpose: "organization_document" },
+        { id: "m2", storageKey: "org-documents/b.jpg", contentHash: "h".repeat(64), purpose: "organization_document" },
+      );
+      await service.create({ ...baseDto(), documentUrl: docUrl("a") }, REP);
+      await expectStatus(
+        service.create({ ...baseDto(), registrationNumber: "999/QĐ", documentUrl: docUrl("b") }, OTHER),
+        409,
+      );
+    });
+
+    it("should accept a different image and free the image once the application is rejected", async () => {
+      mediaRows.push(
+        { id: "m1", storageKey: "org-documents/a.jpg", contentHash: "1".repeat(64), purpose: "organization_document" },
+        { id: "m2", storageKey: "org-documents/b.jpg", contentHash: "2".repeat(64), purpose: "organization_document" },
+      );
+      const first = await service.create({ ...baseDto(), documentUrl: docUrl("a") }, REP);
+      const second = await service.create({ ...baseDto(), registrationNumber: "999/QĐ", documentUrl: docUrl("b") }, OTHER);
+      equal(second.status, OrganizationStatus.PENDING);
+      first.status = OrganizationStatus.REJECTED;
+      const third = await service.create({ ...baseDto(), registrationNumber: "777/QĐ", documentUrl: docUrl("a") }, ADMIN);
+      equal(third.status, OrganizationStatus.PENDING);
+    });
+
+    it("should refuse switching an application to an image already used elsewhere", async () => {
+      await service.create(baseDto(), REP);
+      const mine = await service.create({ ...baseDto(), registrationNumber: "999/QĐ", documentUrl: docUrl("b") }, OTHER);
+      await expectStatus(service.update(mine.id, { documentUrl: baseDto().documentUrl }, OTHER), 409);
+    });
   });
 
   describe("update", () => {

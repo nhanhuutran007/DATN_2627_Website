@@ -10,6 +10,8 @@ import { In, Like, Not, Repository, type FindOptionsWhere } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
+import { MediaFile, MediaPurpose } from "../media/entities/media-file.entity";
+import { MEDIA_URL_PREFIX } from "../media/media.service";
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { NotificationsService } from "../notifications/notifications.service";
 import type { User } from "../users/entities/user.entity";
@@ -111,6 +113,8 @@ export class OrganizationsService {
     private readonly organizationRepo: Repository<Organization>,
     @InjectRepository(Campaign)
     private readonly campaignRepo: Repository<Campaign>,
+    @InjectRepository(MediaFile)
+    private readonly mediaRepo: Repository<MediaFile>,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
   ) {}
@@ -160,6 +164,7 @@ export class OrganizationsService {
       throw new ConflictException(`Mỗi tài khoản đại diện tối đa ${MAX_ORGANIZATIONS_PER_USER} tổ chức.`);
     }
     await this.assertRegistrationAvailable(dto.registrationNumber);
+    await this.assertDocumentAvailable(dto.documentUrl);
 
     const saved = await this.organizationRepo.save(
       this.organizationRepo.create({
@@ -209,6 +214,9 @@ export class OrganizationsService {
     }
     if (newValues.registrationNumber !== undefined) {
       await this.assertRegistrationAvailable(newValues.registrationNumber as string, organization.id);
+    }
+    if (newValues.documentUrl !== undefined) {
+      await this.assertDocumentAvailable(newValues.documentUrl as string, organization.id);
     }
 
     Object.assign(organization, newValues);
@@ -331,6 +339,35 @@ export class OrganizationsService {
     });
     if (existing && existing.id !== exceptId) {
       throw new ConflictException("Số giấy phép này đã được một hồ sơ tổ chức khác đăng ký.");
+    }
+  }
+
+  /**
+   * Một ảnh giấy phép chỉ dùng cho một hồ sơ còn hiệu lực: trùng đường dẫn, hoặc ảnh tải lên lại
+   * trùng từng byte (SHA-256 `content_hash` lúc tải `organization_document`). Ảnh tải trước khi có
+   * dấu vân (không có hash) chỉ so được theo đường dẫn.
+   */
+  private async assertDocumentAvailable(documentUrl: string, exceptId?: string): Promise<void> {
+    const urls = new Set([documentUrl]);
+    if (documentUrl.startsWith(MEDIA_URL_PREFIX)) {
+      const media = await this.mediaRepo.findOne({
+        where: { storageKey: documentUrl.slice(MEDIA_URL_PREFIX.length) },
+        select: { id: true, contentHash: true },
+      });
+      if (media?.contentHash) {
+        const sameImage = await this.mediaRepo.find({
+          where: { contentHash: media.contentHash, purpose: MediaPurpose.ORGANIZATION_DOCUMENT },
+          select: { id: true, storageKey: true },
+        });
+        for (const file of sameImage) urls.add(`${MEDIA_URL_PREFIX}${file.storageKey}`);
+      }
+    }
+    const existing = await this.organizationRepo.findOne({
+      where: { documentUrl: In([...urls]), status: In(ACTIVE_STATUSES), ...(exceptId ? { id: Not(exceptId) } : {}) },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ConflictException("Ảnh giấy phép này đã được dùng cho một hồ sơ tổ chức khác.");
     }
   }
 

@@ -36,7 +36,7 @@ export class MediaFile extends BaseEntity {
   @Column({ name: "original_name", type: "varchar", length: 255, nullable: true })
   originalName?: string | null;
 
-  /** SHA-256 của ảnh chứng từ, phát hiện file trùng y hệt. Chỉ có ở `expense_receipt`. */
+  /** SHA-256 của ảnh chứng từ, phát hiện file trùng y hệt. Có ở `expense_receipt` và `organization_document`. */
   @Column({ name: "content_hash", type: "char", length: 64, nullable: true })
   contentHash?: string | null;
 
