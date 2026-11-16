@@ -41,6 +41,15 @@ type DonationPanelProps = {
 const PRESETS = [50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000];
 const SUGGESTED = 200_000;
 const MIN_AMOUNT = 20_000;
+const PHONE_PATTERN = /^\+?[0-9 .-]{8,20}$/;
+
+/** Kiểm tra thông tin nhận quà giống máy chủ (`RewardRecipientDto`); trả lỗi đầu tiên hoặc "". */
+function recipientError(recipient: { name: string; phone: string; address: string }): string {
+  if (recipient.name.trim().length < 2) return "Vui lòng nhập họ tên người nhận quà.";
+  if (!PHONE_PATTERN.test(recipient.phone.trim())) return "Số điện thoại người nhận quà không hợp lệ.";
+  if (recipient.address.trim().length < 10) return "Vui lòng nhập địa chỉ nhận quà đầy đủ (số nhà, đường, phường/xã, tỉnh/thành).";
+  return "";
+}
 /** Khớp `@MaxLength(500)` của `CreateDonationDto.message`. */
 const MESSAGE_MAX = 500;
 const MAX_DIGITS = 12;
@@ -80,8 +89,12 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
   const [payment, setPayment] = useState("wallet");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Hủy có trạng thái riêng: người dùng vẫn hủy được khi "Thanh toán lại" đang chạy (TC_DON_010).
+  const [cancelling, setCancelling] = useState(false);
   const [donation, setDonation] = useState<ApiDonation | null>(null);
   const [rewardTierId, setRewardTierId] = useState("");
+  // Người nhận quà (TC_DON_007): chỉ hỏi khi chọn mức quà, gửi cho chủ dự án để gửi quà.
+  const [recipient, setRecipient] = useState({ name: "", phone: "", address: "" });
   const [recent, setRecent] = useState<LedgerEntry | null>(null);
   const [options, setOptions] = useState<PaymentOptions | null>(null);
   const methods = paymentMethods(options);
@@ -164,6 +177,13 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
       setError(`Mức quà "${selectedTier.title}" cần ủng hộ tối thiểu ${formatVnd(selectedTier.minAmount)}.`);
       return;
     }
+    if (selectedTier) {
+      const missing = recipientError(recipient);
+      if (missing) {
+        setError(missing);
+        return;
+      }
+    }
 
     setLoading(true);
     let created: ApiDonation | null = null;
@@ -175,7 +195,12 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
         isAnonymous: anonymous,
         ...(message.trim() ? { message: message.trim() } : {}),
         idempotencyKey: generateIdempotencyKey(),
-        ...(selectedTier ? { rewardTierId: selectedTier.id } : {}),
+        ...(selectedTier
+          ? {
+              rewardTierId: selectedTier.id,
+              rewardRecipient: { name: recipient.name.trim(), phone: recipient.phone.trim(), address: recipient.address.trim() },
+            }
+          : {}),
       });
       // Đơn đã tạo: dù xác nhận lỗi vẫn hiển thị để người dùng thanh toán lại hoặc hủy.
       setDonation(created);
@@ -209,14 +234,14 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
 
   const cancelPending = async () => {
     if (!donation) return;
-    setLoading(true);
+    setCancelling(true);
     setError("");
     try {
       setDonation(await cancelDonation(donation.id));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không hủy được giao dịch. Vui lòng thử lại.");
     } finally {
-      setLoading(false);
+      setCancelling(false);
     }
   };
 
@@ -267,11 +292,11 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
         <div className="donate-result-actions">
           {pending ? (
             <>
-              <button className="button button-primary button-lg" type="button" disabled={loading} onClick={retryPayment}>
+              <button className="button button-primary button-lg" type="button" disabled={loading || cancelling} onClick={retryPayment}>
                 {loading ? "Đang xử lý…" : "Thanh toán lại"}
               </button>
-              <button className="button button-outline button-lg" type="button" disabled={loading} onClick={cancelPending}>
-                Hủy giao dịch
+              <button className="button button-outline button-lg" type="button" disabled={cancelling} onClick={cancelPending}>
+                {cancelling ? "Đang hủy…" : "Hủy giao dịch"}
               </button>
             </>
           ) : (
@@ -371,7 +396,7 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
                     <b>{tier.title}</b>
                     <b className="num">từ {formatVnd(tier.minAmount)}</b>
                   </span>
-                  <span>{tier.description}</span>
+                  <span className="pre-line">{tier.description}</span>
                   <small>
                     {soldOut ? "Đã hết suất" : tier.remaining === null ? "Không giới hạn suất" : `Còn ${tier.remaining}/${tier.quantityLimit} suất`}
                     {tier.estimatedDelivery && ` · Dự kiến gửi ${new Date(tier.estimatedDelivery).toLocaleDateString("vi-VN")}`}
@@ -380,6 +405,42 @@ export function DonationPanel({ campaignId, campaignTitle, enabled = true, rewar
               </label>
             );
           })}
+          {selectedTier && (
+            <div className="reward-recipient">
+              <p className="reward-recipient-note">
+                Thông tin nhận quà chỉ chia sẻ với chủ dự án để gửi quà (kể cả khi bạn ủng hộ ẩn danh), không hiển thị công khai.
+              </p>
+              <label className="field">
+                <span>Họ tên người nhận</span>
+                <input
+                  value={recipient.name}
+                  maxLength={120}
+                  autoComplete="name"
+                  onChange={(e) => setRecipient((r) => ({ ...r, name: e.target.value }))}
+                />
+              </label>
+              <label className="field">
+                <span>Số điện thoại</span>
+                <input
+                  value={recipient.phone}
+                  maxLength={20}
+                  inputMode="tel"
+                  autoComplete="tel"
+                  onChange={(e) => setRecipient((r) => ({ ...r, phone: e.target.value }))}
+                />
+              </label>
+              <label className="field reward-recipient-address">
+                <span>Địa chỉ nhận quà</span>
+                <input
+                  value={recipient.address}
+                  maxLength={300}
+                  autoComplete="street-address"
+                  placeholder="Số nhà, đường, phường/xã, tỉnh/thành"
+                  onChange={(e) => setRecipient((r) => ({ ...r, address: e.target.value }))}
+                />
+              </label>
+            </div>
+          )}
         </fieldset>
       )}
 

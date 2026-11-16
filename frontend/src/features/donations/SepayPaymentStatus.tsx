@@ -47,7 +47,9 @@ const COPY: Record<SepayReturn, { title: string; text: string }> = {
  * quay về trang lỗi vẫn được cập nhật.
  */
 export function SepayPaymentStatus({ donation, result, onChange }: SepayPaymentStatusProps) {
-  const [busy, setBusy] = useState(false);
+  // Mở lại trang SePay và hủy tách riêng: đang chuyển sang SePay vẫn hủy được (TC_DON_010).
+  const [opening, setOpening] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -72,25 +74,25 @@ export function SepayPaymentStatus({ donation, result, onChange }: SepayPaymentS
   }, [donation.id, onChange]);
 
   const payAgain = async () => {
-    setBusy(true);
+    setOpening(true);
     setError("");
     try {
       submitSepayCheckout(await createSepayCheckout(donation.id));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không mở được trang thanh toán. Vui lòng thử lại.");
-      setBusy(false);
+      setOpening(false);
     }
   };
 
   const cancel = async () => {
-    setBusy(true);
+    setCancelling(true);
     setError("");
     try {
       onChange(await cancelDonation(donation.id));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Không hủy được giao dịch. Vui lòng thử lại.");
     } finally {
-      setBusy(false);
+      setCancelling(false);
     }
   };
 
@@ -109,11 +111,11 @@ export function SepayPaymentStatus({ donation, result, onChange }: SepayPaymentS
       </p>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="donate-result-actions">
-        <button className="button button-primary button-lg" type="button" disabled={busy} onClick={payAgain}>
-          {result === "success" ? "Mở lại trang thanh toán" : "Thanh toán lại"}
+        <button className="button button-primary button-lg" type="button" disabled={opening || cancelling} onClick={payAgain}>
+          {opening ? "Đang mở trang thanh toán…" : result === "success" ? "Mở lại trang thanh toán" : "Thanh toán lại"}
         </button>
-        <button className="button button-outline button-lg" type="button" disabled={busy} onClick={cancel}>
-          Hủy giao dịch
+        <button className="button button-outline button-lg" type="button" disabled={cancelling} onClick={cancel}>
+          {cancelling ? "Đang hủy…" : "Hủy giao dịch"}
         </button>
       </div>
     </div>

@@ -41,7 +41,11 @@ export type CreateDonationPayload = {
   idempotencyKey: string;
   /** Mức quà chọn kèm khoản ủng hộ (số tiền phải ≥ mức tối thiểu). */
   rewardTierId?: string;
+  /** Bắt buộc khi chọn mức quà; chỉ chủ dự án và quản trị viên xem được. */
+  rewardRecipient?: RewardRecipient;
 };
+
+export type RewardRecipient = { name: string; phone: string; address: string };
 
 export type ConfirmDonationPayload = {
   donationId: string;

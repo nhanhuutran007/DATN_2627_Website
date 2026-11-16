@@ -31,6 +31,8 @@ export type RewardClaim = {
   amount: number;
   backerName: string;
   completedAt: string | null;
+  /** Thông tin gửi quà; `null` với khoản ủng hộ cũ chưa có thông tin này. */
+  recipient: { name: string; phone: string; address: string } | null;
 };
 
 export const MIN_REWARD_AMOUNT = 20_000;

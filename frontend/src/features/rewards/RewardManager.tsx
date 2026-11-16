@@ -138,7 +138,7 @@ export function RewardManager({ campaignId, closed }: { campaignId: string; clos
             </label>
             <label className="field field-span-4">
               <span>Mô tả phần quà</span>
-              <input value={draft.description} maxLength={1000} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+              <textarea rows={2} value={draft.description} maxLength={1000} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
             </label>
           </div>
           <button className="button button-primary button-sm" type="submit" disabled={busy === "new"}>
@@ -152,13 +152,16 @@ export function RewardManager({ campaignId, closed }: { campaignId: string; clos
 
       <div className="reward-claims">
         <p className="reward-add-title">Người nhận quà ({claims.length})</p>
+        {claims.length > 0 && (
+          <p className="hint">Thông tin gửi quà chỉ dùng để gửi quà; không chia sẻ cho bên khác.</p>
+        )}
         {claims.length === 0 ? (
           <p className="hint">Chưa có khoản ủng hộ nào kèm quà được xác nhận.</p>
         ) : (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
-                <tr><th scope="col">Người ủng hộ</th><th scope="col">Phần quà</th><th scope="col" className="num">Số tiền</th><th scope="col">Ngày</th></tr>
+                <tr><th scope="col">Người ủng hộ</th><th scope="col">Phần quà</th><th scope="col" className="num">Số tiền</th><th scope="col">Ngày</th><th scope="col">Gửi quà tới</th></tr>
               </thead>
               <tbody>
                 {claims.map((claim) => (
@@ -167,6 +170,17 @@ export function RewardManager({ campaignId, closed }: { campaignId: string; clos
                     <td>{claim.tierTitle}</td>
                     <td className="num">{formatVnd(claim.amount)}</td>
                     <td className="nowrap">{claim.completedAt ? new Date(claim.completedAt).toLocaleDateString("vi-VN") : "—"}</td>
+                    <td>
+                      {claim.recipient ? (
+                        <>
+                          <b>{claim.recipient.name}</b> · <a href={`tel:${claim.recipient.phone.replace(/[^0-9+]/g, "")}`}>{claim.recipient.phone}</a>
+                          <br />
+                          {claim.recipient.address}
+                        </>
+                      ) : (
+                        <span className="hint">Chưa có (khoản ủng hộ trước khi hệ thống hỏi địa chỉ)</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -11,9 +11,10 @@ import { SepayIpnController } from "./sepay-ipn.controller";
 import { DonationExpiryService } from "./donation-expiry.service";
 import { DonationsService } from "./donations.service";
 import { Donation } from "./entities/donation.entity";
+import { RewardRecipient } from "./entities/reward-recipient.entity";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Donation, Campaign, RewardTier])],
+  imports: [TypeOrmModule.forFeature([Donation, Campaign, RewardTier, RewardRecipient])],
   controllers: [DonationsController, CampaignLedgerController, SepayIpnController],
   providers: [
     DonationsService,

@@ -28,6 +28,7 @@ import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity"
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { donationGroupText, NotificationsService } from "../notifications/notifications.service";
 import { RewardTier } from "../rewards/entities/reward-tier.entity";
+import { RewardRecipient } from "./entities/reward-recipient.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import { CreateDonationDto, WebhookDonationDto, type WebhookStatus } from "./dto/donation.dto";
 import { Donation, DonationStatus } from "./entities/donation.entity";
@@ -297,6 +298,9 @@ export class DonationsService {
 
     if (dto.rewardTierId) {
       await this.assertRewardTierAvailable(dto.rewardTierId, campaign.id, dto.amount);
+      if (!dto.rewardRecipient) {
+        throw new BadRequestException("Vui lòng nhập họ tên, số điện thoại và địa chỉ người nhận quà.");
+      }
     }
 
     if (dto.paymentMethod === "sepay" && !this.sepay) {
@@ -328,7 +332,16 @@ export class DonationsService {
       rewardTierId: dto.rewardTierId ?? null,
     });
 
-    return this.donationRepo.save(donation);
+    const saved = await this.donationRepo.save(donation);
+    if (dto.rewardTierId && dto.rewardRecipient) {
+      await this.dataSource.getRepository(RewardRecipient).save({
+        donationId: saved.id,
+        recipientName: dto.rewardRecipient.name.trim(),
+        phone: dto.rewardRecipient.phone.trim(),
+        address: dto.rewardRecipient.address.trim(),
+      });
+    }
+    return saved;
   }
 
   /**

@@ -1,3 +1,4 @@
+import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsIn,
@@ -7,9 +8,29 @@ import {
   IsPositive,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   Min,
+  MinLength,
+  ValidateNested,
 } from "class-validator";
+
+/** Người nhận quà: bắt buộc khi chọn mức quà để chủ dự án gửi được quà (TC_DON_007). */
+export class RewardRecipientDto {
+  @IsString()
+  @MinLength(2, { message: "Vui lòng nhập họ tên người nhận quà." })
+  @MaxLength(120)
+  name!: string;
+
+  @IsString()
+  @Matches(/^\+?[0-9 .-]{8,20}$/, { message: "Số điện thoại người nhận quà không hợp lệ." })
+  phone!: string;
+
+  @IsString()
+  @MinLength(10, { message: "Vui lòng nhập địa chỉ nhận quà đầy đủ (số nhà, đường, phường/xã, tỉnh/thành)." })
+  @MaxLength(300)
+  address!: string;
+}
 
 export class CreateDonationDto {
   @IsUUID()
@@ -39,6 +60,12 @@ export class CreateDonationDto {
   @IsOptional()
   @IsUUID()
   rewardTierId?: string;
+
+  /** Bắt buộc khi có `rewardTierId`; chỉ chủ dự án và admin xem được. */
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RewardRecipientDto)
+  rewardRecipient?: RewardRecipientDto;
 }
 
 export class ConfirmDonationDto {

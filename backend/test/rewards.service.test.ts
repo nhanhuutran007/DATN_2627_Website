@@ -1,4 +1,4 @@
-import { equal, ok, rejects } from "node:assert/strict";
+import { deepEqual, equal, ok, rejects } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from "@nestjs/common";
@@ -82,7 +82,10 @@ describe("RewardsService", () => {
     const campaignsService = {
       findById: async () => ({ id: CAMPAIGN_ID, ownerId: OWNER.id, status }),
     } as unknown as CampaignsService;
-    service = new RewardsService(tierRepo, donationRepo, campaignsService, audit.service);
+    const recipientRepo: any = {
+      find: async () => [{ donationId: "d2", recipientName: "Bob Nguyễn", phone: "0901234567", address: "12 Lê Lợi, Huế" }],
+    };
+    service = new RewardsService(tierRepo, donationRepo, campaignsService, audit.service, recipientRepo);
   });
 
   it("chủ dự án tạo mức quà (có audit); người khác bị chặn", async () => {
@@ -144,6 +147,9 @@ describe("RewardsService", () => {
     equal(claims[0].backerName, "Alice");
     equal(claims[1].backerName, "Ẩn danh");
     equal(claims[0].amount, 300000);
+    // Thông tin gửi quà (TC_DON_007): khoản cũ không có → null; ẩn danh vẫn có địa chỉ để gửi quà.
+    equal(claims[0].recipient, null);
+    deepEqual(claims[1].recipient, { name: "Bob Nguyễn", phone: "0901234567", address: "12 Lê Lợi, Huế" });
   });
 });
 
@@ -154,6 +160,7 @@ describe("DonationsService + mức quà", () => {
   let notifier: ReturnType<typeof makeNotifierRecorder>;
   let service: DonationsService;
   let pending: any;
+  let recipients: any[];
 
   beforeEach(() => {
     tier = makeTier();
@@ -191,9 +198,16 @@ describe("DonationsService + mức quà", () => {
       findOne: async () => pending,
       createQueryBuilder: () => qb,
     };
+    recipients = [];
     const dataSource: any = {
       transaction: async (fn: any) => fn(manager),
-      getRepository: () => ({ findOne: async () => tier }),
+      getRepository: () => ({
+        findOne: async () => tier,
+        save: async (row: any) => {
+          recipients.push(row);
+          return row;
+        },
+      }),
     };
     service = new DonationsService(donationRepo, campaignRepo, dataSource, new DemoWalletGateway("secret"), makeAuditRecorder().service, notifier.service);
   });
@@ -204,12 +218,26 @@ describe("DonationsService + mức quà", () => {
     paymentMethod: "wallet",
     idempotencyKey: "k-" + Math.random(),
     rewardTierId: TIER_ID,
+    rewardRecipient: { name: "Nguyễn Văn A", phone: "0901 234 567", address: " 12 Lê Lợi, phường Thuận Hóa, Huế " },
     ...overrides,
   });
 
   it("tạo giao dịch kèm mức quà hợp lệ", async () => {
     const donation = await service.create(createDto(), DONOR);
     equal(donation.rewardTierId, TIER_ID);
+    equal(recipients.length, 1);
+    equal(recipients[0].donationId, donation.id);
+    equal(recipients[0].address, "12 Lê Lợi, phường Thuận Hóa, Huế");
+  });
+
+  it("TC_DON_007: chọn quà mà thiếu thông tin người nhận → từ chối, không tạo giao dịch", async () => {
+    await rejects(service.create(createDto({ rewardRecipient: undefined }), DONOR), BadRequestException);
+    equal(recipients.length, 0);
+  });
+
+  it("không chọn quà thì không lưu thông tin người nhận", async () => {
+    await service.create(createDto({ rewardTierId: undefined, rewardRecipient: undefined }), DONOR);
+    equal(recipients.length, 0);
   });
 
   it("từ chối khi số tiền thấp hơn mức tối thiểu", async () => {

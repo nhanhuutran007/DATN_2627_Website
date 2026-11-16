@@ -124,4 +124,6 @@ export type RewardClaimView = {
   /** "Ẩn danh" nếu người ủng hộ chọn ẩn danh. */
   backerName: string;
   completedAt: Date | null;
+  /** Thông tin gửi quà do người ủng hộ khai lúc chọn quà; `null` với khoản cũ chưa có thông tin này. */
+  recipient: { name: string; phone: string; address: string } | null;
 };

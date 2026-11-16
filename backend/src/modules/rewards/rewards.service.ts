@@ -6,12 +6,13 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Not, IsNull, Repository } from "typeorm";
+import { In, IsNull, Not, Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import { CampaignsService } from "../campaigns/campaigns.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
+import { RewardRecipient } from "../donations/entities/reward-recipient.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import {
   CreateRewardTierDto,
@@ -75,6 +76,8 @@ export class RewardsService {
     private readonly donationRepo: Repository<Donation>,
     private readonly campaignsService: CampaignsService,
     private readonly auditService: AuditService,
+    @InjectRepository(RewardRecipient)
+    private readonly recipientRepo: Repository<RewardRecipient>,
   ) {}
 
   private assertCanManage(campaign: Campaign, user: User): void {
@@ -208,13 +211,21 @@ export class RewardsService {
       order: { completedAt: "DESC" },
       take: 500,
     });
-    return donations.map((d) => ({
-      donationId: d.id,
-      tierId: d.rewardTierId as string,
-      tierTitle: d.rewardTier?.title ?? "",
-      amount: Number(d.amount),
-      backerName: d.isAnonymous ? "Ẩn danh" : (d.user?.name ?? "Người ủng hộ"),
-      completedAt: d.completedAt ?? null,
-    }));
+    const recipients = donations.length
+      ? await this.recipientRepo.find({ where: { donationId: In(donations.map((d) => d.id)) } })
+      : [];
+    const recipientOf = new Map(recipients.map((r) => [r.donationId, r]));
+    return donations.map((d) => {
+      const recipient = recipientOf.get(d.id);
+      return {
+        donationId: d.id,
+        tierId: d.rewardTierId as string,
+        tierTitle: d.rewardTier?.title ?? "",
+        amount: Number(d.amount),
+        backerName: d.isAnonymous ? "Ẩn danh" : (d.user?.name ?? "Người ủng hộ"),
+        completedAt: d.completedAt ?? null,
+        recipient: recipient ? { name: recipient.recipientName, phone: recipient.phone, address: recipient.address } : null,
+      };
+    });
   }
 }
