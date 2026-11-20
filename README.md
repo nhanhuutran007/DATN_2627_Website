@@ -527,8 +527,12 @@ DATN_2627_Website/
   - `TC_DON_010`: nút Hủy giao dịch không còn bị khóa khi đang mở lại trang thanh toán.
   - `TC_ORG_002`: chặn hai hồ sơ tổ chức còn hiệu lực dùng cùng một ảnh giấy phép (cùng đường dẫn hoặc ảnh tải lên lại trùng từng byte).
   - Góp ý trong các test case Pass: nút Đăng ký ở trang đăng nhập (`TC_AUTH_001`); bỏ CSS bị dán lẫn vào mô tả và cho "Kết quả đầu ra"/mô tả quà xuống dòng (`TC_CAMP_010`); **trang Liên hệ hỗ trợ** `/lien-he` do quản trị viên cập nhật, có trong header, footer và chính sách quyền riêng tư (`TC_CAMP_016`); **thông tin người nhận quà** (họ tên, điện thoại, địa chỉ) bắt buộc khi chọn quà, chỉ chủ dự án và quản trị viên xem được (`TC_DON_007`); bảng Số liệu/Tiến độ/Mức quà ở trang quản lý không còn chồng lên nhau (`TC_PROG_004`); giải thích khi tài khoản quản trị mở trang đăng ký tổ chức (`TC_ORG_006`); ngày trong CSV xuất thống kê tính theo giờ Việt Nam (`TC_ADMIN_009`); `GOOGLE_CLIENT_ID` trong Docker Compose đặt rỗng được để ẩn nút Google (`TC_AUTH_013`).
+- Chỉnh giao diện và ủng hộ (20/11/2026):
+  - Khoản ủng hộ **mặc định ẩn danh** trên sổ cái và lời động viên (ô "Không hiển thị tên tôi công khai" được chọn sẵn; API không gửi `isAnonymous` cũng coi là ẩn danh); người ủng hộ bỏ chọn nếu muốn hiện tên.
+  - Thẻ dự án chỉ hiện số tiền đã nhận (bỏ chữ "đã nhận"); thẻ gây quỹ ở trang dự án dùng thanh tiến độ ngang thay cho vòng tròn, kèm % đạt mục tiêu.
+  - Trang dự án có mục **Câu hỏi thường gặp** (cách ủng hộ, ẩn danh, thanh toán, giao dịch chờ xác nhận, minh bạch, hoàn tiền, báo cáo chiến dịch), lấy chung nội dung với hộp hỗ trợ.
 
-_Cập nhật lần cuối: 17/11/2026._
+_Cập nhật lần cuối: 20/11/2026._
 
 ### 15.2. Hạn chế
 
