@@ -50,7 +50,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: "ung-ho-chi-tiet",
     question: "Ủng hộ tối thiểu bao nhiêu? Có ủng hộ ẩn danh được không?",
     answer:
-      "Mỗi lần ủng hộ tối thiểu 20.000đ. Trong form ủng hộ, bạn có thể đánh dấu “Ủng hộ ẩn danh” để tên bạn không hiện trên sổ cái công khai của dự án, và gửi kèm lời nhắn tới chủ dự án (tối đa 500 ký tự). Bạn vẫn cần đăng nhập để hệ thống gửi biên nhận cho bạn.",
+      "Mỗi lần ủng hộ tối thiểu 20.000đ. Mặc định khoản ủng hộ hiển thị ẩn danh trên sổ cái công khai của dự án; nếu muốn hiện tên, bỏ chọn ô “Không hiển thị tên tôi công khai” trong form ủng hộ. Bạn cũng có thể gửi kèm lời nhắn tới chủ dự án (tối đa 500 ký tự). Bạn vẫn cần đăng nhập để hệ thống gửi biên nhận cho bạn.",
     keywords: [
       "toi thieu", "it nhat", "bao nhieu tien", "ung ho toi thieu",
       "an danh", "giau ten", "khong hien ten", "ung ho an danh", "loi nhan",

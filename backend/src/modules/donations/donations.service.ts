@@ -328,7 +328,7 @@ export class DonationsService {
       idempotencyKey: dto.idempotencyKey,
       // Lời động viên hiển thị công khai: bỏ khoảng trắng thừa, chuỗi rỗng coi như không có.
       message: dto.message?.trim() || undefined,
-      isAnonymous: dto.isAnonymous ?? false,
+      isAnonymous: dto.isAnonymous ?? true,
       rewardTierId: dto.rewardTierId ?? null,
     });
 
