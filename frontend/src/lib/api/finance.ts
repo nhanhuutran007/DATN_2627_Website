@@ -111,6 +111,11 @@ export function requestRefund(
   return api.post<RefundRequest>(`/donations/${encodeURIComponent(donationId)}/refund-request`, input);
 }
 
+/** Bổ sung tài khoản nhận hoàn cho yêu cầu hệ thống tự tạo (chiến dịch không đạt mục tiêu); cần OTP. */
+export function updateRefundBank(requestId: string, input: RefundBankAccount): Promise<RefundRequest> {
+  return api.patch<RefundRequest>(`/refund-requests/${encodeURIComponent(requestId)}/bank`, input);
+}
+
 export function fetchMyRefundRequests(): Promise<RefundRequest[]> {
   return api.get<RefundRequest[]>("/refund-requests/mine");
 }

@@ -672,32 +672,290 @@ h3 {
   background: var(--soft);
 }
 
-.reward-manager-list {
+/* Thẻ phần quà kiểu Kickstarter (trang dự án, trang ủng hộ, trang quản lý) */
+.reward-card {
   display: grid;
-  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--white);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.reward-card:hover {
+  border-color: #d4d8e2;
+}
+
+.reward-card.is-selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.reward-card.is-unavailable {
+  opacity: 0.6;
+}
+
+.reward-card-media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--soft);
+}
+
+.reward-card-media img {
+  object-fit: cover;
+}
+
+.reward-card-body {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+
+.reward-card-price {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.86rem;
+}
+
+.reward-card-price b {
+  display: block;
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.reward-card-title {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1.05rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.reward-card-desc {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.reward-card-label,
+.reward-card-facts dt {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.reward-card-items {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.reward-card-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.reward-card-facts dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.reward-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.86rem;
+}
+
+.reward-card-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reward-card-limit {
+  padding: 2px 9px;
+  color: var(--navy);
+  border-radius: 999px;
+  background: var(--soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.reward-card-limit.is-out {
+  color: var(--primary-dark);
+  background: var(--primary-soft);
+}
+
+.reward-card-action {
+  margin-top: 4px;
+}
+
+.reward-card-plain .reward-card-title {
+  font-size: 1rem;
+}
+
+/* Cột "Chọn phần quà" ở trang dự án */
+.reward-side {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.reward-side > h2 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1.15rem;
+}
+
+/* Trang ủng hộ: mỗi lựa chọn là một thẻ quà */
+.reward-option-card {
+  align-items: start;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.reward-option-card:has(input:checked) {
+  background: none;
+}
+
+.reward-option-card input {
+  margin-top: 22px;
+}
+
+/* Trang quản lý: thẻ xem trước + sửa từng mức */
+.reward-manager-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.reward-manager-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
+.reward-manager-grid > li:has(.reward-edit) {
+  grid-column: 1 / -1;
+}
+
+.reward-edit {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--primary);
+  border-radius: 12px;
   background: var(--white);
 }
 
-.reward-manager-list li.is-off {
-  opacity: 0.65;
+.reward-add-open {
+  justify-self: start;
 }
 
-.reward-manager-list small {
-  display: block;
+.reward-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.reward-fields .field-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.reward-items-field,
+.reward-shipping {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.reward-items-field legend,
+.reward-shipping legend {
+  margin-bottom: 6px;
+  color: var(--navy);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.reward-items-field legend small,
+.reward-shipping small {
   color: var(--muted);
+  font-weight: 400;
+}
+
+.reward-item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.reward-items-field > .button {
+  justify-self: start;
+}
+
+.reward-item-row input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--white);
+  font-size: 0.95rem;
+}
+
+.reward-item-row input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+/* Fieldset này mang class .field: không để nút radio giãn 100% như ô nhập */
+.reward-shipping input[type="radio"] {
+  width: auto;
+  margin-top: 3px;
+  padding: 0;
+  accent-color: var(--primary);
+}
+
+.reward-shipping label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .reward-fields .field-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reward-item-row {
+    grid-template-columns: minmax(0, 1fr) 70px;
+  }
+
+  .reward-item-row .link-danger {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
 }
 
 .reward-add {
@@ -6917,23 +7175,58 @@ html:has(dialog:modal) .admin-sidebar {
   box-shadow: var(--shadow-card);
 }
 
-.fund-head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 18px;
+/* Thẻ gây quỹ kiểu Kickstarter: thanh ngang + ba số liệu lớn xếp dọc */
+.fund-stats {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.fund-stats .meter {
+  height: 10px;
+  margin: 0 0 4px;
+}
+
+.fund-stat {
+  min-width: 0;
 }
 
 .detail-page .fund-amount {
-  color: var(--navy);
-  font-size: 1.45rem;
+  color: var(--primary);
+  font-size: clamp(1.6rem, 3vw, 1.95rem);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .detail-page .fund-target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  margin: 4px 0 0;
+}
+
+.fund-percent {
+  margin-left: auto;
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.fund-stat-value {
+  margin: 0;
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: clamp(1.45rem, 2.6vw, 1.7rem);
+  font-weight: 800;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.fund-stat-label {
   margin: 2px 0 0;
-  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .fund-target abbr {
@@ -10136,6 +10429,65 @@ html:has(dialog:modal) .admin-sidebar {
   font-weight: 700;
 }
 
+/* Tất cả hoặc không: giải thích khi nào bị trừ tiền */
+.donate-aon,
+.fund-aon {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  color: var(--text-2);
+  border-radius: 10px;
+  background: var(--success-soft);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.donate-aon svg,
+.fund-aon svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--success);
+}
+
+.donate-aon b,
+.fund-aon b {
+  color: var(--navy);
+}
+
+.ledger-pledged {
+  display: block;
+  color: var(--muted);
+  font-family: var(--font-text);
+  font-size: 0.74rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pledge-rules {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 18px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.pledge-rules li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.pledge-rules svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--success);
+}
+
 .donate-form .form-error {
   margin-top: 16px;
 }
@@ -10490,6 +10842,221 @@ html:has(dialog:modal) .admin-sidebar {
 .post-head span {
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+/* "Cập nhật": bài đăng đánh số của người tổ chức (Cập nhật #N) */
+.post-feed {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.post-card {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--white);
+  scroll-margin-top: 96px;
+}
+
+.post-number {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.post-badge {
+  padding: 3px 9px;
+  color: var(--navy);
+  border-radius: 999px;
+  background: var(--soft);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.post-title {
+  margin: -6px 0 0;
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: clamp(1.1rem, 2vw, 1.3rem);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.post-edited {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.post-photo {
+  max-width: 100%;
+}
+
+.post-body p {
+  margin: 0 0 12px;
+  color: var(--text);
+  line-height: 1.7;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.post-body p:last-child {
+  margin-bottom: 0;
+}
+
+.post-locked {
+  display: flex;
+  gap: 14px;
+  padding: 18px;
+  color: var(--navy);
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+.post-locked p {
+  margin: 0 0 6px;
+}
+
+.post-locked-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.post-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.post-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.post-like:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.post-like.is-liked {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.post-like:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.post-like-count {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+/* Bảng điều khiển: soạn và quản lý bài cập nhật */
+.post-manager {
+  display: grid;
+  gap: 20px;
+}
+
+.post-visibility {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.post-visibility legend {
+  margin-bottom: 6px;
+  color: var(--navy);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.post-visibility label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.post-manager-list h3 {
+  margin: 0 0 10px;
+  color: var(--navy);
+  font-size: 1rem;
+}
+
+.post-manager-list ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.post-manager-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.post-manager-list li > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.post-manager-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .post-card {
+    padding: 18px 16px;
+  }
 }
 
 /* "Chia sẻ giúp nhiều hơn bạn nghĩ": thẻ xem trước + hàng nút chia sẻ */
@@ -12297,6 +12864,224 @@ html:has(dialog:modal) .admin-sidebar {
   margin-top: 18px;
   padding-top: 18px;
   border-top: 1px solid var(--line);
+}
+
+/* Cộng tác viên của tổ chức (như Kickstarter): quản lý của người đại diện */
+.team-manager {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.team-manager h3,
+.team-invite h4,
+.collab-campaigns h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1rem;
+}
+
+.team-manager > .hint {
+  margin: -6px 0 0;
+}
+
+.team-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  align-items: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.team-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.team-person > div {
+  display: grid;
+  min-width: 0;
+}
+
+.team-person .hint {
+  overflow-wrap: anywhere;
+}
+
+.team-person .organizer-avatar,
+.org-team .organizer-avatar {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  color: var(--navy);
+  background: var(--soft);
+}
+
+.team-pending {
+  margin-left: 6px;
+}
+
+.team-perms {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.team-perms label {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 0.88rem;
+}
+
+.team-perms-invite {
+  display: grid;
+  gap: 8px;
+}
+
+.team-perms-invite legend {
+  margin-bottom: 6px;
+  color: var(--navy);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.team-perms-invite small {
+  display: block;
+  color: var(--muted);
+}
+
+.team-row > .link-button {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.team-invite {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+.team-invite-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.team-invite .button {
+  justify-self: start;
+}
+
+/* Lời mời và tổ chức mình cộng tác */
+.collab-section {
+  margin-bottom: 28px;
+}
+
+.collab-section > h2 {
+  margin: 0 0 12px;
+  color: var(--navy);
+  font-size: 1.15rem;
+}
+
+.collab-campaigns {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.collab-campaigns ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.collab-campaign-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.collab-campaign-head > a {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.collab-profile {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* Đội ngũ trên trang tổ chức công khai */
+.org-team {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.org-team li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.org-team li > div {
+  display: grid;
+  min-width: 0;
+}
+
+.org-team b {
+  color: var(--navy);
+}
+
+.org-team span:not(.organizer-avatar) {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+@media (max-width: 640px) {
+  .team-row,
+  .team-invite-row {
+    grid-template-columns: 1fr;
+  }
+
+  .team-row > .link-button {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+  }
 }
 
 .org-review-detail {

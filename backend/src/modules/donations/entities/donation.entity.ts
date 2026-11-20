@@ -14,7 +14,26 @@ export enum DonationStatus {
   EXPIRED = "expired",
   /** Người ủng hộ hủy hoặc cổng thanh toán báo hủy. */
   CANCELLED = "cancelled",
+  /**
+   * Đã cam kết (tất cả hoặc không): thẻ/ví đã lưu nhưng CHƯA trừ tiền. Tính vào tiến
+   * độ chiến dịch; chỉ trừ tiền khi chiến dịch hết hạn và đạt mục tiêu.
+   */
+  PLEDGED = "pledged",
+  /** Chiến dịch đạt mục tiêu nhưng trừ tiền thẻ thất bại: người ủng hộ có hạn để đổi thẻ. */
+  CHARGE_FAILED = "charge_failed",
+  /** Chiến dịch không đạt mục tiêu (hoặc bị hủy): cam kết được giải phóng, không trừ tiền. */
+  RELEASED = "released",
 }
+
+/**
+ * Trạng thái được tính vào `currentAmount`/`backerCount` của chiến dịch: tiền đã thu
+ * (`completed`) và cam kết chưa trừ (`pledged`, `charge_failed` còn trong hạn đổi thẻ).
+ */
+export const COUNTED_DONATION_STATUSES: readonly DonationStatus[] = [
+  DonationStatus.COMPLETED,
+  DonationStatus.PLEDGED,
+  DonationStatus.CHARGE_FAILED,
+];
 
 export enum RefundMethod {
   GATEWAY = "gateway",
@@ -93,6 +112,32 @@ export class Donation extends BaseEntity {
   /** `gateway`: cổng thanh toán hoàn; `manual_transfer`: admin chuyển khoản trả lại (khoản qua SePay). */
   @Column({ name: "refund_method", type: "varchar", length: 20, nullable: true })
   refundMethod?: RefundMethod | null;
+
+  /** Lúc cam kết được ghi nhận (thẻ/ví đã lưu, chưa trừ tiền). */
+  @Column({ name: "pledged_at", type: "datetime", nullable: true })
+  pledgedAt?: Date | null;
+
+  /** Mã khách hàng ở cổng thẻ (Stripe `cus_…`) — không chứa số thẻ. */
+  @Column({ name: "payment_customer_ref", type: "varchar", length: 255, nullable: true })
+  paymentCustomerRef?: string | null;
+
+  /** Mã phương thức thanh toán đã lưu ở cổng thẻ (Stripe `pm_…`) — không chứa số thẻ. */
+  @Column({ name: "payment_method_ref", type: "varchar", length: 255, nullable: true })
+  paymentMethodRef?: string | null;
+
+  /** Phiên lưu thẻ gần nhất (Stripe Checkout `cs_…`), để đối soát khi webhook không tới. */
+  @Column({ name: "setup_session_ref", type: "varchar", length: 255, nullable: true })
+  setupSessionRef?: string | null;
+
+  @Column({ name: "charge_attempts", type: "int", default: 0 })
+  chargeAttempts!: number;
+
+  /** Lần trừ tiền thất bại đầu tiên: mốc tính hạn đổi thẻ. */
+  @Column({ name: "charge_failed_at", type: "datetime", nullable: true })
+  chargeFailedAt?: Date | null;
+
+  @Column({ name: "last_charge_error", type: "varchar", length: 255, nullable: true })
+  lastChargeError?: string | null;
 
   /** Ảnh chứng từ chuyển khoản hoàn (chỉ với `manual_transfer`, không bắt buộc). */
   @Column({ name: "refund_proof_url", type: "varchar", length: 500, nullable: true })

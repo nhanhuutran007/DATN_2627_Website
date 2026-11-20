@@ -50,6 +50,29 @@ export class CreateRefundRequestDto {
   bankAccountName?: string;
 }
 
+/** Tài khoản nhận hoàn bổ sung cho yêu cầu hoàn do hệ thống tự tạo (khoản qua SePay). */
+export class RefundBankInfoDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(2, { message: "Tên ngân hàng cần ít nhất 2 ký tự." })
+  @MaxLength(100)
+  bankName!: string;
+
+  @Transform(({ value }: { value: unknown }) => (typeof value === "string" ? value.replace(/[\s.-]/g, "") : value))
+  @IsString()
+  @Matches(/^\d{6,19}$/, { message: "Số tài khoản chỉ gồm 6–19 chữ số." })
+  bankAccountNumber!: string;
+
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === "string" ? value.trim().replace(/\s+/g, " ").toUpperCase() : value,
+  )
+  @IsString()
+  @MinLength(2, { message: "Tên chủ tài khoản cần ít nhất 2 ký tự." })
+  @MaxLength(100)
+  @Matches(/^[\p{L} ]+$/u, { message: "Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng." })
+  bankAccountName!: string;
+}
+
 export class ReviewRefundDto {
   @Transform(trim)
   @IsString()

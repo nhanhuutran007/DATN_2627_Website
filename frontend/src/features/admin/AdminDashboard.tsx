@@ -86,6 +86,9 @@ const DONATION_STATUS_LABEL: Record<AdminDonation["status"], string> = {
   refunded: "Hoàn tiền",
   expired: "Hết hạn",
   cancelled: "Đã hủy",
+  pledged: "Đã cam kết (chưa trừ tiền)",
+  charge_failed: "Trừ tiền thất bại",
+  released: "Không trừ tiền (không đạt)",
 };
 
 const DONATION_STATUS_TONE: Record<AdminDonation["status"], string> = {
@@ -95,6 +98,9 @@ const DONATION_STATUS_TONE: Record<AdminDonation["status"], string> = {
   refunded: "changes",
   expired: "draft",
   cancelled: "draft",
+  pledged: "pending",
+  charge_failed: "failed",
+  released: "draft",
 };
 
 /** Lọc theo trạng thái, hoặc "flagged" = giao dịch có cảnh báo rủi ro đang mở. */
@@ -1976,6 +1982,9 @@ export function AdminDashboard() {
                 <option value="refunded">Đã hoàn tiền</option>
                 <option value="expired">Hết hạn</option>
                 <option value="cancelled">Đã hủy</option>
+                <option value="pledged">Đã cam kết</option>
+                <option value="charge_failed">Trừ tiền thất bại</option>
+                <option value="released">Không trừ tiền</option>
                 <option value="flagged">Có cảnh báo rủi ro</option>
                 <option value="">Tất cả trạng thái</option>
               </select>

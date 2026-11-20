@@ -3,7 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { In, Repository } from "typeorm";
 
 import type { EmailGateway } from "../../integrations/email/email.gateway";
-import { Donation, DonationStatus } from "../donations/entities/donation.entity";
+import { COUNTED_DONATION_STATUSES, Donation } from "../donations/entities/donation.entity";
 import { CampaignFollow } from "../follows/entities/campaign-follow.entity";
 import { User } from "../users/entities/user.entity";
 import { NotificationQueryDto } from "./dto/notification.dto";
@@ -174,7 +174,8 @@ export class NotificationsService {
           .createQueryBuilder("d")
           .select("DISTINCT d.user_id", "userId")
           .where("d.campaign_id = :campaignId", { campaignId })
-          .andWhere("d.status = :status", { status: DonationStatus.COMPLETED })
+          // Người đang cam kết (chưa bị trừ tiền) cũng là người ủng hộ cần nhận tin.
+          .andWhere("d.status IN (:...statuses)", { statuses: COUNTED_DONATION_STATUSES })
           .getRawMany<{ userId: string }>(),
         this.followRepo.find({ select: { userId: true }, where: { campaignId } }),
       ]);

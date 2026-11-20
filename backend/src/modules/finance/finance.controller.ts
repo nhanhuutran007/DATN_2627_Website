@@ -25,6 +25,7 @@ import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entit
 import {
   CreateRefundRequestDto,
   DirectRefundDto,
+  RefundBankInfoDto,
   ReconciliationQueryDto,
   RefundExportQueryDto,
   RefundQueryDto,
@@ -53,6 +54,19 @@ export class FinanceController {
   @Get("refund-requests/mine")
   listMine(@GetCurrentUser() user: User) {
     return this.financeService.listMine(user);
+  }
+
+  /** Bổ sung tài khoản nhận hoàn cho yêu cầu hệ thống tự tạo (chiến dịch thất bại); cần mã OTP. */
+  @Patch("refund-requests/:id/bank")
+  @UseGuards(NonAdminGuard, RateLimitGuard, StepUpGuard)
+  @RequireStepUp(StepUpPurpose.REFUND_REQUEST)
+  @RateLimit({ limit: 5, windowMs: 60 * 60_000, keyPrefix: "refund-bank" })
+  updateBank(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: RefundBankInfoDto,
+    @GetCurrentUser() user: User,
+  ) {
+    return this.financeService.updateBankInfo(id, dto, user);
   }
 }
 

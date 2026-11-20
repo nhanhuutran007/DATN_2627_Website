@@ -15,6 +15,7 @@ import { OrganizationPicker } from "@/features/organizations/OrganizationPicker"
 import {
   emptyTier,
   RewardTiersEditor,
+  tierToDraft,
   tiersToPayloads,
   validateTiers,
   type DraftTier,
@@ -195,15 +196,7 @@ function toDraftMilestones(campaign: ApiCampaign): DraftMilestone[] {
 }
 
 function toDraftTiers(tiers: RewardTier[]): DraftTier[] {
-  return [...tiers]
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((t) => ({
-      title: t.title,
-      description: t.description,
-      minAmount: String(Number(t.minAmount)),
-      limit: t.quantityLimit ? String(t.quantityLimit) : "",
-      delivery: t.estimatedDelivery ? t.estimatedDelivery.slice(0, 10) : "",
-    }));
+  return [...tiers].sort((a, b) => a.sortOrder - b.sortOrder).map(tierToDraft);
 }
 
 type CampaignWizardProps = {

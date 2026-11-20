@@ -238,13 +238,14 @@ describe("DonationsService", () => {
         });
     }
 
-    it("should complete a pending donation with a valid signature", async () => {
+    it("should record a pledge (not a charge) for a wallet donation with a valid signature", async () => {
       const { dto, signature } = signed("completed");
       const donation = await service.handleWebhook(dto, signature);
-      equal(donation.status, DonationStatus.COMPLETED);
-      ok(donation.completedAt);
+      // Tất cả hoặc không: ví demo chỉ cam kết, chưa trừ tiền tới khi chiến dịch đạt mục tiêu.
+      equal(donation.status, DonationStatus.PLEDGED);
+      ok(donation.pledgedAt);
       equal(audit.entries.length, 1);
-      equal(audit.entries[0].action, "donation.payment.completed");
+      equal(audit.entries[0].action, "donation.payment.pledged");
       equal(audit.entries[0].userId, undefined);
       equal(audit.entries[0].newValues?.source, "payment-webhook");
     });
@@ -363,9 +364,9 @@ describe("DonationsService", () => {
 
     it("should let the donation owner confirm a demo wallet payment", async () => {
       const donation = await service.confirmDemoPayment(DONATION_ID, "completed", makeUser());
-      equal(donation.status, DonationStatus.COMPLETED);
+      equal(donation.status, DonationStatus.PLEDGED);
       equal(audit.entries.length, 1);
-      equal(audit.entries[0].action, "donation.payment.completed");
+      equal(audit.entries[0].action, "donation.payment.pledged");
       equal(audit.entries[0].userId, makeUser().id);
       equal(audit.entries[0].newValues?.source, "demo-wallet");
     });

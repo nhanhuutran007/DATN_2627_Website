@@ -14,6 +14,8 @@ import { DonorHighlights } from "@/features/donations/DonorHighlights";
 import { WordsOfSupport } from "@/features/donations/WordsOfSupport";
 import { FollowCampaignButton } from "@/features/follows/FollowCampaignButton";
 import { MilestoneRevisions } from "@/features/progress/MilestoneRevisions";
+import { RewardCard } from "@/features/rewards/RewardCard";
+import { CampaignPosts } from "@/features/posts/CampaignPosts";
 import { ProgressTimeline } from "@/features/progress/ProgressTimeline";
 import { TransparencyScoreCard } from "@/features/progress/TransparencyScoreCard";
 import { ContactOrganizerButton } from "@/features/campaigns/ContactOrganizerButton";
@@ -39,6 +41,7 @@ import {
   TRANSPARENCY_LABEL,
   type CampaignProgress,
 } from "@/lib/api/progress";
+import { fetchRewardTiers, isRewardAvailable, type RewardTier } from "@/lib/api/rewards";
 import { coverFor } from "@/lib/covers";
 import { campaignProgress, campaigns as mockCampaigns, findCampaign, type Campaign } from "@/lib/data/campaigns";
 import { formatVnd, formatVndShort, isLiveId } from "@/lib/format";
@@ -74,6 +77,14 @@ async function loadProgress(id: string): Promise<CampaignProgress | null> {
     return await fetchCampaignProgress(id);
   } catch {
     return null;
+  }
+}
+
+async function loadRewardTiers(id: string): Promise<RewardTier[]> {
+  try {
+    return await fetchRewardTiers(id);
+  } catch {
+    return [];
   }
 }
 
@@ -117,9 +128,10 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   if (!loaded) notFound();
 
   const { campaign, live } = loaded;
-  const [progress, related] = await Promise.all([
+  const [progress, related, rewardTiers] = await Promise.all([
     live ? loadProgress(campaign.slug) : Promise.resolve(null),
     loadRelated(campaign, live),
+    live && isPublishedStatus(campaign.apiStatus) ? loadRewardTiers(campaign.slug) : Promise.resolve([] as RewardTier[]),
   ]);
   const percent = campaignProgress(campaign);
   const open = campaign.status === "Đang gây quỹ";
@@ -233,17 +245,32 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             )}
           </section>
 
+          <section className="detail-section" id="cap-nhat" aria-labelledby="cap-nhat-title">
+            {live ? (
+              <CampaignPosts
+                campaignId={campaign.slug}
+                organizer={campaign.owner}
+                heading={{ id: "cap-nhat-title", title: "Cập nhật" }}
+              />
+            ) : (
+              <>
+                <h2 id="cap-nhat-title">Cập nhật</h2>
+                <p className="hint">Dữ liệu mẫu không có bài cập nhật.</p>
+              </>
+            )}
+          </section>
+
           <section className="detail-section" id="nhat-ky" aria-labelledby="nhat-ky-title">
             {live ? (
               <ProgressTimeline
                 campaignId={campaign.slug}
                 initialSize={1}
-                heading={{ id: "nhat-ky-title", title: "Cập nhật" }}
+                heading={{ id: "nhat-ky-title", title: "Nhật ký tiến độ & chi tiêu" }}
                 organizer={campaign.owner}
               />
             ) : (
               <>
-                <h2 id="nhat-ky-title">Cập nhật</h2>
+                <h2 id="nhat-ky-title">Nhật ký tiến độ &amp; chi tiêu</h2>
                 <p className="hint">Dữ liệu mẫu không có nhật ký tiến độ.</p>
               </>
             )}
@@ -420,15 +447,33 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
 
         <aside className="detail-side">
           <section className="panel fund-card" aria-label="Tiến độ gây quỹ">
-            <div className="fund-head fund-head-bar">
-              <p className="fund-amount">{formatVnd(campaign.raised)}</p>
-              <p className="fund-target">
-                đã nhận / mục tiêu <abbr title={formatVnd(campaign.target)}>{formatVndShort(campaign.target)}</abbr>
-              </p>
+            {/* Bố cục kiểu Kickstarter: thanh tiến độ ngang rồi ba số liệu lớn xếp dọc. */}
+            <div className="fund-stats">
               <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
-              <p className="fund-sub">
-                <b>{percent}%</b> · {campaign.backers.toLocaleString("vi-VN")} lượt ủng hộ · {open ? `còn ${campaign.daysLeft} ngày` : campaign.status}
-              </p>
+              <div className="fund-stat">
+                <p className="fund-amount">{formatVnd(campaign.raised)}</p>
+                <p className="fund-target">
+                  đã ủng hộ trên mục tiêu <abbr title={formatVnd(campaign.target)}>{formatVndShort(campaign.target)}</abbr>
+                  <span className="fund-percent num">{percent}%</span>
+                </p>
+              </div>
+              <div className="fund-stat">
+                <p className="fund-stat-value num">{campaign.backers.toLocaleString("vi-VN")}</p>
+                <p className="fund-stat-label">lượt ủng hộ</p>
+              </div>
+              <div className="fund-stat">
+                {open ? (
+                  <>
+                    <p className="fund-stat-value num">{campaign.daysLeft.toLocaleString("vi-VN")}</p>
+                    <p className="fund-stat-label">ngày còn lại</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="fund-stat-value">{campaign.status}</p>
+                    <p className="fund-stat-label">trạng thái gây quỹ</p>
+                  </>
+                )}
+              </div>
             </div>
             {open && published && (
               <div className="fund-actions">
@@ -440,6 +485,15 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                 />
               </div>
             )}
+            {open && published && (
+              <p className="fund-aon">
+                <Icon name="shield" size={15} />
+                <span>
+                  <b>Tất cả hoặc không.</b> Thẻ chỉ bị trừ tiền nếu dự án đạt mục tiêu
+                  {campaign.endDate ? ` trước ${campaign.endDate}` : " khi kết thúc"}; không đạt thì không ai bị trừ đồng nào.
+                </span>
+              </p>
+            )}
             {transparencyScore?.status === "rated" && (
               <a className={`fund-transparency fund-transparency-${transparencyScore.grade}`} href="#minh-bach">
                 <Icon name="shield" size={16} />
@@ -450,6 +504,36 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             {/* key theo số lượt ủng hộ: tải lại khi trang làm mới sau một khoản ủng hộ mới. */}
             {published && <DonorHighlights key={campaign.backers} campaignId={campaign.slug} />}
           </section>
+
+          {rewardTiers.length > 0 && (
+            <section className="reward-side" aria-labelledby="phan-qua">
+              <h2 id="phan-qua">Chọn phần quà</h2>
+              {open && (
+                <article className="reward-card reward-card-plain">
+                  <div className="reward-card-body">
+                    <h3 className="reward-card-title">Ủng hộ không nhận quà</h3>
+                    <p className="reward-card-desc">Ủng hộ vì bạn tin vào dự án, với bất kỳ số tiền nào.</p>
+                    <div className="reward-card-action">
+                      <DonateLink className="button button-outline button-block" href={donateHref}>Ủng hộ</DonateLink>
+                    </div>
+                  </div>
+                </article>
+              )}
+              {rewardTiers.map((tier) => (
+                <RewardCard
+                  key={tier.id}
+                  tier={tier}
+                  action={
+                    open && isRewardAvailable(tier) ? (
+                      <DonateLink className="button button-primary button-block" href={`${donateHref}?qua=${encodeURIComponent(tier.id)}`}>
+                        Chọn quà này
+                      </DonateLink>
+                    ) : null
+                  }
+                />
+              ))}
+            </section>
+          )}
         </aside>
       </div>
 

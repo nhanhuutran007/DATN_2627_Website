@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, Like, Not, Repository, type FindOptionsWhere } from "typeorm";
@@ -14,6 +15,7 @@ import { MediaFile, MediaPurpose } from "../media/entities/media-file.entity";
 import { MEDIA_URL_PREFIX } from "../media/media.service";
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { NotificationsService } from "../notifications/notifications.service";
+import { OrganizationAccessService } from "./organization-access.service";
 import type { User } from "../users/entities/user.entity";
 import {
   AdminOrganizationQueryDto,
@@ -117,6 +119,8 @@ export class OrganizationsService {
     private readonly mediaRepo: Repository<MediaFile>,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
+    @Optional()
+    private readonly access: OrganizationAccessService | null = null,
   ) {}
 
   /** Danh bạ công khai: chỉ tổ chức đã xác minh, kèm số chiến dịch và tổng đã huy động. */
@@ -193,7 +197,7 @@ export class OrganizationsService {
    * Đang chờ bổ sung hoặc bị từ chối: lưu là gửi lại hồ sơ (về `pending`) để admin xét tiếp.
    */
   async update(id: string, dto: UpdateOrganizationDto, user: User): Promise<Organization> {
-    const organization = await this.findOwned(id, user);
+    const organization = await this.findEditable(id, user);
     const locked = organization.status === OrganizationStatus.VERIFIED || organization.status === OrganizationStatus.SUSPENDED;
 
     const current = organization as unknown as Record<string, unknown>;
@@ -319,6 +323,26 @@ export class OrganizationsService {
       throw new BadRequestException("Tổ chức không tồn tại hoặc chưa được xác minh để nhận gây quỹ.");
     }
     return organization;
+  }
+
+  /**
+   * Người đại diện sửa mọi lúc. Cộng tác viên có quyền "Sửa hồ sơ" chỉ sửa được khi
+   * tổ chức đã xác minh (phần pháp lý bị khóa sẵn), không thay người đại diện gửi lại hồ sơ.
+   */
+  private async findEditable(id: string, user: User): Promise<Organization> {
+    const organization = await this.organizationRepo.findOneBy({ id });
+    if (!organization) {
+      throw new NotFoundException("Organization not found");
+    }
+    if (organization.representativeId === user.id) return organization;
+    if (
+      this.access &&
+      organization.status === OrganizationStatus.VERIFIED &&
+      (await this.access.canEditProfile(organization, user)) === "collaborator"
+    ) {
+      return organization;
+    }
+    throw new ForbiddenException("Only the organization representative can edit it");
   }
 
   private async findOwned(id: string, user: User): Promise<Organization> {

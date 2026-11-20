@@ -21,6 +21,7 @@ import { SupportModule } from "./modules/support/support.module";
 import { ModerationModule } from "./modules/moderation/moderation.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
+import { PostsModule } from "./modules/posts/posts.module";
 import { ProgressModule } from "./modules/progress/progress.module";
 import { RewardsModule } from "./modules/rewards/rewards.module";
 import { UsersModule } from "./modules/users/users.module";
@@ -42,6 +43,7 @@ import { UsersModule } from "./modules/users/users.module";
     CategoriesModule,
     DonationsModule,
     ProgressModule,
+    PostsModule,
     ModerationModule,
     CommentsModule,
     FollowsModule,

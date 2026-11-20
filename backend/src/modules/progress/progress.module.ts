@@ -5,6 +5,7 @@ import { RiskAlert } from "../admin/entities/risk-alert.entity";
 import { Campaign } from "../campaigns/entities/campaign.entity";
 import { Donation } from "../donations/entities/donation.entity";
 import { MediaFile } from "../media/entities/media-file.entity";
+import { OrganizationsModule } from "../organizations/organizations.module";
 import { MilestoneRevision } from "./entities/milestone-revision.entity";
 import { MilestoneUpdateAttachment } from "./entities/milestone-update-attachment.entity";
 import { MilestoneUpdate } from "./entities/milestone-update.entity";
@@ -26,6 +27,7 @@ import { ReceiptDuplicateService } from "./receipt-duplicate.service";
       MediaFile,
       RiskAlert,
     ]),
+    OrganizationsModule,
   ],
   controllers: [ProgressController],
   providers: [ProgressService, MilestoneOverdueService, ReceiptDuplicateService],

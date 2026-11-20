@@ -60,7 +60,10 @@ export function CampaignLedger({ campaignId, sort = "recent" }: CampaignLedgerPr
                 <td className="mono nowrap">{formatDateTime(entry.completedAt)}</td>
                 <td>{entry.donorName ?? <i>Ẩn danh</i>}</td>
                 <td>{paymentMethodLabel(entry.paymentMethod)}</td>
-                <td className="num">{formatVnd(entry.amount)}</td>
+                <td className="num">
+                  {formatVnd(entry.amount)}
+                  {entry.status === "pledged" && <small className="ledger-pledged">cam kết · chưa trừ tiền</small>}
+                </td>
                 <td className="mono">{entry.reference}</td>
               </tr>
             ))}

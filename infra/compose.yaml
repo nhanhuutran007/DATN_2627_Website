@@ -65,6 +65,9 @@ services:
       SEPAY_MERCHANT_ID: ${SEPAY_MERCHANT_ID:-}
       SEPAY_SECRET_KEY: ${SEPAY_SECRET_KEY:-}
       SEPAY_IPN_SECRET: ${SEPAY_IPN_SECRET:-}
+      # Thẻ Stripe test mode (để trống = ẩn kênh thẻ; tất cả hoặc không)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       # Đăng nhập Google (để trống = ẩn nút Google)
       # Mặc định dùng client ID của nhóm; đặt GOOGLE_CLIENT_ID= (rỗng) trong .env để ẩn nút Google
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID-69370430860-ctpq4a1k1adggkt6687d373c2b2bo5ck.apps.googleusercontent.com}

@@ -9,6 +9,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Between, DataSource, FindOptionsWhere, In, Like, Repository } from "typeorm";
@@ -16,9 +17,10 @@ import { Between, DataSource, FindOptionsWhere, In, Like, Repository } from "typ
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { rangeFilter } from "../../common/query/range";
 import type { PaymentGateway } from "../../integrations/payment/payment.gateway";
+import type { CardPledgeGateway } from "../../integrations/payment/stripe";
 import { closedWithoutReachingGoal } from "../campaigns/campaign-outcome";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
-import { Donation, DonationStatus, RefundMethod } from "../donations/entities/donation.entity";
+import { COUNTED_DONATION_STATUSES, Donation, DonationStatus, RefundMethod } from "../donations/entities/donation.entity";
 import { MediaFile, MediaPurpose } from "../media/entities/media-file.entity";
 import { MEDIA_URL_PREFIX } from "../media/media.service";
 import { NotificationType } from "../notifications/entities/notification.entity";
@@ -112,6 +114,9 @@ export class FinanceService {
     private readonly notificationsService: NotificationsService,
     @InjectRepository(MediaFile)
     private readonly mediaRepo: Repository<MediaFile>,
+    @Optional()
+    @Inject("StripeGateway")
+    private readonly stripe: CardPledgeGateway | null = null,
   ) {}
 
   // ---------- Yêu cầu hoàn tiền ----------
@@ -212,6 +217,36 @@ export class FinanceService {
     return { items, total, offset, limit };
   }
 
+  /**
+   * Người ủng hộ bổ sung tài khoản nhận hoàn cho yêu cầu đang chờ (thường là yêu cầu
+   * hệ thống tự tạo khi chiến dịch không đạt mục tiêu, vì SePay không có API hoàn).
+   */
+  async updateBankInfo(
+    id: string,
+    input: { bankName: string; bankAccountNumber: string; bankAccountName: string },
+    user: User,
+  ): Promise<RefundRequest> {
+    const request = await this.refundRepo.findOne({ where: { id } });
+    if (!request || request.userId !== user.id) {
+      throw new NotFoundException("Refund request not found");
+    }
+    if (request.status !== RefundRequestStatus.PENDING) {
+      throw new ConflictException("Yêu cầu đã được xử lý.");
+    }
+    request.bankName = input.bankName;
+    request.bankAccountNumber = input.bankAccountNumber;
+    request.bankAccountName = input.bankAccountName;
+    const saved = await this.refundRepo.save(request);
+    await this.auditService.record({
+      userId: user.id,
+      action: "refund.bank-update",
+      entity: "refund_request",
+      entityId: id,
+      newValues: { bankAccount: `${input.bankName} ${maskAccount(input.bankAccountNumber)}` },
+    });
+    return saved;
+  }
+
   private async getPendingRequest(id: string): Promise<RefundRequest> {
     const request = await this.refundRepo.findOne({ where: { id } });
     if (!request) {
@@ -225,6 +260,12 @@ export class FinanceService {
 
   async approve(id: string, adminNotes: string, admin: User, manual: ManualTransferInput = {}): Promise<RefundRequest> {
     const request = await this.getPendingRequest(id);
+    if (!request.bankAccountNumber) {
+      const donation = await this.donationRepo.findOne({ where: { id: request.donationId } });
+      if (donation && needsManualRefund(donation.paymentMethod)) {
+        throw new BadRequestException("Người ủng hộ chưa bổ sung tài khoản nhận hoàn nên chưa chuyển khoản hoàn được.");
+      }
+    }
     await this.refundDonation(request.donationId, `Duyệt yêu cầu hoàn: ${adminNotes}`, admin, { viaRequest: true, manual });
     request.status = RefundRequestStatus.APPROVED;
     request.adminNotes = adminNotes;
@@ -318,6 +359,16 @@ export class FinanceService {
       let refundId: string;
       if (manualTransfer && transferReference) {
         refundId = transferReference;
+      } else if (donation.paymentMethod === "stripe") {
+        // Khoản cam kết đã trừ tiền thẻ: hoàn qua Stripe theo mã PaymentIntent (`pi_…`).
+        if (!this.stripe || !donation.transactionId) {
+          throw new BadGatewayException("Cổng thẻ Stripe chưa cấu hình nên chưa hoàn được khoản này.");
+        }
+        const result = await this.stripe.refund(donation.transactionId);
+        if (!result.success) {
+          throw new BadGatewayException("Stripe từ chối hoàn tiền. Vui lòng thử lại sau.");
+        }
+        refundId = result.refundId;
       } else {
         const result = await this.paymentGateway.refundTransaction({
           transactionId: donation.transactionId ?? donation.id,
@@ -467,7 +518,8 @@ export class FinanceService {
           .addSelect("COALESCE(SUM(d.amount), 0)", "total")
           .addSelect("COUNT(*)", "backers")
           .where("d.campaign_id IN (:...ids)", { ids })
-          .andWhere("d.status = :status", { status: DonationStatus.COMPLETED })
+          // Tiến độ chiến dịch gồm cả cam kết chưa trừ tiền (gây quỹ tất cả hoặc không).
+          .andWhere("d.status IN (:...statuses)", { statuses: COUNTED_DONATION_STATUSES })
           .groupBy("d.campaign_id")
           .getRawMany()
       : [];

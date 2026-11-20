@@ -57,6 +57,9 @@ locals {
     { name = "SEPAY_MERCHANT_ID", value = var.sepay_merchant_id },
     { name = "SEPAY_SECRET_KEY", value = var.sepay_secret_key },
     { name = "SEPAY_IPN_SECRET", value = var.sepay_ipn_secret },
+    # Thẻ Stripe (tất cả hoặc không); webhook: <public_url>/api/v1/payments/stripe/webhook
+    { name = "STRIPE_SECRET_KEY", value = var.stripe_secret_key },
+    { name = "STRIPE_WEBHOOK_SECRET", value = var.stripe_webhook_secret },
     # Chỉ dùng khi chạy migration/seed bằng ts-node (one-off task), bỏ bước typecheck cho nhanh
     { name = "TS_NODE_TRANSPILE_ONLY", value = "true" },
   ]

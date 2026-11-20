@@ -13,8 +13,10 @@ import {
 } from "@/lib/api/organizations";
 import { useAuthUser, useRedirectAdmin } from "@/lib/auth";
 import { formatVnd } from "@/lib/format";
+import { MyCollaborations } from "./MyCollaborations";
 import { OrganizationForm } from "./OrganizationForm";
 import { OrganizationLogo } from "./OrganizationLogo";
+import { OrganizationTeamManager } from "./OrganizationTeamManager";
 
 /** Lời giải thích cho người đại diện theo trạng thái hồ sơ. */
 const STATUS_HINT: Record<Organization["status"], string> = {
@@ -33,6 +35,7 @@ export function MyOrganizations() {
   const [items, setItems] = useState<Organization[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [teamId, setTeamId] = useState<string | null>(null);
   const [notice, setNotice] = useState(searchParams.get("da-gui") ? "Đã gửi hồ sơ. Quản trị viên sẽ xem xét và thông báo kết quả cho bạn." : "");
 
   useEffect(() => {
@@ -79,12 +82,13 @@ export function MyOrganizations() {
         <div className="org-page-head">
           <div>
             <h1>Tổ chức của tôi</h1>
-            <p className="org-lead">Hồ sơ tổ chức bạn đại diện và trạng thái xác minh.</p>
+            <p className="org-lead">Hồ sơ tổ chức bạn đại diện, đội ngũ cộng tác viên và các tổ chức bạn cộng tác.</p>
           </div>
           <Link className="button button-outline" href="/to-chuc/dang-ky">Đăng ký tổ chức khác</Link>
         </div>
 
         {notice && <p className="form-notice" role="status">{notice}</p>}
+        <MyCollaborations />
         {state === "loading" && <p className="hint" role="status">Đang tải…</p>}
         {state === "error" && <p className="form-error" role="alert">Không tải được danh sách tổ chức.</p>}
         {state === "ready" && items.length === 0 && (
@@ -98,6 +102,8 @@ export function MyOrganizations() {
           {items.map((organization) => {
             const status = ORGANIZATION_STATUS_LABEL[organization.status];
             const editing = editingId === organization.id;
+            const teamOpen = teamId === organization.id;
+            const canInvite = organization.status !== "rejected" && organization.status !== "suspended";
             return (
               <li className="org-mine-item" key={organization.id}>
                 <div className="org-mine-head">
@@ -130,7 +136,18 @@ export function MyOrganizations() {
                   >
                     {editing ? "Đóng" : ["needs_info", "rejected"].includes(organization.status) ? "Sửa và gửi lại" : "Sửa hồ sơ"}
                   </button>
+                  {canInvite && (
+                    <button
+                      className="button button-ghost button-sm"
+                      type="button"
+                      aria-expanded={teamOpen}
+                      onClick={() => setTeamId(teamOpen ? null : organization.id)}
+                    >
+                      {teamOpen ? "Đóng cộng tác viên" : "Cộng tác viên"}
+                    </button>
+                  )}
                 </div>
+                {teamOpen && <OrganizationTeamManager organizationId={organization.id} />}
                 {editing && (
                   <div className="org-mine-edit">
                     <OrganizationForm organization={organization} representativeName={user.name} onSaved={saved} />

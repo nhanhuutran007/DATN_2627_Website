@@ -133,7 +133,8 @@ export class AdminService {
       // Cùng tiêu chí "lệch" với trang Đối soát (chênh > 0,5đ hoặc khác số lượt), nhưng xét mọi chiến dịch.
       count(
         "SELECT COUNT(*) AS n FROM `campaigns` c LEFT JOIN (" +
-          "SELECT `campaign_id`, SUM(`amount`) AS s, COUNT(*) AS k FROM `donations` WHERE `status` = 'completed' GROUP BY `campaign_id`" +
+          // Tiến độ chiến dịch gồm tiền đã thu và cam kết chưa trừ (gây quỹ tất cả hoặc không).
+          "SELECT `campaign_id`, SUM(`amount`) AS s, COUNT(*) AS k FROM `donations` WHERE `status` IN ('completed', 'pledged', 'charge_failed') GROUP BY `campaign_id`" +
           ") d ON d.`campaign_id` = c.`id` " +
           "WHERE ABS(c.`current_amount` - COALESCE(d.s, 0)) > 0.5 OR c.`backer_count` <> COALESCE(d.k, 0)",
       ),

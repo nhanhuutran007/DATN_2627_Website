@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 type DonatePageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ donation?: string; payment?: string }>;
+  searchParams: Promise<{ donation?: string; payment?: string; qua?: string }>;
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,7 +61,10 @@ export async function generateMetadata({ params }: DonatePageProps): Promise<Met
  */
 export default async function DonatePage({ params, searchParams }: DonatePageProps) {
   const { slug } = await params;
-  const sepayReturn = parseSepayReturn(await searchParams);
+  const query = await searchParams;
+  const sepayReturn = parseSepayReturn(query);
+  // "Chọn quà này" ở trang dự án → `?qua=<id mức quà>` chọn sẵn mức đó.
+  const initialRewardId = query.qua && UUID_PATTERN.test(query.qua) ? query.qua : undefined;
   const campaign = await loadCampaign(slug);
   if (!campaign) notFound();
 
@@ -106,7 +109,7 @@ export default async function DonatePage({ params, searchParams }: DonatePagePro
             </div>
           </div>
 
-          <DonationPanel campaignId={campaign.slug} campaignTitle={campaign.title} enabled={accepting} rewardTiers={rewardTiers} sepayReturn={sepayReturn} />
+          <DonationPanel campaignId={campaign.slug} campaignTitle={campaign.title} enabled={accepting} rewardTiers={rewardTiers} sepayReturn={sepayReturn} endDate={campaign.endDate} initialRewardId={initialRewardId} />
         </div>
 
         <aside className="donate-protect">

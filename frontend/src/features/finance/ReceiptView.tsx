@@ -12,6 +12,7 @@ import {
   REFUND_METHOD_LABEL,
   REFUND_STATUS_LABEL,
   requestRefund,
+  updateRefundBank,
   type DonationReceipt,
   type RefundRequest,
 } from "@/lib/api/finance";
@@ -34,13 +35,119 @@ const maskAccount = (value: string) => `•••• ${value.slice(-4)}`;
 const dateTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" }) : "—";
 
-function RefundSection({ receipt, request, onRequested }: { receipt: DonationReceipt; request: RefundRequest | null; onRequested: (r: RefundRequest) => void }) {
+type BankDraft = { bankName: string; accountNumber: string; accountName: string };
+
+const EMPTY_BANK: BankDraft = { bankName: "", accountNumber: "", accountName: "" };
+
+/** Lỗi đầu tiên của tài khoản nhận hoàn (khớp kiểm tra ở server), hoặc "". */
+function bankDraftError(bank: BankDraft): string {
+  if (bank.bankName.trim().length < 2) return "Vui lòng nhập tên ngân hàng.";
+  if (!ACCOUNT_PATTERN.test(accountDigits(bank.accountNumber))) return "Số tài khoản chỉ gồm 6–19 chữ số.";
+  if (bank.accountName.trim().length < 2) return "Vui lòng nhập tên chủ tài khoản.";
+  return "";
+}
+
+function bankPayload(bank: BankDraft) {
+  return {
+    bankName: bank.bankName.trim(),
+    bankAccountNumber: accountDigits(bank.accountNumber),
+    bankAccountName: bank.accountName.trim().toUpperCase(),
+  };
+}
+
+function BankFields({ value, onChange, hint }: { value: BankDraft; onChange: (next: BankDraft) => void; hint: string }) {
   const banksId = useId();
+  return (
+    <fieldset className="refund-bank">
+      <legend>Tài khoản nhận hoàn tiền</legend>
+      <p className="hint">{hint}</p>
+      <label className="field">
+        <span>Ngân hàng</span>
+        <input
+          list={banksId}
+          maxLength={100}
+          autoComplete="off"
+          placeholder="Vd. Vietcombank"
+          value={value.bankName}
+          onChange={(e) => onChange({ ...value, bankName: e.target.value })}
+        />
+        <datalist id={banksId}>
+          {COMMON_BANKS.map((bank) => <option key={bank} value={bank} />)}
+        </datalist>
+      </label>
+      <label className="field">
+        <span>Số tài khoản</span>
+        <input
+          inputMode="numeric"
+          maxLength={30}
+          autoComplete="off"
+          placeholder="Chỉ gồm chữ số"
+          value={value.accountNumber}
+          onChange={(e) => onChange({ ...value, accountNumber: e.target.value })}
+        />
+      </label>
+      <label className="field">
+        <span>Tên chủ tài khoản</span>
+        <input
+          maxLength={100}
+          autoComplete="off"
+          placeholder="Vd. NGUYEN VAN A"
+          value={value.accountName}
+          onChange={(e) => onChange({ ...value, accountName: e.target.value.toUpperCase() })}
+        />
+      </label>
+    </fieldset>
+  );
+}
+
+/**
+ * Yêu cầu hoàn do hệ thống tự tạo khi chiến dịch không đạt mục tiêu (khoản chuyển khoản
+ * SePay): người ủng hộ chỉ cần bổ sung tài khoản nhận để quản trị viên chuyển trả.
+ */
+function RefundBankForm({ request, onSaved }: { request: RefundRequest; onSaved: (r: RefundRequest) => void }) {
+  const [bank, setBank] = useState<BankDraft>(EMPTY_BANK);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const invalid = bankDraftError(bank);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      onSaved(await updateRefundBank(request.id, bankPayload(bank)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Không lưu được tài khoản nhận hoàn.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="form no-print" onSubmit={submit}>
+      <BankFields
+        value={bank}
+        onChange={setBank}
+        hint="Dự án không đạt mục tiêu nên hệ thống đã tạo sẵn yêu cầu hoàn cho bạn. Nhập tài khoản đứng tên bạn để quản trị viên chuyển trả (cần xác nhận bằng mã OTP)."
+      />
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <div className="comment-composer-actions">
+        <button className="button button-primary button-sm" type="submit" disabled={busy}>
+          {busy ? "Đang lưu…" : "Lưu tài khoản nhận hoàn"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function RefundSection({ receipt, request, onRequested }: { receipt: DonationReceipt; request: RefundRequest | null; onRequested: (r: RefundRequest) => void }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
-  const [bankName, setBankName] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [accountName, setAccountName] = useState("");
+  const [bank, setBank] = useState<BankDraft>(EMPTY_BANK);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // Khoản qua SePay hoàn bằng chuyển khoản tay → cần tài khoản nhận.
@@ -57,17 +164,14 @@ function RefundSection({ receipt, request, onRequested }: { receipt: DonationRec
           </p>
         )}
         {request.adminNotes && <p className="hint">Phản hồi của quản trị viên: {request.adminNotes}</p>}
+        {request.status === "pending" && needsBank && !request.bankAccountNumber && (
+          <RefundBankForm request={request} onSaved={onRequested} />
+        )}
       </div>
     );
   }
 
-  const digits = accountDigits(accountNumber);
-  const bankError =
-    !needsBank ? "" :
-    bankName.trim().length < 2 ? "Vui lòng nhập tên ngân hàng." :
-    !ACCOUNT_PATTERN.test(digits) ? "Số tài khoản chỉ gồm 6–19 chữ số." :
-    accountName.trim().length < 2 ? "Vui lòng nhập tên chủ tài khoản." :
-    "";
+  const bankError = needsBank ? bankDraftError(bank) : "";
   const canSubmit = reason.trim().length >= 10 && !bankError && !busy;
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -82,9 +186,7 @@ function RefundSection({ receipt, request, onRequested }: { receipt: DonationRec
       onRequested(
         await requestRefund(receipt.donationId, {
           reason: reason.trim(),
-          ...(needsBank
-            ? { bankName: bankName.trim(), bankAccountNumber: digits, bankAccountName: accountName.trim().toUpperCase() }
-            : {}),
+          ...(needsBank ? bankPayload(bank) : {}),
         }),
       );
     } catch (err) {
@@ -109,48 +211,11 @@ function RefundSection({ receipt, request, onRequested }: { receipt: DonationRec
             <textarea rows={3} maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} />
           </label>
           {needsBank && (
-            <fieldset className="refund-bank">
-              <legend>Tài khoản nhận hoàn tiền</legend>
-              <p className="hint">
-                Khoản ủng hộ qua SePay được hoàn bằng chuyển khoản. Vui lòng nhập đúng tài khoản đứng tên bạn để quản trị viên
-                chuyển trả.
-              </p>
-              <label className="field">
-                <span>Ngân hàng</span>
-                <input
-                  list={banksId}
-                  maxLength={100}
-                  autoComplete="off"
-                  placeholder="Vd. Vietcombank"
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
-                />
-                <datalist id={banksId}>
-                  {COMMON_BANKS.map((bank) => <option key={bank} value={bank} />)}
-                </datalist>
-              </label>
-              <label className="field">
-                <span>Số tài khoản</span>
-                <input
-                  inputMode="numeric"
-                  maxLength={30}
-                  autoComplete="off"
-                  placeholder="Chỉ gồm chữ số"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                />
-              </label>
-              <label className="field">
-                <span>Tên chủ tài khoản</span>
-                <input
-                  maxLength={100}
-                  autoComplete="off"
-                  placeholder="Vd. NGUYEN VAN A"
-                  value={accountName}
-                  onChange={(e) => setAccountName(e.target.value.toUpperCase())}
-                />
-              </label>
-            </fieldset>
+            <BankFields
+              value={bank}
+              onChange={setBank}
+              hint="Khoản ủng hộ qua SePay được hoàn bằng chuyển khoản. Vui lòng nhập đúng tài khoản đứng tên bạn để quản trị viên chuyển trả."
+            />
           )}
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="comment-composer-actions">

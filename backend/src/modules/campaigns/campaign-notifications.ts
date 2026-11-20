@@ -53,12 +53,12 @@ export function campaignStatusNotifications(
     case CampaignStatus.SUCCESS:
       return {
         owner: owner(NotificationType.CAMPAIGN_ENDED, "Chiến dịch đạt mục tiêu", `Chiến dịch ${name} đã kết thúc và đạt mục tiêu gây quỹ. Hãy tiếp tục báo cáo tiến độ cho người ủng hộ.`),
-        backers: { type: NotificationType.CAMPAIGN_ENDED, title: "Chiến dịch bạn ủng hộ đã đạt mục tiêu", message: `Chiến dịch ${name} đã kết thúc và đạt mục tiêu. Cảm ơn bạn đã đồng hành!`, link: publicLink, relatedId: campaign.id },
+        backers: { type: NotificationType.CAMPAIGN_ENDED, title: "Chiến dịch bạn ủng hộ đã đạt mục tiêu", message: `Chiến dịch ${name} đã kết thúc và đạt mục tiêu. Khoản cam kết của bạn sẽ được trừ tiền từ phương thức đã lưu. Cảm ơn bạn đã đồng hành!`, link: publicLink, relatedId: campaign.id },
       };
     case CampaignStatus.FAILED:
       return {
-        owner: owner(NotificationType.CAMPAIGN_ENDED, "Chiến dịch kết thúc chưa đạt mục tiêu", `Chiến dịch ${name} đã hết hạn nhưng chưa đạt mục tiêu gây quỹ. Người ủng hộ có thể yêu cầu hoàn tiền và quản trị viên sẽ xử lý từng yêu cầu.`),
-        backers: { type: NotificationType.CAMPAIGN_ENDED, title: "Chiến dịch bạn ủng hộ đã kết thúc", message: `Chiến dịch ${name} đã hết hạn nhưng chưa đạt mục tiêu. Nếu đã ủng hộ, bạn có thể yêu cầu hoàn tiền từ biên nhận trong mục "Khoản ủng hộ của tôi".`, link: publicLink, relatedId: campaign.id },
+        owner: owner(NotificationType.CAMPAIGN_ENDED, "Chiến dịch kết thúc chưa đạt mục tiêu", `Chiến dịch ${name} đã hết hạn nhưng chưa đạt mục tiêu gây quỹ. Theo nguyên tắc tất cả hoặc không, các khoản cam kết không bị trừ tiền; khoản đã chuyển khoản sẽ được hoàn cho người ủng hộ.`),
+        backers: { type: NotificationType.CAMPAIGN_ENDED, title: "Chiến dịch bạn ủng hộ đã kết thúc", message: `Chiến dịch ${name} đã hết hạn nhưng chưa đạt mục tiêu. Khoản cam kết qua thẻ/ví không bị trừ tiền; khoản đã chuyển khoản sẽ được hoàn (hệ thống đã tạo sẵn yêu cầu hoàn trong biên nhận).`, link: publicLink, relatedId: campaign.id },
       };
     case CampaignStatus.ENDED:
       return { owner: owner(NotificationType.CAMPAIGN_ENDED, "Chiến dịch đã đóng", `Chiến dịch ${name} đã được đóng.`, false) };

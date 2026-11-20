@@ -96,14 +96,14 @@ describe("CampaignExpiryService (TC_CAMP_017 & TC_CAMP_018)", () => {
     equal(notifier.notified[0].userId, campaign.ownerId);
     equal(notifier.notified[0].type, NotificationType.CAMPAIGN_ENDED);
     equal(notifier.notified[0].title, "Chiến dịch kết thúc chưa đạt mục tiêu");
-    ok(notifier.notified[0].message.includes("yêu cầu hoàn tiền"));
+    ok(notifier.notified[0].message.includes("không bị trừ tiền"));
 
     // Notification check: backers notification with refund information
     equal(notifier.backerNotices.length, 1);
     equal(notifier.backerNotices[0].campaignId, campaign.id);
     equal(notifier.backerNotices[0].base.type, NotificationType.CAMPAIGN_ENDED);
     equal(notifier.backerNotices[0].base.title, "Chiến dịch bạn ủng hộ đã kết thúc");
-    ok(notifier.backerNotices[0].base.message.includes("yêu cầu hoàn tiền từ biên nhận"));
+    ok(notifier.backerNotices[0].base.message.includes("không bị trừ tiền"));
   });
 
   it("should be idempotent: subsequent run when no active expired campaigns exist does nothing", async () => {

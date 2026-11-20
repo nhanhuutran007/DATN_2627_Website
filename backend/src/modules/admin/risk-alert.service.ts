@@ -7,6 +7,7 @@ import type { AiFraudResponse } from "../../integrations/ai/ai.types";
 import { AiService, logAmountZScore, maxDonationsPerDonor } from "../ai/ai.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import {
+  COUNTED_DONATION_STATUSES,
   Donation,
   DonationStatus,
 } from "../donations/entities/donation.entity";
@@ -251,7 +252,8 @@ export class RiskAlertService {
         select: { id: true, userId: true },
       }),
       this.donationRepo.find({
-        where: { campaignId, status: DonationStatus.COMPLETED },
+        // Gồm cả cam kết chưa trừ tiền: với gây quỹ tất cả hoặc không, đó là dòng ủng hộ chính.
+        where: { campaignId, status: In([...COUNTED_DONATION_STATUSES]) },
         select: { id: true, amount: true },
       }),
     ]);

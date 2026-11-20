@@ -38,6 +38,7 @@ export function isLiveId(id: string): boolean {
 /** Nhãn kênh thanh toán; `payos` chỉ còn ở giao dịch cũ (kênh đã thay bằng SePay). */
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   sepay: "Chuyển khoản qua SePay",
+  stripe: "Thẻ quốc tế (Stripe)",
   wallet: "Ví demo Góp Mầm",
   wallet_demo: "Ví demo Góp Mầm",
   payos: "PayOS sandbox (cũ)",

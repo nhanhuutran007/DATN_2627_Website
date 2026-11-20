@@ -27,6 +27,7 @@ function user(id = OWNER_ID): User {
 type Row = Pick<Donation, "id" | "userId" | "campaignId" | "amount" | "status" | "transactionId" | "createdAt"> & {
   completedAt?: Date;
   rewardTierId?: string | null;
+  paymentMethod?: string;
 };
 
 /**
@@ -67,8 +68,27 @@ function makeStore(initial: Partial<Row> = {}) {
     find: async () => (row.status === DonationStatus.PENDING ? [{ ...row }] : []),
   };
   const campaignRepo = { findOne: async () => ({ id: CAMPAIGN_ID, title: "C", ownerId: "owner" }) };
-  const dataSource = { transaction: async (fn: (m: typeof manager) => unknown) => fn(manager), getRepository: () => ({}) };
-  return { row, increments, donationRepo, campaignRepo, dataSource };
+  // Theo dõi tự động sau khi ủng hộ: INSERT IGNORE vào campaign_follows (ghi lại để kiểm tra).
+  const follows: Array<{ userId: string; campaignId: string }> = [];
+  const followQuery = () => {
+    let value: { userId: string; campaignId: string };
+    const qb = {
+      insert: () => qb,
+      into: () => qb,
+      values: (v: { userId: string; campaignId: string }) => ((value = v), qb),
+      orIgnore: () => qb,
+      execute: async () => {
+        if (!follows.some((f) => f.userId === value.userId && f.campaignId === value.campaignId)) follows.push(value);
+      },
+    };
+    return qb;
+  };
+  const dataSource = {
+    transaction: async (fn: (m: typeof manager) => unknown) => fn(manager),
+    getRepository: () => ({}),
+    createQueryBuilder: followQuery,
+  };
+  return { row, increments, donationRepo, campaignRepo, dataSource, follows };
 }
 
 function makeService(store: ReturnType<typeof makeStore>, audit: ReturnType<typeof makeAuditRecorder>) {
@@ -149,7 +169,8 @@ describe("Vòng đời giao dịch: hủy / hết hạn", () => {
     });
 
     it("thanh toán thành công đến muộn vẫn được ghi nhận và đánh dấu để admin xem xét", async () => {
-      const store = makeStore({ status: DonationStatus.EXPIRED });
+      // Tiền đã thật sự chuyển (kênh trả ngay) nên không được bỏ qua.
+      const store = makeStore({ status: DonationStatus.EXPIRED, paymentMethod: "sepay" });
       const { dto, signature } = signed("completed");
       const result = await makeService(store, audit).handleWebhook(dto, signature);
       equal(result.status, DonationStatus.COMPLETED);
@@ -158,6 +179,31 @@ describe("Vòng đời giao dịch: hủy / hết hạn", () => {
       equal(entry?.action, "donation.payment.completed");
       equal(entry?.oldValues?.status, DonationStatus.EXPIRED);
       equal(entry?.newValues?.lateCompletion, true);
+    });
+
+    it("ủng hộ thành công thì tự động theo dõi dự án (một lần)", async () => {
+      const store = makeStore({ paymentMethod: "sepay" });
+      const { dto, signature } = signed("completed");
+      await makeService(store, audit).handleWebhook(dto, signature);
+      await makeService(store, audit).handleWebhook(dto, signature);
+      deepEqual(store.follows, [{ userId: OWNER_ID, campaignId: CAMPAIGN_ID }]);
+    });
+
+    it("lỗi khi tự theo dõi không làm hỏng giao dịch đã ghi nhận", async () => {
+      const store = makeStore({ paymentMethod: "sepay" });
+      store.dataSource.createQueryBuilder = () => {
+        throw new Error("db down");
+      };
+      const { dto, signature } = signed("completed");
+      const result = await makeService(store, audit).handleWebhook(dto, signature);
+      equal(result.status, DonationStatus.COMPLETED);
+    });
+
+    it("thanh toán thất bại thì không tự theo dõi", async () => {
+      const store = makeStore({ paymentMethod: "sepay" });
+      const { dto, signature } = signed("failed");
+      await makeService(store, audit).handleWebhook(dto, signature);
+      deepEqual(store.follows, []);
     });
 
     it("báo thất bại cho đơn đã hết hạn thì bỏ qua (idempotent)", async () => {

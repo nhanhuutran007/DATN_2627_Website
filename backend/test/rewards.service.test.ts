@@ -37,6 +37,19 @@ function makeTier(overrides: Partial<RewardTier> = {}): RewardTier {
 }
 
 describe("toTierView", () => {
+  it("chi tiết kiểu Kickstarter: món bao gồm, giao hàng, còn chọn được hay không", () => {
+    const view = toTierView(makeTier({ items: [{ name: "Sổ tay", quantity: 1 }], requiresShipping: false }));
+    deepEqual(view.items, [{ name: "Sổ tay", quantity: 1 }]);
+    equal(view.requiresShipping, false);
+    equal(view.available, true);
+    equal(toTierView(makeTier({ quantityLimit: 2, claimedCount: 2 })).available, false);
+    equal(toTierView(makeTier({ isActive: false })).available, false);
+    equal(toTierView(makeTier({ availableUntil: new Date(Date.now() - 1000) })).available, false);
+    // Mức cũ chưa có trường mới: mặc định cần giao, không có món liệt kê.
+    deepEqual(toTierView(makeTier()).items, []);
+    equal(toTierView(makeTier()).requiresShipping, true);
+  });
+
   it("tính số suất còn lại; null khi không giới hạn", () => {
     equal(toTierView(makeTier({ quantityLimit: 5, claimedCount: 2 })).remaining, 3);
     equal(toTierView(makeTier({ quantityLimit: null })).remaining, null);
@@ -93,6 +106,35 @@ describe("RewardsService", () => {
     equal(view.remaining, 50);
     equal(audit.entries.at(-1)?.action, "reward_tier.create");
     await rejects(service.create(CAMPAIGN_ID, { title: "Áo", description: "Áo phông in logo", minAmount: 500000 }, DONOR), ForbiddenException);
+  });
+
+  it("lưu ảnh, món bao gồm, loại giao và hạn chọn quà", async () => {
+    const view = await service.create(
+      CAMPAIGN_ID,
+      {
+        title: "Gói ghi danh",
+        description: "Tên bạn trên bảng vinh danh của thư viện",
+        minAmount: 100000,
+        imageUrl: "https://example.com/qua.jpg",
+        items: [{ name: "Ghi danh trên bảng", quantity: 1 }],
+        requiresShipping: false,
+        availableUntil: "2099-01-01T00:00:00.000Z",
+      },
+      OWNER,
+    );
+    equal(view.imageUrl, "https://example.com/qua.jpg");
+    deepEqual(view.items, [{ name: "Ghi danh trên bảng", quantity: 1 }]);
+    equal(view.requiresShipping, false);
+    equal(view.available, true);
+    const cleared = await service.update(view.id, { imageUrl: null, items: [], availableUntil: null }, OWNER);
+    equal(cleared.imageUrl, null);
+    deepEqual(cleared.items, []);
+    equal(cleared.availableUntil, null);
+  });
+
+  it("đã có người nhận quà gửi tận nơi thì không đổi sang quà không cần giao", async () => {
+    tiers = [makeTier({ claimedCount: 1, requiresShipping: true })];
+    await rejects(service.update(TIER_ID, { requiresShipping: false }, OWNER), ConflictException);
   });
 
   it(`tối đa ${MAX_TIERS_PER_CAMPAIGN} mức mỗi chiến dịch`, async () => {
@@ -240,6 +282,18 @@ describe("DonationsService + mức quà", () => {
     equal(recipients.length, 0);
   });
 
+  it("quà không cần giao: không bắt buộc và không lưu địa chỉ", async () => {
+    tier = makeTier({ requiresShipping: false });
+    await service.create(createDto({ rewardRecipient: undefined }), DONOR);
+    await service.create(createDto(), DONOR);
+    equal(recipients.length, 0);
+  });
+
+  it("từ chối mức quà đã hết hạn chọn", async () => {
+    tier = makeTier({ availableUntil: new Date(Date.now() - 60_000) });
+    await rejects(service.create(createDto(), DONOR), ConflictException);
+  });
+
   it("từ chối khi số tiền thấp hơn mức tối thiểu", async () => {
     await rejects(service.create(createDto({ amount: 100000 }), DONOR), BadRequestException);
   });
@@ -253,9 +307,9 @@ describe("DonationsService + mức quà", () => {
     await rejects(service.create(createDto(), DONOR), NotFoundException);
   });
 
-  it("xác nhận thanh toán → trừ suất, thông báo nêu phần quà", async () => {
+  it("xác nhận cam kết → giữ suất, thông báo nêu phần quà", async () => {
     const result = await service.confirmDemoPayment(pending.id, "completed", DONOR);
-    equal(result.status, DonationStatus.COMPLETED);
+    equal(result.status, DonationStatus.PLEDGED);
     equal(result.rewardTierId, TIER_ID);
     ok(!updates.some((u) => u.patch.rewardTierId === null));
     const donorNote = notifier.notified.find((n) => n.userId === DONOR.id);
@@ -265,7 +319,7 @@ describe("DonationsService + mức quà", () => {
   it("hết suất đúng lúc xác nhận → vẫn ghi nhận tiền, bỏ quà và báo rõ", async () => {
     claimAffected = 0;
     const result = await service.confirmDemoPayment(pending.id, "completed", DONOR);
-    equal(result.status, DonationStatus.COMPLETED);
+    equal(result.status, DonationStatus.PLEDGED);
     equal(result.rewardTierId, null);
     ok(updates.some((u) => u.patch.rewardTierId === null));
     const donorNote = notifier.notified.find((n) => n.userId === DONOR.id);

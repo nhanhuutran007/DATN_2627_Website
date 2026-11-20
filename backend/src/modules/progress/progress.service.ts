@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, Repository } from "typeorm";
@@ -16,6 +17,8 @@ import { MediaFile, MediaPurpose } from "../media/entities/media-file.entity";
 import { MEDIA_URL_PREFIX } from "../media/media.service";
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { NotificationsService } from "../notifications/notifications.service";
+import { OrgPermission } from "../organizations/entities/organization-member.entity";
+import { OrganizationAccessService } from "../organizations/organization-access.service";
 import { User, UserRole } from "../users/entities/user.entity";
 import {
   CampaignUpdatesQueryDto,
@@ -129,6 +132,8 @@ export class ProgressService {
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
     private readonly receiptDuplicates: ReceiptDuplicateService,
+    @Optional()
+    private readonly access: OrganizationAccessService | null = null,
   ) {}
 
   async findCampaignMilestones(
@@ -153,7 +158,7 @@ export class ProgressService {
     user: User,
   ): Promise<Milestone> {
     const campaign = await this.getCampaign(campaignId);
-    this.assertCanManage(campaign, user);
+    await this.assertCanManage(campaign, user);
     this.assertEditable(campaign);
 
     const sortOrder = dto.sortOrder ?? (await this.nextSortOrder(campaignId));
@@ -195,7 +200,7 @@ export class ProgressService {
   ): Promise<Milestone> {
     const milestone = await this.getMilestone(id);
     const campaign = await this.getCampaign(milestone.campaignId);
-    this.assertCanManage(campaign, user);
+    await this.assertCanManage(campaign, user);
     this.assertEditable(campaign);
 
     const { changeReason, sortOrder } = dto;
@@ -294,7 +299,7 @@ export class ProgressService {
   async removeMilestone(id: string, user: User): Promise<void> {
     const milestone = await this.getMilestone(id);
     const campaign = await this.getCampaign(milestone.campaignId);
-    this.assertCanManage(campaign, user);
+    await this.assertCanManage(campaign, user);
     this.assertEditable(campaign);
     if (REPORTABLE_STATUSES.includes(campaign.status)) {
       throw new ConflictException(
@@ -321,7 +326,7 @@ export class ProgressService {
   async completeMilestone(id: string, user: User): Promise<Milestone> {
     const milestone = await this.getMilestone(id);
     const campaign = await this.getCampaign(milestone.campaignId);
-    this.assertCanManage(campaign, user);
+    await this.assertCanManage(campaign, user);
     await this.assertReportable(campaign);
     if (milestone.isCompleted) return milestone;
 
@@ -366,7 +371,7 @@ export class ProgressService {
   ): Promise<MilestoneUpdate> {
     const milestone = await this.getMilestone(milestoneId);
     const campaign = await this.getCampaign(milestone.campaignId);
-    this.assertCanManage(campaign, user);
+    await this.assertCanManage(campaign, user);
     await this.assertReportable(campaign);
 
     const expense = Number(dto.expenseAmount ?? 0);
@@ -615,7 +620,17 @@ export class ProgressService {
     return (max ?? 0) + 1;
   }
 
-  private assertCanManage(campaign: Campaign, user: User): void {
+  /** Chủ dự án, admin, hoặc đội ngũ tổ chức có quyền "Báo cáo tiến độ & chi tiêu". */
+  private async assertCanManage(campaign: Campaign, user: User): Promise<void> {
+    if (this.access) {
+      await this.access.assertCanOnCampaign(
+        campaign,
+        user,
+        OrgPermission.REPORT_PROGRESS,
+        "Bạn không có quyền quản lý tiến độ của chiến dịch này.",
+      );
+      return;
+    }
     if (campaign.ownerId !== user.id && user.role !== UserRole.ADMIN) {
       throw new ForbiddenException(
         "You can only manage milestones of your own campaigns",

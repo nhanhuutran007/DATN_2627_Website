@@ -9,7 +9,8 @@ import { readAppConfig } from "./config/app.config";
 
 async function bootstrap(): Promise<void> {
   const config = readAppConfig();
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: webhook Stripe xác thực chữ ký trên đúng byte body gốc (req.rawBody).
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // Tin đúng `trustProxyHops` hop reverse-proxy để `req.ip` (audit log, rate
   // limit theo IP) đọc đúng IP thật của client thay vì IP của Nginx/ALB.

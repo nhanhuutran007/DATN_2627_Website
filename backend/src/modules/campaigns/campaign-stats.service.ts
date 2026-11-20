@@ -2,10 +2,13 @@ import { createHash } from "node:crypto";
 
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Between, In, Repository } from "typeorm";
+import { Between, In, IsNull, Repository } from "typeorm";
 
 import { RateLimiterService } from "../../common/rate-limit/rate-limiter.service";
-import { Donation, DonationStatus } from "../donations/entities/donation.entity";
+import { COUNTED_DONATION_STATUSES, Donation, DonationStatus } from "../donations/entities/donation.entity";
+
+/** Mọi trạng thái từng là một lượt ủng hộ thật (đã thu, đang cam kết, đã hoàn, đã giải phóng). */
+const CONVERTED_STATUSES = [...COUNTED_DONATION_STATUSES, DonationStatus.REFUNDED, DonationStatus.RELEASED];
 import { CampaignFollow } from "../follows/entities/campaign-follow.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import { CampaignViewDaily } from "./entities/campaign-view-daily.entity";
@@ -127,14 +130,19 @@ export class CampaignStatsService {
 
     const [viewRows, donations, followerCount] = await Promise.all([
       this.viewDailyRepo.find({ where: { campaignId, viewDate: In(dates) } }),
-      // Chỉ giao dịch đã xác nhận (kể cả đã hoàn tiền sau đó vẫn là lượt chuyển đổi đã xảy ra).
+      // Lượt chuyển đổi = lúc người ủng hộ cam kết (`pledgedAt`) hoặc, với khoản trả ngay
+      // (SePay), lúc xác nhận. Đã hoàn/giải phóng sau đó vẫn là lượt chuyển đổi đã xảy ra.
       this.donationRepo.find({
-        select: { amount: true, completedAt: true, status: true },
-        where: {
-          campaignId,
-          status: In([DonationStatus.COMPLETED, DonationStatus.REFUNDED]),
-          completedAt: Between(from, now),
-        },
+        select: { amount: true, completedAt: true, pledgedAt: true, status: true },
+        where: [
+          { campaignId, status: In(CONVERTED_STATUSES), pledgedAt: Between(from, now) },
+          {
+            campaignId,
+            status: In([DonationStatus.COMPLETED, DonationStatus.REFUNDED]),
+            pledgedAt: IsNull(),
+            completedAt: Between(from, now),
+          },
+        ],
       }),
       this.followRepo.count({ where: { campaignId } }),
     ]);
@@ -149,12 +157,13 @@ export class CampaignStatsService {
       if (point) point.views += Number(row.views);
     }
     for (const donation of donations) {
-      if (!donation.completedAt) continue;
-      const point = byDate.get(utcDate(new Date(donation.completedAt)));
+      const at = donation.pledgedAt ?? donation.completedAt;
+      if (!at) continue;
+      const point = byDate.get(utcDate(new Date(at)));
       if (!point) continue;
       point.donations += 1;
-      // Đã hoàn tiền thì không còn là tiền quỹ giữ lại.
-      if (donation.status === DonationStatus.COMPLETED) point.amount += Number(donation.amount);
+      // Đã hoàn/giải phóng thì không còn là tiền quỹ giữ lại hoặc đang cam kết.
+      if (COUNTED_DONATION_STATUSES.includes(donation.status)) point.amount += Number(donation.amount);
     }
 
     const viewCount = Number(campaign.viewCount) || 0;

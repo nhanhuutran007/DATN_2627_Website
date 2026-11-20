@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
 
-import { MoneyInput } from "@/components/ui/MoneyInput";
 import { ApiError } from "@/lib/api";
 import {
   createRewardTier,
@@ -12,21 +11,33 @@ import {
 } from "@/lib/api/rewards";
 import { formatVnd } from "@/lib/format";
 
-import { emptyTier, tiersToPayloads, validateTiers, type DraftTier } from "./RewardTiersEditor";
+import { RewardCard } from "./RewardCard";
+import { draftToPayload, emptyTier, RewardTierFields, tierToDraft, validateTiers, type DraftTier } from "./RewardTiersEditor";
 
 type LoadState = "loading" | "ready" | "error";
+
+const CLAIM_STATUS: Record<string, { label: string; tone: string }> = {
+  completed: { label: "Đã thanh toán", tone: "tag-green" },
+  pledged: { label: "Cam kết · chưa trừ tiền", tone: "tag-amber" },
+  charge_failed: { label: "Trừ tiền thất bại", tone: "tag-red" },
+};
 
 function message(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
 }
 
-/** Quản lý mức quà của một chiến dịch đã có (trang quản lý của chủ dự án). */
+/**
+ * Quản lý mức quà của một chiến dịch đã có: xem trước thẻ quà như người ủng hộ thấy,
+ * sửa/ngừng nhận từng mức, thêm mức mới, và danh sách người nhận quà (backer report).
+ */
 export function RewardManager({ campaignId, closed }: { campaignId: string; closed: boolean }) {
   const [tiers, setTiers] = useState<RewardTier[]>([]);
   const [claims, setClaims] = useState<RewardClaim[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [reloadKey, setReloadKey] = useState(0);
-  const [draft, setDraft] = useState<DraftTier>({ ...emptyTier });
+  const [draft, setDraft] = useState<DraftTier>({ ...emptyTier, items: [] });
+  const [editing, setEditing] = useState<{ id: string; draft: DraftTier } | null>(null);
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -48,12 +59,14 @@ export function RewardManager({ campaignId, closed }: { campaignId: string; clos
     };
   }, [campaignId, reloadKey]);
 
+  const replace = (updated: RewardTier) => setTiers((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+
   const toggle = async (tier: RewardTier) => {
     setBusy(tier.id);
     setError("");
     try {
       const updated = await updateRewardTier(tier.id, { isActive: !tier.isActive });
-      setTiers((prev) => prev.map((t) => (t.id === tier.id ? updated : t)));
+      replace(updated);
       setNotice(updated.isActive ? `Đã mở lại mức "${tier.title}".` : `Đã ngừng nhận mức "${tier.title}".`);
     } catch (err) {
       setError(message(err, "Không cập nhật được mức quà."));
@@ -62,20 +75,46 @@ export function RewardManager({ campaignId, closed }: { campaignId: string; clos
     }
   };
 
+  const saveEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editing) return;
+    const invalid = validateTiers([editing.draft]);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    const original = tiers.find((t) => t.id === editing.id);
+    const payload = draftToPayload(editing.draft);
+    // Sau khi có người chọn, không gửi lại số tiền (máy chủ chặn đổi số tiền khi đã phát hành).
+    if (original && Number(original.minAmount) === payload.minAmount) delete (payload as { minAmount?: number }).minAmount;
+    setBusy(editing.id);
+    setError("");
+    try {
+      const updated = await updateRewardTier(editing.id, payload);
+      replace(updated);
+      setEditing(null);
+      setNotice(`Đã lưu mức "${updated.title}".`);
+    } catch (err) {
+      setError(message(err, "Không lưu được mức quà."));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const add = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const invalid = validateTiers([draft]);
-    const [payload] = tiersToPayloads([draft]);
-    if (invalid || !payload) {
+    if (invalid || !draft.title.trim()) {
       setError(invalid || "Vui lòng nhập thông tin mức quà.");
       return;
     }
     setBusy("new");
     setError("");
     try {
-      const created = await createRewardTier(campaignId, { ...payload, sortOrder: tiers.length });
+      const created = await createRewardTier(campaignId, draftToPayload(draft, tiers.length));
       setTiers((prev) => [...prev, created]);
-      setDraft({ ...emptyTier });
+      setDraft({ ...emptyTier, items: [] });
+      setAdding(false);
       setNotice(`Đã thêm mức "${created.title}".`);
     } catch (err) {
       setError(message(err, "Không thêm được mức quà."));
@@ -94,26 +133,46 @@ export function RewardManager({ campaignId, closed }: { campaignId: string; clos
     );
   }
 
+  const shippingClaims = claims.filter((claim) => claim.recipient);
+
   return (
     <div className="reward-manager">
       {tiers.length === 0 ? (
         <p className="hint">Chiến dịch chưa có mức quà nào.</p>
       ) : (
-        <ul className="reward-manager-list">
+        <ul className="reward-manager-grid">
           {tiers.map((tier) => (
-            <li key={tier.id} className={tier.isActive ? "" : "is-off"}>
-              <div>
-                <b>{tier.title}</b> <span className="num">· từ {formatVnd(tier.minAmount)}</span>
-                <small>
-                  Đã nhận {tier.claimedCount}
-                  {tier.quantityLimit !== null ? `/${tier.quantityLimit} suất` : " suất (không giới hạn)"}
-                  {!tier.isActive && " · đang ngừng nhận"}
-                </small>
-              </div>
-              {!closed && (
-                <button className="button button-outline button-sm" type="button" disabled={busy === tier.id} onClick={() => toggle(tier)}>
-                  {tier.isActive ? "Ngừng nhận" : "Mở lại"}
-                </button>
+            <li key={tier.id}>
+              {editing?.id === tier.id ? (
+                <form className="reward-edit" onSubmit={saveEdit}>
+                  <RewardTierFields
+                    tier={editing.draft}
+                    lockAmount={tier.claimedCount > 0}
+                    onChange={(next) => setEditing({ id: tier.id, draft: next })}
+                  />
+                  <div className="own-actions">
+                    <button className="button button-primary button-sm" type="submit" disabled={busy === tier.id}>
+                      {busy === tier.id ? "Đang lưu…" : "Lưu mức quà"}
+                    </button>
+                    <button className="button button-ghost button-sm" type="button" onClick={() => setEditing(null)}>Hủy</button>
+                  </div>
+                </form>
+              ) : (
+                <RewardCard
+                  tier={tier}
+                  action={
+                    !closed && (
+                      <div className="own-actions">
+                        <button className="button button-outline button-sm" type="button" onClick={() => { setEditing({ id: tier.id, draft: tierToDraft(tier) }); setError(""); }}>
+                          Sửa
+                        </button>
+                        <button className="button button-ghost button-sm" type="button" disabled={busy === tier.id} onClick={() => toggle(tier)}>
+                          {tier.isActive ? "Ngừng nhận" : "Mở lại"}
+                        </button>
+                      </div>
+                    )
+                  }
+                />
               )}
             </li>
           ))}
@@ -121,68 +180,75 @@ export function RewardManager({ campaignId, closed }: { campaignId: string; clos
       )}
 
       {!closed && tiers.length < 10 && (
-        <form className="reward-add" onSubmit={add}>
-          <p className="reward-add-title">Thêm mức quà</p>
-          <div className="field-row">
-            <label className="field field-span-2">
-              <span>Tên mức</span>
-              <input value={draft.title} maxLength={120} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-            </label>
-            <label className="field">
-              <span>Ủng hộ từ (VNĐ)</span>
-              <MoneyInput value={draft.minAmount} placeholder="200.000đ" onChange={(digits) => setDraft({ ...draft, minAmount: digits })} />
-            </label>
-            <label className="field">
-              <span>Số suất</span>
-              <input type="number" min={1} placeholder="Không giới hạn" value={draft.limit} onChange={(e) => setDraft({ ...draft, limit: e.target.value })} />
-            </label>
-            <label className="field field-span-4">
-              <span>Mô tả phần quà</span>
-              <textarea rows={2} value={draft.description} maxLength={1000} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
-            </label>
-          </div>
-          <button className="button button-primary button-sm" type="submit" disabled={busy === "new"}>
-            {busy === "new" ? "Đang thêm…" : "Thêm mức"}
+        adding ? (
+          <form className="reward-add" onSubmit={add}>
+            <p className="reward-add-title">Thêm mức quà</p>
+            <RewardTierFields tier={draft} onChange={setDraft} />
+            <div className="own-actions">
+              <button className="button button-primary button-sm" type="submit" disabled={busy === "new"}>
+                {busy === "new" ? "Đang thêm…" : "Thêm mức"}
+              </button>
+              <button className="button button-ghost button-sm" type="button" onClick={() => setAdding(false)}>Hủy</button>
+            </div>
+          </form>
+        ) : (
+          <button className="button button-outline button-sm reward-add-open" type="button" onClick={() => setAdding(true)}>
+            + Thêm mức quà
           </button>
-        </form>
+        )
       )}
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && !error && <p className="form-notice" role="status">{notice}</p>}
 
       <div className="reward-claims">
-        <p className="reward-add-title">Người nhận quà ({claims.length})</p>
+        <p className="reward-add-title">
+          Người nhận quà ({claims.length}){shippingClaims.length > 0 && ` · ${shippingClaims.length} cần gửi tận nơi`}
+        </p>
         {claims.length > 0 && (
-          <p className="hint">Thông tin gửi quà chỉ dùng để gửi quà; không chia sẻ cho bên khác.</p>
+          <p className="hint">
+            Gồm cả khoản đang cam kết (chưa trừ tiền). Chỉ gửi quà cho khoản “Đã thanh toán”; thông tin gửi quà không chia sẻ cho bên khác.
+          </p>
         )}
         {claims.length === 0 ? (
-          <p className="hint">Chưa có khoản ủng hộ nào kèm quà được xác nhận.</p>
+          <p className="hint">Chưa có khoản ủng hộ nào kèm quà.</p>
         ) : (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
-                <tr><th scope="col">Người ủng hộ</th><th scope="col">Phần quà</th><th scope="col" className="num">Số tiền</th><th scope="col">Ngày</th><th scope="col">Gửi quà tới</th></tr>
+                <tr>
+                  <th scope="col">Người ủng hộ</th>
+                  <th scope="col">Phần quà</th>
+                  <th scope="col" className="num">Số tiền</th>
+                  <th scope="col">Trạng thái</th>
+                  <th scope="col">Ngày</th>
+                  <th scope="col">Gửi quà tới</th>
+                </tr>
               </thead>
               <tbody>
-                {claims.map((claim) => (
-                  <tr key={claim.donationId}>
-                    <td>{claim.backerName}</td>
-                    <td>{claim.tierTitle}</td>
-                    <td className="num">{formatVnd(claim.amount)}</td>
-                    <td className="nowrap">{claim.completedAt ? new Date(claim.completedAt).toLocaleDateString("vi-VN") : "—"}</td>
-                    <td>
-                      {claim.recipient ? (
-                        <>
-                          <b>{claim.recipient.name}</b> · <a href={`tel:${claim.recipient.phone.replace(/[^0-9+]/g, "")}`}>{claim.recipient.phone}</a>
-                          <br />
-                          {claim.recipient.address}
-                        </>
-                      ) : (
-                        <span className="hint">Chưa có (khoản ủng hộ trước khi hệ thống hỏi địa chỉ)</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {claims.map((claim) => {
+                  const status = CLAIM_STATUS[claim.status ?? "completed"] ?? { label: claim.status ?? "", tone: "" };
+                  return (
+                    <tr key={claim.donationId}>
+                      <td>{claim.backerName}</td>
+                      <td>{claim.tierTitle}</td>
+                      <td className="num">{formatVnd(claim.amount)}</td>
+                      <td><span className={`tag ${status.tone}`}>{status.label}</span></td>
+                      <td className="nowrap">{claim.completedAt ? new Date(claim.completedAt).toLocaleDateString("vi-VN") : "—"}</td>
+                      <td>
+                        {claim.recipient ? (
+                          <>
+                            <b>{claim.recipient.name}</b> · <a href={`tel:${claim.recipient.phone.replace(/[^0-9+]/g, "")}`}>{claim.recipient.phone}</a>
+                            <br />
+                            {claim.recipient.address}
+                          </>
+                        ) : (
+                          <span className="hint">Không cần giao, hoặc khoản cũ chưa có địa chỉ</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

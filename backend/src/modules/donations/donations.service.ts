@@ -10,12 +10,13 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Raw, Repository } from "typeorm";
+import { DataSource, EntityManager, In, Raw, Repository } from "typeorm";
 
 import {
   PaymentGateway,
   WEBHOOK_MAX_SKEW_MS,
 } from "../../integrations/payment/payment.gateway";
+import type { CardPledgeGateway, CardSetupResult, ChargeResult } from "../../integrations/payment/stripe";
 import { frontendBaseUrl } from "../../integrations/email/email.gateway";
 import {
   generateTransferCode,
@@ -25,13 +26,43 @@ import {
 } from "../../integrations/payment/sepay";
 import { AuditService } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
+import { CampaignFollow } from "../follows/entities/campaign-follow.entity";
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { donationGroupText, NotificationsService } from "../notifications/notifications.service";
 import { RewardTier } from "../rewards/entities/reward-tier.entity";
 import { RewardRecipient } from "./entities/reward-recipient.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import { CreateDonationDto, WebhookDonationDto, type WebhookStatus } from "./dto/donation.dto";
-import { Donation, DonationStatus } from "./entities/donation.entity";
+import { COUNTED_DONATION_STATUSES, Donation, DonationStatus } from "./entities/donation.entity";
+
+/** Hạn đổi thẻ sau khi trừ tiền cam kết thất bại (như Kickstarter: 7 ngày). */
+export const CHARGE_RETRY_DAYS = 7;
+const DAY_MS = 86_400_000;
+
+/**
+ * Kênh trả ngay (tiền chuyển đi lúc ủng hộ): SePay. Các kênh còn lại (thẻ Stripe, ví
+ * demo) theo mô hình tất cả hoặc không — chỉ cam kết, trừ tiền khi chiến dịch đạt mục tiêu.
+ */
+export function isPledgeMethod(paymentMethod?: string | null): boolean {
+  return paymentMethod !== "sepay";
+}
+
+/** Chiến dịch còn nhận/giữ cam kết: đang chạy (hoặc tạm dừng) và chưa tới hạn. */
+function campaignOpenForPledges(campaign: Campaign | null, now = new Date()): boolean {
+  return (
+    !!campaign &&
+    (campaign.status === CampaignStatus.ACTIVE || campaign.status === CampaignStatus.PAUSED) &&
+    new Date(campaign.endDate).getTime() > now.getTime()
+  );
+}
+
+function money(value: number | string): string {
+  return `${Number(value).toLocaleString("vi-VN")} ₫`;
+}
+
+function vnDate(value: Date | string): string {
+  return new Date(value).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+}
 
 export type DonationReceipt = {
   receiptNumber: string;
@@ -62,7 +93,14 @@ export type PaymentOptions = {
   sepay: { env: "sandbox" | "production" } | null;
   /** Ví demo: người ủng hộ tự bấm xác nhận (không có tiền thật). */
   demoWallet: boolean;
+  /** Thẻ qua Stripe (lưu thẻ, trừ khi đạt mục tiêu); null khi chưa cấu hình khóa. */
+  stripe: { testMode: boolean } | null;
 };
+
+/** Kết quả đối soát phiên lưu thẻ Stripe. */
+export type StripeSyncResult = { donation: Donation; applied: boolean };
+
+type PaymentSource = "payment-webhook" | "demo-wallet" | "sepay-ipn" | "sepay-sync" | "stripe-webhook" | "stripe-sync";
 
 /** Kết quả đối soát một đơn với SePay. */
 export type SepaySyncResult = {
@@ -93,9 +131,22 @@ const STATUS_FROM_GATEWAY: Record<WebhookStatus, DonationStatus> = {
  * thể hoàn tiền nếu cần. Các kết quả không thu tiền chỉ áp dụng cho đơn `pending`.
  */
 function transitionSources(next: DonationStatus): DonationStatus[] {
-  return next === DonationStatus.COMPLETED
-    ? [DonationStatus.PENDING, DonationStatus.EXPIRED, DonationStatus.CANCELLED]
-    : [DonationStatus.PENDING];
+  if (next === DonationStatus.COMPLETED) {
+    return [DonationStatus.PENDING, DonationStatus.EXPIRED, DonationStatus.CANCELLED];
+  }
+  // Lưu thẻ xong ngay sau khi đơn quá hạn chờ vẫn nhận; đơn người dùng đã hủy thì không.
+  if (next === DonationStatus.PLEDGED) {
+    return [DonationStatus.PENDING, DonationStatus.EXPIRED];
+  }
+  return [DonationStatus.PENDING];
+}
+
+/** "completed" từ cổng/ví nghĩa là đã thu tiền (SePay) hoặc đã lưu phương thức (cam kết). */
+function nextStatusFor(status: WebhookStatus, paymentMethod?: string | null): DonationStatus {
+  if (status === "completed" && isPledgeMethod(paymentMethod)) {
+    return DonationStatus.PLEDGED;
+  }
+  return STATUS_FROM_GATEWAY[status];
 }
 
 @Injectable()
@@ -112,6 +163,9 @@ export class DonationsService {
     @Optional()
     @Inject("SepayGateway")
     private readonly sepay: SepayGateway | null = null,
+    @Optional()
+    @Inject("StripeGateway")
+    private readonly stripe: CardPledgeGateway | null = null,
   ) {}
 
   /**
@@ -126,7 +180,344 @@ export class DonationsService {
     return {
       sepay: this.sepay ? { env: this.sepay.env } : null,
       demoWallet: this.demoWalletEnabled(),
+      stripe: this.stripe ? { testMode: this.stripe.testMode } : null,
     };
+  }
+
+  /**
+   * Trang Stripe Checkout (chế độ `setup`: chỉ lưu thẻ, KHÔNG trừ tiền) cho đơn `pending`
+   * của chính người ủng hộ, hoặc để đổi thẻ khi lần trừ tiền cam kết thất bại.
+   */
+  async createStripeCheckout(donationId: string, user: User, now = new Date()): Promise<{ url: string }> {
+    if (!this.stripe) {
+      throw new NotFoundException("Cổng thẻ Stripe chưa được cấu hình");
+    }
+    const donation = await this.donationRepo.findOne({ where: { id: donationId } });
+    if (!donation || donation.userId !== user.id) {
+      throw new NotFoundException("Donation not found");
+    }
+    if (donation.paymentMethod !== "stripe") {
+      throw new ConflictException("Giao dịch này không thanh toán bằng thẻ Stripe");
+    }
+    if (donation.status === DonationStatus.CHARGE_FAILED) {
+      if (now.getTime() > this.chargeRetryDeadline(donation).getTime()) {
+        throw new ConflictException("Đã quá hạn cập nhật thẻ cho khoản cam kết này.");
+      }
+    } else if (donation.status !== DonationStatus.PENDING) {
+      throw new ConflictException("Giao dịch không còn chờ lưu thẻ. Vui lòng tạo giao dịch mới.");
+    }
+    const base = `${frontendBaseUrl()}/du-an/${encodeURIComponent(donation.campaignId)}/ung-ho?donation=${donation.id}`;
+    let session: { sessionId: string; url: string };
+    try {
+      session = await this.stripe.createSetupCheckout({
+        donationId: donation.id,
+        userId: user.id,
+        description: `Cam ket ung ho Gop Mam ${donation.id.slice(0, 8).toUpperCase()}`,
+        successUrl: `${base}&payment=success`,
+        cancelUrl: `${base}&payment=cancel`,
+        customerId: donation.paymentCustomerRef ?? null,
+      });
+    } catch {
+      throw new ServiceUnavailableException("Không kết nối được Stripe. Vui lòng thử lại sau.");
+    }
+    await this.donationRepo.update({ id: donation.id }, { setupSessionRef: session.sessionId });
+    return { url: session.url };
+  }
+
+  /**
+   * Hỏi Stripe kết quả phiên lưu thẻ (khi webhook chưa tới, vd. chạy local không có
+   * `stripe listen`). Nguồn sự thật là Stripe gọi từ server, không phải URL trả về.
+   */
+  async syncStripeDonation(donationId: string, user: User): Promise<StripeSyncResult> {
+    if (!this.stripe) {
+      throw new NotFoundException("Cổng thẻ Stripe chưa được cấu hình");
+    }
+    const donation = await this.donationRepo.findOne({ where: { id: donationId } });
+    if (!donation || (donation.userId !== user.id && user.role !== UserRole.ADMIN)) {
+      throw new NotFoundException("Donation not found");
+    }
+    const waiting = [DonationStatus.PENDING, DonationStatus.EXPIRED, DonationStatus.CHARGE_FAILED];
+    if (donation.paymentMethod !== "stripe" || !donation.setupSessionRef || !waiting.includes(donation.status)) {
+      return { donation, applied: false };
+    }
+    let result: CardSetupResult;
+    try {
+      result = await this.stripe.getSetupResult(donation.setupSessionRef);
+    } catch {
+      throw new ServiceUnavailableException("Không kết nối được Stripe. Vui lòng thử lại sau.");
+    }
+    return this.applyCardSaved(donation, result, "stripe-sync", user.id);
+  }
+
+  /**
+   * Webhook Stripe (`checkout.session.completed`, chế độ setup). Chữ ký `Stripe-Signature`
+   * trên raw body được kiểm TRƯỚC mọi truy vấn; sau đó vẫn hỏi lại Stripe trạng thái phiên.
+   */
+  async handleStripeWebhook(rawBody: Buffer | undefined, signature: string | undefined): Promise<{ received: true; applied: boolean }> {
+    let event;
+    try {
+      if (!this.stripe || !rawBody) throw new Error("stripe-disabled");
+      event = this.stripe.parseWebhook(rawBody, signature);
+    } catch {
+      await this.auditService.record({
+        action: "donation.stripe.rejected",
+        entity: "donation",
+        newValues: { reason: this.stripe ? "invalid-signature" : "stripe-disabled" },
+      });
+      throw new UnauthorizedException("Invalid Stripe signature");
+    }
+    if (event.type !== "setup-completed") {
+      return { received: true, applied: false };
+    }
+    const donation = await this.donationRepo.findOne({ where: { setupSessionRef: event.sessionId } });
+    if (!donation) {
+      await this.auditService.record({
+        action: "donation.stripe.unmatched",
+        entity: "donation",
+        newValues: { sessionId: event.sessionId },
+      });
+      return { received: true, applied: false };
+    }
+    // Lỗi mạng ở đây ném 5xx để Stripe tự gửi lại webhook.
+    const result = await this.stripe!.getSetupResult(event.sessionId);
+    const outcome = await this.applyCardSaved(donation, result, "stripe-webhook");
+    return { received: true, applied: outcome.applied };
+  }
+
+  /**
+   * Thẻ đã lưu ở Stripe: đơn đang chờ → cam kết; khoản trừ tiền thất bại → cập nhật thẻ
+   * mới rồi trừ lại ngay. Phiên của đơn khác hoặc thẻ cũ (đã thử) bị bỏ qua.
+   */
+  private async applyCardSaved(
+    donation: Donation,
+    result: CardSetupResult,
+    source: "stripe-webhook" | "stripe-sync",
+    actorId?: string,
+  ): Promise<StripeSyncResult> {
+    if (result.status !== "saved" || (result.donationId && result.donationId !== donation.id)) {
+      return { donation, applied: false };
+    }
+    if (donation.status === DonationStatus.CHARGE_FAILED) {
+      if (result.paymentMethodId === donation.paymentMethodRef) {
+        return { donation, applied: false };
+      }
+      const updated = await this.donationRepo.update(
+        { id: donation.id, status: DonationStatus.CHARGE_FAILED },
+        { paymentCustomerRef: result.customerId, paymentMethodRef: result.paymentMethodId },
+      );
+      if (!updated.affected) {
+        return { donation, applied: false };
+      }
+      await this.auditService.record({
+        userId: actorId,
+        action: "donation.pledge.card-updated",
+        entity: "donation",
+        entityId: donation.id,
+        newValues: { source },
+      });
+      const charged = await this.chargePledge(donation.id);
+      return { donation: charged, applied: charged.status === DonationStatus.COMPLETED };
+    }
+    const pledged = await this.applyPaymentResult(
+      { donationId: donation.id, status: "completed", timestamp: Date.now() },
+      source,
+      actorId,
+      { paymentCustomerRef: result.customerId, paymentMethodRef: result.paymentMethodId },
+    );
+    return { donation: pledged, applied: pledged.status === DonationStatus.PLEDGED };
+  }
+
+  private chargeRetryDeadline(donation: Donation): Date {
+    const failedAt = donation.chargeFailedAt ? new Date(donation.chargeFailedAt) : new Date();
+    return new Date(failedAt.getTime() + CHARGE_RETRY_DAYS * DAY_MS);
+  }
+
+  /**
+   * Trừ tiền một khoản cam kết (chiến dịch đã đạt mục tiêu). Gọi bởi job tất toán, sau
+   * khi người ủng hộ đổi thẻ, hoặc khi họ bấm "Thử trừ lại". Số liệu chiến dịch không
+   * đổi (cam kết đã được tính); chỉ trạng thái chuyển `completed` hoặc `charge_failed`.
+   * Khóa idempotency theo lần thử: job chạy chồng không trừ hai lần cùng một lần thử.
+   */
+  async chargePledge(donationId: string, now = new Date(), actorId?: string): Promise<Donation> {
+    const donation = await this.donationRepo.findOne({ where: { id: donationId } });
+    if (!donation) {
+      throw new NotFoundException("Donation not found");
+    }
+    const from = donation.status;
+    if (from !== DonationStatus.PLEDGED && from !== DonationStatus.CHARGE_FAILED) {
+      return donation;
+    }
+    const attempt = (donation.chargeAttempts ?? 0) + 1;
+    let result: ChargeResult;
+    if (donation.paymentMethod === "stripe") {
+      result =
+        this.stripe && donation.paymentCustomerRef && donation.paymentMethodRef
+          ? await this.stripe.chargeSaved({
+              donationId: donation.id,
+              amount: Number(donation.amount),
+              customerId: donation.paymentCustomerRef,
+              paymentMethodId: donation.paymentMethodRef,
+              idempotencyKey: `pledge-charge-${donation.id}-${attempt}`,
+            })
+          : { success: false, error: "Không có thẻ đã lưu hoặc cổng Stripe đang tắt" };
+    } else {
+      const tx = await this.paymentGateway.createTransaction({
+        amount: Number(donation.amount),
+        currency: donation.currency ?? "VND",
+        metadata: { donationId: donation.id, pledgeCharge: true },
+      });
+      result = tx.success ? { success: true, transactionId: tx.transactionId } : { success: false, error: "Ví demo từ chối" };
+    }
+
+    if (result.success) {
+      const updated = await this.donationRepo.update(
+        { id: donation.id, status: from },
+        {
+          status: DonationStatus.COMPLETED,
+          transactionId: result.transactionId,
+          completedAt: now,
+          chargeAttempts: attempt,
+          lastChargeError: null,
+        },
+      );
+      if (!updated.affected) {
+        return (await this.donationRepo.findOne({ where: { id: donation.id } })) ?? donation;
+      }
+      const charged = { ...donation, status: DonationStatus.COMPLETED, transactionId: result.transactionId, completedAt: now, chargeAttempts: attempt, lastChargeError: null } as Donation;
+      await this.auditService.record({
+        userId: actorId,
+        action: "donation.pledge.charged",
+        entity: "donation",
+        entityId: donation.id,
+        oldValues: { status: from },
+        newValues: { status: DonationStatus.COMPLETED, amount: Number(donation.amount), campaignId: donation.campaignId, transactionId: result.transactionId, attempt },
+      });
+      await this.notifyPledgeCharged(charged).catch(() => undefined);
+      return charged;
+    }
+
+    const chargeFailedAt = donation.chargeFailedAt ?? now;
+    const lastChargeError = result.error.slice(0, 255);
+    const updated = await this.donationRepo.update(
+      { id: donation.id, status: from },
+      { status: DonationStatus.CHARGE_FAILED, chargeAttempts: attempt, chargeFailedAt, lastChargeError },
+    );
+    if (!updated.affected) {
+      return (await this.donationRepo.findOne({ where: { id: donation.id } })) ?? donation;
+    }
+    const failed = { ...donation, status: DonationStatus.CHARGE_FAILED, chargeAttempts: attempt, chargeFailedAt, lastChargeError } as Donation;
+    await this.auditService.record({
+      userId: actorId,
+      action: "donation.pledge.charge-failed",
+      entity: "donation",
+      entityId: donation.id,
+      oldValues: { status: from },
+      newValues: { status: DonationStatus.CHARGE_FAILED, error: lastChargeError, attempt },
+    });
+    await this.notifyChargeFailed(failed).catch(() => undefined);
+    return failed;
+  }
+
+  /** Người ủng hộ thử trừ lại khoản cam kết thất bại (vd. đã nạp thêm tiền vào thẻ). */
+  async retryCharge(donationId: string, user: User, now = new Date()): Promise<Donation> {
+    const donation = await this.donationRepo.findOne({ where: { id: donationId } });
+    if (!donation || donation.userId !== user.id) {
+      throw new NotFoundException("Donation not found");
+    }
+    if (donation.status !== DonationStatus.CHARGE_FAILED) {
+      throw new ConflictException("Chỉ thử lại được khoản cam kết trừ tiền thất bại.");
+    }
+    if (now.getTime() > this.chargeRetryDeadline(donation).getTime()) {
+      throw new ConflictException("Đã quá hạn cập nhật thanh toán cho khoản cam kết này.");
+    }
+    return this.chargePledge(donation.id, now, user.id);
+  }
+
+  /** Chiến dịch không đạt mục tiêu/bị hủy: giải phóng cam kết, không trừ tiền. */
+  async releasePledge(donation: Donation, campaignTitle: string): Promise<boolean> {
+    const released = await this.uncountPledge(donation, DonationStatus.PLEDGED, DonationStatus.RELEASED);
+    if (!released) return false;
+    await this.auditService.record({
+      action: "donation.pledge.released",
+      entity: "donation",
+      entityId: donation.id,
+      oldValues: { status: DonationStatus.PLEDGED },
+      newValues: { status: DonationStatus.RELEASED, amount: Number(donation.amount), campaignId: donation.campaignId },
+    });
+    await this.notificationsService
+      .notify({
+        userId: donation.userId,
+        type: NotificationType.CAMPAIGN_ENDED,
+        title: "Bạn không bị trừ tiền",
+        message: `Chiến dịch "${campaignTitle}" không đạt mục tiêu nên khoản cam kết ${money(donation.amount)} của bạn đã được hủy. Không có khoản tiền nào bị trừ.`,
+        link: `/du-an/${donation.campaignId}`,
+        relatedId: donation.id,
+        email: true,
+      })
+      .catch(() => undefined);
+    return true;
+  }
+
+  /** Quá hạn đổi thẻ: bỏ khoản cam kết, trừ khỏi số liệu chiến dịch, trả suất quà. */
+  async expireChargeFailure(donation: Donation, campaignTitle: string): Promise<boolean> {
+    const expired = await this.uncountPledge(donation, DonationStatus.CHARGE_FAILED, DonationStatus.FAILED);
+    if (!expired) return false;
+    await this.auditService.record({
+      action: "donation.pledge.charge-expired",
+      entity: "donation",
+      entityId: donation.id,
+      oldValues: { status: DonationStatus.CHARGE_FAILED },
+      newValues: { status: DonationStatus.FAILED, amount: Number(donation.amount), campaignId: donation.campaignId, retryDays: CHARGE_RETRY_DAYS },
+    });
+    await this.notificationsService
+      .notify({
+        userId: donation.userId,
+        type: NotificationType.SYSTEM,
+        title: "Khoản cam kết đã bị hủy",
+        message: `Không trừ được tiền cho khoản cam kết ${money(donation.amount)} của chiến dịch "${campaignTitle}" sau ${CHARGE_RETRY_DAYS} ngày nên khoản này đã bị hủy. Bạn không bị trừ tiền.`,
+        link: `/du-an/${donation.campaignId}`,
+        relatedId: donation.id,
+        email: true,
+      })
+      .catch(() => undefined);
+    return true;
+  }
+
+  /**
+   * Bỏ một khoản đang được tính (cam kết) khỏi số liệu chiến dịch trong một transaction:
+   * đổi trạng thái có điều kiện, trừ `currentAmount`/`backerCount`, trả lại suất quà.
+   */
+  private async uncountPledge(
+    donation: Donation,
+    from: DonationStatus,
+    to: DonationStatus,
+    manager?: EntityManager,
+  ): Promise<boolean> {
+    const run = async (m: EntityManager) => {
+      const result = await m.update(Donation, { id: donation.id, status: from }, { status: to });
+      if (!result.affected) return false;
+      await m
+        .createQueryBuilder()
+        .update(Campaign)
+        .set({
+          currentAmount: () => "GREATEST(current_amount - :amount, 0)",
+          backerCount: () => "GREATEST(backer_count - 1, 0)",
+        })
+        .where("id = :id", { id: donation.campaignId })
+        .setParameter("amount", Number(donation.amount))
+        .execute();
+      if (donation.rewardTierId) {
+        await m
+          .createQueryBuilder()
+          .update(RewardTier)
+          .set({ claimedCount: () => "claimed_count - 1" })
+          .where("id = :id", { id: donation.rewardTierId })
+          .andWhere("claimed_count > 0")
+          .execute();
+      }
+      return true;
+    };
+    return manager ? run(manager) : this.dataSource.transaction(run);
   }
 
   /**
@@ -296,9 +687,11 @@ export class DonationsService {
       throw new ConflictException("Campaign has ended");
     }
 
+    let rewardNeedsShipping = false;
     if (dto.rewardTierId) {
-      await this.assertRewardTierAvailable(dto.rewardTierId, campaign.id, dto.amount);
-      if (!dto.rewardRecipient) {
+      const tier = await this.assertRewardTierAvailable(dto.rewardTierId, campaign.id, dto.amount);
+      rewardNeedsShipping = tier.requiresShipping ?? true;
+      if (rewardNeedsShipping && !dto.rewardRecipient) {
         throw new BadRequestException("Vui lòng nhập họ tên, số điện thoại và địa chỉ người nhận quà.");
       }
     }
@@ -306,15 +699,22 @@ export class DonationsService {
     if (dto.paymentMethod === "sepay" && !this.sepay) {
       throw new BadRequestException("Cổng SePay chưa được cấu hình");
     }
-    if (dto.paymentMethod !== "sepay" && !this.demoWalletEnabled()) {
-      throw new BadRequestException("Kênh thanh toán demo đã tắt. Vui lòng chọn SePay.");
+    if (dto.paymentMethod === "stripe" && !this.stripe) {
+      throw new BadRequestException("Cổng thẻ Stripe chưa được cấu hình");
+    }
+    if (dto.paymentMethod === "wallet" && !this.demoWalletEnabled()) {
+      throw new BadRequestException("Kênh thanh toán demo đã tắt. Vui lòng chọn kênh khác.");
     }
 
-    const paymentResult = await this.paymentGateway.createTransaction({
-      amount: dto.amount,
-      currency: "VND",
-      metadata: { campaignId: dto.campaignId, userId: user.id },
-    });
+    // Thẻ Stripe nhận mã giao dịch thật (`pi_…`) khi trừ tiền; các kênh khác giữ mã tham chiếu cũ.
+    const paymentResult =
+      dto.paymentMethod === "stripe"
+        ? null
+        : await this.paymentGateway.createTransaction({
+            amount: dto.amount,
+            currency: "VND",
+            metadata: { campaignId: dto.campaignId, userId: user.id },
+          });
 
     const donation = this.donationRepo.create({
       userId: user.id,
@@ -323,7 +723,7 @@ export class DonationsService {
       currency: "VND",
       status: DonationStatus.PENDING,
       paymentMethod: dto.paymentMethod,
-      transactionId: paymentResult.transactionId,
+      transactionId: paymentResult?.transactionId,
       transferCode: generateTransferCode(),
       idempotencyKey: dto.idempotencyKey,
       // Lời động viên hiển thị công khai: bỏ khoảng trắng thừa, chuỗi rỗng coi như không có.
@@ -333,7 +733,8 @@ export class DonationsService {
     });
 
     const saved = await this.donationRepo.save(donation);
-    if (dto.rewardTierId && dto.rewardRecipient) {
+    // Quà không cần giao (quà số, ghi danh…): không lưu địa chỉ dù trình duyệt có gửi.
+    if (dto.rewardTierId && dto.rewardRecipient && rewardNeedsShipping) {
       await this.dataSource.getRepository(RewardRecipient).save({
         donationId: saved.id,
         recipientName: dto.rewardRecipient.name.trim(),
@@ -348,10 +749,13 @@ export class DonationsService {
    * Kiểm tra lúc tạo giao dịch (suất chỉ bị trừ khi thanh toán được xác nhận,
    * xem applyPaymentResult): mức thuộc chiến dịch, đang nhận, đủ tiền, còn suất.
    */
-  private async assertRewardTierAvailable(tierId: string, campaignId: string, amount: number): Promise<void> {
+  private async assertRewardTierAvailable(tierId: string, campaignId: string, amount: number): Promise<RewardTier> {
     const tier = await this.dataSource.getRepository(RewardTier).findOne({ where: { id: tierId } });
     if (!tier || tier.campaignId !== campaignId || !tier.isActive) {
       throw new NotFoundException("Reward tier not found");
+    }
+    if (tier.availableUntil && new Date(tier.availableUntil).getTime() <= Date.now()) {
+      throw new ConflictException(`Mức quà "${tier.title}" đã hết hạn chọn.`);
     }
     if (Number(amount) < Number(tier.minAmount)) {
       throw new BadRequestException(
@@ -361,6 +765,7 @@ export class DonationsService {
     if (tier.quantityLimit != null && tier.claimedCount >= tier.quantityLimit) {
       throw new ConflictException(`Mức quà "${tier.title}" đã hết suất.`);
     }
+    return tier;
   }
 
   /**
@@ -449,10 +854,16 @@ export class DonationsService {
     );
   }
 
+  /**
+   * Ghi kết quả thanh toán. Với kênh trả ngay (SePay) "completed" là đã thu tiền; với
+   * kênh cam kết (thẻ, ví demo) "completed" là đã lưu phương thức → `pledged`, chưa trừ.
+   * Cả hai đều được cộng vào tiến độ chiến dịch và giữ suất quà.
+   */
   private async applyPaymentResult(
     dto: WebhookDonationDto,
-    source: "payment-webhook" | "demo-wallet" | "sepay-ipn" | "sepay-sync",
+    source: PaymentSource,
     actorId?: string,
+    extra: Partial<Pick<Donation, "paymentCustomerRef" | "paymentMethodRef">> = {},
   ): Promise<Donation> {
     const donation = await this.donationRepo.findOne({
       where: { id: dto.donationId },
@@ -460,18 +871,43 @@ export class DonationsService {
     if (!donation) {
       throw new NotFoundException("Donation not found");
     }
-    const nextStatus = STATUS_FROM_GATEWAY[dto.status];
+    const nextStatus = nextStatusFor(dto.status, donation.paymentMethod);
     const sources = transitionSources(nextStatus);
     const previousStatus = donation.status;
     if (!sources.includes(previousStatus)) {
       // Đã xử lý rồi (hoặc chuyển không hợp lệ, vd. hủy một đơn đã thành công): idempotent.
       return donation;
     }
+    if (nextStatus === DonationStatus.PLEDGED) {
+      const campaign = await this.campaignRepo.findOne({ where: { id: donation.campaignId } });
+      if (!campaignOpenForPledges(campaign)) {
+        // Chiến dịch đã chốt kết quả trong lúc người ủng hộ đang lưu thẻ: không nhận cam
+        // kết muộn (sẽ làm lệch kết quả đã chốt). Chưa trừ tiền nên không cần hoàn.
+        const closed = await this.donationRepo.update(
+          { id: donation.id, status: previousStatus },
+          { status: DonationStatus.FAILED, lastChargeError: "Chiến dịch đã kết thúc trước khi lưu thẻ xong" },
+        );
+        if (closed.affected) {
+          await this.auditService.record({
+            userId: actorId,
+            action: "donation.pledge.rejected",
+            entity: "donation",
+            entityId: donation.id,
+            oldValues: { status: previousStatus },
+            newValues: { status: DonationStatus.FAILED, reason: "campaign-closed", source },
+          });
+          return { ...donation, status: DonationStatus.FAILED } as Donation;
+        }
+        return (await this.donationRepo.findOne({ where: { id: donation.id } })) ?? donation;
+      }
+    }
+    const counted = nextStatus === DonationStatus.COMPLETED || nextStatus === DonationStatus.PLEDGED;
     const nextTransactionId = dto.transactionId ?? donation.transactionId;
     const completedAt =
       nextStatus === DonationStatus.COMPLETED
         ? new Date()
         : donation.completedAt;
+    const pledgedAt = nextStatus === DonationStatus.PLEDGED ? new Date() : donation.pledgedAt;
 
     const outcome = await this.dataSource.transaction(async (manager) => {
       // Update có điều kiện trên chính cột `status`: chỉ ghi khi donation vẫn
@@ -482,7 +918,12 @@ export class DonationsService {
       const updateResult = await manager.update(
         Donation,
         { id: donation.id, status: previousStatus },
-        { status: nextStatus, transactionId: nextTransactionId, completedAt },
+        {
+          status: nextStatus,
+          transactionId: nextTransactionId,
+          completedAt,
+          ...(nextStatus === DonationStatus.PLEDGED ? { pledgedAt, ...extra } : {}),
+        },
       );
 
       if (!updateResult.affected) {
@@ -495,7 +936,7 @@ export class DonationsService {
       }
 
       let rewardDropped = false;
-      if (nextStatus === DonationStatus.COMPLETED && donation.rewardTierId) {
+      if (counted && donation.rewardTierId) {
         // Trừ suất có điều kiện: hai giao dịch đua nhau không vượt giới hạn.
         const claim = await manager
           .createQueryBuilder()
@@ -511,7 +952,7 @@ export class DonationsService {
         }
       }
 
-      if (nextStatus === DonationStatus.COMPLETED) {
+      if (counted) {
         await manager.increment(
           Campaign,
           { id: donation.campaignId },
@@ -534,6 +975,7 @@ export class DonationsService {
           status: nextStatus,
           transactionId: nextTransactionId,
           completedAt,
+          ...(nextStatus === DonationStatus.PLEDGED ? { pledgedAt, ...extra } : {}),
           rewardTierId: rewardDropped ? null : donation.rewardTierId,
         } as Donation,
       };
@@ -560,11 +1002,57 @@ export class DonationsService {
         ...(previousStatus !== DonationStatus.PENDING ? { lateCompletion: true } : {}),
       },
     });
-    if (result.status === DonationStatus.COMPLETED) {
+    if (result.status === DonationStatus.COMPLETED || result.status === DonationStatus.PLEDGED) {
       // Giao dịch đã commit: lỗi khi gửi thông báo không được làm hỏng phản hồi thanh toán.
       await this.notifyDonationCompleted(result, outcome.rewardDropped).catch(() => undefined);
+      await this.autoFollow(result).catch(() => undefined);
     }
     return result;
+  }
+
+  /**
+   * Ủng hộ (hoặc cam kết) thành công thì tự động theo dõi dự án để nhận cập nhật và
+   * lời nhắc. INSERT IGNORE: đã theo dõi rồi thì giữ nguyên. Chủ dự án không theo dõi
+   * chính dự án của mình (đã nhận mọi thông báo).
+   */
+  private async autoFollow(donation: Donation): Promise<void> {
+    const campaign = await this.campaignRepo.findOne({ where: { id: donation.campaignId } });
+    if (!campaign || campaign.ownerId === donation.userId) return;
+    await this.dataSource
+      .createQueryBuilder()
+      .insert()
+      .into(CampaignFollow)
+      .values({ userId: donation.userId, campaignId: donation.campaignId })
+      .orIgnore()
+      .execute();
+  }
+
+  /** Báo người ủng hộ: khoản cam kết đã được trừ tiền vì chiến dịch đạt mục tiêu. */
+  private async notifyPledgeCharged(donation: Donation): Promise<void> {
+    const campaign = await this.campaignRepo.findOne({ where: { id: donation.campaignId } });
+    await this.notificationsService.notify({
+      userId: donation.userId,
+      type: NotificationType.DONATION_CONFIRMED,
+      title: "Đã trừ tiền khoản ủng hộ",
+      message: `Chiến dịch "${campaign?.title ?? ""}" đã đạt mục tiêu nên khoản cam kết ${money(donation.amount)} của bạn vừa được trừ tiền. Cảm ơn bạn!`,
+      link: `/bien-nhan/${donation.id}`,
+      relatedId: donation.id,
+      email: true,
+    });
+  }
+
+  /** Báo người ủng hộ: trừ tiền thất bại, cần đổi thẻ trước hạn. */
+  private async notifyChargeFailed(donation: Donation): Promise<void> {
+    const campaign = await this.campaignRepo.findOne({ where: { id: donation.campaignId } });
+    await this.notificationsService.notify({
+      userId: donation.userId,
+      type: NotificationType.SYSTEM,
+      title: "Chưa trừ được tiền khoản ủng hộ",
+      message: `Chiến dịch "${campaign?.title ?? ""}" đã đạt mục tiêu nhưng chưa trừ được ${money(donation.amount)} từ phương thức bạn đã lưu. Vui lòng cập nhật thẻ trước ${vnDate(this.chargeRetryDeadline(donation))}, nếu không khoản cam kết sẽ bị hủy.`,
+      link: `/du-an/${donation.campaignId}/ung-ho?donation=${donation.id}&payment=success`,
+      relatedId: donation.id,
+      email: true,
+    });
   }
 
   /** Báo người ủng hộ và chủ dự án; không nêu tên người ủng hộ (tôn trọng ẩn danh). */
@@ -580,16 +1068,27 @@ export class DonationsService {
       : rewardDropped
         ? " Mức quà bạn chọn vừa hết suất nên khoản ủng hộ được ghi nhận không kèm quà."
         : "";
+    const pledged = donation.status === DonationStatus.PLEDGED;
     await this.notificationsService.notify([
-      {
-        userId: donation.userId,
-        type: NotificationType.DONATION_CONFIRMED,
-        title: "Ủng hộ thành công",
-        message: `Khoản ủng hộ ${amount} cho chiến dịch "${campaign.title}" đã được xác nhận.${rewardNote} Cảm ơn bạn!`,
-        link: `/bien-nhan/${donation.id}`,
-        relatedId: donation.id,
-        email: true,
-      },
+      pledged
+        ? {
+            userId: donation.userId,
+            type: NotificationType.DONATION_CONFIRMED,
+            title: "Đã ghi nhận cam kết ủng hộ",
+            message: `Cam kết ${amount} cho chiến dịch "${campaign.title}" đã được ghi nhận, bạn CHƯA bị trừ tiền. Tiền chỉ được trừ nếu chiến dịch đạt mục tiêu khi kết thúc ngày ${vnDate(campaign.endDate)}; không đạt thì không trừ.${rewardNote} Cảm ơn bạn!`,
+            link: `/du-an/${campaign.id}`,
+            relatedId: donation.id,
+            email: true,
+          }
+        : {
+            userId: donation.userId,
+            type: NotificationType.DONATION_CONFIRMED,
+            title: "Ủng hộ thành công",
+            message: `Khoản ủng hộ ${amount} cho chiến dịch "${campaign.title}" đã được xác nhận.${rewardNote} Cảm ơn bạn!`,
+            link: `/bien-nhan/${donation.id}`,
+            relatedId: donation.id,
+            email: true,
+          },
       ...(campaign.ownerId !== donation.userId
         ? [
             {
@@ -678,6 +1177,9 @@ export class DonationsService {
     if (donation.status === DonationStatus.CANCELLED) {
       return donation;
     }
+    if (donation.status === DonationStatus.PLEDGED) {
+      return this.cancelPledge(donation, user);
+    }
     // Có điều kiện: không đè lên kết quả thanh toán vừa về cùng lúc.
     const result = await this.donationRepo.update(
       { id: donation.id, status: DonationStatus.PENDING },
@@ -692,6 +1194,30 @@ export class DonationsService {
       entity: "donation",
       entityId: donation.id,
       oldValues: { status: DonationStatus.PENDING },
+      newValues: { status: DonationStatus.CANCELLED, amount: donation.amount, campaignId: donation.campaignId },
+    });
+    return { ...donation, status: DonationStatus.CANCELLED } as Donation;
+  }
+
+  /**
+   * Rút cam kết trước hạn chiến dịch (như Kickstarter): chưa trừ tiền nên chỉ cần bỏ
+   * khỏi tiến độ và trả suất quà. Sau hạn (đang/đã trừ tiền) thì không rút được.
+   */
+  private async cancelPledge(donation: Donation, user: User): Promise<Donation> {
+    const campaign = await this.campaignRepo.findOne({ where: { id: donation.campaignId } });
+    if (!campaignOpenForPledges(campaign)) {
+      throw new ConflictException("Chiến dịch đã kết thúc nên không rút được cam kết.");
+    }
+    const cancelled = await this.uncountPledge(donation, DonationStatus.PLEDGED, DonationStatus.CANCELLED);
+    if (!cancelled) {
+      throw new ConflictException("Khoản cam kết vừa được xử lý. Vui lòng tải lại trang.");
+    }
+    await this.auditService.record({
+      userId: user.id,
+      action: "donation.pledge.cancel",
+      entity: "donation",
+      entityId: donation.id,
+      oldValues: { status: DonationStatus.PLEDGED },
       newValues: { status: DonationStatus.CANCELLED, amount: donation.amount, campaignId: donation.campaignId },
     });
     return { ...donation, status: DonationStatus.CANCELLED } as Donation;
@@ -717,13 +1243,14 @@ export class DonationsService {
     }
 
     const take = Math.min(Math.max(1, limit), 50);
+    // Gồm cam kết chưa trừ tiền (đánh dấu `pledged`) — khớp với tiến độ đang hiển thị.
     const [donations, total] = await this.donationRepo.findAndCount({
-      where: { campaignId, status: DonationStatus.COMPLETED },
+      where: { campaignId, status: In([...COUNTED_DONATION_STATUSES]) },
       relations: { user: true },
       order:
         sort === "top"
-          ? { amount: "DESC", completedAt: "DESC" }
-          : { completedAt: "DESC", createdAt: "DESC" },
+          ? { amount: "DESC", createdAt: "DESC" }
+          : { createdAt: "DESC" },
       take,
     });
 
@@ -735,8 +1262,9 @@ export class DonationsService {
         amount: Number(donation.amount),
         currency: donation.currency,
         paymentMethod: donation.paymentMethod ?? null,
+        status: donation.status === DonationStatus.COMPLETED ? ("completed" as const) : ("pledged" as const),
         reference: maskReference(donation.transactionId ?? donation.id),
-        completedAt: donation.completedAt ?? donation.createdAt,
+        completedAt: donation.completedAt ?? donation.pledgedAt ?? donation.createdAt,
       })),
     };
   }
@@ -755,11 +1283,11 @@ export class DonationsService {
     const [donations, total] = await this.donationRepo.findAndCount({
       where: {
         campaignId,
-        status: DonationStatus.COMPLETED,
+        status: In([...COUNTED_DONATION_STATUSES]),
         message: Raw((column) => `${column} IS NOT NULL AND TRIM(${column}) <> ''`),
       },
       relations: { user: true },
-      order: { completedAt: "DESC", createdAt: "DESC" },
+      order: { createdAt: "DESC" },
       skip: Math.max(0, offset),
       take: Math.min(Math.max(1, limit), 50),
     });
@@ -771,7 +1299,7 @@ export class DonationsService {
         donorName: donation.isAnonymous ? null : (donation.user?.name ?? null),
         amount: Number(donation.amount),
         message: (donation.message ?? "").trim(),
-        createdAt: donation.completedAt ?? donation.createdAt,
+        createdAt: donation.completedAt ?? donation.pledgedAt ?? donation.createdAt,
       })),
     };
   }
@@ -795,6 +1323,8 @@ export type PublicLedgerEntry = {
   amount: number;
   currency: string;
   paymentMethod: string | null;
+  /** `pledged`: đã cam kết, chưa trừ tiền (trừ khi chiến dịch đạt mục tiêu). */
+  status: "completed" | "pledged";
   reference: string;
   completedAt: Date;
 };

@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, IsNull, Not, Repository } from "typeorm";
@@ -11,8 +12,10 @@ import { In, IsNull, Not, Repository } from "typeorm";
 import { AuditService } from "../../common/audit/audit.service";
 import { CampaignsService } from "../campaigns/campaigns.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
-import { Donation, DonationStatus } from "../donations/entities/donation.entity";
+import { COUNTED_DONATION_STATUSES, Donation } from "../donations/entities/donation.entity";
 import { RewardRecipient } from "../donations/entities/reward-recipient.entity";
+import { OrgPermission } from "../organizations/entities/organization-member.entity";
+import { OrganizationAccessService } from "../organizations/organization-access.service";
 import { User, UserRole } from "../users/entities/user.entity";
 import {
   CreateRewardTierDto,
@@ -45,6 +48,13 @@ const CLOSED_STATUSES = [
   CampaignStatus.ENDED,
 ];
 
+/** Mức quà còn chọn được: đang mở, còn suất, chưa quá hạn chọn. */
+export function isTierAvailable(tier: RewardTier, now = new Date()): boolean {
+  const soldOut = tier.quantityLimit != null && tier.claimedCount >= tier.quantityLimit;
+  const expired = !!tier.availableUntil && new Date(tier.availableUntil).getTime() <= now.getTime();
+  return tier.isActive && !soldOut && !expired;
+}
+
 export function toTierView(tier: RewardTier): RewardTierView {
   const limit = tier.quantityLimit ?? null;
   return {
@@ -59,6 +69,11 @@ export function toTierView(tier: RewardTier): RewardTierView {
     estimatedDelivery: tier.estimatedDelivery ?? null,
     sortOrder: tier.sortOrder,
     isActive: tier.isActive,
+    imageUrl: tier.imageUrl ?? null,
+    items: tier.items ?? [],
+    requiresShipping: tier.requiresShipping ?? true,
+    availableUntil: tier.availableUntil ?? null,
+    available: isTierAvailable(tier),
   };
 }
 
@@ -78,11 +93,19 @@ export class RewardsService {
     private readonly auditService: AuditService,
     @InjectRepository(RewardRecipient)
     private readonly recipientRepo: Repository<RewardRecipient>,
+    @Optional()
+    private readonly access: OrganizationAccessService | null = null,
   ) {}
 
-  private assertCanManage(campaign: Campaign, user: User): void {
+  /** Chủ dự án, admin, hoặc đội ngũ tổ chức có quyền "Quản lý mức quà". */
+  private async assertCanManage(campaign: Campaign, user: User): Promise<void> {
+    const message = "Bạn không có quyền quản lý mức quà của chiến dịch này.";
+    if (this.access) {
+      await this.access.assertCanOnCampaign(campaign, user, OrgPermission.MANAGE_REWARDS, message);
+      return;
+    }
     if (campaign.ownerId !== user.id && user.role !== UserRole.ADMIN) {
-      throw new ForbiddenException("Chỉ chủ dự án được quản lý mức quà.");
+      throw new ForbiddenException(message);
     }
   }
 
@@ -110,14 +133,14 @@ export class RewardsService {
   /** Chủ dự án/admin: mọi mức (kể cả đang tắt). */
   async listForManage(campaignId: string, user: User): Promise<RewardTierView[]> {
     const campaign = await this.campaignsService.findById(campaignId);
-    this.assertCanManage(campaign, user);
+    await this.assertCanManage(campaign, user);
     const tiers = await this.tierRepo.find({ where: { campaignId }, order: { sortOrder: "ASC", minAmount: "ASC" } });
     return tiers.map(toTierView);
   }
 
   async create(campaignId: string, dto: CreateRewardTierDto, user: User): Promise<RewardTierView> {
     const campaign = await this.campaignsService.findById(campaignId);
-    this.assertCanManage(campaign, user);
+    await this.assertCanManage(campaign, user);
     if (CLOSED_STATUSES.includes(campaign.status)) {
       throw new ConflictException("Chiến dịch đã kết thúc, không thêm mức quà được.");
     }
@@ -136,6 +159,10 @@ export class RewardsService {
         sortOrder: dto.sortOrder ?? count,
         claimedCount: 0,
         isActive: true,
+        imageUrl: dto.imageUrl || null,
+        items: dto.items?.length ? dto.items : null,
+        requiresShipping: dto.requiresShipping ?? true,
+        availableUntil: dto.availableUntil ? new Date(dto.availableUntil) : null,
       }),
     );
     await this.auditService.record({
@@ -151,7 +178,7 @@ export class RewardsService {
   async update(id: string, dto: UpdateRewardTierDto, user: User): Promise<RewardTierView> {
     const tier = await this.getTier(id);
     const campaign = await this.campaignsService.findById(tier.campaignId);
-    this.assertCanManage(campaign, user);
+    await this.assertCanManage(campaign, user);
     if (CLOSED_STATUSES.includes(campaign.status)) {
       throw new ConflictException("Chiến dịch đã kết thúc, không sửa mức quà được.");
     }
@@ -162,6 +189,10 @@ export class RewardsService {
     if (dto.quantityLimit !== undefined && dto.quantityLimit !== null && dto.quantityLimit < tier.claimedCount) {
       throw new ConflictException(`Giới hạn không được thấp hơn số suất đã nhận (${tier.claimedCount}).`);
     }
+    // Đã có người chọn quà gửi tận nơi: không chuyển sang "không cần giao" (sẽ mất địa chỉ đã hứa gửi).
+    if (dto.requiresShipping === false && tier.requiresShipping && tier.claimedCount > 0) {
+      throw new ConflictException("Đã có người nhận quà này nên không đổi sang quà không cần giao được.");
+    }
 
     const before = toTierView(tier);
     if (dto.title !== undefined) tier.title = dto.title;
@@ -171,6 +202,10 @@ export class RewardsService {
     if (dto.estimatedDelivery !== undefined) tier.estimatedDelivery = dto.estimatedDelivery;
     if (dto.sortOrder !== undefined) tier.sortOrder = dto.sortOrder;
     if (dto.isActive !== undefined) tier.isActive = dto.isActive;
+    if (dto.imageUrl !== undefined) tier.imageUrl = dto.imageUrl || null;
+    if (dto.items !== undefined) tier.items = dto.items.length ? dto.items : null;
+    if (dto.requiresShipping !== undefined) tier.requiresShipping = dto.requiresShipping;
+    if (dto.availableUntil !== undefined) tier.availableUntil = dto.availableUntil ? new Date(dto.availableUntil) : null;
     const saved = await this.tierRepo.save(tier);
     await this.auditService.record({
       userId: user.id,
@@ -186,7 +221,7 @@ export class RewardsService {
   async remove(id: string, user: User): Promise<void> {
     const tier = await this.getTier(id);
     const campaign = await this.campaignsService.findById(tier.campaignId);
-    this.assertCanManage(campaign, user);
+    await this.assertCanManage(campaign, user);
     const linked = await this.donationRepo.count({ where: { rewardTierId: id } });
     if (tier.claimedCount > 0 || linked > 0) {
       throw new ConflictException("Mức quà đã có người chọn: hãy tắt (ngừng nhận) thay vì xóa.");
@@ -201,14 +236,17 @@ export class RewardsService {
     });
   }
 
-  /** Danh sách người nhận quà để chủ dự án chuẩn bị giao (chỉ khoản đã xác nhận). */
+  /**
+   * Danh sách người nhận quà (như backer report của Kickstarter): khoản đã thu tiền và
+   * khoản cam kết đang được tính, kèm trạng thái để biết khoản nào cần gửi quà.
+   */
   async listClaims(campaignId: string, user: User): Promise<RewardClaimView[]> {
     const campaign = await this.campaignsService.findById(campaignId);
-    this.assertCanManage(campaign, user);
+    await this.assertCanManage(campaign, user);
     const donations = await this.donationRepo.find({
-      where: { campaignId, status: DonationStatus.COMPLETED, rewardTierId: Not(IsNull()) },
+      where: { campaignId, status: In([...COUNTED_DONATION_STATUSES]), rewardTierId: Not(IsNull()) },
       relations: { user: true, rewardTier: true },
-      order: { completedAt: "DESC" },
+      order: { createdAt: "DESC" },
       take: 500,
     });
     const recipients = donations.length
@@ -223,7 +261,8 @@ export class RewardsService {
         tierTitle: d.rewardTier?.title ?? "",
         amount: Number(d.amount),
         backerName: d.isAnonymous ? "Ẩn danh" : (d.user?.name ?? "Người ủng hộ"),
-        completedAt: d.completedAt ?? null,
+        status: d.status,
+        completedAt: d.completedAt ?? d.pledgedAt ?? null,
         recipient: recipient ? { name: recipient.recipientName, phone: recipient.phone, address: recipient.address } : null,
       };
     });

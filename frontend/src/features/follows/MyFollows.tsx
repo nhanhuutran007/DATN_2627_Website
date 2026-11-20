@@ -51,7 +51,7 @@ export function MyFollows({ items, onRemove }: MyFollowsProps) {
   if (items.length === 0) {
     return (
       <div className="activity-empty">
-        <p>Bấm “Theo dõi” ở trang dự án để nhận thông báo khi dự án có cập nhật, đạt mốc hoặc đổi trạng thái.</p>
+        <p>Bấm “Theo dõi” ở trang dự án (hoặc ủng hộ một dự án — bạn sẽ tự động theo dõi) để nhận thông báo khi dự án có cập nhật, đạt mốc, đổi trạng thái và lời nhắc khi dự án chỉ còn 48 giờ.</p>
         <Link className="button button-outline" href="/du-an">Khám phá dự án</Link>
       </div>
     );

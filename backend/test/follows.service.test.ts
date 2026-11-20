@@ -7,6 +7,7 @@ import { CampaignStatus } from "../src/modules/campaigns/entities/campaign.entit
 import type { CampaignFollow } from "../src/modules/follows/entities/campaign-follow.entity";
 import { FollowsService } from "../src/modules/follows/follows.service";
 import { UserRole, UserStatus, type User } from "../src/modules/users/entities/user.entity";
+import { makeNotifierRecorder } from "./helpers/notifications";
 
 const OWNER = "00000000-0000-4000-8000-000000000001";
 const FAN = "00000000-0000-4000-8000-000000000002";
@@ -61,7 +62,7 @@ describe("FollowsService", () => {
         return { id, ownerId: OWNER, status: campaignStatus };
       },
     };
-    service = new FollowsService(followRepo as never, campaignsService as never);
+    service = new FollowsService(followRepo as never, campaignsService as never, makeNotifierRecorder().service);
   });
 
   it("theo dõi idempotent và đếm đúng số người theo dõi", async () => {
@@ -99,5 +100,67 @@ describe("FollowsService", () => {
       await rejects(service.status(CAMPAIGN, null), NotFoundException);
       await rejects(service.follow(CAMPAIGN, makeUser(FAN)), NotFoundException);
     }
+  });
+});
+
+describe("FollowsService – nhắc dự án sắp hết hạn", () => {
+  const NOW = new Date("2026-11-20T08:00:00Z");
+  const HOUR = 3_600_000;
+  const OTHER = "00000000-0000-4000-8000-000000000003";
+  let campaign: { id: string; title: string; ownerId: string; status: CampaignStatus; endDate: Date };
+  let rows: Array<{ id: string; userId: string; campaignId: string; remindedAt: Date | null }>;
+  let backers: Set<string>;
+  let notifier: ReturnType<typeof makeNotifierRecorder>;
+  let service: FollowsService;
+
+  beforeEach(() => {
+    campaign = { id: CAMPAIGN, title: "Thư viện nhỏ", ownerId: OWNER, status: CampaignStatus.ACTIVE, endDate: new Date(NOW.getTime() + 30 * HOUR) };
+    rows = [
+      { id: "f1", userId: FAN, campaignId: CAMPAIGN, remindedAt: null },
+      { id: "f2", userId: OTHER, campaignId: CAMPAIGN, remindedAt: null },
+    ];
+    backers = new Set();
+    notifier = makeNotifierRecorder();
+    // Lọc giống câu SQL của service: chưa nhắc, đang gây quỹ, hết hạn trong 48 giờ, chưa ủng hộ.
+    const qb = {
+      innerJoinAndSelect: () => qb,
+      where: () => qb,
+      andWhere: () => qb,
+      orderBy: () => qb,
+      take: () => qb,
+      getMany: async () => {
+        const end = campaign.endDate.getTime();
+        const due = campaign.status === CampaignStatus.ACTIVE && end > NOW.getTime() && end <= NOW.getTime() + 48 * HOUR;
+        return due ? rows.filter((r) => r.remindedAt === null && !backers.has(r.userId)).map((r) => ({ ...r, campaign })) : [];
+      },
+    };
+    const followRepo = {
+      createQueryBuilder: () => qb,
+      update: async (where: { id: string }, patch: { remindedAt: Date }) => {
+        const row = rows.find((r) => r.id === where.id && r.remindedAt === null);
+        if (row) Object.assign(row, patch);
+        return { affected: row ? 1 : 0 };
+      },
+    };
+    service = new FollowsService(followRepo as never, {} as never, notifier.service);
+  });
+
+  it("nhắc một lần người theo dõi chưa ủng hộ khi còn dưới 48 giờ", async () => {
+    backers.add(OTHER);
+    equal(await service.sendEndingReminders(NOW), 1);
+    deepEqual(notifier.notified.map((n) => n.userId), [FAN]);
+    equal(notifier.notified[0].link, `/du-an/${CAMPAIGN}/ung-ho`);
+    equal(notifier.notified[0].email, true);
+    equal(await service.sendEndingReminders(NOW), 0);
+    equal(notifier.notified.length, 1);
+  });
+
+  it("không nhắc khi còn xa hạn hoặc chiến dịch không còn gây quỹ", async () => {
+    campaign.endDate = new Date(NOW.getTime() + 72 * HOUR);
+    equal(await service.sendEndingReminders(NOW), 0);
+    campaign.endDate = new Date(NOW.getTime() + 5 * HOUR);
+    campaign.status = CampaignStatus.PAUSED;
+    equal(await service.sendEndingReminders(NOW), 0);
+    equal(notifier.notified.length, 0);
   });
 });

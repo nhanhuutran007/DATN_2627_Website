@@ -15,6 +15,9 @@ const STATUS_LABEL: Record<ApiDonation["status"], { label: string; tone: string 
   refunded: { label: "Đã hoàn tiền", tone: "tag-blue" },
   expired: { label: "Hết hạn thanh toán", tone: "" },
   cancelled: { label: "Đã hủy", tone: "" },
+  pledged: { label: "Đã cam kết · chưa trừ tiền", tone: "tag-amber" },
+  charge_failed: { label: "Trừ tiền thất bại", tone: "tag-red" },
+  released: { label: "Không trừ tiền", tone: "" },
 };
 
 export type MyDonation = ApiDonation & { rewardTier?: { title: string } | null };
@@ -87,6 +90,14 @@ export function MyDonations({ items, onChange }: MyDonationsProps) {
                     <button className="link-button" type="button" disabled={busyId === d.id} onClick={() => cancel(d)}>
                       Hủy giao dịch<span className="sr-only"> {formatVnd(Number(d.amount))}</span>
                     </button>
+                  )}
+                  {d.status === "pledged" && (
+                    <button className="link-button" type="button" disabled={busyId === d.id} onClick={() => cancel(d)}>
+                      Rút cam kết<span className="sr-only"> {formatVnd(Number(d.amount))}</span>
+                    </button>
+                  )}
+                  {d.status === "charge_failed" && d.campaign && (
+                    <Link href={`/du-an/${d.campaign.id}/ung-ho?donation=${d.id}&payment=success`}>Cập nhật thanh toán</Link>
                   )}
                 </div>
               </div>

@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { OrganizationLogo } from "@/features/organizations/OrganizationLogo";
 import { ApiError } from "@/lib/api";
 import { apiCampaignToView, fetchCampaigns } from "@/lib/api/campaigns";
+import { fetchTeam, type TeamMember } from "@/lib/api/organization-members";
 import { ORGANIZATION_TYPE_LABEL, fetchOrganization, type Organization } from "@/lib/api/organizations";
 import type { Campaign } from "@/lib/data/campaigns";
 import { formatVnd } from "@/lib/format";
@@ -36,6 +37,15 @@ async function loadCampaigns(organizationId: string): Promise<Campaign[] | null>
   }
 }
 
+/** Đội ngũ công khai; lỗi tải thì ẩn mục (không chặn cả trang). */
+async function loadTeam(slug: string): Promise<TeamMember[]> {
+  try {
+    return await fetchTeam(slug);
+  } catch {
+    return [];
+  }
+}
+
 function websiteLabel(url: string): string {
   try {
     return new URL(url).host.replace(/^www\./, "");
@@ -60,7 +70,7 @@ export default async function OrganizationProfilePage({ params }: OrganizationPa
   const { slug } = await params;
   const organization = await loadOrganization(slug);
   if (!organization) notFound();
-  const campaigns = await loadCampaigns(organization.id);
+  const [campaigns, team] = await Promise.all([loadCampaigns(organization.id), loadTeam(organization.slug)]);
   const fundraiseHref = `/tao-chien-dich?to-chuc=${encodeURIComponent(organization.slug)}`;
   const active = (campaigns ?? []).filter((campaign) => campaign.status === "Đang gây quỹ");
 
@@ -92,6 +102,23 @@ export default async function OrganizationProfilePage({ params }: OrganizationPa
             <h2 id="org-about">Về tổ chức</h2>
             <p className="org-profile-mission">{organization.mission}</p>
           </section>
+
+          {team.length > 0 && (
+            <section className="detail-section" aria-labelledby="org-team">
+              <h2 id="org-team">Đội ngũ</h2>
+              <ul className="org-team">
+                {team.map((member, index) => (
+                  <li key={`${member.role}-${index}`}>
+                    <span className="organizer-avatar" aria-hidden="true">{member.name.charAt(0).toUpperCase()}</span>
+                    <div>
+                      <b>{member.name}</b>
+                      <span>{member.title}{member.role === "representative" ? " · Người đại diện" : " · Cộng tác viên"}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section className="detail-section" aria-labelledby="org-campaigns">
             <h2 id="org-campaigns">Chiến dịch gây quỹ cho tổ chức</h2>

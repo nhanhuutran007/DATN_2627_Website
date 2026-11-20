@@ -82,6 +82,33 @@ export class DonationsController {
     return this.donationsService.syncSepayDonation(id, user);
   }
 
+  /** URL Stripe Checkout để lưu thẻ (cam kết) hoặc đổi thẻ khi trừ tiền thất bại. */
+  @Post(":id/stripe-checkout")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 10, windowMs: 60_000, keyPrefix: "stripe-checkout" })
+  stripeCheckout(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
+    return this.donationsService.createStripeCheckout(id, user);
+  }
+
+  /** Hỏi lại Stripe kết quả lưu thẻ khi webhook chưa tới (người ủng hộ hoặc admin). */
+  @Post(":id/stripe-sync")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 20, windowMs: 60_000, keyPrefix: "stripe-sync" })
+  stripeSync(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
+    return this.donationsService.syncStripeDonation(id, user);
+  }
+
+  /** Thử trừ lại khoản cam kết trừ tiền thất bại (chỉ người ủng hộ, trong hạn). */
+  @Post(":id/retry-charge")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 5, windowMs: 60_000, keyPrefix: "retry-charge" })
+  retryCharge(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
+    return this.donationsService.retryCharge(id, user);
+  }
+
   /** Form có chữ ký để trình duyệt chuyển sang trang thanh toán SePay (chỉ người ủng hộ). */
   @Post(":id/sepay-checkout")
   @HttpCode(HttpStatus.OK)

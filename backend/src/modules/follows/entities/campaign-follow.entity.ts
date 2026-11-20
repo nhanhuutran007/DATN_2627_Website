@@ -15,4 +15,8 @@ export class CampaignFollow extends BaseEntity {
   @ManyToOne(() => Campaign, { onDelete: "CASCADE" })
   @JoinColumn({ name: "campaign_id" })
   campaign?: Campaign;
+
+  /** Đã nhắc "dự án sắp hết hạn" lúc nào; NULL = chưa nhắc. */
+  @Column({ name: "reminded_at", type: "datetime", nullable: true })
+  remindedAt?: Date | null;
 }

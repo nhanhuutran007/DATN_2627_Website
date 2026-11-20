@@ -3,7 +3,16 @@ import type { ApiCampaign, ApiCampaignStatus } from "./campaigns";
 
 export type AdminUserRole = "user" | "campaign_owner" | "admin";
 export type AdminUserStatus = "active" | "inactive" | "banned";
-export type AdminDonationStatus = "pending" | "completed" | "failed" | "refunded" | "expired" | "cancelled";
+export type AdminDonationStatus =
+  | "pending"
+  | "completed"
+  | "failed"
+  | "refunded"
+  | "expired"
+  | "cancelled"
+  | "pledged"
+  | "charge_failed"
+  | "released";
 
 export type AdminOverview = {
   users: {

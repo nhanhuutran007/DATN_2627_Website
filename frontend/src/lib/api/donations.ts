@@ -1,6 +1,20 @@
 import { api } from "../api";
 
-export type ApiDonationStatus = "pending" | "completed" | "failed" | "refunded" | "expired" | "cancelled";
+/**
+ * `pledged`: đã cam kết (lưu thẻ/ví), CHƯA trừ tiền — chỉ trừ khi chiến dịch đạt mục tiêu.
+ * `charge_failed`: đạt mục tiêu nhưng trừ thẻ thất bại, cần đổi thẻ trong hạn.
+ * `released`: chiến dịch không đạt, cam kết được hủy, không trừ tiền.
+ */
+export type ApiDonationStatus =
+  | "pending"
+  | "completed"
+  | "failed"
+  | "refunded"
+  | "expired"
+  | "cancelled"
+  | "pledged"
+  | "charge_failed"
+  | "released";
 
 export type ApiDonation = {
   id: string;
@@ -18,6 +32,11 @@ export type ApiDonation = {
   isAnonymous: boolean;
   rewardTierId?: string | null;
   completedAt?: string | null;
+  /** Lúc cam kết được ghi nhận (gây quỹ tất cả hoặc không). */
+  pledgedAt?: string | null;
+  /** Lần trừ tiền thất bại đầu tiên — hạn đổi thẻ tính từ mốc này. */
+  chargeFailedAt?: string | null;
+  lastChargeError?: string | null;
   createdAt?: string;
   campaign?: {
     id: string;
@@ -85,7 +104,32 @@ export type PaymentOptions = {
   sepay: { env: "sandbox" | "production" } | null;
   /** Ví demo (tự xác nhận, không có tiền thật); tắt khi SePay chạy production. */
   demoWallet: boolean;
+  /** Thẻ qua Stripe (lưu thẻ, trừ khi đạt mục tiêu); null khi máy chủ chưa cấu hình. */
+  stripe?: { testMode: boolean } | null;
 };
+
+/** Hạn đổi thẻ sau khi trừ tiền cam kết thất bại (khớp `CHARGE_RETRY_DAYS` ở backend). */
+export const CHARGE_RETRY_DAYS = 7;
+
+/** Kênh trả ngay (tiền chuyển đi lúc ủng hộ); các kênh khác chỉ cam kết. */
+export function isPledgeMethod(method: string | null | undefined): boolean {
+  return method !== "sepay";
+}
+
+/** Mở Stripe Checkout để lưu thẻ (cam kết) hoặc đổi thẻ khi trừ tiền thất bại. */
+export async function createStripeCheckout(donationId: string): Promise<{ url: string }> {
+  return api.post<{ url: string }>(`/donations/${encodeURIComponent(donationId)}/stripe-checkout`);
+}
+
+/** Nhờ server hỏi lại Stripe kết quả lưu thẻ (khi webhook chưa tới). */
+export async function syncStripeDonation(donationId: string): Promise<{ donation: ApiDonation; applied: boolean }> {
+  return api.post<{ donation: ApiDonation; applied: boolean }>(`/donations/${encodeURIComponent(donationId)}/stripe-sync`);
+}
+
+/** Thử trừ lại khoản cam kết trừ tiền thất bại. */
+export async function retryCharge(donationId: string): Promise<ApiDonation> {
+  return api.post<ApiDonation>(`/donations/${encodeURIComponent(donationId)}/retry-charge`);
+}
 
 export async function fetchPaymentOptions(): Promise<PaymentOptions> {
   return api.get<PaymentOptions>("/donations/payment-options");
@@ -139,6 +183,8 @@ export type LedgerEntry = {
   amount: number;
   currency: string;
   paymentMethod: string | null;
+  /** `pledged`: đã cam kết, chưa trừ tiền (bản API cũ không có trường này). */
+  status?: "completed" | "pledged";
   reference: string;
   completedAt: string;
 };

@@ -1,5 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsInt,
@@ -10,14 +12,61 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
+  ValidateNested,
 } from "class-validator";
+
+import { IsImageUrl } from "../../../common/validators/is-image-url";
 
 const trim = ({ value }: { value: unknown }) => (typeof value === "string" ? value.trim() : value);
 
 /** Mức ủng hộ tối thiểu của hệ thống (khớp CreateDonationDto). */
 export const MIN_REWARD_AMOUNT = 20_000;
+export const MAX_REWARD_ITEMS = 10;
 
-export class CreateRewardTierDto {
+/** Một món "Bao gồm" của phần quà. */
+export class RewardItemDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(2, { message: "Tên món quà cần ít nhất 2 ký tự." })
+  @MaxLength(120)
+  name!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  quantity!: number;
+}
+
+/** Trường chi tiết kiểu Kickstarter, dùng chung cho tạo và sửa (bỏ trống = giữ nguyên khi sửa). */
+class RewardDetailsDto {
+  /** `null` để gỡ ảnh. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsImageUrl()
+  @MaxLength(500)
+  imageUrl?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_REWARD_ITEMS)
+  @ValidateNested({ each: true })
+  @Type(() => RewardItemDto)
+  items?: RewardItemDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  requiresShipping?: boolean;
+
+  /** Hạn chọn quà; `null` = đến hết chiến dịch. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsDateString()
+  availableUntil?: string | null;
+}
+
+export class CreateRewardTierDto extends RewardDetailsDto {
   @Transform(trim)
   @IsString()
   @MinLength(3)
@@ -56,7 +105,7 @@ export class CreateRewardTierDto {
   sortOrder?: number;
 }
 
-export class UpdateRewardTierDto {
+export class UpdateRewardTierDto extends RewardDetailsDto {
   @IsOptional()
   @Transform(trim)
   @IsString()
@@ -114,6 +163,12 @@ export type RewardTierView = {
   estimatedDelivery: string | null;
   sortOrder: number;
   isActive: boolean;
+  imageUrl: string | null;
+  items: { name: string; quantity: number }[];
+  requiresShipping: boolean;
+  availableUntil: Date | null;
+  /** Còn chọn được: đang mở, còn suất và chưa quá hạn chọn. */
+  available: boolean;
 };
 
 export type RewardClaimView = {
@@ -123,6 +178,8 @@ export type RewardClaimView = {
   amount: number;
   /** "Ẩn danh" nếu người ủng hộ chọn ẩn danh. */
   backerName: string;
+  /** `completed`: đã thu tiền; `pledged`/`charge_failed`: cam kết, chờ trừ tiền (như backer report của Kickstarter). */
+  status: string;
   completedAt: Date | null;
   /** Thông tin gửi quà do người ủng hộ khai lúc chọn quà; `null` với khoản cũ chưa có thông tin này. */
   recipient: { name: string; phone: string; address: string } | null;

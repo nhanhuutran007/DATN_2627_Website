@@ -161,3 +161,17 @@ variable "sepay_ipn_secret" {
   default     = ""
   sensitive   = true
 }
+
+variable "stripe_secret_key" {
+  description = "Khóa bí mật Stripe (sk_test_… cho đồ án); để trống = ẩn kênh thẻ"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "stripe_webhook_secret" {
+  description = "Khóa ký webhook Stripe (whsec_…) để xác thực sự kiện checkout.session.completed"
+  type        = string
+  default     = ""
+  sensitive   = true
+}

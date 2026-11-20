@@ -22,4 +22,7 @@ ai_api_key             = "change-me-at-least-32-characters-long"
 sepay_env         = "sandbox"
 sepay_merchant_id = ""
 sepay_secret_key  = ""
+# Stripe test mode (tất cả hoặc không); để trống = ẩn kênh thẻ
+stripe_secret_key     = ""
+stripe_webhook_secret = ""
 sepay_ipn_secret  = ""
