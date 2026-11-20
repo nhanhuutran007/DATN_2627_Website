@@ -44,7 +44,7 @@ export function CampaignCard({ campaign, showAiReason = false, onOpen }: Campaig
           <p className="c-card-reason"><Icon name="sparkles" size={14} /> {campaign.aiReason}</p>
         )}
         <ProgressBar value={progress} label={`Đạt ${progress}% mục tiêu`} />
-        <p className="c-card-raised">{formatVnd(campaign.raised)} đã nhận</p>
+        <p className="c-card-raised">{formatVnd(campaign.raised)}</p>
       </div>
     </article>
   );

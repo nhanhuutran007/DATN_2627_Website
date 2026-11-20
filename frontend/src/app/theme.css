@@ -6949,6 +6949,55 @@ html:has(dialog:modal) .admin-sidebar {
   font-size: 0.82rem;
 }
 
+/* Thẻ gây quỹ trang dự án: số tiền → thanh tiến độ ngang → % và lượt ủng hộ */
+.fund-head-bar {
+  display: block;
+}
+
+.fund-head-bar .meter {
+  margin: 12px 0 10px;
+}
+
+.fund-head-bar .fund-sub b {
+  color: var(--navy);
+}
+
+/* Câu hỏi thường gặp ở trang dự án (cùng kiểu accordion với .start-faq, cỡ nhỏ hơn) */
+.detail-faq details {
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  color: var(--navy);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.detail-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-faq summary svg {
+  flex: none;
+  transition: transform 0.2s ease;
+}
+
+.detail-faq details[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.detail-faq details p {
+  margin: 0 0 16px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
 .progress-ring {
   position: relative;
   display: grid;

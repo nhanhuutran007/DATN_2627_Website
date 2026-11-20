@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { jsonLdString } from "@/lib/json-ld";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { CollapsibleStory } from "@/components/campaign/CollapsibleStory";
-import { ProgressRing } from "@/components/campaign/ProgressRing";
+import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { Icon } from "@/components/ui/Icon";
 import { CampaignComments } from "@/features/comments/CampaignComments";
 import { DonateLink } from "@/features/donations/DonateLink";
@@ -22,6 +22,7 @@ import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ShareSpread } from "@/features/follows/ShareSpread";
 import { CampaignViewTracker } from "@/features/campaign-stats/CampaignViewTracker";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
+import { FAQ_ITEMS } from "@/features/support/faq";
 import { OrganizationLogo } from "@/features/organizations/OrganizationLogo";
 import {
   apiCampaignToView,
@@ -45,6 +46,10 @@ import { sanitizeRichText } from "@/lib/rich-text.server";
 import { timeAgo } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
+
+/** Câu hỏi người ủng hộ hay gặp ở trang dự án, lấy từ bộ hỏi đáp chung của hộp hỗ trợ. */
+const DETAIL_FAQ_IDS = ["cach-ung-ho", "ung-ho-chi-tiet", "thanh-toan", "cho-xac-nhan", "minh-bach", "hoan-tien", "bao-cao"];
+const DETAIL_FAQS = DETAIL_FAQ_IDS.flatMap((id) => FAQ_ITEMS.filter((item) => item.id === id));
 
 type CampaignDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -386,6 +391,20 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             )}
           </section>
 
+          <section className="detail-section detail-faq" id="cau-hoi-thuong-gap" aria-labelledby="cau-hoi-thuong-gap-title">
+            <h2 id="cau-hoi-thuong-gap-title">Câu hỏi thường gặp</h2>
+            {DETAIL_FAQS.map((faq) => (
+              <details key={faq.id}>
+                <summary>
+                  {faq.question}
+                  <Icon name="chevron-down" size={18} />
+                </summary>
+                <p>{faq.answer}</p>
+                {faq.link && <p><Link href={faq.link.href}>{faq.link.label}</Link></p>}
+              </details>
+            ))}
+          </section>
+
           <p className="detail-meta">
             {campaign.createdDate && <span>Tạo ngày {campaign.createdDate}</span>}
             <span><Link href={`/du-an?category=${encodeURIComponent(campaign.category)}`}>{campaign.category}</Link></span>
@@ -401,17 +420,15 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
 
         <aside className="detail-side">
           <section className="panel fund-card" aria-label="Tiến độ gây quỹ">
-            <div className="fund-head">
-              <ProgressRing value={percent} />
-              <div>
-                <p className="fund-amount">{formatVnd(campaign.raised)}</p>
-                <p className="fund-target">
-                  đã nhận / mục tiêu <abbr title={formatVnd(campaign.target)}>{formatVndShort(campaign.target)}</abbr>
-                </p>
-                <p className="fund-sub">
-                  {campaign.backers.toLocaleString("vi-VN")} lượt ủng hộ · {open ? `còn ${campaign.daysLeft} ngày` : campaign.status}
-                </p>
-              </div>
+            <div className="fund-head fund-head-bar">
+              <p className="fund-amount">{formatVnd(campaign.raised)}</p>
+              <p className="fund-target">
+                đã nhận / mục tiêu <abbr title={formatVnd(campaign.target)}>{formatVndShort(campaign.target)}</abbr>
+              </p>
+              <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
+              <p className="fund-sub">
+                <b>{percent}%</b> · {campaign.backers.toLocaleString("vi-VN")} lượt ủng hộ · {open ? `còn ${campaign.daysLeft} ngày` : campaign.status}
+              </p>
             </div>
             {open && published && (
               <div className="fund-actions">
