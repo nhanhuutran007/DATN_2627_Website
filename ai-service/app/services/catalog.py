@@ -53,9 +53,22 @@ _CATEGORY_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Y tế", ("y te", "suc khoe", "benh")),
     ("Giáo dục", ("giao duc", "hoc bong", "truong hoc")),
     ("Công nghệ", ("cong nghe", "ky thuat so", "phan mem")),
-    ("Văn hóa", ("van hoa", "nghe thuat", "am nhac", "dien anh")),
-    ("Khởi nghiệp", ("khoi nghiep", "nong nghiep", "kinh doanh", "thu cong", "thuc pham")),
-    ("Môi trường", ("moi truong",)),
+    ("Văn hóa", ("van hoa", "nghe thuat", "am nhac", "dien anh", "truyen thong", "xuat ban")),
+    (
+        "Khởi nghiệp",
+        (
+            "khoi nghiep",
+            "nong nghiep",
+            "kinh doanh",
+            "thu cong",
+            "thuc pham",
+            "am thuc",
+            "thoi trang",
+            "lang nghe",
+            "du lich",
+        ),
+    ),
+    ("Môi trường", ("moi truong", "nang luong", "dong vat")),
 )
 
 

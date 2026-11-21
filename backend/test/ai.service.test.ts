@@ -166,6 +166,18 @@ describe("aiCategoryId", () => {
     equal(aiCategoryId("Chăm sóc sức khỏe"), 3);
   });
 
+  it("maps the extra industry categories from migration 023", () => {
+    equal(aiCategoryId("Điện ảnh & truyền thông"), 4);
+    equal(aiCategoryId("Xuất bản & sách"), 4);
+    equal(aiCategoryId("Ẩm thực"), 1);
+    equal(aiCategoryId("Thiết kế & thời trang"), 1);
+    equal(aiCategoryId("Thủ công & làng nghề"), 1);
+    equal(aiCategoryId("Du lịch cộng đồng"), 1);
+    equal(aiCategoryId("Năng lượng sạch"), 0);
+    // Nhóm cộng đồng không có lĩnh vực tương ứng trong dữ liệu huấn luyện → mặc định.
+    equal(aiCategoryId("Trẻ em"), 0);
+  });
+
   it("falls back to the default id for unknown or empty categories", () => {
     equal(aiCategoryId("Thể thao"), 0);
     equal(aiCategoryId(""), 0);

@@ -73,9 +73,12 @@ const AI_CATEGORY_RULES: ReadonlyArray<{ id: number; keywords: readonly string[]
   { id: 3, keywords: ["y te", "suc khoe", "benh"] },
   { id: 2, keywords: ["giao duc", "hoc bong", "truong hoc"] },
   { id: 5, keywords: ["cong nghe", "ky thuat so", "phan mem"] },
-  { id: 4, keywords: ["van hoa", "nghe thuat", "am nhac", "dien anh"] },
-  { id: 1, keywords: ["khoi nghiep", "nong nghiep", "kinh doanh", "thu cong", "thuc pham"] },
-  { id: 0, keywords: ["moi truong"] },
+  { id: 4, keywords: ["van hoa", "nghe thuat", "am nhac", "dien anh", "truyen thong", "xuat ban"] },
+  {
+    id: 1,
+    keywords: ["khoi nghiep", "nong nghiep", "kinh doanh", "thu cong", "thuc pham", "am thuc", "thoi trang", "lang nghe", "du lich"],
+  },
+  { id: 0, keywords: ["moi truong", "nang luong", "dong vat"] },
 ];
 /** Không khớp lĩnh vực nào: giữ mã 0 như trước (Môi trường). */
 const AI_CATEGORY_DEFAULT = 0;
