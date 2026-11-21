@@ -25,6 +25,7 @@ import { PostsModule } from "./modules/posts/posts.module";
 import { ProgressModule } from "./modules/progress/progress.module";
 import { RewardsModule } from "./modules/rewards/rewards.module";
 import { UsersModule } from "./modules/users/users.module";
+import { WalletModule } from "./modules/wallet/wallet.module";
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { UsersModule } from "./modules/users/users.module";
     AiModule,
     AuthModule,
     UsersModule,
+    WalletModule,
     CampaignsModule,
     CategoriesModule,
     DonationsModule,

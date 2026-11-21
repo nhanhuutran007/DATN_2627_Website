@@ -33,6 +33,7 @@ export const ADMIN_SECTION_GROUPS: AdminSectionGroup[] = [
     sections: [
       { slug: "giao-dich", label: "Giao dịch", title: "Giao dịch", icon: "receipt" },
       { slug: "hoan-tien", label: "Hoàn tiền", title: "Yêu cầu hoàn tiền", icon: "wallet" },
+      { slug: "rut-tien", label: "Rút tiền ví", title: "Yêu cầu rút tiền ví", icon: "wallet" },
       { slug: "doi-soat", label: "Đối soát", title: "Đối soát giao dịch", icon: "scale" },
     ],
   },

@@ -40,8 +40,11 @@ export class CreateDonationDto {
   @Min(20_000)
   amount!: number;
 
-  /** `sepay`: trả ngay; `stripe`/`wallet`: cam kết, chỉ trừ tiền khi chiến dịch đạt mục tiêu. */
-  @IsIn(["wallet", "sepay", "stripe"])
+  /**
+   * `sepay`: trả ngay; `balance` (ví Góp Mầm), `stripe`, `wallet` (ví demo cũ): cam kết,
+   * chỉ trừ tiền khi chiến dịch đạt mục tiêu.
+   */
+  @IsIn(["wallet", "sepay", "stripe", "balance"])
   paymentMethod!: string;
 
   @IsOptional()

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
   Optional,
@@ -133,6 +134,8 @@ export class ProgressService {
     private readonly notificationsService: NotificationsService,
     private readonly receiptDuplicates: ReceiptDuplicateService,
     @Optional()
+    // Kiểu `X | null` làm metadata thành Object: phải chỉ rõ token, nếu không Nest âm thầm inject null.
+    @Inject(OrganizationAccessService)
     private readonly access: OrganizationAccessService | null = null,
   ) {}
 

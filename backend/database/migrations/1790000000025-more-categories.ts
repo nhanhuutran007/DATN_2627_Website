@@ -29,8 +29,8 @@ const NEW_CATEGORIES = [
   "Năng lượng sạch",
 ];
 
-export class MoreCategories1790000000023 implements MigrationInterface {
-  name = "MoreCategories1790000000023";
+export class MoreCategories1790000000025 implements MigrationInterface {
+  name = "MoreCategories1790000000025";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const [{ maxOrder }]: Array<{ maxOrder: number | null }> = await queryRunner.query(

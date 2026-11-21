@@ -166,7 +166,7 @@ describe("aiCategoryId", () => {
     equal(aiCategoryId("Chăm sóc sức khỏe"), 3);
   });
 
-  it("maps the extra industry categories from migration 023", () => {
+  it("maps the extra industry categories from migration 025", () => {
     equal(aiCategoryId("Điện ảnh & truyền thông"), 4);
     equal(aiCategoryId("Xuất bản & sách"), 4);
     equal(aiCategoryId("Ẩm thực"), 1);

@@ -9,6 +9,8 @@ import { LogoMark } from "@/components/ui/LogoMark";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { logoutRequest } from "@/lib/api";
 import { useAuthUser } from "@/lib/auth";
+import { formatVnd } from "@/lib/format";
+import { useWalletSummary } from "@/lib/wallet-store";
 
 type MenuKey = "ung-ho" | "gay-quy" | "gioi-thieu" | "tai-khoan";
 
@@ -50,6 +52,8 @@ export function SiteHeader() {
       : `/dang-nhap?next=${encodeURIComponent(pathname)}`;
   const router = useRouter();
   const user = useAuthUser();
+  // Số dư ví (khách/admin: null → không hiện).
+  const wallet = useWalletSummary();
   const [menu, setMenu] = useState<MenuKey | null>(null);
   const [drawer, setDrawer] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -122,6 +126,7 @@ export function SiteHeader() {
   const accountLinks: MenuLink[] = user
     ? [
         isAdmin ? { href: "/admin", label: "Trang quản trị" } : { href: "/dashboard", label: "Hoạt động của bạn" },
+        ...(isAdmin ? [] : [{ href: "/vi", label: "Ví Góp Mầm" }]),
         { href: "/thong-bao", label: "Thông báo" },
         { href: "/ho-so", label: "Cài đặt tài khoản" },
       ]
@@ -154,6 +159,18 @@ export function SiteHeader() {
         </Link>
 
         <div className="gh-right">
+          {wallet && (
+            <Link
+              className="gh-wallet"
+              href="/vi"
+              onClick={closeAll}
+              title={wallet.held > 0 ? `Đang giữ cho cam kết: ${formatVnd(wallet.held)}` : "Ví Góp Mầm"}
+              aria-label={`Số dư ví Góp Mầm: ${formatVnd(wallet.balance)}`}
+            >
+              <Icon name="wallet" size={16} />
+              <span className="num">{formatVnd(wallet.balance)}</span>
+            </Link>
+          )}
           <div className="gh-nav">
             {user ? (
               <div className="gh-dropdown">
@@ -174,6 +191,11 @@ export function SiteHeader() {
                       <b>{user.name}</b>
                       <small>{user.email}</small>
                       <span className={`tag ${user.role === "admin" ? "tag-blue" : "tag-green"}`}>{ROLE_LABEL[user.role]}</span>
+                      {wallet && (
+                        <Link className="gh-account-wallet" href="/vi" onClick={closeAll}>
+                          <Icon name="wallet" size={14} /> Số dư ví <b className="num">{formatVnd(wallet.balance)}</b>
+                        </Link>
+                      )}
                     </div>
                     <MenuList links={accountLinks} onNavigate={closeAll} />
                     <button className="gh-menu-item gh-menu-logout" type="button" onClick={logout}>Đăng xuất</button>
@@ -215,6 +237,11 @@ export function SiteHeader() {
             {user ? (
               <section className="gh-drawer-section">
                 <h2>{user.name}</h2>
+                {wallet && (
+                  <Link className="gh-account-wallet" href="/vi" onClick={closeAll}>
+                    <Icon name="wallet" size={14} /> Số dư ví <b className="num">{formatVnd(wallet.balance)}</b>
+                  </Link>
+                )}
                 <MenuList links={accountLinks} onNavigate={closeAll} />
                 <button className="gh-menu-item gh-menu-logout" type="button" onClick={logout}>Đăng xuất</button>
               </section>

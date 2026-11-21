@@ -1483,6 +1483,57 @@ h3 {
   }
 }
 
+/* Số dư ví Góp Mầm trên header (bấm để sang /vi) */
+.gh-wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  color: var(--success);
+  border: 1px solid #cfe9d8;
+  border-radius: 999px;
+  background: var(--success-soft);
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.gh-wallet:hover {
+  border-color: var(--success);
+}
+
+.gh-wallet:focus-visible,
+.gh-account-wallet:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Trong menu tài khoản và trình đơn màn hình hẹp */
+.gh-account-wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--text-2);
+  font-size: 0.88rem;
+}
+
+.gh-account-wallet b {
+  color: var(--success);
+}
+
+.gh-drawer-section .gh-account-wallet {
+  margin: 0 0 10px;
+}
+
+@media (max-width: 640px) {
+  /* Màn hình hẹp: số dư nằm trong trình đơn, giữ header gọn */
+  .gh-wallet {
+    display: none;
+  }
+}
+
 .gh-right .notification-bell {
   border-color: transparent;
   border-radius: 50%;
@@ -12617,6 +12668,196 @@ html:has(dialog:modal) .admin-sidebar {
 .org-page {
   padding: 40px 16px 88px;
   background: var(--white);
+}
+
+/* Ví Góp Mầm (/vi) */
+.wallet-page {
+  padding: 40px 16px 88px;
+  background: var(--white);
+}
+
+.wallet-inner {
+  display: grid;
+  gap: 24px;
+  width: min(820px, 100%);
+  margin-inline: auto;
+}
+
+.wallet-head h1 {
+  margin: 12px 0 8px;
+  font-size: clamp(1.6rem, 1.5vw + 1rem, 2.1rem);
+}
+
+.wallet-balances {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.wallet-balance {
+  display: grid;
+  gap: 4px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--white);
+}
+
+.wallet-balance span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.wallet-balance b {
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.wallet-balance small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.wallet-balance-held {
+  background: var(--soft);
+}
+
+.wallet-topup {
+  display: grid;
+  gap: 14px;
+}
+
+.wallet-topup h2,
+.wallet-history h2 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1.15rem;
+}
+
+.wallet-topup-form,
+.wallet-pending {
+  display: grid;
+  gap: 12px;
+}
+
+.wallet-topup-form .donate-presets {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.wallet-topup-form > .button {
+  justify-self: start;
+}
+
+.wallet-pending p {
+  margin: 0;
+}
+
+.wallet-history {
+  display: grid;
+  gap: 12px;
+}
+
+.wallet-amount-topup,
+.wallet-amount-release,
+.wallet-amount-refund {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.wallet-amount-hold {
+  color: var(--primary-dark);
+  font-weight: 700;
+}
+
+.wallet-amount-capture {
+  color: var(--text-2);
+}
+
+/* Rút tiền ví về tài khoản ngân hàng */
+.wallet-withdraw {
+  display: grid;
+  gap: 12px;
+}
+
+.wallet-withdraw h2 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 1.15rem;
+}
+
+.wallet-withdraw > .hint {
+  margin: 0;
+}
+
+.wallet-withdraw-form {
+  display: grid;
+  gap: 12px;
+}
+
+.wallet-withdraw-open {
+  justify-self: start;
+}
+
+.wallet-withdraw-list {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wallet-withdraw-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.wallet-withdraw-list li > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wallet-withdraw-list .hint {
+  overflow-wrap: anywhere;
+}
+
+.wallet-withdraw-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Trang ủng hộ: số dư ví không đủ */
+.donate-wallet-short {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  color: var(--navy);
+  border-radius: 10px;
+  background: var(--primary-soft);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .wallet-balances {
+    grid-template-columns: 1fr;
+  }
+
+  .wallet-topup-form .donate-presets {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .org-page-inner {

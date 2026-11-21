@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api";
@@ -19,86 +19,12 @@ import {
 import { useAuthUser } from "@/lib/auth";
 import { formatVnd, paymentMethodLabel } from "@/lib/format";
 
+import { BankFields, bankDraftError, bankPayload, EMPTY_BANK, maskAccount, type BankDraft } from "./BankFields";
+
 type LoadState = "loading" | "ready" | "notfound" | "error";
-
-/** Gợi ý tên ngân hàng phổ biến cho ô nhập (vẫn gõ tự do được). */
-const COMMON_BANKS = [
-  "Vietcombank", "VietinBank", "BIDV", "Agribank", "Techcombank", "MB Bank", "ACB", "VPBank", "Sacombank",
-  "TPBank", "VIB", "HDBank", "SHB", "OCB", "MSB", "SeABank", "Eximbank", "LPBank", "Nam A Bank", "Bac A Bank",
-];
-
-/** Số tài khoản: bỏ khoảng trắng, dấu chấm, gạch ngang — khớp chuẩn hóa ở server. */
-const accountDigits = (value: string) => value.replace(/[\s.-]/g, "");
-const ACCOUNT_PATTERN = /^\d{6,19}$/;
-const maskAccount = (value: string) => `•••• ${value.slice(-4)}`;
 
 const dateTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("vi-VN", { dateStyle: "medium", timeStyle: "short" }) : "—";
-
-type BankDraft = { bankName: string; accountNumber: string; accountName: string };
-
-const EMPTY_BANK: BankDraft = { bankName: "", accountNumber: "", accountName: "" };
-
-/** Lỗi đầu tiên của tài khoản nhận hoàn (khớp kiểm tra ở server), hoặc "". */
-function bankDraftError(bank: BankDraft): string {
-  if (bank.bankName.trim().length < 2) return "Vui lòng nhập tên ngân hàng.";
-  if (!ACCOUNT_PATTERN.test(accountDigits(bank.accountNumber))) return "Số tài khoản chỉ gồm 6–19 chữ số.";
-  if (bank.accountName.trim().length < 2) return "Vui lòng nhập tên chủ tài khoản.";
-  return "";
-}
-
-function bankPayload(bank: BankDraft) {
-  return {
-    bankName: bank.bankName.trim(),
-    bankAccountNumber: accountDigits(bank.accountNumber),
-    bankAccountName: bank.accountName.trim().toUpperCase(),
-  };
-}
-
-function BankFields({ value, onChange, hint }: { value: BankDraft; onChange: (next: BankDraft) => void; hint: string }) {
-  const banksId = useId();
-  return (
-    <fieldset className="refund-bank">
-      <legend>Tài khoản nhận hoàn tiền</legend>
-      <p className="hint">{hint}</p>
-      <label className="field">
-        <span>Ngân hàng</span>
-        <input
-          list={banksId}
-          maxLength={100}
-          autoComplete="off"
-          placeholder="Vd. Vietcombank"
-          value={value.bankName}
-          onChange={(e) => onChange({ ...value, bankName: e.target.value })}
-        />
-        <datalist id={banksId}>
-          {COMMON_BANKS.map((bank) => <option key={bank} value={bank} />)}
-        </datalist>
-      </label>
-      <label className="field">
-        <span>Số tài khoản</span>
-        <input
-          inputMode="numeric"
-          maxLength={30}
-          autoComplete="off"
-          placeholder="Chỉ gồm chữ số"
-          value={value.accountNumber}
-          onChange={(e) => onChange({ ...value, accountNumber: e.target.value })}
-        />
-      </label>
-      <label className="field">
-        <span>Tên chủ tài khoản</span>
-        <input
-          maxLength={100}
-          autoComplete="off"
-          placeholder="Vd. NGUYEN VAN A"
-          value={value.accountName}
-          onChange={(e) => onChange({ ...value, accountName: e.target.value.toUpperCase() })}
-        />
-      </label>
-    </fieldset>
-  );
-}
 
 /**
  * Yêu cầu hoàn do hệ thống tự tạo khi chiến dịch không đạt mục tiêu (khoản chuyển khoản
