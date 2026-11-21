@@ -517,6 +517,18 @@ export function DonationPanel({
             </span>
           </label>
         ))}
+        {/* Cách trừ tiền phụ thuộc kênh: giải thích ngay khi người dùng chọn thẻ/ví hay chuyển khoản. */}
+        {payment && (
+          <p className="donate-aon" aria-live="polite">
+            <Icon name="shield" size={15} />
+            <span>
+              <b>Tất cả hoặc không.</b>{" "}
+              {pledging
+                ? `Chỉ trừ ${formatVnd(amount)} nếu dự án đạt mục tiêu khi kết thúc${endDate ? ` (${endDate})` : ""}. Không đạt thì không trừ đồng nào, và bạn rút cam kết được trước hạn.`
+                : "Nếu dự án không đạt mục tiêu, khoản chuyển khoản được hoàn lại cho bạn (hệ thống tự tạo yêu cầu hoàn)."}
+            </span>
+          </p>
+        )}
       </fieldset>
 
       <div className="donate-section donate-message">
@@ -551,15 +563,6 @@ export function DonationPanel({
           {selectedTier && bonus > 0 && <div><dt>Ủng hộ thêm</dt><dd className="num">{formatVnd(bonus)}</dd></div>}
           <div className="donate-summary-total"><dt>Trừ tiền hôm nay</dt><dd className="num">{formatVnd(pledging ? 0 : amount)}</dd></div>
         </dl>
-        <p className="donate-aon">
-          <Icon name="shield" size={15} />
-          <span>
-            <b>Tất cả hoặc không.</b>{" "}
-            {pledging
-              ? `Chỉ trừ ${formatVnd(amount)} nếu dự án đạt mục tiêu khi kết thúc${endDate ? ` (${endDate})` : ""}. Không đạt thì không trừ đồng nào, và bạn rút cam kết được trước hạn.`
-              : "Nếu dự án không đạt mục tiêu, khoản chuyển khoản được hoàn lại cho bạn (hệ thống tự tạo yêu cầu hoàn)."}
-          </span>
-        </p>
       </section>
 
       {error === "login" ? (

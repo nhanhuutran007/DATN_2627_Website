@@ -447,7 +447,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
 
         <aside className="detail-side">
           <section className="panel fund-card" aria-label="Tiến độ gây quỹ">
-            {/* Bố cục kiểu Kickstarter: thanh tiến độ ngang rồi ba số liệu lớn xếp dọc. */}
+            {/* Thanh tiến độ, số tiền, rồi lượt ủng hộ + ngày còn lại nằm cùng một hàng. */}
             <div className="fund-stats">
               <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
               <div className="fund-stat">
@@ -457,22 +457,24 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   <span className="fund-percent num">{percent}%</span>
                 </p>
               </div>
-              <div className="fund-stat">
-                <p className="fund-stat-value num">{campaign.backers.toLocaleString("vi-VN")}</p>
-                <p className="fund-stat-label">lượt ủng hộ</p>
-              </div>
-              <div className="fund-stat">
-                {open ? (
-                  <>
-                    <p className="fund-stat-value num">{campaign.daysLeft.toLocaleString("vi-VN")}</p>
-                    <p className="fund-stat-label">ngày còn lại</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="fund-stat-value">{campaign.status}</p>
-                    <p className="fund-stat-label">trạng thái gây quỹ</p>
-                  </>
-                )}
+              <div className="fund-stat-row">
+                <div className="fund-stat">
+                  <p className="fund-stat-value num">{campaign.backers.toLocaleString("vi-VN")}</p>
+                  <p className="fund-stat-label">lượt ủng hộ</p>
+                </div>
+                <div className="fund-stat">
+                  {open ? (
+                    <>
+                      <p className="fund-stat-value num">{campaign.daysLeft.toLocaleString("vi-VN")}</p>
+                      <p className="fund-stat-label">ngày còn lại</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="fund-stat-value">{campaign.status}</p>
+                      <p className="fund-stat-label">trạng thái gây quỹ</p>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
             {open && published && (
@@ -484,15 +486,6 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   className="button button-dark button-block button-lg"
                 />
               </div>
-            )}
-            {open && published && (
-              <p className="fund-aon">
-                <Icon name="shield" size={15} />
-                <span>
-                  <b>Tất cả hoặc không.</b> Thẻ chỉ bị trừ tiền nếu dự án đạt mục tiêu
-                  {campaign.endDate ? ` trước ${campaign.endDate}` : " khi kết thúc"}; không đạt thì không ai bị trừ đồng nào.
-                </span>
-              </p>
             )}
             {transparencyScore?.status === "rated" && (
               <a className={`fund-transparency fund-transparency-${transparencyScore.grade}`} href="#minh-bach">

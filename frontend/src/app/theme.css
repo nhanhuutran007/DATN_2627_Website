@@ -7175,11 +7175,22 @@ html:has(dialog:modal) .admin-sidebar {
   box-shadow: var(--shadow-card);
 }
 
-/* Thẻ gây quỹ kiểu Kickstarter: thanh ngang + ba số liệu lớn xếp dọc */
+/* Thẻ gây quỹ: thanh ngang + số tiền, rồi lượt ủng hộ và ngày còn lại chung một hàng */
 .fund-stats {
   display: grid;
   gap: 18px;
   margin-bottom: 22px;
+}
+
+.fund-stat-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.fund-stat-row .fund-stat + .fund-stat {
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
 }
 
 .fund-stats .meter {
@@ -10429,13 +10440,12 @@ html:has(dialog:modal) .admin-sidebar {
   font-weight: 700;
 }
 
-/* Tất cả hoặc không: giải thích khi nào bị trừ tiền */
-.donate-aon,
-.fund-aon {
+/* Tất cả hoặc không: giải thích khi nào bị trừ tiền, ngay dưới phương thức thanh toán đang chọn */
+.donate-aon {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 14px 0 0;
+  margin: 2px 0 0;
   padding: 12px 14px;
   color: var(--text-2);
   border-radius: 10px;
@@ -10444,15 +10454,13 @@ html:has(dialog:modal) .admin-sidebar {
   line-height: 1.5;
 }
 
-.donate-aon svg,
-.fund-aon svg {
+.donate-aon svg {
   flex: none;
   margin-top: 2px;
   color: var(--success);
 }
 
-.donate-aon b,
-.fund-aon b {
+.donate-aon b {
   color: var(--navy);
 }
 
