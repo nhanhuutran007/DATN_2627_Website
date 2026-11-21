@@ -106,6 +106,8 @@ export type PaymentOptions = {
   demoWallet: boolean;
   /** Thẻ qua Stripe (lưu thẻ, trừ khi đạt mục tiêu); null khi máy chủ chưa cấu hình. */
   stripe?: { testMode: boolean } | null;
+  /** Ví Góp Mầm: nạp qua SePay, ủng hộ bằng số dư (tiền được giữ đến khi chiến dịch kết thúc). */
+  balance?: { demoTopup: boolean } | null;
 };
 
 /** Hạn đổi thẻ sau khi trừ tiền cam kết thất bại (khớp `CHARGE_RETRY_DAYS` ở backend). */

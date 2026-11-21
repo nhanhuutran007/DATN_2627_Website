@@ -27,6 +27,7 @@ import {
   USER_STATUS_LABEL,
 } from "@/features/admin/labels";
 import { ADMIN_SECTION_GROUPS, ADMIN_SECTIONS, adminHref, findAdminSection } from "@/features/admin/sections";
+import { AdminWithdrawals } from "@/features/admin/AdminWithdrawals";
 import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredictionCard";
 import {
   fetchAdminCampaigns,
@@ -2086,6 +2087,7 @@ export function AdminDashboard() {
           )}
 
           {view === "hoan-tien" && <AdminFinance view="refunds" onChanged={() => { void loadDonations(donationFilter, donationPaging.page); void reloadOverview(); }} />}
+          {view === "rut-tien" && <AdminWithdrawals />}
           {view === "doi-soat" && <AdminFinance view="reconciliation" onChanged={() => { void loadDonations(donationFilter, donationPaging.page); void reloadOverview(); }} />}
 
           {view === "nguoi-dung" && (

@@ -18,6 +18,7 @@ import { AuditService, truncateForAudit } from "../../common/audit/audit.service
 import { rangeFilter } from "../../common/query/range";
 import type { PaymentGateway } from "../../integrations/payment/payment.gateway";
 import type { CardPledgeGateway } from "../../integrations/payment/stripe";
+import { WalletService } from "../wallet/wallet.service";
 import { closedWithoutReachingGoal } from "../campaigns/campaign-outcome";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { COUNTED_DONATION_STATUSES, Donation, DonationStatus, RefundMethod } from "../donations/entities/donation.entity";
@@ -117,6 +118,10 @@ export class FinanceService {
     @Optional()
     @Inject("StripeGateway")
     private readonly stripe: CardPledgeGateway | null = null,
+    @Optional()
+    // Kiểu `X | null` làm metadata thành Object: phải chỉ rõ token, nếu không Nest âm thầm inject null.
+    @Inject(WalletService)
+    private readonly wallet: WalletService | null = null,
   ) {}
 
   // ---------- Yêu cầu hoàn tiền ----------
@@ -341,7 +346,12 @@ export class FinanceService {
         "Khoản ủng hộ qua SePay phải chuyển khoản hoàn thủ công: nhập mã giao dịch chuyển khoản đã thực hiện.",
       );
     }
-    const refundMethod = manualTransfer ? RefundMethod.MANUAL_TRANSFER : RefundMethod.GATEWAY;
+    const toWallet = donation.paymentMethod === "balance";
+    const refundMethod = manualTransfer
+      ? RefundMethod.MANUAL_TRANSFER
+      : toWallet
+        ? RefundMethod.WALLET
+        : RefundMethod.GATEWAY;
     const refundProofUrl =
       manualTransfer && options.manual?.proofMediaId
         ? await this.resolveRefundProof(options.manual.proofMediaId, actor)
@@ -359,6 +369,12 @@ export class FinanceService {
       let refundId: string;
       if (manualTransfer && transferReference) {
         refundId = transferReference;
+      } else if (toWallet) {
+        // Ủng hộ bằng ví: hoàn thẳng về ví Góp Mầm trong cùng transaction.
+        if (!this.wallet) {
+          throw new BadGatewayException("Ví Góp Mầm chưa sẵn sàng nên chưa hoàn được khoản này.");
+        }
+        refundId = await this.wallet.refund(manager, donation, reason);
       } else if (donation.paymentMethod === "stripe") {
         // Khoản cam kết đã trừ tiền thẻ: hoàn qua Stripe theo mã PaymentIntent (`pi_…`).
         if (!this.stripe || !donation.transactionId) {

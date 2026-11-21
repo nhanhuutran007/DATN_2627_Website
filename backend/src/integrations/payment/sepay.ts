@@ -36,9 +36,12 @@ export function sepayConfigFromEnv(env: Env = process.env): SepayConfig | null {
 /** Bỏ chữ dễ nhầm (0/O, 1/I/L) vì mã có thể hiện trong nội dung chuyển khoản. */
 const TRANSFER_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
-/** Mã đơn duy nhất gửi SePay làm `order_invoice_number`, vd. `GM7K2QX9AB`. */
-export function generateTransferCode(): string {
-  let code = "GM";
+/**
+ * Mã đơn duy nhất gửi SePay làm `order_invoice_number`, vd. `GM7K2QX9AB`. Tiền tố
+ * phân biệt loại đơn trên cùng một IPN: `GM` = khoản ủng hộ, `NP` = nạp ví.
+ */
+export function generateTransferCode(prefix = "GM"): string {
+  let code = prefix;
   for (let i = 0; i < 8; i += 1) {
     code += TRANSFER_CODE_ALPHABET[randomInt(TRANSFER_CODE_ALPHABET.length)];
   }

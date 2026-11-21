@@ -23,6 +23,15 @@ export function auditGroup(action: string): AuditGroup | null {
 }
 
 export const AUDIT_ACTION_LABEL: Record<string, string> = {
+  "wallet.topup.create": "Tạo lệnh nạp ví",
+  "wallet.topup.completed": "Nạp ví thành công",
+  "wallet.topup.unmatched": "IPN nạp ví không khớp",
+  "wallet.topup.amount-mismatch": "IPN nạp ví sai số tiền",
+  "wallet.topup.ignored": "Bỏ qua IPN nạp ví",
+  "wallet.withdraw.request": "Yêu cầu rút tiền ví",
+  "wallet.withdraw.cancel": "Hủy yêu cầu rút tiền",
+  "wallet.withdraw.approve": "Duyệt chi tiền rút ví",
+  "wallet.withdraw.reject": "Từ chối rút tiền ví",
   "auth.register": "Đăng ký tài khoản",
   "auth.login.success": "Đăng nhập",
   "auth.google.login": "Đăng nhập bằng Google",
@@ -96,6 +105,8 @@ export const AUDIT_ENTITY_LABEL: Record<string, string> = {
   campaign: "Chiến dịch",
   donation: "Giao dịch",
   refund_request: "Yêu cầu hoàn tiền",
+  wallet_topup: "Nạp ví",
+  wallet_withdrawal: "Rút tiền ví",
   user: "Người dùng",
   category: "Lĩnh vực",
   campaign_comment: "Bình luận",

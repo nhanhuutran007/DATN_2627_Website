@@ -38,6 +38,8 @@ export const COUNTED_DONATION_STATUSES: readonly DonationStatus[] = [
 export enum RefundMethod {
   GATEWAY = "gateway",
   MANUAL_TRANSFER = "manual_transfer",
+  /** Hoàn về ví Góp Mầm (khoản ủng hộ bằng ví). */
+  WALLET = "wallet",
 }
 
 @Entity("donations")

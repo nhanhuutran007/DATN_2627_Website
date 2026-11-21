@@ -160,8 +160,8 @@ describe("DonationsService – SePay", () => {
   });
 
   it("paymentOptions không lộ thông tin merchant", () => {
-    deepEqual(setup().service.paymentOptions(), { sepay: { env: "sandbox" }, demoWallet: true, stripe: null });
-    deepEqual(setup({ sepay: null }).service.paymentOptions(), { sepay: null, demoWallet: true, stripe: null });
+    deepEqual(setup().service.paymentOptions(), { sepay: { env: "sandbox" }, demoWallet: true, stripe: null, balance: null });
+    deepEqual(setup({ sepay: null }).service.paymentOptions(), { sepay: null, demoWallet: true, stripe: null, balance: null });
   });
 
   it("checkout dùng mã đơn làm order_invoice_number, chỉ cho chủ đơn đang chờ", async () => {
@@ -178,7 +178,7 @@ describe("DonationsService – SePay", () => {
   it("SePay production tắt hẳn ví demo (không tạo, không tự xác nhận được)", async () => {
     const live = new SepayGateway({ env: "production", merchantId: "MC", secretKey: SECRET, ipnSecret: SECRET });
     const { service } = setup({ sepay: live, donation: { paymentMethod: "wallet" } });
-    deepEqual(service.paymentOptions(), { sepay: { env: "production" }, demoWallet: false, stripe: null });
+    deepEqual(service.paymentOptions(), { sepay: { env: "production" }, demoWallet: false, stripe: null, balance: null });
     await rejects(
       service.create({ campaignId: CAMPAIGN_ID, amount: 200000, paymentMethod: "wallet", idempotencyKey: "k-3" }, donor),
       (err: { status?: number }) => err.status === 400,

@@ -39,6 +39,7 @@ export function isLiveId(id: string): boolean {
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   sepay: "Chuyển khoản qua SePay",
   stripe: "Thẻ quốc tế (Stripe)",
+  balance: "Ví Góp Mầm",
   wallet: "Ví demo Góp Mầm",
   wallet_demo: "Ví demo Góp Mầm",
   payos: "PayOS sandbox (cũ)",
