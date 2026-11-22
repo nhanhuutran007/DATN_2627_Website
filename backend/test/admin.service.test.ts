@@ -98,6 +98,8 @@ function createMockRepos() {
     findAndCount: async () => [[makeCampaign()], 1],
     findOneBy: async () => makeCampaign(),
     save: async (campaign: Campaign) => campaign,
+    // Kết quả duyệt tự động gắn vào danh sách chiến dịch admin
+    manager: { getRepository: () => ({ find: async () => [] }) },
     calls: [],
   };
   const donationRepo: MockRepo = {

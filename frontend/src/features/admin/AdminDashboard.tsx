@@ -15,7 +15,9 @@ import { BackupManager } from "@/features/admin/BackupManager";
 import { SupportContactManager } from "@/features/admin/SupportContactManager";
 import { OrganizationReview } from "@/features/admin/OrganizationReview";
 import { AdminFinance } from "@/features/admin/AdminFinance";
+import { ReviewAutomationPanel } from "@/features/admin/AutomationSettings";
 import { CampaignReviewDialog } from "@/features/admin/CampaignReviewDialog";
+import { ScreeningBadge } from "@/features/admin/CampaignScreeningPanel";
 import { CopyableCode, DonationDetailDialog } from "@/features/admin/DonationDetailDialog";
 import { AuditLogViewer } from "@/features/admin/AuditLogViewer";
 import { UserDetailDialog } from "@/features/admin/UserDetailDialog";
@@ -1417,6 +1419,7 @@ export function AdminDashboard() {
             </>
           )}
 
+          {view === "cho-duyet" && <ReviewAutomationPanel />}
           {view === "cho-duyet" && (
           <section className="admin-card admin-table-card" id="cho-duyet">
             <div className="card-heading">
@@ -1498,7 +1501,7 @@ export function AdminDashboard() {
             </form>
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Chiến dịch</th><th>Chủ dự án</th><th>Hạng mục</th><th>Mục tiêu</th><th>{awaitingReview ? "Gửi duyệt" : "Đã huy động"}</th><th>Kết thúc</th><th>Trạng thái</th><th /></tr></thead>
+                <thead><tr><th>Chiến dịch</th><th>Chủ dự án</th><th>Hạng mục</th><th>Mục tiêu</th><th>{awaitingReview ? "Gửi duyệt" : "Đã huy động"}</th><th>Kết thúc</th><th title="Điểm rủi ro 0–100 của bước duyệt tự động">Duyệt tự động</th><th>Trạng thái</th><th /></tr></thead>
                 <tbody>
                   {campaigns.map((campaign) => (
                     <Fragment key={campaign.id}>
@@ -1556,6 +1559,7 @@ export function AdminDashboard() {
                         {formatDate(campaign.endDate)}
                         {endDateWarning(campaign) && <small className="table-cell-note is-urgent">{endDateWarning(campaign)}</small>}
                       </td>
+                      <td><ScreeningBadge screening={campaign.screening} /></td>
                       <td><span className={`table-status ${CAMPAIGN_STATUS_TONE[campaign.status]}`}>{CAMPAIGN_STATUS_LABEL[campaign.status]}</span></td>
                       <td>
                         <button
@@ -1569,13 +1573,13 @@ export function AdminDashboard() {
                     </tr>
                     {predictionOpen === campaign.id && (
                       <tr className="table-detail-row">
-                        <td colSpan={8}><CampaignPredictionCard campaignId={campaign.id} variant="admin" /></td>
+                        <td colSpan={9}><CampaignPredictionCard campaignId={campaign.id} variant="admin" /></td>
                       </tr>
                     )}
                     </Fragment>
                   ))}
                   {campaigns.length === 0 && (
-                    <tr><td colSpan={8}><span className="table-muted">Không có chiến dịch nào khớp bộ lọc.</span></td></tr>
+                    <tr><td colSpan={9}><span className="table-muted">Không có chiến dịch nào khớp bộ lọc.</span></td></tr>
                   )}
                 </tbody>
               </table>

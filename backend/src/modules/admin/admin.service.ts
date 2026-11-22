@@ -14,6 +14,7 @@ import {
 
 import { AuditService } from "../../common/audit/audit.service";
 import { rangeFilter } from "../../common/query/range";
+import { CampaignScreening } from "../campaigns/entities/campaign-screening.entity";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
 import { User, UserRole, UserStatus } from "../users/entities/user.entity";
@@ -347,7 +348,23 @@ export class AdminService {
       skip: offset,
       take: limit,
     });
-    return { items, total, limit, offset };
+    // Kết quả duyệt tự động (điểm rủi ro, đề xuất) để admin ưu tiên hồ sơ cần xem kỹ.
+    const screenings = items.length
+      ? await this.campaignRepo.manager.getRepository(CampaignScreening).find({
+        where: { campaignId: In(items.map((item) => item.id)) },
+        select: { campaignId: true, score: true, level: true, recommendation: true, autoApproved: true, screenedAt: true },
+      })
+      : [];
+    const byCampaign = new Map(screenings.map((row) => [row.campaignId, row]));
+    const withScreening = items.map((item) => {
+      const row = byCampaign.get(item.id);
+      return Object.assign(item, {
+        screening: row
+          ? { score: row.score, level: row.level, recommendation: row.recommendation, autoApproved: row.autoApproved, screenedAt: row.screenedAt }
+          : null,
+      });
+    });
+    return { items: withScreening, total, limit, offset };
   }
 
   async listDonations(

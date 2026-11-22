@@ -1,4 +1,5 @@
 import { api, apiDownload, apiFetch } from "../api";
+import type { ScreeningSummary } from "./automation";
 import type { ApiCampaign, ApiCampaignStatus } from "./campaigns";
 
 export type AdminUserRole = "user" | "campaign_owner" | "admin";
@@ -58,6 +59,8 @@ export type AdminOverview = {
 
 export type AdminCampaign = ApiCampaign & {
   owner?: { id: string; name: string; email?: string } | null;
+  /** Kết quả duyệt tự động mới nhất (null: chưa chấm, vd. bản nháp). */
+  screening?: ScreeningSummary | null;
 };
 
 export type AdminCampaignList = {

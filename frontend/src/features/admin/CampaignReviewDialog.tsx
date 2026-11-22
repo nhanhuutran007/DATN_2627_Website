@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Icon } from "@/components/ui/Icon";
+import { CampaignScreeningPanel } from "@/features/admin/CampaignScreeningPanel";
 import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredictionCard";
 import { resolveMediaUrl } from "@/lib/api";
 import type { AdminCampaign } from "@/lib/api/admin";
@@ -120,6 +121,8 @@ export function CampaignReviewDialog({ campaign, statusLabel, actions, onClose }
 
         {detail && (
           <>
+            {detail.status !== "draft" && <CampaignScreeningPanel campaignId={campaign.id} />}
+
             <dl className="review-facts">
               <div><dt>Chủ dự án</dt><dd>{owner?.name ?? "—"}{campaign.owner?.email && <small>{campaign.owner.email}</small>}</dd></div>
               <div><dt>Lĩnh vực</dt><dd>{detail.category}</dd></div>

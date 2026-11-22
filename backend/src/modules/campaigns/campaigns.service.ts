@@ -2,8 +2,11 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Brackets, In, Repository, SelectQueryBuilder } from "typeorm";
@@ -13,8 +16,10 @@ import { sanitizeRichText } from "../../common/html/rich-text";
 import { RefundRequest, RefundRequestStatus } from "../finance/entities/refund-request.entity";
 import { NotificationsService } from "../notifications/notifications.service";
 import { Organization, OrganizationStatus } from "../organizations/entities/organization.entity";
+import { AutomationSettingsService } from "../support/automation-settings.service";
 import { User, UserRole } from "../users/entities/user.entity";
 import { campaignStatusNotifications } from "./campaign-notifications";
+import { CampaignScreeningService, type ScreeningView } from "./campaign-screening.service";
 import {
   CampaignQueryDto,
   CreateCampaignDto,
@@ -118,11 +123,19 @@ export type CampaignListResult = {
 
 @Injectable()
 export class CampaignsService {
+  private readonly logger = new Logger(CampaignsService.name);
+
   constructor(
     @InjectRepository(Campaign)
     private readonly campaignRepo: Repository<Campaign>,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
+    @Optional()
+    @Inject(CampaignScreeningService)
+    private readonly screeningService: CampaignScreeningService | null = null,
+    @Optional()
+    @Inject(AutomationSettingsService)
+    private readonly automationSettings: AutomationSettingsService | null = null,
   ) {}
 
   async findAll(
@@ -420,6 +433,44 @@ export class CampaignsService {
       oldValues: { status: previousStatus },
       newValues: { status: saved.status },
     });
+    return this.runAutoReview(saved);
+  }
+
+  /**
+   * Duyệt tự động sau khi gửi: chấm điểm hồ sơ cho hàng đợi admin. Chỉ khi admin bật chế độ
+   * `auto_low_risk` và hồ sơ qua đủ các bước, rủi ro thấp thì hệ thống tự phát hành (pending → active).
+   * Không bao giờ tự từ chối hay yêu cầu bổ sung — các trường hợp đó luôn để admin quyết định.
+   * Lỗi khi chấm điểm không chặn việc gửi duyệt.
+   */
+  private async runAutoReview(campaign: Campaign): Promise<Campaign> {
+    if (!this.screeningService) return campaign;
+    let screening: ScreeningView;
+    try {
+      screening = await this.screeningService.screen(campaign.id);
+    } catch (error) {
+      this.logger.error(`Không chấm điểm được chiến dịch ${campaign.id}: ${(error as Error).message}`);
+      return campaign;
+    }
+    const settings = this.automationSettings ? await this.automationSettings.get().catch(() => null) : null;
+    if (settings?.campaignReviewMode !== "auto_low_risk" || screening.recommendation !== "auto_approve") {
+      return campaign;
+    }
+    const published = await this.campaignRepo.update(
+      { id: campaign.id, status: CampaignStatus.PENDING },
+      { status: CampaignStatus.ACTIVE },
+    );
+    if (!published.affected) return campaign;
+    await this.screeningService.markAutoApproved(campaign.id);
+    const saved = { ...campaign, status: CampaignStatus.ACTIVE } as Campaign;
+    await this.auditService.record({
+      action: "campaign.auto_approve",
+      entity: "campaign",
+      entityId: campaign.id,
+      oldValues: { status: CampaignStatus.PENDING },
+      newValues: { status: CampaignStatus.ACTIVE, score: screening.score, rulesVersion: screening.rulesVersion },
+    });
+    const notices = campaignStatusNotifications(saved, CampaignStatus.PENDING, CampaignStatus.ACTIVE);
+    if (notices.owner) await this.notificationsService.notify(notices.owner).catch(() => undefined);
     return saved;
   }
 
