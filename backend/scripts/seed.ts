@@ -1,8 +1,7 @@
-import { config } from "dotenv";
-import { DataSource } from "typeorm";
 import * as bcrypt from "bcryptjs";
 
-import { readDatabaseSsl } from "../src/config/database.config";
+import { createSeedDataSource } from "./seed-data-source";
+import { seedOrganizationExtras } from "./seed-org-extras";
 import { User, UserRole } from "../src/modules/users/entities/user.entity";
 import { Campaign, CampaignStatus } from "../src/modules/campaigns/entities/campaign.entity";
 import {
@@ -22,24 +21,10 @@ import {
   OrganizationType,
 } from "../src/modules/organizations/entities/organization.entity";
 
-config({ path: ".env" });
-
 /** Mật khẩu chung của mọi tài khoản mẫu (chỉ dùng cho demo/kiểm thử). */
 export const SEED_PASSWORD = "Test@123";
 
-const dataSource = new DataSource({
-  type: "mysql",
-  host: process.env.DB_HOST ?? "localhost",
-  port: Number(process.env.DB_PORT ?? 3306),
-  username: process.env.DB_USERNAME ?? "root",
-  password: process.env.DB_PASSWORD ?? "",
-  database: process.env.DB_DATABASE ?? "crowdfunding",
-  ssl: readDatabaseSsl(),
-  // DATETIME lưu theo UTC như backend.
-  timezone: "Z",
-  entities: ["src/modules/**/*.entity.ts"],
-  synchronize: false,
-});
+const dataSource = createSeedDataSource();
 
 const DAY_MS = 86_400_000;
 
@@ -514,6 +499,8 @@ async function seed() {
       `${donationRows.length} donations (${completedCount} completed), ${viewRows.length} daily view rows, ` +
       `${milestoneRows.length} milestones, ${updateCount} progress updates, ${followRows.length} follows, ${reportRows.length} reports. Password: ${SEED_PASSWORD}`,
   );
+  // Cộng tác viên tổ chức, dự án do tổ chức thực hiện và mức quà tặng.
+  await seedOrganizationExtras(dataSource);
   await dataSource.destroy();
   console.log("Done!");
 }
