@@ -1,4 +1,4 @@
-import { equal, match, ok, rejects } from "node:assert/strict";
+import { deepEqual, equal, match, ok, rejects } from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
 import {
@@ -151,6 +151,52 @@ describe("FinanceService — hoàn tiền", () => {
     service = new FinanceService(
       refundRepo, donationRepo, campaignRepo, dataSource, gateway, audit.service, notifier.service, mediaRepo,
     );
+  });
+
+  async function pendingRequest() {
+    return service.requestRefund(DONATION_ID, { reason: "Chiến dịch không đạt mục tiêu." }, DONOR);
+  }
+
+  it("người ủng hộ gửi yêu cầu luôn chờ admin duyệt thủ công, kể cả khi dự án đã thất bại", async () => {
+    campaign.status = CampaignStatus.FAILED;
+    const r = await pendingRequest();
+    equal(r.status, RefundRequestStatus.PENDING);
+    equal(donation.status, DonationStatus.COMPLETED);
+  });
+
+  it("hoàn tự động: dự án kết thúc không đạt mục tiêu → hoàn, audit không có admin", async () => {
+    campaign.status = CampaignStatus.FAILED;
+    const r = await pendingRequest();
+    const outcome = await service.tryAutoRefund(r.id);
+    equal(outcome.refunded, true);
+    equal(r.status, RefundRequestStatus.APPROVED);
+    equal(r.reviewedBy, null);
+    ok(String(r.adminNotes).startsWith("Tự động:"));
+    equal(donation.status, DonationStatus.REFUNDED);
+    equal(campaignUpdates, 1);
+    const entry = audit.entries.find((e) => e.action === "refund.auto_approve");
+    ok(entry);
+    equal(entry?.userId, undefined);
+  });
+
+  it("hoàn tự động không áp dụng khi dự án còn chạy hoặc khoản qua SePay → giữ chờ admin", async () => {
+    const active = await pendingRequest();
+    equal((await service.tryAutoRefund(active.id)).refunded, false);
+    equal(active.status, RefundRequestStatus.PENDING);
+    equal(donation.status, DonationStatus.COMPLETED);
+
+    requests.length = 0;
+    campaign.status = CampaignStatus.FAILED;
+    donation.paymentMethod = "sepay";
+    const sepay = await service.requestRefund(
+      DONATION_ID,
+      { reason: "Chiến dịch không đạt mục tiêu.", bankName: "Vietcombank", bankAccountNumber: "0123456789", bankAccountName: "NGUYEN VAN A" },
+      DONOR,
+    );
+    const outcome = await service.tryAutoRefund(sepay.id);
+    equal(outcome.refunded, false);
+    ok(outcome.reason.includes("SePay"));
+    equal(donation.status, DonationStatus.COMPLETED);
   });
 
   it("yêu cầu hoàn trong thời hạn khi chiến dịch đang gây quỹ", async () => {
@@ -385,5 +431,40 @@ describe("DonationsService — biên nhận & quyền xem", () => {
 
   it("chưa xác nhận thì không có biên nhận", async () => {
     await rejects(makeService({ ...base, status: DonationStatus.PENDING }).getReceipt(DONATION_ID, DONOR), ConflictException);
+  });
+});
+
+describe("FinanceService — theo dõi hoàn tiền tự động", () => {
+  it("tổng hợp cam kết trả về ví, khoản tự hoàn và số yêu cầu chờ admin", async () => {
+    const at = new Date("2026-11-20T03:00:00Z");
+    const released = [
+      { id: "d1", amount: "200000", paymentMethod: "balance", updatedAt: at, campaign: { title: "Thư viện" }, user: { name: "An" } },
+    ];
+    const donationRepo: any = {
+      find: async () => released,
+      createQueryBuilder: () => {
+        const qb: any = { select: () => qb, addSelect: () => qb, where: () => qb, getRawOne: async () => ({ count: "4", amount: "900000" }) };
+        return qb;
+      },
+    };
+    const refundRepo: any = {
+      find: async () => [
+        {
+          donationId: "d2",
+          reviewedAt: new Date("2026-11-21T03:00:00Z"),
+          donation: { amount: "150000", paymentMethod: "balance", campaign: { title: "Giếng nước" }, user: { name: "Bình" } },
+        },
+      ],
+      count: async () => 2,
+    };
+    const service = new FinanceService(refundRepo, donationRepo, {} as any, {} as any, {} as any, makeAuditRecorder().service, makeNotifierRecorder().service, {} as any);
+    const summary = await service.autoRefundSummary();
+    deepEqual(summary.releasedPledges, { count: 4, amount: 900000 });
+    deepEqual(summary.autoRefunds, { count: 1, amount: 150000 });
+    equal(summary.pendingManual, 2);
+    deepEqual(summary.recent.map((e) => [e.kind, e.destination, e.campaignTitle]), [
+      ["auto_refund", "wallet", "Giếng nước"],
+      ["pledge_released", "wallet", "Thư viện"],
+    ]);
   });
 });

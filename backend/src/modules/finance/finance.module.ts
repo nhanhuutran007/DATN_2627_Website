@@ -6,6 +6,7 @@ import { DonationsModule } from "../donations/donations.module";
 import { WalletModule } from "../wallet/wallet.module";
 import { Donation } from "../donations/entities/donation.entity";
 import { MediaFile } from "../media/entities/media-file.entity";
+import { AutoRefundService } from "./auto-refund.service";
 import { RefundRequest } from "./entities/refund-request.entity";
 import { AdminFinanceController, FinanceController } from "./finance.controller";
 import { FinanceService } from "./finance.service";
@@ -14,6 +15,6 @@ import { FinanceService } from "./finance.service";
   // DonationsModule export "PaymentGateway" (dùng chung cổng thanh toán)
   imports: [TypeOrmModule.forFeature([RefundRequest, Donation, Campaign, MediaFile]), DonationsModule, WalletModule],
   controllers: [FinanceController, AdminFinanceController],
-  providers: [FinanceService],
+  providers: [FinanceService, AutoRefundService],
 })
 export class FinanceModule {}

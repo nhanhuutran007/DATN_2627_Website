@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
 import { PAGE_SIZE, Pagination, pageSlice } from "@/components/ui/Pagination";
+import { RefundAutoMonitor } from "@/features/admin/AutomationSettings";
 import { useManualRefundDialog } from "@/features/admin/ManualRefundDialog";
 import { ApiError } from "@/lib/api";
 import {
@@ -254,6 +255,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
   return (
     <>
       {manualDialog}
+      {view === "refunds" && <RefundAutoMonitor />}
       {view === "refunds" && (
       <section className="admin-card risk-card" id="hoan-tien">
         <div className="card-heading">
@@ -393,7 +395,11 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
                       )}
                     </small>
                   )}
-                  {r.adminNotes && <small><b>Ghi chú quản trị:</b> {r.adminNotes}</small>}
+                  {r.adminNotes && (
+                    <small>
+                      <b>{r.adminNotes.startsWith("Tự động:") ? "Hệ thống tự hoàn:" : "Ghi chú quản trị:"}</b> {r.adminNotes.replace(/^Tự động:\s*/, "")}
+                    </small>
+                  )}
                 </div>
                 <div className="risk-actions">
                   {r.status === "pending" && (

@@ -41,6 +41,28 @@ import { RefundRequest, RefundRequestStatus } from "./entities/refund-request.en
 /** Người ủng hộ tự yêu cầu hoàn trong khoảng này nếu chiến dịch còn đang gây quỹ. */
 export const REFUND_WINDOW_DAYS = 7;
 
+export type AutoRefundOutcome = { refunded: boolean; reason: string };
+
+export type AutoRefundEvent = {
+  /** `pledge_released`: cam kết trả về ví/hủy khi dự án không đạt; `auto_refund`: khoản đã thu được tự hoàn. */
+  kind: "pledge_released" | "auto_refund";
+  donationId: string;
+  campaignTitle: string;
+  donorName: string;
+  amount: number;
+  /** `wallet`: về ví Góp Mầm; `pledge_cancelled`: cam kết thẻ không bị trừ; `gateway`: hoàn qua cổng. */
+  destination: "wallet" | "pledge_cancelled" | "gateway";
+  at: string;
+};
+
+export type AutoRefundSummary = {
+  releasedPledges: { count: number; amount: number };
+  autoRefunds: { count: number; amount: number };
+  /** Yêu cầu hoàn còn chờ admin kiểm tra và duyệt thủ công. */
+  pendingManual: number;
+  recent: AutoRefundEvent[];
+};
+
 const WINDOW_REFUNDABLE = [CampaignStatus.ACTIVE, CampaignStatus.PAUSED, CampaignStatus.APPROVED];
 
 const DAY_MS = 86_400_000;
@@ -188,6 +210,122 @@ export class FinanceService {
     return saved;
   }
 
+  /**
+   * Hoàn tiền tự động theo kết quả dự án: chỉ khi chiến dịch kết thúc không đạt mục tiêu hoặc bị hủy,
+   * khoản đã thu qua ví Góp Mầm/cổng có API được hoàn ngay (khoản ví về lại ví Góp Mầm). Khoản cam kết
+   * (`pledged`) không qua đây — `PledgeSettlementService` trả thẳng về ví khi chiến dịch không đạt.
+   * Mọi trường hợp khác — người ủng hộ tự yêu cầu khi dự án còn chạy, khoản SePay cần chuyển khoản tay —
+   * giữ `pending` để admin kiểm tra thông tin và duyệt thủ công.
+   */
+  async tryAutoRefund(requestId: string, now = new Date()): Promise<AutoRefundOutcome> {
+    const request = await this.refundRepo.findOne({ where: { id: requestId } });
+    if (!request || request.status !== RefundRequestStatus.PENDING) {
+      return { refunded: false, reason: "Yêu cầu không còn chờ xử lý." };
+    }
+    const donation = await this.donationRepo.findOne({ where: { id: request.donationId } });
+    if (!donation || donation.status !== DonationStatus.COMPLETED) {
+      return { refunded: false, reason: "Khoản ủng hộ không còn ở trạng thái hoàn được." };
+    }
+    if (needsManualRefund(donation.paymentMethod)) {
+      return { refunded: false, reason: "Khoản qua SePay: admin kiểm tra tài khoản nhận và chuyển khoản hoàn thủ công." };
+    }
+    const campaign = await this.campaignRepo.findOne({ where: { id: donation.campaignId } });
+    const campaignFailed = campaign ? await closedWithoutReachingGoal(campaign, this.donationRepo) : false;
+    if (!campaignFailed) {
+      return { refunded: false, reason: "Dự án chưa kết thúc thất bại: admin kiểm tra và duyệt thủ công." };
+    }
+
+    const notes = "Tự động: chiến dịch kết thúc không đạt mục tiêu hoặc bị hủy.";
+    await this.refundDonation(donation.id, notes, null, { viaRequest: true });
+    request.status = RefundRequestStatus.APPROVED;
+    request.adminNotes = notes;
+    request.reviewedBy = null;
+    request.reviewedAt = now;
+    await this.refundRepo.save(request);
+    await this.auditService.record({
+      action: "refund.auto_approve",
+      entity: "refund_request",
+      entityId: request.id,
+      oldValues: { status: RefundRequestStatus.PENDING },
+      newValues: { status: RefundRequestStatus.APPROVED, adminNotes: notes, amount: Number(donation.amount) },
+    });
+    return { refunded: true, reason: notes };
+  }
+
+  /** Quét yêu cầu đang chờ (hệ thống tạo khi chiến dịch thất bại) để tự hoàn khoản đủ điều kiện. */
+  async processPendingAutoRefunds(limit = 50, now = new Date()): Promise<number> {
+    const pending = await this.refundRepo.find({
+      where: { status: RefundRequestStatus.PENDING },
+      order: { createdAt: "ASC" },
+      take: limit,
+    });
+    let refunded = 0;
+    for (const request of pending) {
+      try {
+        if ((await this.tryAutoRefund(request.id, now)).refunded) refunded += 1;
+      } catch (error) {
+        this.logger.error(`Không tự hoàn được yêu cầu ${request.id}: ${(error as Error).message}`);
+      }
+    }
+    return refunded;
+  }
+
+  /**
+   * Theo dõi hoàn tiền tự động cho admin: cam kết đã trả về ví (dự án không đạt mục tiêu), khoản đã thu
+   * được hệ thống tự hoàn, và số yêu cầu còn chờ admin duyệt thủ công; kèm các sự kiện gần nhất.
+   */
+  async autoRefundSummary(limit = 15): Promise<AutoRefundSummary> {
+    const [released, releasedSum, autoRefunds, pendingManual] = await Promise.all([
+      this.donationRepo.find({
+        where: { status: DonationStatus.RELEASED },
+        relations: { campaign: true, user: true },
+        order: { updatedAt: "DESC" },
+        take: limit,
+      }),
+      this.donationRepo
+        .createQueryBuilder("d")
+        .select("COUNT(*)", "count")
+        .addSelect("COALESCE(SUM(d.amount), 0)", "amount")
+        .where("d.status = :status", { status: DonationStatus.RELEASED })
+        .getRawOne<{ count: string | number; amount: string | number }>(),
+      this.refundRepo.find({
+        where: { status: RefundRequestStatus.APPROVED, adminNotes: Like("Tự động:%") },
+        relations: { donation: { campaign: true, user: true } },
+        order: { reviewedAt: "DESC" },
+      }),
+      this.refundRepo.count({ where: { status: RefundRequestStatus.PENDING } }),
+    ]);
+
+    const releasedEvents: AutoRefundEvent[] = released.map((d) => ({
+      kind: "pledge_released",
+      donationId: d.id,
+      campaignTitle: d.campaign?.title ?? "",
+      donorName: d.user?.name ?? "",
+      amount: Number(d.amount),
+      destination: d.paymentMethod === "balance" ? "wallet" : "pledge_cancelled",
+      at: new Date(d.updatedAt).toISOString(),
+    }));
+    const refundEvents: AutoRefundEvent[] = autoRefunds.slice(0, limit).map((r) => ({
+      kind: "auto_refund",
+      donationId: r.donationId,
+      campaignTitle: r.donation?.campaign?.title ?? "",
+      donorName: r.donation?.user?.name ?? "",
+      amount: Number(r.donation?.amount ?? 0),
+      destination: r.donation?.paymentMethod === "balance" ? "wallet" : "gateway",
+      at: new Date(r.reviewedAt ?? r.updatedAt).toISOString(),
+    }));
+
+    return {
+      releasedPledges: { count: Number(releasedSum?.count ?? 0), amount: Number(releasedSum?.amount ?? 0) },
+      autoRefunds: {
+        count: autoRefunds.length,
+        amount: autoRefunds.reduce((sum, r) => sum + Number(r.donation?.amount ?? 0), 0),
+      },
+      pendingManual,
+      recent: [...releasedEvents, ...refundEvents].sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit),
+    };
+  }
+
   listMine(user: User): Promise<RefundRequest[]> {
     return this.refundRepo.find({
       where: { userId: user.id },
@@ -326,7 +464,8 @@ export class FinanceService {
   async refundDonation(
     donationId: string,
     reason: string,
-    actor: User,
+    /** `null` = hệ thống (hoàn tiền tự động). */
+    actor: User | null,
     options: { viaRequest?: boolean; manual?: ManualTransferInput } = {},
   ): Promise<Donation> {
     const viaRequest = options.viaRequest ?? false;
@@ -353,7 +492,7 @@ export class FinanceService {
         ? RefundMethod.WALLET
         : RefundMethod.GATEWAY;
     const refundProofUrl =
-      manualTransfer && options.manual?.proofMediaId
+      manualTransfer && options.manual?.proofMediaId && actor
         ? await this.resolveRefundProof(options.manual.proofMediaId, actor)
         : null;
 
@@ -420,7 +559,7 @@ export class FinanceService {
     });
 
     await this.auditService.record({
-      userId: actor.id,
+      userId: actor?.id ?? null,
       action: "donation.refund",
       entity: "donation",
       entityId: donationId,
