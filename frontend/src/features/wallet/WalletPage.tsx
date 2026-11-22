@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { Icon } from "@/components/ui/Icon";
+import { BalanceToggle, MaskedAmount } from "@/components/ui/MaskedAmount";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { ApiError } from "@/lib/api";
 import { useAuthUser, useRedirectAdmin } from "@/lib/auth";
@@ -54,6 +55,8 @@ export function WalletPage() {
   const next = safeNext(params.get("next"));
   const suggested = Number(params.get("nap")) || 0;
   const [wallet, setWallet] = useState<WalletView | null>(null);
+  // Số dư che mặc định với mọi tài khoản (kể cả ví 0 ₫); một nút con mắt bật/tắt cho cả trang.
+  const [shown, setShown] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [digits, setDigits] = useState(suggested >= MIN_TOPUP ? String(Math.ceil(suggested)) : "");
@@ -187,18 +190,21 @@ export function WalletPage() {
 
         <section className="wallet-balances" aria-label="Số dư ví">
           <div className="wallet-balance">
-            <span>Số dư dùng được</span>
-            <b className="num">{wallet ? formatVnd(wallet.balance) : "…"}</b>
+            <span className="wallet-balance-label">
+              Số dư dùng được
+              <BalanceToggle className="balance-toggle-sm" shown={shown} onToggle={() => setShown((value) => !value)} />
+            </span>
+            <b className="num">{wallet ? <MaskedAmount className="masked-amount-start" value={wallet.balance} shown={shown} /> : "…"}</b>
           </div>
           <div className="wallet-balance wallet-balance-held">
             <span>Đang giữ cho cam kết</span>
-            <b className="num">{wallet ? formatVnd(wallet.held) : "…"}</b>
+            <b className="num">{wallet ? <MaskedAmount className="masked-amount-start" value={wallet.held} shown={shown} /> : "…"}</b>
             <small>Trừ khi dự án đạt mục tiêu, hoàn về ví nếu không đạt</small>
           </div>
           {wallet && wallet.withdrawing > 0 && (
             <div className="wallet-balance wallet-balance-held">
               <span>Đang chờ rút về ngân hàng</span>
-              <b className="num">{formatVnd(wallet.withdrawing)}</b>
+              <b className="num"><MaskedAmount className="masked-amount-start" value={wallet.withdrawing} shown={shown} /></b>
               <small>Quản trị viên đang chuyển khoản</small>
             </div>
           )}
@@ -284,9 +290,9 @@ export function WalletPage() {
                         <td className={`num wallet-amount wallet-amount-${tx.type}`}>
                           {meta.sign}{formatVnd(tx.amount)}
                         </td>
-                        <td className="num">{formatVnd(tx.balanceAfter)}</td>
-                        <td className="num">{formatVnd(tx.heldAfter)}</td>
-                        <td className="num">{formatVnd(tx.withdrawingAfter ?? 0)}</td>
+                        <td className="num"><MaskedAmount value={tx.balanceAfter} shown={shown} /></td>
+                        <td className="num"><MaskedAmount value={tx.heldAfter} shown={shown} /></td>
+                        <td className="num"><MaskedAmount value={tx.withdrawingAfter ?? 0} shown={shown} /></td>
                       </tr>
                     );
                   })}

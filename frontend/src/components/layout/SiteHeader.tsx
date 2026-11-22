@@ -5,11 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Icon } from "@/components/ui/Icon";
+import { BalanceToggle, MaskedAmount } from "@/components/ui/MaskedAmount";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { logoutRequest } from "@/lib/api";
 import { useAuthUser } from "@/lib/auth";
-import { formatVnd } from "@/lib/format";
 import { useWalletSummary } from "@/lib/wallet-store";
 
 type MenuKey = "ung-ho" | "gay-quy" | "gioi-thieu" | "tai-khoan";
@@ -298,27 +298,11 @@ function WalletBalance({ balance, held, onNavigate }: { balance: number; held: n
         <Icon name="wallet" size={16} />
         <span>Ví Góp Mầm</span>
       </Link>
-      {/* Bản ẩn và bản hiện chồng lên cùng một ô: khung luôn có kích thước của bản lớn hơn nên không co giãn khi bấm. */}
       <span className="gh-account-wallet-amount" aria-live="polite">
-        <span className={shown ? "is-off" : undefined} aria-hidden={shown}>
-          <b className="num">••••••</b>
-          {held > 0 && <small>Đang giữ ••••••</small>}
-        </span>
-        <span className={shown ? undefined : "is-off"} aria-hidden={!shown}>
-          <b className="num">{formatVnd(balance)}</b>
-          {held > 0 && <small>Đang giữ {formatVnd(held)}</small>}
-        </span>
+        <b className="num"><MaskedAmount value={balance} shown={shown} /></b>
+        {held > 0 && <small>Đang giữ <MaskedAmount value={held} shown={shown} /></small>}
       </span>
-      <button
-        className="gh-account-wallet-toggle"
-        type="button"
-        aria-pressed={shown}
-        aria-label={shown ? "Ẩn số dư ví" : "Hiện số dư ví"}
-        title={shown ? "Ẩn số dư" : "Hiện số dư"}
-        onClick={() => setShown((value) => !value)}
-      >
-        <Icon name={shown ? "eye-off" : "eye"} size={16} />
-      </button>
+      <BalanceToggle className="gh-account-wallet-toggle" shown={shown} onToggle={() => setShown((value) => !value)} />
     </div>
   );
 }

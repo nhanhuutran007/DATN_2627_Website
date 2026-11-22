@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useId, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
+import { BalanceToggle, MaskedAmount } from "@/components/ui/MaskedAmount";
 import { PledgeStatus } from "@/features/donations/PledgeStatus";
 import { RewardCard } from "@/features/rewards/RewardCard";
 import { SepayPaymentStatus, type SepayReturn } from "@/features/donations/SepayPaymentStatus";
@@ -66,7 +67,8 @@ function recipientError(recipient: { name: string; phone: string; address: strin
 const MESSAGE_MAX = 500;
 const MAX_DIGITS = 12;
 
-type PaymentMethod = { value: string; label: string; note: string };
+/** `balance`: số dư ví hiển thị (che mặc định) sau nhãn của lựa chọn "Ví Góp Mầm". */
+type PaymentMethod = { value: string; label: string; note: string; balance?: number | null };
 
 const DEMO_METHODS: PaymentMethod[] = [
   { value: "wallet", label: "Ví demo Góp Mầm", note: "Cam kết bằng ví demo, chỉ “trừ” khi dự án đạt mục tiêu (không có tiền thật)" },
@@ -81,7 +83,8 @@ function paymentMethods(options: PaymentOptions | null, balance: number | null):
   const wallet: PaymentMethod[] = options.balance
     ? [{
         value: "balance",
-        label: balance === null ? "Ví Góp Mầm" : `Ví Góp Mầm · số dư ${formatVnd(balance)}`,
+        label: "Ví Góp Mầm",
+        balance,
         note: "Tiền được giữ trong ví; đạt mục tiêu mới trừ, không đạt tự hoàn về ví",
       }]
     : [];
@@ -132,6 +135,8 @@ export function DonationPanel({
   // Số dư ví của người đang đăng nhập (null = khách hoặc chưa tải), dùng chung với header.
   const walletBalance = useWalletSummary()?.balance ?? null;
   const methods = paymentMethods(options, walletBalance);
+  // Số dư ví che mặc định (kể cả khi 0 ₫); bấm con mắt mới hiện.
+  const [balanceShown, setBalanceShown] = useState(false);
   const amountId = useId();
   const selectedTier = rewardTiers.find((tier) => tier.id === rewardTierId) ?? null;
   // Quà số/ghi danh không cần địa chỉ; mức quà cũ (API chưa có trường) coi như gửi tận nơi.
@@ -522,7 +527,16 @@ export function DonationPanel({
           <label key={method.value}>
             <input type="radio" name="payment" value={method.value} checked={payment === method.value} onChange={() => setPayment(method.value)} />
             <span>
-              <b>{method.label}</b>
+              <b>
+                {method.label}
+                {method.balance != null && (
+                  <span className="donate-balance">
+                    {" · số dư "}
+                    <MaskedAmount value={method.balance} shown={balanceShown} />
+                    <BalanceToggle className="balance-toggle-sm" shown={balanceShown} onToggle={() => setBalanceShown((value) => !value)} />
+                  </span>
+                )}
+              </b>
               <small>{method.note}</small>
             </span>
           </label>
