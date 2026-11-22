@@ -15,7 +15,6 @@ import {
   cancelDonation,
   confirmDonation,
   createDonation,
-  createSepayCheckout,
   createStripeCheckout,
   fetchCampaignLedger,
   fetchDonation,
@@ -26,7 +25,6 @@ import {
   type ApiDonationStatus,
   type LedgerEntry,
   type PaymentOptions,
-  submitSepayCheckout,
   syncSepayDonation,
   syncStripeDonation,
 } from "@/lib/api/donations";
@@ -75,8 +73,8 @@ const DEMO_METHODS: PaymentMethod[] = [
 ];
 
 /**
- * Ví Góp Mầm đứng đầu (tiền giữ trong ví, không thể trừ thất bại), rồi thẻ Stripe, SePay
- * (chuyển khoản trả ngay, hoàn lại nếu dự án không đạt). Có ví thì ẩn ví demo cũ.
+ * Ví Góp Mầm đứng đầu (tiền giữ trong ví, không thể trừ thất bại), rồi thẻ Stripe. SePay không
+ * còn là kênh ủng hộ trực tiếp: chỉ dùng để nạp tiền vào ví ở trang /vi. Có ví thì ẩn ví demo cũ.
  */
 function paymentMethods(options: PaymentOptions | null, balance: number | null): PaymentMethod[] {
   if (!options) return DEMO_METHODS;
@@ -94,14 +92,7 @@ function paymentMethods(options: PaymentOptions | null, balance: number | null):
         note: "Chỉ lưu thẻ hôm nay; trừ tiền khi dự án đạt mục tiêu, không đạt thì không trừ",
       }]
     : [];
-  const sepay: PaymentMethod[] = options.sepay
-    ? [{
-        value: "sepay",
-        label: options.sepay.env === "sandbox" ? "Chuyển khoản QR · SePay (sandbox)" : "Chuyển khoản QR · SePay",
-        note: "Chuyển tiền ngay bằng VietQR; được hoàn lại nếu dự án không đạt mục tiêu",
-      }]
-    : [];
-  return [...wallet, ...stripe, ...sepay, ...(options.demoWallet && !options.balance ? DEMO_METHODS : [])];
+  return [...wallet, ...stripe, ...(options.demoWallet && !options.balance ? DEMO_METHODS : [])];
 }
 
 const vnNumber = new Intl.NumberFormat("vi-VN");
@@ -171,7 +162,6 @@ export function DonationPanel({
         setOptions(data);
         if (data.balance) setPayment("balance");
         else if (data.stripe) setPayment("stripe");
-        else if (data.sepay) setPayment("sepay");
         else if (!data.demoWallet) setPayment("");
       })
       .catch(() => undefined);
@@ -265,11 +255,6 @@ export function DonationPanel({
       });
       // Đơn đã tạo: dù xác nhận lỗi vẫn hiển thị để người dùng thanh toán lại hoặc hủy.
       setDonation(created);
-      if (payment === "sepay") {
-        // Sang trang SePay quét QR; kết quả về qua IPN, trang này chỉ hiển thị lại.
-        submitSepayCheckout(await createSepayCheckout(created.id));
-        return;
-      }
       if (payment === "balance") {
         // Ví: máy chủ đã giữ tiền và ghi nhận cam kết ngay khi tạo (không có bước thanh toán ngoài).
         setDonation(created);
@@ -542,17 +527,16 @@ export function DonationPanel({
             </span>
           </label>
         ))}
-        {/* Cách trừ tiền phụ thuộc kênh: giải thích ngay khi người dùng chọn thẻ/ví hay chuyển khoản. */}
+        {/* Cách giữ/trừ tiền phụ thuộc kênh: giải thích ngay khi người dùng chọn ví hay thẻ. */}
         {payment && (
           <p className="donate-aon" aria-live="polite">
             <Icon name="shield" size={15} />
             <span>
-              <b>Tất cả hoặc không.</b>{" "}
               {payByWallet
-                ? `${formatVnd(amount)} được giữ trong ví và chỉ bị trừ nếu dự án đạt mục tiêu khi kết thúc${endDate ? ` (${endDate})` : ""}. Không đạt hoặc bạn rút cam kết trước hạn thì tiền tự hoàn về ví.`
+                ? `${amount > 0 ? `Khoản ${formatVnd(amount)}` : "Số tiền ủng hộ"} được tạm giữ trong ví của bạn đến khi dự án kết thúc${endDate ? ` (${endDate})` : ""}. Nếu dự án đạt mục tiêu, tiền mới được chuyển cho dự án; nếu không đạt hoặc bạn rút lại trước hạn, tiền tự hoàn về ví.`
                 : pledging
-                  ? `Chỉ trừ ${formatVnd(amount)} nếu dự án đạt mục tiêu khi kết thúc${endDate ? ` (${endDate})` : ""}. Không đạt thì không trừ đồng nào, và bạn rút cam kết được trước hạn.`
-                  : "Nếu dự án không đạt mục tiêu, khoản chuyển khoản được hoàn lại cho bạn (hệ thống tự tạo yêu cầu hoàn)."}
+                  ? `Bạn chỉ bị trừ tiền nếu dự án đạt mục tiêu khi kết thúc${endDate ? ` (${endDate})` : ""}. Nếu không đạt, bạn không mất đồng nào và có thể rút lại trước hạn.`
+                  : "Nếu dự án không đạt mục tiêu, khoản ủng hộ được hoàn lại cho bạn."}
             </span>
           </p>
         )}
@@ -618,10 +602,8 @@ export function DonationPanel({
         {enabled ? (
           <>
             Khi bấm “{pledging ? "Cam kết ủng hộ" : "Ủng hộ ngay"}”, bạn đồng ý với <Link href="/chinh-sach-bao-mat">chính sách quyền riêng tư</Link> của Góp Mầm.{" "}
-            {payment === "sepay"
-              ? "Bạn sẽ được chuyển sang trang thanh toán SePay để quét QR. Góp Mầm không lưu thông tin tài khoản hay thẻ của bạn."
-              : payment === "balance"
-                ? "Số tiền được giữ trong ví Góp Mầm của bạn; không cần chuyển khoản thêm."
+            {payment === "balance"
+                ? "Số tiền được giữ trong ví Góp Mầm của bạn; không cần chuyển khoản thêm. Nạp ví bằng chuyển khoản QR SePay ở trang Ví."
               : payment === "stripe"
                 ? "Bạn sẽ được chuyển sang trang bảo mật của Stripe để lưu thẻ. Góp Mầm không lưu số thẻ; Stripe chỉ trừ tiền khi dự án đạt mục tiêu."
                 : "Ví demo dùng cho môi trường thử nghiệm, không trừ tiền thật và không lưu dữ liệu thẻ."}

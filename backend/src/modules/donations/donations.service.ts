@@ -102,7 +102,7 @@ export type DonationReceipt = {
 
 /** Kênh thanh toán đang bật, để frontend chỉ hiện lựa chọn dùng được. */
 export type PaymentOptions = {
-  /** Cổng SePay (QR chuyển khoản thật); null khi chưa cấu hình merchant. */
+  /** Cổng SePay (QR chuyển khoản thật, chỉ dùng để nạp ví); null khi chưa cấu hình merchant. */
   sepay: { env: "sandbox" | "production" } | null;
   /** Ví demo: người ủng hộ tự bấm xác nhận (không có tiền thật). */
   demoWallet: boolean;
@@ -772,8 +772,12 @@ export class DonationsService {
       }
     }
 
-    if (dto.paymentMethod === "sepay" && !this.sepay) {
-      throw new BadRequestException("Cổng SePay chưa được cấu hình");
+    // SePay chỉ còn là cổng nạp tiền vào ví Góp Mầm; ủng hộ thì dùng số dư ví (cam kết tất cả hoặc không).
+    // Đơn SePay cũ vẫn được IPN/đối soát/hoàn tiền xử lý như trước.
+    if (dto.paymentMethod === "sepay") {
+      throw new BadRequestException(
+        "SePay dùng để nạp tiền vào ví Góp Mầm. Vui lòng nạp ví rồi ủng hộ bằng số dư ví.",
+      );
     }
     if (dto.paymentMethod === "stripe" && !this.stripe) {
       throw new BadRequestException("Cổng thẻ Stripe chưa được cấu hình");
