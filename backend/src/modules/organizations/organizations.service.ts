@@ -320,10 +320,21 @@ export class OrganizationsService {
   }
 
   /** Chiến dịch chỉ được gây quỹ cho tổ chức đã xác minh. */
-  async assertCanReceiveCampaigns(organizationId: string): Promise<Organization> {
+  /**
+   * Tổ chức nhận được chiến dịch gây quỹ: phải đã xác minh. Cộng tác viên (kể cả đang chờ nhận
+   * lời) không được tự tạo chiến dịch cho tổ chức mình cộng tác: chỉ người đại diện tạo, cộng tác
+   * viên làm việc trên chiến dịch đó theo quyền được giao. Người ngoài vẫn gây quỹ cho tổ chức được
+   * (chiến dịch thuộc riêng họ, đội ngũ tổ chức không có quyền).
+   */
+  async assertCanReceiveCampaigns(organizationId: string, user?: Pick<User, "id">): Promise<Organization> {
     const organization = await this.organizationRepo.findOneBy({ id: organizationId });
     if (!organization || organization.status !== OrganizationStatus.VERIFIED) {
       throw new BadRequestException("Tổ chức không tồn tại hoặc chưa được xác minh để nhận gây quỹ.");
+    }
+    if (user && this.access && organization.representativeId !== user.id && (await this.access.isMemberOrInvited(organization.id, user.id))) {
+      throw new ForbiddenException(
+        "Cộng tác viên không được tạo chiến dịch cho tổ chức. Hãy nhờ người đại diện tạo; bạn sẽ quản lý chiến dịch theo quyền được giao.",
+      );
     }
     return organization;
   }

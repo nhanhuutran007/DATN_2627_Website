@@ -86,6 +86,12 @@ export type PostView = {
   liked: boolean;
   createdAt: Date;
   editedAt: Date | null;
+  /** Số bình luận (gốc + trả lời) đang hiển thị dưới bài. */
+  commentCount: number;
+  /** Người xem đã ủng hộ: viết được bình luận gốc. */
+  canComment: boolean;
+  /** Người xem quản lý bài (chủ dự án, quản trị viên, đội ngũ): trả lời được mọi bình luận. */
+  canReply: boolean;
 };
 
 export type PostPage = { items: PostView[]; total: number; offset: number; limit: number };

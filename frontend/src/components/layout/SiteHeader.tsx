@@ -159,18 +159,6 @@ export function SiteHeader() {
         </Link>
 
         <div className="gh-right">
-          {wallet && (
-            <Link
-              className="gh-wallet"
-              href="/vi"
-              onClick={closeAll}
-              title={wallet.held > 0 ? `Đang giữ cho cam kết: ${formatVnd(wallet.held)}` : "Ví Góp Mầm"}
-              aria-label={`Số dư ví Góp Mầm: ${formatVnd(wallet.balance)}`}
-            >
-              <Icon name="wallet" size={16} />
-              <span className="num">{formatVnd(wallet.balance)}</span>
-            </Link>
-          )}
           <div className="gh-nav">
             {user ? (
               <div className="gh-dropdown">
@@ -191,12 +179,8 @@ export function SiteHeader() {
                       <b>{user.name}</b>
                       <small>{user.email}</small>
                       <span className={`tag ${user.role === "admin" ? "tag-blue" : "tag-green"}`}>{ROLE_LABEL[user.role]}</span>
-                      {wallet && (
-                        <Link className="gh-account-wallet" href="/vi" onClick={closeAll}>
-                          <Icon name="wallet" size={14} /> Số dư ví <b className="num">{formatVnd(wallet.balance)}</b>
-                        </Link>
-                      )}
                     </div>
+                    {wallet && <WalletBalance balance={wallet.balance} held={wallet.held} onNavigate={closeAll} />}
                     <MenuList links={accountLinks} onNavigate={closeAll} />
                     <button className="gh-menu-item gh-menu-logout" type="button" onClick={logout}>Đăng xuất</button>
                   </div>
@@ -237,11 +221,7 @@ export function SiteHeader() {
             {user ? (
               <section className="gh-drawer-section">
                 <h2>{user.name}</h2>
-                {wallet && (
-                  <Link className="gh-account-wallet" href="/vi" onClick={closeAll}>
-                    <Icon name="wallet" size={14} /> Số dư ví <b className="num">{formatVnd(wallet.balance)}</b>
-                  </Link>
-                )}
+                {wallet && <WalletBalance balance={wallet.balance} held={wallet.held} onNavigate={closeAll} />}
                 <MenuList links={accountLinks} onNavigate={closeAll} />
                 <button className="gh-menu-item gh-menu-logout" type="button" onClick={logout}>Đăng xuất</button>
               </section>
@@ -303,5 +283,35 @@ function DrawerSection({ title, links, onNavigate }: { title: string; links: Men
       <h2>{title}</h2>
       <MenuList links={links} onNavigate={onNavigate} />
     </section>
+  );
+}
+
+/**
+ * Số dư ví trong menu tài khoản: mặc định ẩn (••••••), bấm biểu tượng con mắt mới hiện số tiền.
+ * Menu đóng là component bị gỡ nên lần mở sau số dư lại ẩn.
+ */
+function WalletBalance({ balance, held, onNavigate }: { balance: number; held: number; onNavigate: () => void }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="gh-account-wallet">
+      <Link className="gh-account-wallet-link" href="/vi" onClick={onNavigate}>
+        <Icon name="wallet" size={16} />
+        <span>Ví Góp Mầm</span>
+      </Link>
+      <span className="gh-account-wallet-amount">
+        <b className="num" aria-live="polite">{shown ? formatVnd(balance) : "••••••"}</b>
+        {shown && held > 0 && <small>Đang giữ {formatVnd(held)}</small>}
+      </span>
+      <button
+        className="gh-account-wallet-toggle"
+        type="button"
+        aria-pressed={shown}
+        aria-label={shown ? "Ẩn số dư ví" : "Hiện số dư ví"}
+        title={shown ? "Ẩn số dư" : "Hiện số dư"}
+        onClick={() => setShown((value) => !value)}
+      >
+        <Icon name={shown ? "eye-off" : "eye"} size={16} />
+      </button>
+    </div>
   );
 }

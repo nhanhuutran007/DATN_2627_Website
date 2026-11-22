@@ -127,6 +127,7 @@ export class OrganizationMembersService {
         link: "/to-chuc/cua-toi#loi-moi",
         relatedId: saved.id,
         email: true,
+        emailSubject: `${user.name} mời bạn cộng tác với tổ chức ${organization.name}`,
       })
       .catch(() => undefined);
     return this.toView(saved);
@@ -166,16 +167,30 @@ export class OrganizationMembersService {
       oldValues: { memberId, userId: member.userId, title: member.title, status: member.status },
     });
     const notifyUserId = self ? organization.representativeId : member.userId;
+    const revokedInvite = !self && member.status === MemberStatus.PENDING;
     await this.notificationsService
       .notify({
         userId: notifyUserId,
         type: NotificationType.SYSTEM,
-        title: self ? "Cộng tác viên đã rời tổ chức" : "Bạn không còn là cộng tác viên",
+        title: self
+          ? "Cộng tác viên đã rời tổ chức"
+          : revokedInvite
+            ? "Lời mời cộng tác đã bị thu hồi"
+            : "Bạn không còn là cộng tác viên",
         message: self
           ? `${user.name} đã rời vị trí "${member.title}" của tổ chức "${organization.name}".`
-          : `Người đại diện tổ chức "${organization.name}" đã gỡ bạn khỏi danh sách cộng tác viên.`,
+          : revokedInvite
+            ? `Người đại diện tổ chức "${organization.name}" đã thu hồi lời mời bạn làm cộng tác viên "${member.title}".`
+            : `Người đại diện tổ chức "${organization.name}" đã gỡ bạn khỏi vị trí cộng tác viên "${member.title}". Bạn không còn quyền với tổ chức và các chiến dịch của tổ chức.`,
         link: "/to-chuc/cua-toi",
         relatedId: organizationId,
+        // Mất quyền (hoặc mất một thành viên đội ngũ) là thay đổi quan trọng nên báo cả qua email.
+        email: true,
+        emailSubject: self
+          ? `${user.name} đã rời tổ chức ${organization.name}`
+          : revokedInvite
+            ? `Lời mời cộng tác từ tổ chức ${organization.name} đã bị thu hồi`
+            : `Bạn không còn là cộng tác viên của tổ chức ${organization.name}`,
       })
       .catch(() => undefined);
   }
@@ -271,24 +286,17 @@ export class OrganizationMembersService {
       order: { createdAt: "DESC" },
     });
     const active = members.filter((m) => m.status === MemberStatus.ACTIVE && m.organization);
-    // Chiến dịch của tổ chức do đội ngũ (đại diện + cộng tác viên đang hoạt động) tạo.
+    // Chiến dịch chung của tổ chức: do người đại diện tạo (cộng tác viên không tự tạo được).
     const campaignsByOrg = new Map<string, Campaign[]>();
     if (active.length > 0) {
       const orgIds = active.map((m) => m.organizationId);
-      const team = await this.memberRepo.find({
-        select: { organizationId: true, userId: true },
-        where: { organizationId: In(orgIds), status: MemberStatus.ACTIVE },
-      });
       const campaigns = await this.campaignRepo.find({
         where: { organizationId: In(orgIds) },
         order: { createdAt: "DESC" },
       });
       for (const campaign of campaigns) {
         const org = active.find((m) => m.organizationId === campaign.organizationId)?.organization;
-        const byTeam =
-          campaign.ownerId === org?.representativeId ||
-          team.some((t) => t.organizationId === campaign.organizationId && t.userId === campaign.ownerId);
-        if (!byTeam || !campaign.organizationId) continue;
+        if (campaign.ownerId !== org?.representativeId || !campaign.organizationId) continue;
         const list = campaignsByOrg.get(campaign.organizationId) ?? [];
         list.push(campaign);
         campaignsByOrg.set(campaign.organizationId, list);

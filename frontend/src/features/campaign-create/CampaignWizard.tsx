@@ -31,6 +31,7 @@ import {
   type CreateCampaignPayload,
 } from "@/lib/api/campaigns";
 import { useCategories } from "@/lib/api/categories";
+import { fetchMyCollaborations } from "@/lib/api/organization-members";
 import type { PickedOrganization } from "@/lib/api/organizations";
 import {
   createMilestone,
@@ -253,6 +254,23 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
   const [editState, setEditState] = useState<EditState>(editId ? "loading" : "none");
   const [reviewNote, setReviewNote] = useState("");
   const userId = user?.id;
+  // Tổ chức mình là cộng tác viên (hoặc có lời mời chờ): không được tạo chiến dịch cho tổ chức đó.
+  const [collabOrgIds, setCollabOrgIds] = useState<string[]>([]);
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    fetchMyCollaborations()
+      .then((list) => {
+        if (active) setCollabOrgIds(list.map((item) => item.organization.id));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+  const COLLAB_BLOCKED =
+    "Bạn là cộng tác viên của tổ chức này nên không tự tạo chiến dịch cho tổ chức được. Hãy nhờ người đại diện tạo; bạn sẽ quản lý chiến dịch theo quyền được giao.";
+  const collabBlocked = !!pickedOrganization && collabOrgIds.includes(pickedOrganization.id);
   const loginPath = editId ? `/dang-nhap?next=${encodeURIComponent(`/tao-chien-dich?sua=${editId}`)}` : "/dang-nhap?next=/tao-chien-dich";
 
   // Sửa hồ sơ đã lưu: nạp lại toàn bộ form, mốc và mức quà; các lần lưu sau thay thế đúng bản ghi cũ.
@@ -346,6 +364,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
   const validateStep = (index: number, forDraft = false): string => {
     if (index === STEP_BASICS) {
       if (beneficiary === "organization" && !organization) return "Vui lòng chọn tổ chức bạn gây quỹ cho.";
+      if (collabBlocked) return COLLAB_BLOCKED;
       if (!draft.location.trim()) return "Vui lòng chọn tỉnh/thành nơi thực hiện dự án.";
       if (!draft.category) return "Vui lòng chọn lĩnh vực của dự án.";
     }
@@ -614,6 +633,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                         }}
                       />
                     )}
+                    {collabBlocked && <p className="form-error" role="alert">{COLLAB_BLOCKED}</p>}
                   </fieldset>
                   <div className="create-q">
                     <label htmlFor="create-location">Dự án được thực hiện ở đâu?</label>

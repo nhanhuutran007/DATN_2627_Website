@@ -283,7 +283,7 @@ export class ProgressService {
           const fmt = (v: number | null | undefined) => `${Number(v ?? 0).toLocaleString("vi-VN")} ₫`;
           parts.push(`ngân sách từ ${fmt(oldValues.budget)} sang ${fmt(newValues.budget)}`);
         }
-        await this.notificationsService.notifyCampaignBackers(
+        await this.notificationsService.notifyCampaignFollowers(
           campaign.id,
           {
             type: NotificationType.MILESTONE_RESCHEDULED,
@@ -353,7 +353,7 @@ export class ProgressService {
       entityId: saved.id,
       newValues: { isCompleted: true, completedAt: saved.completedAt },
     });
-    await this.notificationsService.notifyCampaignBackers(
+    await this.notificationsService.notifyCampaignFollowers(
       campaign.id,
       {
         type: NotificationType.MILESTONE_COMPLETED,
@@ -409,7 +409,7 @@ export class ProgressService {
         content: truncateForAudit(saved.content),
       },
     });
-    await this.notificationsService.notifyCampaignBackers(
+    await this.notificationsService.notifyCampaignFollowers(
       campaign.id,
       {
         type: NotificationType.PROGRESS_UPDATE,

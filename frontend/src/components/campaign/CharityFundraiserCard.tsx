@@ -1,12 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { ProgressRing } from "@/components/campaign/ProgressRing";
+import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { campaignProgress, type Campaign } from "@/lib/data/campaigns";
 import { coverFor } from "@/lib/covers";
 import { formatVnd } from "@/lib/format";
 
-/** Thẻ tối giản theo mục "Discover fundraisers supporting charities" của GoFundMe: ảnh, địa điểm, tên, số đã nhận và vòng %. */
+/** Thẻ gây quỹ cho tổ chức: ảnh, địa điểm, tên, tổ chức nhận, thanh tiến độ ngang (giống thẻ dự án) và số đã nhận. */
 export function CharityFundraiserCard({ campaign }: { campaign: Campaign }) {
   const progress = campaignProgress(campaign);
   const cover = coverFor(campaign);
@@ -19,14 +19,12 @@ export function CharityFundraiserCard({ campaign }: { campaign: Campaign }) {
         <span className="cf-card-location">{campaign.location}</span>
       </div>
       <div className="cf-card-body">
-        <div>
-          <h3 className="cf-card-title">
-            <Link href={href}>{campaign.title}</Link>
-          </h3>
-          <p className="cf-card-raised">{formatVnd(campaign.raised)} đã nhận</p>
-          {campaign.organization && <p className="cf-card-org">cho {campaign.organization.name}</p>}
-        </div>
-        <ProgressRing value={progress} size={60} />
+        <h3 className="cf-card-title">
+          <Link href={href}>{campaign.title}</Link>
+        </h3>
+        {campaign.organization && <p className="cf-card-org">cho {campaign.organization.name}</p>}
+        <ProgressBar value={progress} label={`Đạt ${progress}% mục tiêu`} />
+        <p className="cf-card-raised"><b>{formatVnd(campaign.raised)}</b> đã nhận · {progress}%</p>
       </div>
     </article>
   );

@@ -9,11 +9,10 @@ import { Organization, OrganizationStatus } from "./entities/organization.entity
 
 /**
  * Kiểm tra quyền dùng chung cho mọi module quản lý chiến dịch. Chủ chiến dịch và admin
- * luôn được phép. Ngoài ra, với chiến dịch của một tổ chức (không bị tạm ngưng) mà
- * người tạo là người đại diện hoặc cộng tác viên đang hoạt động của tổ chức đó:
- * - người đại diện có mọi quyền;
- * - cộng tác viên có quyền nào thì làm được việc đó.
- * Chiến dịch người ngoài tạo để gây quỹ cho tổ chức vẫn chỉ thuộc về người tạo.
+ * luôn được phép. Ngoài ra, với chiến dịch của một tổ chức (không bị tạm ngưng) do chính
+ * người đại diện tạo, cộng tác viên đang hoạt động có quyền nào thì làm được việc đó.
+ * Cộng tác viên không tự tạo chiến dịch cho tổ chức (xem `assertCanReceiveCampaigns`);
+ * chiến dịch người khác tạo để gây quỹ cho tổ chức chỉ thuộc về người tạo.
  */
 @Injectable()
 export class OrganizationAccessService {
@@ -33,8 +32,8 @@ export class OrganizationAccessService {
     if (!campaign.organizationId) return false;
     const organization = await this.organizationRepo.findOneBy({ id: campaign.organizationId });
     if (!organization || organization.status === OrganizationStatus.SUSPENDED) return false;
-    if (!(await this.isTeamMember(organization, campaign.ownerId))) return false;
-    if (organization.representativeId === user.id) return true;
+    // Chỉ chiến dịch người đại diện tạo mới là chiến dịch chung của đội ngũ.
+    if (organization.representativeId !== campaign.ownerId) return false;
     const member = await this.activeMember(organization.id, user.id);
     return !!member && member[PERMISSION_COLUMN[permission]] === true;
   }
@@ -61,9 +60,8 @@ export class OrganizationAccessService {
     return this.memberRepo.findOne({ where: { organizationId, userId, status: MemberStatus.ACTIVE } });
   }
 
-  /** Người tạo chiến dịch thuộc đội ngũ tổ chức (đại diện hoặc cộng tác viên đang hoạt động). */
-  private async isTeamMember(organization: Organization, userId: string): Promise<boolean> {
-    if (organization.representativeId === userId) return true;
-    return !!(await this.activeMember(organization.id, userId));
+  /** Đang là cộng tác viên hoặc có lời mời chờ nhận của tổ chức. */
+  isMemberOrInvited(organizationId: string, userId: string): Promise<boolean> {
+    return this.memberRepo.exists({ where: { organizationId, userId } });
   }
 }

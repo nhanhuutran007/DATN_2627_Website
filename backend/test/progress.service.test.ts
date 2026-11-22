@@ -242,7 +242,7 @@ describe("ProgressService", () => {
       equal(repos.savedRevisions.length, 1);
       equal(repos.savedRevisions[0].reason, "Gộp hai hạng mục khảo sát");
       // Chỉ đổi tên: không thông báo đổi lịch
-      equal(notifier.backerNotices.length, 0);
+      equal(notifier.followerNotices.length, 0);
     });
 
     it("should require a reason after the campaign is published", async () => {
@@ -272,9 +272,9 @@ describe("ProgressService", () => {
       );
       equal(milestone.overdueNotifiedAt, null);
       equal(repos.savedRevisions[0].newValues.targetDate, "2026-12-01T00:00:00.000Z");
-      equal(notifier.backerNotices.length, 1);
-      equal(notifier.backerNotices[0].base.type, "milestone_rescheduled");
-      ok(notifier.backerNotices[0].base.message.includes("Nhà cung cấp giao hàng chậm hai tuần"));
+      equal(notifier.followerNotices.length, 1);
+      equal(notifier.followerNotices[0].base.type, "milestone_rescheduled");
+      ok(notifier.followerNotices[0].base.message.includes("Nhà cung cấp giao hàng chậm hai tuần"));
     });
 
     it("should not reschedule a completed milestone", async () => {
@@ -349,7 +349,7 @@ describe("ProgressService", () => {
       repos.updateRepo.find = async () => [{ id: UPDATE_ID, milestoneId: MILESTONE_ID, content: "Đã xong", attachments: [] }];
       await rejects(service.completeMilestone(MILESTONE_ID, makeUser()), (err: any) => err.status === 409);
       equal(repos.mockMilestone.isCompleted, false);
-      equal(notifier.backerNotices.length, 0);
+      equal(notifier.followerNotices.length, 0);
     });
 
     it("should accept a receipt as evidence", async () => {

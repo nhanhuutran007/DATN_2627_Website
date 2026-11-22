@@ -2,6 +2,7 @@ import { Column, DeleteDateColumn, Entity, JoinColumn, ManyToOne } from "typeorm
 
 import { BaseEntity } from "../../../common/base.entity";
 import type { Campaign } from "../../campaigns/entities/campaign.entity";
+import type { CampaignPost } from "../../posts/entities/campaign-post.entity";
 import type { User } from "../../users/entities/user.entity";
 
 export enum CommentKind {
@@ -22,6 +23,14 @@ export class CampaignComment extends BaseEntity {
   @ManyToOne("Campaign")
   @JoinColumn({ name: "campaign_id" })
   campaign?: Campaign;
+
+  /** Bình luận trên một bài cập nhật; `null` = bình luận/hỏi đáp chung của chiến dịch. */
+  @Column({ name: "post_id", type: "varchar", nullable: true })
+  postId?: string | null;
+
+  @ManyToOne("CampaignPost", { onDelete: "CASCADE" })
+  @JoinColumn({ name: "post_id" })
+  post?: CampaignPost | null;
 
   @Column({ name: "user_id" })
   userId!: string;

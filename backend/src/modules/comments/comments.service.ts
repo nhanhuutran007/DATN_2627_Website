@@ -107,6 +107,7 @@ export class CommentsService {
         avatar: comment.user?.avatar ?? null,
       },
       isOwner: comment.userId === ownerId,
+      isAdmin: comment.user?.role === UserRole.ADMIN,
       replies,
     };
   }
@@ -117,7 +118,8 @@ export class CommentsService {
     const offset = query.offset ?? 0;
     const limit = query.limit ?? 20;
     const [roots, total] = await this.commentRepo.findAndCount({
-      where: { campaignId, parentId: IsNull(), status: CommentStatus.VISIBLE },
+      // Bình luận trên bài cập nhật hiển thị dưới bài, không lẫn vào hỏi đáp chung.
+      where: { campaignId, postId: IsNull(), parentId: IsNull(), status: CommentStatus.VISIBLE },
       relations: { user: true },
       order: { createdAt: "DESC" },
       skip: offset,
@@ -154,7 +156,7 @@ export class CommentsService {
     let parent: CampaignComment | null = null;
     if (dto.parentId) {
       parent = await this.commentRepo.findOne({ where: { id: dto.parentId } });
-      if (!parent || parent.campaignId !== campaignId || parent.status !== CommentStatus.VISIBLE) {
+      if (!parent || parent.campaignId !== campaignId || parent.postId || parent.status !== CommentStatus.VISIBLE) {
         throw new NotFoundException("Comment not found");
       }
       if (parent.parentId) {
@@ -221,6 +223,8 @@ export class CommentsService {
       throw new ForbiddenException("Bạn chỉ xóa được bình luận của mình.");
     }
     await this.commentRepo.softDelete({ id });
+    // Bình luận gốc bị xóa thì các trả lời của nó cũng không còn chỗ hiển thị (và không bị đếm).
+    if (!comment.parentId) await this.commentRepo.softDelete({ parentId: id });
     await this.auditService.record({
       userId: user.id,
       action: "comment.delete",
@@ -269,7 +273,7 @@ export class CommentsService {
       : base;
     const [items, total] = await this.commentRepo.findAndCount({
       where,
-      relations: { user: true, campaign: true },
+      relations: { user: true, campaign: true, post: true },
       order: { createdAt: "DESC" },
       skip: offset,
       take: limit,
@@ -350,7 +354,7 @@ export class CommentsService {
       type: NotificationType.COMMENT_HIDDEN,
       title: "Bình luận của bạn đã bị ẩn",
       message: `Bình luận trong chiến dịch "${comment.campaign?.title ?? ""}" đã bị quản trị viên ẩn. Lý do: ${reason}`,
-      link: `/du-an/${comment.campaignId}`,
+      link: `/du-an/${comment.campaignId}${comment.postId ? "#cap-nhat" : ""}`,
       relatedId: id,
     });
     return saved;

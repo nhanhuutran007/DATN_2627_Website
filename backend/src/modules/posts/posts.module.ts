@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { Campaign } from "../campaigns/entities/campaign.entity";
+import { CampaignComment } from "../comments/entities/campaign-comment.entity";
 import { Donation } from "../donations/entities/donation.entity";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { CampaignPostLike } from "./entities/campaign-post-like.entity";
@@ -10,7 +11,7 @@ import { PostsController } from "./posts.controller";
 import { PostsService } from "./posts.service";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CampaignPost, CampaignPostLike, Campaign, Donation]), OrganizationsModule],
+  imports: [TypeOrmModule.forFeature([CampaignPost, CampaignPostLike, Campaign, Donation, CampaignComment]), OrganizationsModule],
   controllers: [PostsController],
   providers: [PostsService],
 })

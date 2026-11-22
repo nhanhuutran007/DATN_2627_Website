@@ -157,7 +157,7 @@ export function MyCollaborations() {
                     <div className="collab-campaigns">
                       <h3>Chiến dịch của tổ chức</h3>
                       {item.campaigns.length === 0 && (
-                        <p className="hint">Chưa có chiến dịch nào do người đại diện hoặc cộng tác viên tạo cho tổ chức.</p>
+                        <p className="hint">Người đại diện chưa tạo chiến dịch nào cho tổ chức.</p>
                       )}
                       <ul>
                         {item.campaigns.map((campaign) => {

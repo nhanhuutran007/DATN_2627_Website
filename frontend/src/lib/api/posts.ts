@@ -1,4 +1,5 @@
 import { api } from "../api";
+import type { CampaignCommentView, CommentThreadPage } from "./comments";
 
 export type PostVisibility = "public" | "backers";
 
@@ -16,6 +17,12 @@ export type ApiPost = {
   liked: boolean;
   createdAt: string;
   editedAt: string | null;
+  /** Số bình luận đang hiển thị dưới bài. */
+  commentCount: number;
+  /** Người xem đã ủng hộ: viết được bình luận gốc. */
+  canComment: boolean;
+  /** Người xem quản lý bài (chủ dự án, quản trị viên, đội ngũ): trả lời được bình luận. */
+  canReply: boolean;
 };
 
 export type ApiPostPage = { items: ApiPost[]; total: number; offset: number; limit: number };
@@ -59,4 +66,12 @@ export function likePost(postId: string): Promise<PostLikeState> {
 
 export function unlikePost(postId: string): Promise<PostLikeState> {
   return api.del<PostLikeState>(`${postPath(postId)}/like`);
+}
+
+export function fetchPostComments(postId: string, offset = 0, limit = 10): Promise<CommentThreadPage> {
+  return api.get<CommentThreadPage>(`/posts/${encodeURIComponent(postId)}/comments?offset=${offset}&limit=${limit}`);
+}
+
+export function postPostComment(postId: string, payload: { content: string; parentId?: string }): Promise<CampaignCommentView> {
+  return api.post<CampaignCommentView>(`/posts/${encodeURIComponent(postId)}/comments`, payload);
 }

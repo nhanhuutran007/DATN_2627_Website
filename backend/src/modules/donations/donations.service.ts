@@ -1172,14 +1172,24 @@ export class DonationsService {
   /** Báo người ủng hộ: trừ tiền thất bại, cần đổi thẻ trước hạn. */
   private async notifyChargeFailed(donation: Donation): Promise<void> {
     const campaign = await this.campaignRepo.findOne({ where: { id: donation.campaignId } });
+    const deadline = this.chargeRetryDeadline(donation);
+    const link = `/du-an/${donation.campaignId}/ung-ho?donation=${donation.id}&payment=success`;
     await this.notificationsService.notify({
       userId: donation.userId,
       type: NotificationType.SYSTEM,
       title: "Chưa trừ được tiền khoản ủng hộ",
-      message: `Chiến dịch "${campaign?.title ?? ""}" đã đạt mục tiêu nhưng chưa trừ được ${money(donation.amount)} từ phương thức bạn đã lưu. Vui lòng cập nhật thẻ trước ${vnDate(this.chargeRetryDeadline(donation))}, nếu không khoản cam kết sẽ bị hủy.`,
-      link: `/du-an/${donation.campaignId}/ung-ho?donation=${donation.id}&payment=success`,
+      message: `Chiến dịch "${campaign?.title ?? ""}" đã đạt mục tiêu nhưng chưa trừ được ${money(donation.amount)} từ phương thức bạn đã lưu. Vui lòng cập nhật thẻ trước ${vnDate(deadline)}, nếu không khoản cam kết sẽ bị hủy.`,
+      link,
       relatedId: donation.id,
       email: true,
+      chargeFailed: {
+        campaignTitle: campaign?.title ?? "",
+        amount: Number(donation.amount),
+        reason: donation.lastChargeError,
+        deadline,
+        graceDays: CHARGE_RETRY_DAYS,
+        fixLink: link,
+      },
     });
   }
 

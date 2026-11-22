@@ -83,6 +83,8 @@ export type CommentView = {
   author: CommentAuthor;
   /** Người viết là chủ dự án (hiển thị nhãn "Chủ dự án"). */
   isOwner: boolean;
+  /** Người viết là quản trị viên Góp Mầm (hiển thị nhãn "Quản trị viên"). */
+  isAdmin?: boolean;
   replies: CommentView[];
 };
 

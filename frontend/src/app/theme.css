@@ -1483,55 +1483,76 @@ h3 {
   }
 }
 
-/* Số dư ví Góp Mầm trên header (bấm để sang /vi) */
-.gh-wallet {
+/* Số dư ví trong menu tài khoản: ẩn mặc định, bấm con mắt để hiện */
+.gh-account-wallet {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  padding: 10px 12px;
+  border: 1px solid #cfe9d8;
+  border-radius: 12px;
+  background: var(--success-soft);
+}
+
+.gh-account-wallet-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.gh-account-wallet-link:hover {
+  color: var(--success);
+}
+
+.gh-account-wallet-amount {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.gh-account-wallet-amount b {
+  color: var(--success);
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.gh-account-wallet-amount small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
+.gh-account-wallet-toggle {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   color: var(--success);
   border: 1px solid #cfe9d8;
   border-radius: 999px;
-  background: var(--success-soft);
-  font-size: 0.88rem;
-  font-weight: 700;
-  white-space: nowrap;
-  transition: border-color 150ms ease, background-color 150ms ease;
+  background: #ffffff;
+  cursor: pointer;
 }
 
-.gh-wallet:hover {
+.gh-account-wallet-toggle:hover {
   border-color: var(--success);
 }
 
-.gh-wallet:focus-visible,
-.gh-account-wallet:focus-visible {
+.gh-account-wallet-link:focus-visible,
+.gh-account-wallet-toggle:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-}
-
-/* Trong menu tài khoản và trình đơn màn hình hẹp */
-.gh-account-wallet {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  color: var(--text-2);
-  font-size: 0.88rem;
-}
-
-.gh-account-wallet b {
-  color: var(--success);
-}
-
-.gh-drawer-section .gh-account-wallet {
-  margin: 0 0 10px;
-}
-
-@media (max-width: 640px) {
-  /* Màn hình hẹp: số dư nằm trong trình đơn, giữ header gọn */
-  .gh-wallet {
-    display: none;
-  }
 }
 
 .gh-right .notification-bell {
@@ -1986,7 +2007,10 @@ h3 {
 }
 
 .block-head-center p {
+  max-width: 720px;
   margin-inline: auto;
+  /* Chia đều chữ giữa các dòng, tránh một chữ lẻ (vd. "khác") rơi xuống dòng cuối. */
+  text-wrap: balance;
 }
 
 .block-head-split {
@@ -2207,6 +2231,7 @@ h3 {
   border-radius: 8px;
   background: var(--primary-soft);
   font-size: 0.82rem;
+  text-wrap: pretty;
 }
 
 .c-card-reason svg {
@@ -10996,8 +11021,18 @@ html:has(dialog:modal) .admin-sidebar {
   margin-top: 10px;
 }
 
+/* Bình luận dưới bài cập nhật: người ủng hộ bình luận, chủ dự án/quản trị viên trả lời */
+.post-comments {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+
 .post-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding-top: 12px;
@@ -12894,6 +12929,22 @@ html:has(dialog:modal) .admin-sidebar {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  margin-bottom: 32px;
+}
+
+/* Khối tiêu đề co lại để nút "Đăng ký tổ chức khác" nằm cùng hàng trên màn rộng. */
+.org-page-head > div {
+  flex: 1 1 380px;
+  min-width: 0;
+}
+
+.org-page-head > div .org-lead {
+  margin-bottom: 0;
+}
+
+.org-page-head > .button {
+  flex-shrink: 0;
+  margin-top: 16px;
 }
 
 .org-form {
@@ -13243,7 +13294,23 @@ html:has(dialog:modal) .admin-sidebar {
 
 /* Lời mời và tổ chức mình cộng tác */
 .collab-section {
-  margin-bottom: 28px;
+  margin-bottom: 36px;
+}
+
+.collab-section .org-mine-item > p {
+  margin: 0 0 6px;
+  line-height: 1.5;
+}
+
+.collab-section .org-mine-item > p.hint {
+  margin-bottom: 16px;
+}
+
+/* Chưa có tổ chức: khung nét đứt để tách khỏi phần lời mời phía trên. */
+.org-page .activity-empty {
+  padding: 32px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
 }
 
 .collab-section > h2 {
@@ -13938,14 +14005,15 @@ html:has(dialog:modal) .admin-sidebar {
 
 .cf-card-body {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
   padding: 0 12px;
 }
 
-.cf-card-body > div {
-  min-width: 0;
+.cf-card-body .cf-card-title,
+.cf-card-body .cf-card-org {
+  margin: 0;
 }
 
 .cf-card-title {
@@ -13982,6 +14050,11 @@ html:has(dialog:modal) .admin-sidebar {
   margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.cf-card-raised b {
+  color: var(--text);
+  font-weight: 700;
 }
 
 .cf-card-org {

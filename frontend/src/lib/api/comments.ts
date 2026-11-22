@@ -12,6 +12,8 @@ export type CampaignCommentView = {
   author: { id: string; name: string; avatar: string | null };
   /** Người viết là chủ dự án. */
   isOwner: boolean;
+  /** Người viết là quản trị viên Góp Mầm. */
+  isAdmin?: boolean;
   replies: CampaignCommentView[];
 };
 
@@ -26,6 +28,8 @@ export type AdminComment = {
   id: string;
   campaignId: string;
   campaign?: { id: string; title: string; status: ApiCampaignStatus } | null;
+  /** Bình luận dưới bài cập nhật (không có = hỏi đáp chung của chiến dịch). */
+  post?: { id: string; number: number; title: string } | null;
   userId: string;
   user?: { id: string; name: string; email?: string } | null;
   parentId?: string | null;

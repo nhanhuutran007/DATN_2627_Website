@@ -166,14 +166,37 @@ describe("Cộng tác viên tổ chức", () => {
     equal(await access.canOnCampaign(outsiderCampaign, makeUser(ADMIN, UserRole.ADMIN), OrgPermission.POST_UPDATES), true);
   });
 
-  it("người đại diện có mọi quyền trên chiến dịch cộng tác viên tạo; tổ chức tạm ngưng thì mất quyền", async () => {
-    const view = await invite({});
+  it("chiến dịch cộng tác viên tạo không phải chiến dịch chung; tổ chức tạm ngưng thì cộng tác viên mất quyền", async () => {
+    const view = await invite({ reportProgress: true });
     await service.accept(view.id, collab);
     const collabCampaign = { ownerId: COLLAB, organizationId: ORG };
-    equal(await access.canOnCampaign(collabCampaign, rep, OrgPermission.REPORT_PROGRESS), true);
-    organization.status = OrganizationStatus.SUSPENDED;
     equal(await access.canOnCampaign(collabCampaign, rep, OrgPermission.REPORT_PROGRESS), false);
     equal(await access.canOnCampaign(collabCampaign, collab, OrgPermission.REPORT_PROGRESS), true);
+
+    const repCampaign = { ownerId: REP, organizationId: ORG };
+    equal(await access.canOnCampaign(repCampaign, collab, OrgPermission.REPORT_PROGRESS), true);
+    organization.status = OrganizationStatus.SUSPENDED;
+    equal(await access.canOnCampaign(repCampaign, collab, OrgPermission.REPORT_PROGRESS), false);
+    equal(await access.canOnCampaign(repCampaign, rep, OrgPermission.REPORT_PROGRESS), true);
+  });
+
+  it("cộng tác viên (kể cả đang chờ nhận lời) không được tạo chiến dịch cho tổ chức", async () => {
+    const { OrganizationsService } = await import("../src/modules/organizations/organizations.service");
+    const orgService = new OrganizationsService(
+      makeRepo([organization]) as never,
+      {} as never,
+      {} as never,
+      makeAuditRecorder().service,
+      notifier.service,
+      access,
+    );
+    equal((await orgService.assertCanReceiveCampaigns(ORG, rep)).id, ORG);
+    equal((await orgService.assertCanReceiveCampaigns(ORG, outsider)).id, ORG);
+
+    const view = await invite();
+    await rejects(orgService.assertCanReceiveCampaigns(ORG, collab), ForbiddenException);
+    await service.accept(view.id, collab);
+    await rejects(orgService.assertCanReceiveCampaigns(ORG, collab), ForbiddenException);
   });
 
   it("sửa quyền, từ chối lời mời, gỡ và tự rời", async () => {
@@ -191,6 +214,23 @@ describe("Cộng tác viên tổ chức", () => {
     await service.remove(ORG, again.id, collab);
     equal(members.rows.length, 0);
     equal(notifier.notified.at(-1)?.userId, REP);
+  });
+
+  it("bị gỡ hoặc bị thu hồi lời mời thì được báo kèm email", async () => {
+    const view = await invite();
+    await service.accept(view.id, collab);
+    await service.remove(ORG, view.id, rep);
+    const removed = notifier.notified.at(-1);
+    equal(removed?.userId, COLLAB);
+    equal(removed?.email, true);
+    equal(removed?.title, "Bạn không còn là cộng tác viên");
+
+    const pending = await invite();
+    await service.remove(ORG, pending.id, rep);
+    const revoked = notifier.notified.at(-1);
+    equal(revoked?.userId, COLLAB);
+    equal(revoked?.email, true);
+    equal(revoked?.title, "Lời mời cộng tác đã bị thu hồi");
   });
 
   it("đội ngũ công khai: người đại diện trước, chỉ cộng tác viên đã nhận lời", async () => {

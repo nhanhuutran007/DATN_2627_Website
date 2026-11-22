@@ -68,7 +68,7 @@ export function RewardCard({ tier, action, selected = false }: RewardCardProps) 
             </div>
           )}
           <div>
-            <dt>Cách nhận</dt>
+            <dt>Hình thức nhận</dt>
             <dd>{shipping ? "Gửi tận nơi trong Việt Nam" : "Không cần giao (quà số/ghi danh)"}</dd>
           </div>
         </dl>

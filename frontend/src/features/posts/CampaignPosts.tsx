@@ -10,6 +10,8 @@ import { useAuthUser } from "@/lib/auth";
 import { fetchCampaignPosts, likePost, unlikePost, type ApiPost } from "@/lib/api/posts";
 import { formatDateTime, formatDay } from "@/lib/format";
 
+import { PostComments } from "./PostComments";
+
 const PAGE_SIZE = 5;
 /** Bài dài hơn chừng này ký tự được thu gọn, bấm "Đọc tiếp" để mở. */
 const COLLAPSE_AT = 600;
@@ -121,6 +123,7 @@ type PostCardProps = {
 
 function PostCard({ post, campaignId, organizer, signedIn, onChange }: PostCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const long = (post.content?.length ?? 0) > COLLAPSE_AT;
@@ -208,8 +211,25 @@ function PostCard({ post, campaignId, organizer, signedIn, onChange }: PostCardP
             <Icon name="heart" size={16} /> {post.likeCount} lượt thích · <Link href={loginHref}>Đăng nhập</Link> để thích
           </span>
         )}
+        {!post.locked && (
+          <button
+            className={commentsOpen ? "post-like is-liked" : "post-like"}
+            type="button"
+            aria-expanded={commentsOpen}
+            aria-controls={`binh-luan-${post.id}`}
+            onClick={() => setCommentsOpen((value) => !value)}
+          >
+            <Icon name="message" size={16} /> Bình luận
+            {post.commentCount > 0 && <span className="num"> · {post.commentCount}</span>}
+          </button>
+        )}
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
+      {commentsOpen && !post.locked && (
+        <div id={`binh-luan-${post.id}`}>
+          <PostComments post={post} onCountChange={(delta) => onChange({ ...post, commentCount: Math.max(0, post.commentCount + delta) })} />
+        </div>
+      )}
     </li>
   );
 }

@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, Repository } from "typeorm";
 
-import type { EmailGateway } from "../../integrations/email/email.gateway";
+import type { ChargeFailedDetails, EmailGateway } from "../../integrations/email/email.gateway";
 import { COUNTED_DONATION_STATUSES, Donation } from "../donations/entities/donation.entity";
 import { CampaignFollow } from "../follows/entities/campaign-follow.entity";
 import { User } from "../users/entities/user.entity";
@@ -24,6 +24,10 @@ export type NotifyInput = {
    * cùng chiến dịch chưa đọc thì cộng dồn vào đó thay vì thêm một dòng mới.
    */
   donationGroup?: { campaignTitle: string; amount: number };
+  /** Tiêu đề email riêng (mặc định dùng `title`); nên cụ thể để Gmail không gom nhầm các thư. */
+  emailSubject?: string;
+  /** Email dùng template "Cần xử lý" (trừ tiền cam kết thất bại) thay cho email thông báo chung. */
+  chargeFailed?: ChargeFailedDetails;
 };
 
 export type NotificationPage = {
@@ -146,9 +150,10 @@ export class NotificationsService {
           .sendNotification({
             to: user.email,
             name: user.name,
-            subject: i.title,
+            subject: i.emailSubject ?? i.title,
             paragraphs: [i.message],
             link: i.link,
+            chargeFailed: i.chargeFailed,
           })
           .catch((error: Error) =>
             this.logger.error(`Gửi email thông báo cho user ${user.id} thất bại: ${error.message}`),
@@ -187,6 +192,32 @@ export class NotificationsService {
       return userIds.length;
     } catch (error) {
       this.logger.error(`Không tìm được người ủng hộ của chiến dịch ${campaignId}: ${(error as Error).message}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Tin cập nhật của dự án (bài cập nhật, tiến độ, mốc): chỉ gửi người đang theo dõi, kèm email.
+   * Ủng hộ thành công đã tự động theo dõi, nên người ủng hộ nhận tin cho tới khi tự bỏ theo dõi.
+   * `onlyUserIds`: giới hạn thêm (vd. bài chỉ dành cho người ủng hộ).
+   */
+  async notifyCampaignFollowers(
+    campaignId: string,
+    base: Omit<NotifyInput, "userId" | "email">,
+    excludeUserIds: string[] = [],
+    onlyUserIds?: string[],
+  ): Promise<number> {
+    try {
+      const follows = await this.followRepo.find({ select: { userId: true }, where: { campaignId } });
+      const exclude = new Set(excludeUserIds);
+      const only = onlyUserIds ? new Set(onlyUserIds) : null;
+      const userIds = [...new Set(follows.map((r) => r.userId))].filter(
+        (id) => id && !exclude.has(id) && (!only || only.has(id)),
+      );
+      await this.notify(userIds.map((userId) => ({ ...base, userId, email: true })));
+      return userIds.length;
+    } catch (error) {
+      this.logger.error(`Không tìm được người theo dõi của chiến dịch ${campaignId}: ${(error as Error).message}`);
       return 0;
     }
   }

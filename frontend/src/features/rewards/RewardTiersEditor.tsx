@@ -169,7 +169,7 @@ export function RewardTierFields({ tier, onChange, lockAmount = false }: FieldsP
           <small className="hint">Bỏ trống = đến hết chiến dịch</small>
         </label>
         <fieldset className="field field-span-2 reward-shipping">
-          <legend>Cách nhận quà</legend>
+          <legend>Hình thức nhận quà</legend>
           <label>
             <input type="radio" checked={tier.shipping} onChange={() => set("shipping", true)} />
             <span>Gửi tận nơi <small>— hỏi tên, số điện thoại, địa chỉ người nhận</small></span>
@@ -197,7 +197,7 @@ export function RewardTiersEditor({ tiers, onChange }: Props) {
     <div className="reward-editor">
       <h3>Mức ủng hộ &amp; phần quà <small>(tùy chọn)</small></h3>
       <p className="hint">
-        Như Kickstarter: mỗi mức nêu rõ số tiền, các món bao gồm, thời gian dự kiến giao và cách nhận quà. Sau khi chiến dịch
+        Như Kickstarter: mỗi mức nêu rõ số tiền, các món bao gồm, thời gian dự kiến giao và hình thức nhận quà. Sau khi chiến dịch
         phát hành, số tiền tối thiểu của mỗi mức không thay đổi được để giữ đúng cam kết với người đã ủng hộ.
       </p>
       {tiers.map((tier, index) => (

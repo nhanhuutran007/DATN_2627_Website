@@ -73,7 +73,7 @@ export class CampaignsController {
   @UseGuards(JwtAuthGuard, NonAdminGuard)
   async create(@Body() dto: CreateCampaignDto, @GetCurrentUser() user: User) {
     await this.categoriesService.assertUsable(dto.category);
-    if (dto.organizationId) await this.organizationsService.assertCanReceiveCampaigns(dto.organizationId);
+    if (dto.organizationId) await this.organizationsService.assertCanReceiveCampaigns(dto.organizationId, user);
     return this.campaignsService.create(dto, user);
   }
 
@@ -87,7 +87,7 @@ export class CampaignsController {
     if (dto.category !== undefined) {
       await this.categoriesService.assertUsable(dto.category);
     }
-    if (dto.organizationId) await this.organizationsService.assertCanReceiveCampaigns(dto.organizationId);
+    if (dto.organizationId) await this.organizationsService.assertCanReceiveCampaigns(dto.organizationId, user);
     return this.campaignsService.update(id, dto, user);
   }
 

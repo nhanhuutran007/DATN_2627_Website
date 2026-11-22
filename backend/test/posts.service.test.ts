@@ -180,16 +180,18 @@ describe("PostsService", () => {
     equal(ownerView.locked, false);
   });
 
-  it("bài công khai báo cho người ủng hộ và người theo dõi; bài riêng chỉ báo người ủng hộ", async () => {
+  it("bài công khai báo người theo dõi kèm email; bài riêng chỉ báo người ủng hộ còn theo dõi", async () => {
     await service.create(CAMPAIGN, draft(), owner);
-    equal(notifier.backerNotices.length, 1);
-    deepEqual(notifier.backerNotices[0].excludeUserIds, [OWNER]);
-    equal(notifier.notified.length, 0);
+    equal(notifier.followerNotices.length, 1);
+    deepEqual(notifier.followerNotices[0].excludeUserIds, [OWNER]);
+    equal(notifier.followerNotices[0].onlyUserIds, undefined);
+    equal(notifier.followerNotices[0].base.email, true);
 
     await service.create(CAMPAIGN, draft(PostVisibility.BACKERS), owner);
-    equal(notifier.backerNotices.length, 1);
-    deepEqual(notifier.notified.map((n) => n.userId), [BACKER]);
-    ok(notifier.notified[0].title.startsWith("Cập nhật #2"));
+    equal(notifier.followerNotices.length, 2);
+    deepEqual(notifier.followerNotices[1].onlyUserIds, [BACKER]);
+    ok(notifier.followerNotices[1].base.title.startsWith("Cập nhật #2"));
+    equal(notifier.backerNotices.length, 0);
   });
 
   it("thích bài idempotent, bỏ thích giảm số đếm; không thích được bài đang khóa", async () => {

@@ -1915,6 +1915,7 @@ export function AdminDashboard() {
                         ) : (
                           "Chiến dịch"
                         )}
+                        {comment.post && <span className="comment-flag">Cập nhật #{comment.post.number}</span>}
                         {comment.openReportCount > 0 && (
                           <Link className="comment-flag is-reported" href={adminHref("bao-cao-vi-pham")} title="Xem báo cáo vi phạm">
                             Bị báo cáo{comment.openReportCount > 1 ? ` (${comment.openReportCount})` : ""}

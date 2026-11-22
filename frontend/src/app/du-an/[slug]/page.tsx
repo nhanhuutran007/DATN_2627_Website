@@ -501,17 +501,6 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           {rewardTiers.length > 0 && (
             <section className="reward-side" aria-labelledby="phan-qua">
               <h2 id="phan-qua">Chọn phần quà</h2>
-              {open && (
-                <article className="reward-card reward-card-plain">
-                  <div className="reward-card-body">
-                    <h3 className="reward-card-title">Ủng hộ không nhận quà</h3>
-                    <p className="reward-card-desc">Ủng hộ vì bạn tin vào dự án, với bất kỳ số tiền nào.</p>
-                    <div className="reward-card-action">
-                      <DonateLink className="button button-outline button-block" href={donateHref}>Ủng hộ</DonateLink>
-                    </div>
-                  </div>
-                </article>
-              )}
               {rewardTiers.map((tier) => (
                 <RewardCard
                   key={tier.id}

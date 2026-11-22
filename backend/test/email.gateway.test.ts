@@ -111,6 +111,22 @@ describe("SmtpEmailGateway", () => {
     ok(String(sent[0].html).includes("Đặt lại mật khẩu"));
     equal((sent[0].attachments as { cid: string }[] | undefined)?.[0]?.cid, "gopmam-logo");
   });
+
+  it("tags every email with a unique X-Entity-Ref-ID so Gmail does not collapse repeats", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const gateway = new SmtpEmailGateway(
+      { sendMail: async (mail: Record<string, unknown>) => sent.push(mail) } as never,
+      "Góp Mầm <gopmam@gmail.com>",
+    );
+    const notice = { to: "an@example.com", name: "An", subject: "Lời mời", paragraphs: ["x"] };
+
+    await gateway.sendNotification(notice);
+    await gateway.sendNotification(notice);
+
+    const ids = sent.map((mail) => (mail.headers as Record<string, string>)["X-Entity-Ref-ID"]);
+    ok(ids[0] && ids[1]);
+    ok(ids[0] !== ids[1]);
+  });
 });
 
 describe("renderPasswordChangedEmail", () => {
@@ -140,5 +156,33 @@ describe("renderEmailVerificationEmail", () => {
     ok(email.text.includes("24 giờ"));
     ok(email.html.includes("token=abc&amp;x=1"));
     ok(email.html.includes("An &lt;i&gt;"));
+  });
+});
+
+describe("renderNotificationEmail with chargeFailed", () => {
+  it("uses the action-needed template with reason, deadline and escaped title", async () => {
+    const { renderNotificationEmail } = await import("../src/integrations/email/email.gateway");
+    const email = renderNotificationEmail({
+      to: "an@example.com",
+      name: "An",
+      subject: "Chưa trừ được tiền khoản ủng hộ",
+      paragraphs: ["x"],
+      chargeFailed: {
+        campaignTitle: "Dự án <b>A</b>",
+        amount: 150000,
+        reason: "Your card was declined.",
+        deadline: new Date("2026-11-28T08:30:00Z"),
+        graceDays: 7,
+        fixLink: "/du-an/c1/ung-ho?donation=d1&payment=success",
+      },
+    });
+    equal(email.subject, "Vui lòng cập nhật phương thức thanh toán cho Dự án <b>A</b>");
+    ok(email.html.includes("Cần xử lý"));
+    ok(email.html.includes("Your card was declined."));
+    ok(email.html.includes("Dự án &lt;b&gt;A&lt;/b&gt;"));
+    ok(!email.html.includes("Dự án <b>A</b>"));
+    ok(email.html.includes("/du-an/c1/ung-ho?donation=d1&amp;payment=success"));
+    ok(email.text.includes("15:30 ngày 28/11/2026"));
+    equal(email.attachments?.length, 1);
   });
 });
