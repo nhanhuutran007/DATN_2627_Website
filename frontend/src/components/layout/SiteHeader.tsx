@@ -298,9 +298,16 @@ function WalletBalance({ balance, held, onNavigate }: { balance: number; held: n
         <Icon name="wallet" size={16} />
         <span>Ví Góp Mầm</span>
       </Link>
-      <span className="gh-account-wallet-amount">
-        <b className="num" aria-live="polite">{shown ? formatVnd(balance) : "••••••"}</b>
-        {shown && held > 0 && <small>Đang giữ {formatVnd(held)}</small>}
+      {/* Bản ẩn và bản hiện chồng lên cùng một ô: khung luôn có kích thước của bản lớn hơn nên không co giãn khi bấm. */}
+      <span className="gh-account-wallet-amount" aria-live="polite">
+        <span className={shown ? "is-off" : undefined} aria-hidden={shown}>
+          <b className="num">••••••</b>
+          {held > 0 && <small>Đang giữ ••••••</small>}
+        </span>
+        <span className={shown ? undefined : "is-off"} aria-hidden={!shown}>
+          <b className="num">{formatVnd(balance)}</b>
+          {held > 0 && <small>Đang giữ {formatVnd(held)}</small>}
+        </span>
       </span>
       <button
         className="gh-account-wallet-toggle"

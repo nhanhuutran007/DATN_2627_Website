@@ -1510,12 +1510,23 @@ h3 {
 }
 
 .gh-account-wallet-amount {
-  display: flex;
+  display: grid;
   flex: 1;
-  flex-direction: column;
-  align-items: flex-end;
+  justify-items: end;
   min-width: 0;
   line-height: 1.25;
+}
+
+/* Hai bản (ẩn/hiện) cùng nằm ở ô 1/1: kích thước khung theo bản lớn hơn, không đổi khi bấm. */
+.gh-account-wallet-amount > span {
+  display: flex;
+  grid-area: 1 / 1;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.gh-account-wallet-amount > .is-off {
+  visibility: hidden;
 }
 
 .gh-account-wallet-amount b {
