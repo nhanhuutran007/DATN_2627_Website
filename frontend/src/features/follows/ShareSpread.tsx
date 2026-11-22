@@ -3,10 +3,10 @@
 import Image from "next/image";
 import { useState, useSyncExternalStore } from "react";
 
-import { ProgressRing } from "@/components/campaign/ProgressRing";
+import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { Icon } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/ui/LogoMark";
-import { formatVndShort } from "@/lib/format";
+import { formatVndCompact } from "@/lib/format";
 
 import { SHARE_CHANNELS } from "./ShareCampaignButton";
 
@@ -59,8 +59,11 @@ export function ShareSpread({ campaignId, title, owner, raised, percent, cover, 
           <Image src={cover.src} alt="" fill sizes="(max-width: 560px) 50vw, 340px" unoptimized={!cover.illustrative} />
           <span className="share-preview-heart"><Icon name="heart" size={20} /></span>
           <div className="share-preview-stats">
-            <ProgressRing value={percent} size={76} />
-            <span className="share-preview-raised">Đã nhận {formatVndShort(raised)}</span>
+            <span className="share-preview-progress">
+              <b>{percent}%</b>
+              <ProgressBar value={percent} />
+            </span>
+            <span className="share-preview-raised">Đã nhận {formatVndCompact(raised)}</span>
             {open && <span className="share-preview-cta">Ủng hộ ngay!</span>}
           </div>
         </div>

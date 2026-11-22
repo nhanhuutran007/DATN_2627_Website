@@ -2303,11 +2303,36 @@ h3 {
   margin-top: auto;
 }
 
-.c-card-raised {
+/* Hàng dưới thanh tiến độ: thời gian còn lại (trái) · % đã đạt (phải), như thẻ Kickstarter */
+.c-card-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin: 10px 0 0;
+  font-size: 0.88rem;
+  color: var(--muted, #6b7385);
+}
+
+.c-card-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.c-card-pct {
+  white-space: nowrap;
+}
+
+.c-card-pct b {
   color: var(--navy);
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 700;
+}
+
+.c-card-pct.is-funded b {
+  color: #1f8a4c;
 }
 
 .meter {
@@ -5210,6 +5235,30 @@ button {
   justify-content: flex-end;
 }
 
+/* Ảnh đại diện lĩnh vực (ảnh admin tải lên hoặc ảnh minh họa mặc định) */
+#danh-muc .category-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f1efe9;
+  color: #6b6b6b;
+}
+
+#danh-muc .category-thumb img {
+  object-fit: cover;
+}
+
+#danh-muc .category-image-source {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #6b6b6b;
+}
+
 /* Cặp mũi tên sắp xếp dính liền nhau, tách khỏi các nút chữ */
 #danh-muc .category-move {
   display: inline-flex;
@@ -7380,6 +7429,25 @@ html:has(dialog:modal) .admin-sidebar {
   border-left: 1px solid var(--line);
 }
 
+/* Đã vượt mục tiêu nhưng còn hạn: vẫn nhận ủng hộ (như Kickstarter) */
+.fund-overfunded {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ecf7f0;
+  color: #1f6b3d;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.fund-overfunded svg {
+  flex: none;
+  margin-top: 3px;
+}
+
 .fund-stats .meter {
   height: 10px;
   margin: 0 0 4px;
@@ -7487,33 +7555,6 @@ html:has(dialog:modal) .admin-sidebar {
   margin: 0 0 16px;
   color: var(--text-2);
   line-height: 1.6;
-}
-
-.progress-ring {
-  position: relative;
-  display: grid;
-  flex: none;
-  place-items: center;
-}
-
-.progress-ring svg {
-  position: absolute;
-  inset: 0;
-}
-
-.progress-ring-track {
-  stroke: #eef0f4;
-}
-
-.progress-ring-value {
-  stroke: var(--primary);
-}
-
-.progress-ring-label {
-  position: relative;
-  color: var(--navy);
-  font-size: 0.85rem;
-  font-weight: 700;
 }
 
 .donor-highlights {
@@ -10351,6 +10392,34 @@ html:has(dialog:modal) .admin-sidebar {
   line-height: 1.25;
 }
 
+.donate-card-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Thanh tiến độ ngang ở trang ủng hộ (giống trang chi tiết dự án) */
+.donate-progress {
+  margin-top: 14px;
+}
+
+.donate-progress .meter {
+  height: 10px;
+  margin: 0 0 6px;
+}
+
+.donate-card-head .donate-progress-figures {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-weight: 500;
+  color: #4a5268;
+}
+
+.donate-progress-figures b {
+  color: var(--navy);
+}
+
 .donate-card-head p {
   margin: 4px 0 0;
   color: var(--navy);
@@ -11353,14 +11422,27 @@ html:has(dialog:modal) .admin-sidebar {
   padding: 0 14px 14px 0;
 }
 
-.share-preview-stats .progress-ring {
-  border-radius: 50%;
+/* Ô % + thanh ngang nhỏ (thay vòng tròn), cùng kiểu thanh tiến độ ở trang dự án */
+.share-preview-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 96px;
+  padding: 6px 10px 8px;
+  border-radius: 10px;
   background: var(--white);
-  box-shadow: 0 0 0 4px var(--white);
+  box-shadow: 0 2px 8px rgba(21, 29, 54, 0.12);
 }
 
-.share-preview-stats .progress-ring-label {
+.share-preview-progress b {
+  color: var(--navy);
   font-size: 1rem;
+  line-height: 1;
+}
+
+.share-preview-progress .meter {
+  height: 6px;
+  margin: 0;
 }
 
 .share-preview-raised,
@@ -12849,16 +12931,19 @@ html:has(dialog:modal) .admin-sidebar {
   background: var(--white);
 }
 
-.wallet-balance span {
+/* Chỉ nhãn (con trực tiếp) — không áp vào span bên trong số tiền (MaskedAmount), nếu không số bị thu về cỡ nhãn */
+.wallet-balance > span {
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
-.wallet-balance b {
+.wallet-balance > b {
   color: var(--navy);
   font-family: var(--font-heading);
-  font-size: clamp(1.5rem, 3vw, 1.9rem);
+  font-size: clamp(2rem, 3.6vw, 2.5rem);
   font-weight: 800;
+  line-height: 1.15;
   overflow-wrap: anywhere;
 }
 
@@ -14123,7 +14208,8 @@ html:has(dialog:modal) .admin-sidebar {
 }
 
 .cf-card-body .cf-card-title,
-.cf-card-body .cf-card-org {
+.cf-card-body .cf-card-org,
+.cf-card-body .c-card-stats {
   margin: 0;
 }
 
@@ -14157,17 +14243,6 @@ html:has(dialog:modal) .admin-sidebar {
   outline-offset: 3px;
 }
 
-.cf-card-raised {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.cf-card-raised b {
-  color: var(--text);
-  font-weight: 700;
-}
-
 .cf-card-org {
   margin: 2px 0 0;
   overflow: hidden;
@@ -14176,18 +14251,6 @@ html:has(dialog:modal) .admin-sidebar {
   font-weight: 600;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.cf-card .progress-ring-value {
-  stroke: #6cc36a;
-}
-
-.cf-card .progress-ring-track {
-  stroke: #e7f3e4;
-}
-
-.cf-card .progress-ring-label {
-  font-size: 0.8rem;
 }
 
 .cf-pages {
@@ -14597,4 +14660,225 @@ html:has(dialog:modal) .admin-sidebar {
   .support-form {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---------- Duyệt tự động & hoàn tiền tự động (admin) ---------- */
+.automation-card {
+  margin-bottom: 20px;
+}
+
+.automation-lead {
+  margin: 0 0 14px;
+  color: #4a5268;
+  line-height: 1.6;
+}
+
+.automation-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.automation-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.automation-option.is-checked {
+  border-color: #e0402b;
+  background: #fff6f4;
+}
+
+.automation-option input {
+  margin-top: 4px;
+  accent-color: #e0402b;
+}
+
+.automation-option b {
+  display: block;
+  color: var(--navy);
+}
+
+.automation-option small {
+  display: block;
+  margin-top: 4px;
+  color: #6b7385;
+  line-height: 1.5;
+}
+
+.refund-monitor-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.refund-monitor-stats > div {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fafbfc;
+}
+
+.refund-monitor-stats > div.is-attention {
+  border-color: #f2c66d;
+  background: #fff8e6;
+}
+
+.refund-monitor-stats dt {
+  font-size: 0.85rem;
+  color: #6b7385;
+}
+
+.refund-monitor-stats dd {
+  margin: 4px 0 0;
+  color: #4a5268;
+}
+
+.refund-monitor-stats dd b {
+  font-size: 1.3rem;
+  color: var(--navy);
+}
+
+.screening-cell {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.screening-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.screening-badge.is-low,
+.screening-summary.is-low .screening-score {
+  background: #e7f6ed;
+  color: #1f6b3d;
+}
+
+.screening-badge.is-medium,
+.screening-summary.is-medium .screening-score {
+  background: #fff3d6;
+  color: #8a5a00;
+}
+
+.screening-badge.is-high,
+.screening-summary.is-high .screening-score {
+  background: #fde7e4;
+  color: #b42318;
+}
+
+.screening-panel {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fafbfc;
+}
+
+.screening-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.screening-head h3 {
+  margin: 0;
+}
+
+.screening-summary {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.screening-summary p {
+  margin: 0;
+}
+
+.screening-score {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+
+.screening-score b {
+  font-size: 1.5rem;
+}
+
+.screening-level {
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.screening-checks {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.screening-checks > li {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+.screening-check-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.screening-check-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.screening-checks .is-pass .screening-check-icon { background: #e7f6ed; color: #1f6b3d; }
+.screening-checks .is-warn .screening-check-icon { background: #fff3d6; color: #8a5a00; }
+.screening-checks .is-fail .screening-check-icon { background: #fde7e4; color: #b42318; }
+
+.screening-check-status {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: #6b7385;
+}
+
+.screening-checks ul {
+  margin: 6px 0 0 30px;
+  padding-left: 16px;
+  color: #4a5268;
+  line-height: 1.5;
+}
+
+.screening-checks li.is-note {
+  color: #1f6b3d;
+}
+
+.screening-foot {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #6b7385;
 }

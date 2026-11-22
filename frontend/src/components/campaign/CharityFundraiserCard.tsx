@@ -2,11 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { ProgressBar } from "@/components/campaign/ProgressBar";
-import { campaignProgress, type Campaign } from "@/lib/data/campaigns";
+import { Icon } from "@/components/ui/Icon";
+import { campaignProgress, campaignTimeLabel, type Campaign } from "@/lib/data/campaigns";
 import { coverFor } from "@/lib/covers";
-import { formatVnd } from "@/lib/format";
 
-/** Thẻ gây quỹ cho tổ chức: ảnh, địa điểm, tên, tổ chức nhận, thanh tiến độ ngang (giống thẻ dự án) và số đã nhận. */
+/** Thẻ gây quỹ cho tổ chức: ảnh, địa điểm, tên, tổ chức nhận, thanh tiến độ ngang và hàng thời gian · % như thẻ ở trang khám phá. */
 export function CharityFundraiserCard({ campaign }: { campaign: Campaign }) {
   const progress = campaignProgress(campaign);
   const cover = coverFor(campaign);
@@ -24,7 +24,15 @@ export function CharityFundraiserCard({ campaign }: { campaign: Campaign }) {
         </h3>
         {campaign.organization && <p className="cf-card-org">cho {campaign.organization.name}</p>}
         <ProgressBar value={progress} label={`Đạt ${progress}% mục tiêu`} />
-        <p className="cf-card-raised"><b>{formatVnd(campaign.raised)}</b> đã nhận · {progress}%</p>
+        {/* Cùng kiểu với CampaignCard: thời gian còn lại bên trái, % đã đạt (có thể vượt 100%) bên phải. */}
+        <p className="c-card-stats">
+          <span className="c-card-time" title={campaign.endDate ? `Kết thúc ${campaign.endDate}` : undefined}>
+            <Icon name="clock" size={14} /> {campaignTimeLabel(campaign)}
+          </span>
+          <span className={`c-card-pct${progress >= 100 ? " is-funded" : ""}`}>
+            <b>{progress.toLocaleString("vi-VN")}%</b> đã đạt
+          </span>
+        </p>
       </div>
     </article>
   );

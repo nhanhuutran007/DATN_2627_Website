@@ -12,6 +12,27 @@ export function formatVndShort(value: number): string {
   return formatVnd(value);
 }
 
+/**
+ * Số tiền gọn cho dự án: 100000 → "100k", 1000000 → "1M", 1500000 → "1,5M", 2300000000 → "2,3B".
+ * Dưới 1.000 giữ nguyên kèm "₫". Nơi dùng nên kèm số đầy đủ (`formatVnd`) trong `title` để rê chuột xem.
+ */
+export function formatVndCompact(value: number): string {
+  const amount = Math.max(0, Math.round(value));
+  const units: Array<[number, string]> = [
+    [1_000_000_000, "B"],
+    [1_000_000, "M"],
+    [1_000, "k"],
+  ];
+  for (const [size, suffix] of units) {
+    if (amount >= size) {
+      // Làm tròn xuống 1 chữ số thập phân để không hiện "đạt 1M" khi mới có 999.999 ₫.
+      const scaled = Math.floor((amount / size) * 10) / 10;
+      return `${scaled.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}${suffix}`;
+    }
+  }
+  return `${amount.toLocaleString("vi-VN")} ₫`;
+}
+
 /** "25/09/2026" */
 export function formatDay(value: Date | string): string {
   const date = typeof value === "string" ? new Date(value) : value;

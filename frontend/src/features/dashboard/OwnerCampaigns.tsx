@@ -10,7 +10,7 @@ import { ProgressManager } from "@/features/progress/ProgressManager";
 import { RewardManager } from "@/features/rewards/RewardManager";
 import { ApiError } from "@/lib/api";
 import { deleteCampaign, submitCampaign, type ApiCampaign, type ApiCampaignStatus } from "@/lib/api/campaigns";
-import { formatVnd } from "@/lib/format";
+import { formatVnd, formatVndCompact } from "@/lib/format";
 
 const STATUS: Record<ApiCampaignStatus, { label: string; tone: string }> = {
   draft: { label: "Bản nháp", tone: "" },
@@ -152,7 +152,8 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
         {campaigns.map((c) => {
           const raised = Number(c.currentAmount) || 0;
           const goal = Number(c.goalAmount) || 0;
-          const percent = goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
+          // Có thể vượt 100%: chiến dịch vẫn nhận ủng hộ tới hết hạn sau khi đạt mục tiêu.
+          const percent = goal > 0 ? Math.floor((raised / goal) * 100) : 0;
           const status = STATUS[c.status];
           const editable = EDITABLE.includes(c.status);
           return (
@@ -167,7 +168,7 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
               )}
               <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
               <div className="own-figures">
-                <span><b className="num">{formatVnd(raised)}</b> / <span className="num">{formatVnd(goal)}</span></span>
+                <span><b className="num" title={formatVnd(raised)}>{formatVndCompact(raised)}</b> / <span className="num" title={formatVnd(goal)}>{formatVndCompact(goal)}</span></span>
                 <span className="num">{percent}%</span>
               </div>
               <div className="own-actions">

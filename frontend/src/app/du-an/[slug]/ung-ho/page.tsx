@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ProgressRing } from "@/components/campaign/ProgressRing";
+import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { Icon } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { DonationPanel } from "@/features/donations/DonationPanel";
@@ -10,7 +10,7 @@ import type { SepayReturn } from "@/features/donations/SepayPaymentStatus";
 import { apiCampaignToView, fetchCampaign, isPublishedStatus } from "@/lib/api/campaigns";
 import { fetchRewardTiers, type RewardTier } from "@/lib/api/rewards";
 import { campaignProgress, type Campaign } from "@/lib/data/campaigns";
-import { formatVnd, isLiveId } from "@/lib/format";
+import { formatVnd, formatVndCompact, isLiveId } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +90,6 @@ export default async function DonatePage({ params, searchParams }: DonatePagePro
       <main className="donate-main">
         <div className="donate-card">
           <div className="donate-card-head">
-            <ProgressRing value={percent} size={72} />
             <div>
               <h1>{campaign.title}</h1>
               {campaign.organization && (
@@ -99,11 +98,19 @@ export default async function DonatePage({ params, searchParams }: DonatePagePro
                   <span>Khoản ủng hộ dành cho <b>{campaign.organization.name}</b> · tổ chức đã xác minh</span>
                 </p>
               )}
+              {/* Thanh tiến độ ngang như trang chi tiết dự án (thay vòng tròn %). */}
+              <div className="donate-progress">
+                <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
+                <p className="donate-progress-figures">
+                  <span><b title={formatVnd(campaign.raised)}>{formatVndCompact(campaign.raised)}</b> / <span title={formatVnd(campaign.target)}>{formatVndCompact(campaign.target)}</span></span>
+                  <b className="num">{percent}%</b>
+                </p>
+              </div>
               <p>
                 {!accepting
                   ? `Dự án hiện không nhận ủng hộ (${campaign.status.toLowerCase()}).`
                   : remaining > 0
-                    ? `Còn ${formatVnd(remaining)} để đạt mục tiêu. Cùng tạo đà cho dự án!`
+                    ? `Còn ${formatVndCompact(remaining)} để đạt mục tiêu. Cùng tạo đà cho dự án!`
                     : "Dự án đã đạt mục tiêu — khoản ủng hộ thêm giúp dự án làm được nhiều hơn."}
               </p>
             </div>

@@ -3,9 +3,8 @@ import Link from "next/link";
 import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { FadeInImage } from "@/components/ui/FadeInImage";
 import { Icon } from "@/components/ui/Icon";
-import { campaignProgress, type Campaign } from "@/lib/data/campaigns";
+import { campaignProgress, campaignTimeLabel, type Campaign } from "@/lib/data/campaigns";
 import { coverFor } from "@/lib/covers";
-import { formatVnd } from "@/lib/format";
 
 type CampaignCardProps = {
   campaign: Campaign;
@@ -16,7 +15,7 @@ type CampaignCardProps = {
 };
 
 /**
- * Thẻ dự án tối giản như kết quả tìm kiếm của GoFundMe: ảnh, tên, người tổ chức, thanh tiến độ và số đã nhận.
+ * Thẻ dự án tối giản: ảnh, tên, người tổ chức, thanh tiến độ, thời gian còn lại và % đã đạt (kiểu Kickstarter).
  * Chi tiết (lĩnh vực, địa điểm, mục tiêu, hạn…) để ở trang dự án.
  */
 export function CampaignCard({ campaign, showAiReason = false, onOpen }: CampaignCardProps) {
@@ -44,7 +43,15 @@ export function CampaignCard({ campaign, showAiReason = false, onOpen }: Campaig
           <p className="c-card-reason"><Icon name="sparkles" size={14} /> {campaign.aiReason}</p>
         )}
         <ProgressBar value={progress} label={`Đạt ${progress}% mục tiêu`} />
-        <p className="c-card-raised">{formatVnd(campaign.raised)}</p>
+        {/* Như thẻ Kickstarter: thời gian bên trái, % đã đạt bên phải (có thể vượt 100%). */}
+        <p className="c-card-stats">
+          <span className="c-card-time" title={campaign.endDate ? `Kết thúc ${campaign.endDate}` : undefined}>
+            <Icon name="clock" size={14} /> {campaignTimeLabel(campaign)}
+          </span>
+          <span className={`c-card-pct${progress >= 100 ? " is-funded" : ""}`}>
+            <b>{progress.toLocaleString("vi-VN")}%</b> đã đạt
+          </span>
+        </p>
       </div>
     </article>
   );

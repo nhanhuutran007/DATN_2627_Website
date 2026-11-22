@@ -45,7 +45,7 @@ import {
 import { fetchRewardTiers, isRewardAvailable, type RewardTier } from "@/lib/api/rewards";
 import { coverFor } from "@/lib/covers";
 import { campaignProgress, campaigns as mockCampaigns, findCampaign, type Campaign } from "@/lib/data/campaigns";
-import { formatVnd, formatVndShort, isLiveId } from "@/lib/format";
+import { formatVnd, formatVndCompact, isLiveId } from "@/lib/format";
 import { sanitizeRichText } from "@/lib/rich-text.server";
 import { timeAgo } from "@/lib/time";
 
@@ -467,9 +467,9 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             <div className="fund-stats">
               <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
               <div className="fund-stat">
-                <p className="fund-amount">{formatVnd(campaign.raised)}</p>
+                <p className="fund-amount" title={formatVnd(campaign.raised)}>{formatVndCompact(campaign.raised)}</p>
                 <p className="fund-target">
-                  đã ủng hộ trên mục tiêu <abbr title={formatVnd(campaign.target)}>{formatVndShort(campaign.target)}</abbr>
+                  đã ủng hộ trên mục tiêu <abbr title={formatVnd(campaign.target)}>{formatVndCompact(campaign.target)}</abbr>
                   <span className="fund-percent num">{percent}%</span>
                 </p>
               </div>
@@ -492,6 +492,12 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   )}
                 </div>
               </div>
+              {open && percent >= 100 && (
+                <p className="fund-overfunded" role="status">
+                  <Icon name="check" size={16} /> Đã đạt mục tiêu! Dự án vẫn tiếp tục nhận ủng hộ đến hết
+                  {campaign.endDate ? ` ngày ${campaign.endDate}` : " thời hạn gây quỹ"} — mọi khoản thêm giúp dự án làm được nhiều hơn.
+                </p>
+              )}
             </div>
             {open && published && (
               <div className="fund-actions">
