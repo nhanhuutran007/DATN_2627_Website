@@ -19,6 +19,7 @@ import { CampaignPosts } from "@/features/posts/CampaignPosts";
 import { ProgressTimeline } from "@/features/progress/ProgressTimeline";
 import { TransparencyScoreCard } from "@/features/progress/TransparencyScoreCard";
 import { ContactOrganizerButton } from "@/features/campaigns/ContactOrganizerButton";
+import { DetailToc, type DetailTocItem } from "@/features/campaigns/DetailToc";
 import { UnpublishedCampaignPreview } from "@/features/campaigns/UnpublishedCampaignPreview";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ShareSpread } from "@/features/follows/ShareSpread";
@@ -146,6 +147,19 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   const stateById = new Map((progress?.milestoneStates ?? []).map((item) => [item.id, item.state]));
   const transparencyScore = progress?.transparencyScore;
 
+  // Mục lục cột trái (màn hình rộng): chỉ các mục thực sự hiển thị.
+  const tocItems: DetailTocItem[] = [
+    { id: "cau-chuyen", label: "Câu chuyện" },
+    { id: "cap-nhat", label: "Cập nhật" },
+    { id: "nhat-ky", label: "Nhật ký chi tiêu" },
+    ...(published ? [{ id: "chia-se", label: "Chia sẻ" }] : []),
+    { id: "nguoi-to-chuc", label: campaign.organization ? "Người tổ chức & thụ hưởng" : "Người tổ chức" },
+    ...(published ? [{ id: "loi-dong-vien", label: "Lời động viên" }] : []),
+    { id: "ke-hoach-ngan-sach", label: "Kế hoạch và ngân sách" },
+    { id: "hoi-dap", label: "Hỏi đáp & bình luận" },
+    { id: "cau-hoi-thuong-gap", label: "Câu hỏi thường gặp" },
+  ];
+
   const crumbs = [{ href: "/", label: "Trang chủ" }, { href: "/du-an", label: "Dự án" }, { label: campaign.category }];
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -181,6 +195,8 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             Hồ sơ chưa công khai ({campaign.status.toLowerCase()}): chưa hiển thị trong danh sách dự án, chưa nhận ủng hộ, theo dõi hay bình luận.
           </p>
         )}
+
+        <DetailToc items={tocItems} />
 
         <div className="detail-main">
           <figure className="detail-cover">
@@ -222,7 +238,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             </Link>
           )}
 
-          <section className="detail-story-block" aria-labelledby="gioi-thieu-du-an">
+          <section className="detail-story-block" id="cau-chuyen" aria-labelledby="gioi-thieu-du-an">
             <h2 id="gioi-thieu-du-an" className="sr-only">Câu chuyện dự án</h2>
             <CollapsibleStory>
               {campaign.storyHtml ? (
@@ -278,7 +294,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           </section>
 
           {published && (
-            <section className="detail-section" aria-labelledby="chia-se-title">
+            <section className="detail-section" id="chia-se" aria-labelledby="chia-se-title">
               <h2 id="chia-se-title">Chia sẻ giúp nhiều hơn bạn nghĩ</h2>
               <p className="section-lead">
                 Mỗi lượt chia sẻ đưa dự án <b>đến với nhiều người hơn</b> — kể cả khi bạn chưa thể ủng hộ.
@@ -328,7 +344,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             </section>
           )}
 
-          <section className="detail-section" aria-labelledby="ke-hoach">
+          <section className="detail-section" id="ke-hoach-ngan-sach" aria-labelledby="ke-hoach">
             <h2 id="ke-hoach">Kế hoạch và ngân sách</h2>
             {transparencyScore && <TransparencyScoreCard id="minh-bach" score={transparencyScore} />}
             <ul className="plan-facts">

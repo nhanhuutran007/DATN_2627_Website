@@ -149,10 +149,13 @@ describe("SePay gateway", () => {
 });
 
 describe("DonationsService – SePay", () => {
-  it("đơn mới có mã đơn riêng; chặn chọn SePay khi chưa cấu hình", async () => {
+  it("SePay chỉ dùng để nạp ví: không tạo khoản ủng hộ SePay mới", async () => {
     const { service, saved } = setup();
-    await service.create({ campaignId: CAMPAIGN_ID, amount: 200000, paymentMethod: "sepay", idempotencyKey: "k-1" }, donor);
-    match(saved[0]?.transferCode ?? "", /^GM/);
+    await rejects(
+      service.create({ campaignId: CAMPAIGN_ID, amount: 200000, paymentMethod: "sepay", idempotencyKey: "k-1" }, donor),
+      (err: { status?: number }) => err.status === 400,
+    );
+    equal(saved.length, 0);
     await rejects(
       setup({ sepay: null }).service.create({ campaignId: CAMPAIGN_ID, amount: 200000, paymentMethod: "sepay", idempotencyKey: "k-2" }, donor),
       (err: { status?: number }) => err.status === 400,

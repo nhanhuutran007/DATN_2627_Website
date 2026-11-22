@@ -2018,9 +2018,9 @@ h3 {
 }
 
 .block-head-center p {
-  max-width: 720px;
+  /* Đủ rộng cho câu một dòng; khi phải xuống dòng thì chia đều, không để một chữ lẻ ở hàng dưới. */
+  max-width: 760px;
   margin-inline: auto;
-  /* Chia đều chữ giữa các dòng, tránh một chữ lẻ (vd. "khác") rơi xuống dòng cuối. */
   text-wrap: balance;
 }
 
@@ -7254,6 +7254,74 @@ html:has(dialog:modal) .admin-sidebar {
 .detail-page .detail-side {
   position: sticky;
   top: 96px;
+}
+
+/* Nhảy tới mục từ mục lục/anchor: chừa chỗ cho header dính. */
+.detail-page .detail-main > section[id] {
+  scroll-margin-top: 96px;
+}
+
+/* Mục lục cột trái (như Kickstarter) — chỉ hiện ở màn hình rộng, xem media query bên dưới. */
+.detail-toc {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .detail-page .container.detail-head,
+  .detail-page .container.detail-layout {
+    width: min(1440px, calc(100% - 64px));
+  }
+
+  .detail-page .detail-layout {
+    grid-template-columns: 200px minmax(0, 1fr) 380px;
+    gap: 40px;
+  }
+
+  .detail-toc {
+    display: block;
+    position: sticky;
+    top: 96px;
+  }
+
+  .detail-toc-title {
+    margin: 0 0 10px;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .detail-toc ul {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    border-left: 2px solid var(--line);
+    list-style: none;
+  }
+
+  .detail-toc a {
+    display: block;
+    margin-left: -2px;
+    padding: 7px 0 7px 14px;
+    border-left: 2px solid transparent;
+    color: var(--text-2);
+    font-size: 0.92rem;
+    line-height: 1.35;
+    text-decoration: none;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .detail-toc a:hover {
+    color: var(--text);
+  }
+
+  .detail-toc a[aria-current="location"] {
+    border-left-color: var(--primary);
+    color: var(--text);
+    font-weight: 700;
+  }
 }
 
 .detail-page .fund-card {
