@@ -423,7 +423,7 @@ cd backend
 cd backend; ..\scripts\npm-local.cmd run test:coverage   # unit test backend kèm độ phủ mã
 ```
 
-Lần chạy ngày 22/11/2026 (sau khi chuyển SePay thành cổng nạp ví và thêm ví Góp Mầm): backend 596 test, frontend 36 test đều đạt; typecheck, ESLint và build không báo lỗi. AI service không đổi từ lần chạy 17/11/2026 (34 test đạt, Ruff không báo lỗi). Độ phủ của unit test backend (đo ngày 14/11/2026) là 89,1% dòng lệnh, 79,3% nhánh và 83,3% hàm, tính trên các file được test nạp vào (service, guard, DTO); phần lớn controller được kiểm tra qua smoke test và kiểm thử thủ công nên không nằm trong phép đo này.
+Lần chạy ngày 23/11/2026 (sau khi thêm duyệt tự động, hoàn tiền tự động và ảnh lĩnh vực): backend 621 test, frontend 36 test đều đạt; typecheck, ESLint và build không báo lỗi. AI service không đổi từ lần chạy 17/11/2026 (34 test đạt, Ruff không báo lỗi). Độ phủ của unit test backend (đo ngày 14/11/2026) là 89,1% dòng lệnh, 79,3% nhánh và 83,3% hàm, tính trên các file được test nạp vào (service, guard, DTO); phần lớn controller được kiểm tra qua smoke test và kiểm thử thủ công nên không nằm trong phép đo này.
 
 **Kết quả kiểm thử thủ công (đợt 14–16/11/2026):**
 
@@ -551,8 +551,14 @@ DATN_2627_Website/
   - Dữ liệu mẫu bổ sung (`npm run seed:extras`, chạy lặp lại an toàn trên DB đã seed; `seed.ts` cũng gọi ở cuối): thêm tổ chức đã xác minh thứ 5, 10 cộng tác viên tổ chức (có lời mời đang chờ), 7 dự án do tổ chức thực hiện kèm giao dịch đã xác nhận, 24 mức quà tặng trên 10 chiến dịch cùng người đã chọn quà.
   - Trang dự án trên màn hình rộng (≥1280px) chia 3 cột như Kickstarter: mục lục "Trong trang này" dính bên trái (tô đậm mục đang đọc), nội dung ở giữa, thẻ gây quỹ và phần quà bên phải.
   - Dòng mô tả gợi ý "Có thể bạn sẽ quan tâm" không còn rớt một chữ xuống hàng dưới.
+- Duyệt tự động, hoàn tiền tự động và giao diện (22–23/11/2026, migration `1790000000027`–`1790000000028`):
+  - **Duyệt tự động** khi chủ dự án gửi hồ sơ: 4 bước kiểm tra bằng luật (đủ thông tin bắt buộc; giấy tờ và xác minh — email chủ dự án, giấy phép tổ chức; nội dung cấm theo từ khóa đã bỏ dấu; chấm điểm rủi ro 0–100), lưu ở bảng `campaign_screenings`. Admin chọn chế độ ở mục "Duyệt chiến dịch": **admin duyệt tất cả** (mặc định, hệ thống chỉ chấm điểm để xếp hồ sơ) hoặc **tự phát hành hồ sơ rủi ro thấp** (còn lại chờ admin). Hệ thống không bao giờ tự từ chối; hồ sơ duyệt hiện từng bước, điểm, đề xuất và nút "Kiểm tra lại". Bước nội dung cấm hiện là luật từ khóa, chưa có mô hình phân loại văn bản.
+  - **Hoàn tiền tự động theo kết quả dự án**: dự án hết hạn không đạt mục tiêu hoặc bị hủy thì cam kết được trả về ví Góp Mầm, khoản đã thu qua ví được tự hoàn (job 10 phút/lần). Yêu cầu do người ủng hộ gửi, khoản SePay và rút tiền ví vẫn do admin kiểm tra và duyệt thủ công. Mục "Hoàn tiền" có khung theo dõi (`GET /admin/refunds/auto-summary`).
+  - **Ảnh lĩnh vực**: đủ ảnh cho 25 lĩnh vực (12 ảnh mới chụp tại Việt Nam, thay 2 ảnh Y tế có bác sĩ nước ngoài, ghi nguồn ở `/nguon-anh`); admin đổi ảnh đại diện lĩnh vực trong mục "Lĩnh vực" (`categories.image_url`, ảnh `purpose=category_image` chỉ admin tải).
+  - **Thẻ dự án kiểu Kickstarter**: bên trái thời gian còn lại, bên phải % đã đạt; % có thể vượt 100% vì dự án vẫn nhận ủng hộ tới hết hạn sau khi đạt mục tiêu (trang dự án hiện dòng "Đã đạt mục tiêu! Dự án vẫn tiếp tục nhận ủng hộ…"). Thẻ dự án của tổ chức dùng cùng kiểu.
+  - Số tiền dự án rút gọn (100k, 1M, 1,5M; rê chuột xem số đầy đủ); vòng tròn % ở trang ủng hộ và khung chia sẻ đổi thành thanh ngang; số dư ví Góp Mầm hiển thị to hơn.
 
-_Cập nhật lần cuối: 22/11/2026._
+_Cập nhật lần cuối: 23/11/2026._
 
 ### 15.2. Hạn chế
 
