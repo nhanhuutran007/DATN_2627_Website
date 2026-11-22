@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { BadRequestException, NotFoundException, PayloadTooLargeException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, NotFoundException, PayloadTooLargeException } from "@nestjs/common";
 
 import { isImageUrl } from "../src/common/validators/is-image-url";
 import { LocalStorageGateway, type StorageGateway } from "../src/integrations/storage/storage.gateway";
@@ -91,6 +91,19 @@ describe("MediaService", () => {
   it("dùng thư mục theo mục đích ảnh", async () => {
     const result = await service.uploadImage({ buffer: JPEG, size: JPEG.length }, user, MediaPurpose.PROGRESS_IMAGE);
     match(result.url, /\/media\/progress\/.+\.jpg$/);
+  });
+
+  it("chỉ admin được tải ảnh lĩnh vực", async () => {
+    await rejects(
+      service.uploadImage({ buffer: JPEG, size: JPEG.length }, { ...user, role: "user" }, MediaPurpose.CATEGORY_IMAGE),
+      ForbiddenException,
+    );
+    const result = await service.uploadImage(
+      { buffer: WEBP, size: WEBP.length },
+      { ...user, role: "admin" },
+      MediaPurpose.CATEGORY_IMAGE,
+    );
+    match(result.url, /^\/api\/v1\/media\/categories\/[0-9a-f-]{36}\.webp$/);
   });
 
   it("từ chối khi thiếu file, file rỗng, quá 5 MB hoặc không phải ảnh", async () => {

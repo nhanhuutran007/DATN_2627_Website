@@ -9,6 +9,8 @@ import { Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import { Campaign } from "../campaigns/entities/campaign.entity";
+import { MediaFile, MediaPurpose } from "../media/entities/media-file.entity";
+import { MEDIA_URL_PREFIX } from "../media/media.service";
 import type { User } from "../users/entities/user.entity";
 import { CreateCategoryDto, UpdateCategoryDto } from "./dto/category.dto";
 import { Category } from "./entities/category.entity";
@@ -28,6 +30,8 @@ export class CategoriesService {
     @InjectRepository(Campaign)
     private readonly campaignRepo: Repository<Campaign>,
     private readonly auditService: AuditService,
+    @InjectRepository(MediaFile)
+    private readonly mediaRepo: Repository<MediaFile>,
   ) {}
 
   /** Danh mục đang nhận chiến dịch — dùng cho form tạo chiến dịch và bộ lọc. */
@@ -102,6 +106,10 @@ export class CategoriesService {
     track("description", category.description ?? null, dto.description === undefined ? undefined : dto.description || null);
     track("sortOrder", category.sortOrder, dto.sortOrder);
     track("isActive", category.isActive, dto.isActive);
+    const imageUrl = dto.imageUrl === undefined ? undefined : dto.imageUrl || null;
+    if (track("imageUrl", category.imageUrl ?? null, imageUrl) && imageUrl) {
+      await this.assertCategoryImage(imageUrl);
+    }
     if (Object.keys(newValues).length === 0) {
       return category;
     }
@@ -159,6 +167,17 @@ export class CategoriesService {
       newValues: { order: ordered.map((category) => category.name) },
     });
     return ordered;
+  }
+
+  /** Chỉ nhận ảnh đã tải lên với mục đích `category_image` (admin), không nhận đường dẫn tùy ý. */
+  private async assertCategoryImage(imageUrl: string): Promise<void> {
+    const storageKey = imageUrl.slice(MEDIA_URL_PREFIX.length);
+    const media = imageUrl.startsWith(MEDIA_URL_PREFIX)
+      ? await this.mediaRepo.findOne({ where: { storageKey }, select: { id: true, purpose: true } })
+      : null;
+    if (!media || media.purpose !== MediaPurpose.CATEGORY_IMAGE) {
+      throw new BadRequestException("Ảnh lĩnh vực không hợp lệ, vui lòng tải ảnh lên lại.");
+    }
   }
 
   private async assertUniqueName(name: string): Promise<void> {

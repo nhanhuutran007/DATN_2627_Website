@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { apiCampaignToView, fetchCampaigns, imageByCategory } from "@/lib/api/campaigns";
-import { coverByKey } from "@/lib/covers";
+import { api } from "@/lib/api";
+import { categoryCover, coverByKey } from "@/lib/covers";
 import { campaigns as mockCampaigns, type Campaign } from "@/lib/data/campaigns";
 
 import { CategoryCampaignGrid } from "./CategoryCampaignGrid";
@@ -27,11 +28,21 @@ async function loadCategory(category: string): Promise<{ live: boolean; items: C
   }
 }
 
+/** Ảnh admin tải lên cho lĩnh vực (nếu có); lỗi mạng thì dùng ảnh minh họa có sẵn. */
+async function loadCategoryImage(category: string): Promise<string | null> {
+  try {
+    const categories = await api.get<Array<{ name: string; imageUrl?: string | null }>>("/categories");
+    return categories.find((item) => item.name === category)?.imageUrl ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Trang một lĩnh vực, theo bố cục GoFundMe Discover (vd. /discover/medical-fundraiser). */
 export async function CategoryLanding({ category }: { category: string }) {
-  const { live, items, total } = await loadCategory(category);
+  const [{ live, items, total }, imageUrl] = await Promise.all([loadCategory(category), loadCategoryImage(category)]);
   const label = category.toLocaleLowerCase("vi");
-  const cover = coverByKey(imageByCategory(category));
+  const cover = categoryCover(category, imageUrl) ?? { ...coverByKey(imageByCategory(category)), uploaded: false };
 
   return (
     <>
@@ -44,7 +55,7 @@ export async function CategoryLanding({ category }: { category: string }) {
           {!live && <p className="sample-flag">Dữ liệu mẫu — không kết nối được máy chủ</p>}
         </div>
         <div className="category-hero-media">
-          <Image src={cover.src} alt={cover.alt} fill priority sizes="(max-width: 900px) 100vw, 360px" />
+          <Image src={cover.src} alt={cover.alt} fill priority sizes="(max-width: 900px) 100vw, 360px" unoptimized={cover.uploaded} />
         </div>
       </section>
 

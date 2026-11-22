@@ -32,6 +32,7 @@ const FOLDER_BY_PURPOSE: Record<MediaPurpose, string> = {
   [MediaPurpose.REFUND_PROOF]: "refunds",
   [MediaPurpose.ORGANIZATION_LOGO]: "organizations",
   [MediaPurpose.ORGANIZATION_DOCUMENT]: "org-documents",
+  [MediaPurpose.CATEGORY_IMAGE]: "categories",
 };
 
 export type IncomingFile = {
@@ -57,6 +58,9 @@ export class MediaService {
   ): Promise<UploadedImageResponse> {
     if (purpose === MediaPurpose.REFUND_PROOF && user.role !== UserRole.ADMIN) {
       throw new ForbiddenException("Chỉ quản trị viên được tải chứng từ hoàn tiền.");
+    }
+    if (purpose === MediaPurpose.CATEGORY_IMAGE && user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException("Chỉ quản trị viên được tải ảnh lĩnh vực.");
     }
     if (!file || !file.buffer || file.size === 0) {
       throw new BadRequestException("Vui lòng chọn một file ảnh.");

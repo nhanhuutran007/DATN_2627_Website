@@ -1,5 +1,6 @@
 import type { IconName } from "@/components/ui/Icon";
 import { resolveMediaUrl } from "@/lib/api";
+import { hasCategoryImages, imageByCategory } from "@/lib/api/campaigns";
 import type { Campaign } from "@/lib/data/campaigns";
 
 type CoverKey = Campaign["image"];
@@ -16,8 +17,8 @@ const COVERS: Record<CoverKey, { src: string; alt: string }> = {
   robot: { src: "/images/cover-robot.webp", alt: "Sinh viên thi đấu tại Cuộc thi Sáng tạo Robot Việt Nam ở Huế" },
   library: { src: "/images/cover-library.webp", alt: "Học sinh vùng cao trong lớp học ở Bát Xát, Lào Cai" },
   reading: { src: "/images/cover-reading.webp", alt: "Hai học sinh tiểu học đọc sách trong thư viện" },
-  health: { src: "/images/cover-health.webp", alt: "Khám mắt miễn phí cho người dân tại một điểm khám cộng đồng" },
-  clinic: { src: "/images/cover-clinic.webp", alt: "Bác sĩ tình nguyện khám bệnh cho người dân tại trạm y tế phường" },
+  health: { src: "/images/cover-health.webp", alt: "Nhân viên y tế đo thị lực cho trẻ mẫu giáo ở Quốc Oai, Hà Nội" },
+  clinic: { src: "/images/cover-clinic.webp", alt: "Bác sĩ khám bệnh cho một cụ ông ở Bắc Ninh" },
   music: { src: "/images/cover-music.webp", alt: "Nghệ nhân người Tày hát Then cùng đàn tính" },
   lantern: { src: "/images/cover-lantern.webp", alt: "Đèn lồng thủ công tại một xưởng ở Hội An" },
   solar: { src: "/images/cover-solar.webp", alt: "Hệ thống pin năng lượng mặt trời trên mái nhà xưởng" },
@@ -30,6 +31,18 @@ const COVERS: Record<CoverKey, { src: string; alt: string }> = {
   graduate: { src: "/images/cover-graduate.webp", alt: "Sinh viên Đại học Đông Á ở Đà Nẵng mừng lễ tốt nghiệp" },
   water: { src: "/images/cover-water.webp", alt: "Giếng nước xây bằng đá ong ở làng quê Việt Nam" },
   bridge: { src: "/images/cover-bridge.webp", alt: "Cầu khỉ bằng tre bắc qua kênh ở Mỹ Tho" },
+  relief: { src: "/images/cover-relief.webp", alt: "Gia đình được hỗ trợ sau lũ ở Long An" },
+  elderly: { src: "/images/cover-elderly.webp", alt: "Cụ bà ngồi trò chuyện cùng các cháu nhỏ" },
+  wheelchair: { src: "/images/cover-wheelchair.webp", alt: "Lễ trao xe lăn cho người khuyết tật ở Đà Nẵng" },
+  housing: { src: "/images/cover-housing.webp", alt: "Căn nhà sàn tạm bợ trên kênh cần được cải thiện" },
+  wildlife: { src: "/images/cover-wildlife.webp", alt: "Voọc chà vá chân xám tại Trung tâm cứu hộ linh trưởng Cúc Phương" },
+  football: { src: "/images/cover-football.webp", alt: "Các em nhỏ đá bóng trên sân cộng đồng ở Hà Nội" },
+  memorial: { src: "/images/cover-memorial.webp", alt: "Đài tưởng niệm tại Nghĩa trang liệt sĩ Trường Sơn" },
+  catru: { src: "/images/cover-catru.webp", alt: "Biểu diễn ca trù ở Hà Nội" },
+  studio: { src: "/images/cover-studio.webp", alt: "Máy quay trong trường quay S14 của Đài Truyền hình Việt Nam" },
+  aodai: { src: "/images/cover-aodai.webp", alt: "Trưng bày áo dài và vải lụa tại Festival Hoa Đà Lạt" },
+  streetfood: { src: "/images/cover-streetfood.webp", alt: "Gánh chè và hoa quả dầm gần cầu Trường Tiền, Huế" },
+  homestay: { src: "/images/cover-homestay.webp", alt: "Nhà sàn của người Tày làm homestay bên sông ở Pác Ngòi, Ba Bể" },
 };
 
 export function coverFor(campaign: Pick<Campaign, "image" | "imageUrl" | "title">): {
@@ -45,6 +58,19 @@ export function coverFor(campaign: Pick<Campaign, "image" | "imageUrl" | "title"
 
 export function coverByKey(key: CoverKey) {
   return COVERS[key];
+}
+
+/**
+ * Ảnh đại diện lĩnh vực: ảnh admin tải lên nếu có, không thì ảnh minh họa có sẵn của lĩnh vực;
+ * `null` khi lĩnh vực mới tạo chưa có ảnh nào (giao diện hiện icon).
+ */
+export function categoryCover(
+  category: string,
+  imageUrl?: string | null,
+): { src: string; alt: string; uploaded: boolean } | null {
+  if (imageUrl) return { src: resolveMediaUrl(imageUrl), alt: `Ảnh lĩnh vực ${category}`, uploaded: true };
+  if (!hasCategoryImages(category)) return null;
+  return { ...COVERS[imageByCategory(category)], uploaded: false };
 }
 
 const CATEGORY_ICONS: Record<string, IconName> = {

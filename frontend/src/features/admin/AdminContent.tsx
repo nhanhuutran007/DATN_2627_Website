@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import Image from "next/image";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
@@ -8,6 +9,8 @@ import { PAGE_SIZE, Pagination, pageSlice } from "@/components/ui/Pagination";
 import { ApiError } from "@/lib/api";
 import { downloadCampaignStatsCsv, downloadDailyDonationsCsv } from "@/lib/api/admin";
 import { createCategory, fetchAdminCategories, reorderCategories, updateCategory, type AdminCategory } from "@/lib/api/categories";
+import { ACCEPTED_IMAGE_TYPES, uploadImage, validateImageFile } from "@/lib/api/media";
+import { categoryCover, categoryIcon } from "@/lib/covers";
 
 function errorText(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
@@ -26,6 +29,8 @@ export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (catego
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [imageTarget, setImageTarget] = useState<AdminCategory | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -112,6 +117,37 @@ export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (catego
     );
   };
 
+  const pickImage = (category: AdminCategory) => {
+    setImageTarget(category);
+    fileInput.current?.click();
+  };
+
+  const uploadCategoryImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    const category = imageTarget;
+    if (!file || !category) return;
+    const invalid = validateImageFile(file);
+    if (invalid) {
+      setNotice({ tone: "error", text: invalid });
+      return;
+    }
+    void run(category.id, async () => {
+      const uploaded = await uploadImage(file, "category_image");
+      await updateCategory(category.id, { imageUrl: uploaded.url });
+    }, `Đã cập nhật ảnh đại diện cho “${category.name}”.`);
+  };
+
+  const resetImage = async (category: AdminCategory) => {
+    const confirmed = await dialog.confirm({
+      title: "Dùng lại ảnh mặc định",
+      message: <>Bỏ ảnh đã tải lên của lĩnh vực <b>{category.name}</b> và dùng lại ảnh minh họa có sẵn.</>,
+      confirmLabel: "Dùng ảnh mặc định",
+    });
+    if (!confirmed) return;
+    void run(category.id, () => updateCategory(category.id, { imageUrl: "" }), `Đã dùng lại ảnh mặc định cho “${category.name}”.`);
+  };
+
   const move = (index: number, delta: -1 | 1) => {
     if (!categories || !categories[index + delta]) return;
     const ids = categories.map((category) => category.id);
@@ -138,20 +174,42 @@ export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (catego
       {notice && (
         <p className={notice.tone === "ok" ? "admin-notice" : "form-error"} role={notice.tone === "ok" ? "status" : "alert"}>{notice.text}</p>
       )}
+      <input
+        ref={fileInput}
+        className="sr-only"
+        type="file"
+        accept={ACCEPTED_IMAGE_TYPES.join(",")}
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={uploadCategoryImage}
+      />
       <div className="table-scroll">
         <table>
-          <thead><tr><th title="Thứ tự hiển thị">#</th><th>Lĩnh vực</th><th>Chiến dịch</th><th>Trạng thái</th><th /></tr></thead>
+          <thead><tr><th title="Thứ tự hiển thị">#</th><th>Ảnh</th><th>Lĩnh vực</th><th>Chiến dịch</th><th>Trạng thái</th><th /></tr></thead>
           <tbody>
             {categories === null ? (
-              <tr><td colSpan={5}><span className="table-muted">Đang tải…</span></td></tr>
+              <tr><td colSpan={6}><span className="table-muted">Đang tải…</span></td></tr>
             ) : (
               pageSlice(categories, page).map((category, pageIndex) => {
                 // Vị trí trong toàn danh sách (dùng cho sắp xếp), không phải trong trang.
                 const index = page * PAGE_SIZE + pageIndex;
+                const cover = categoryCover(category.name, category.imageUrl);
                 return (
                 <tr key={category.id} className={category.isActive ? undefined : "category-inactive"}>
                   <td className="table-muted">{index + 1}</td>
-                  <td><b>{category.name}</b></td>
+                  <td>
+                    <span className="category-thumb" title={cover ? (cover.uploaded ? "Ảnh đã tải lên" : "Ảnh minh họa mặc định") : "Chưa có ảnh"}>
+                      {cover ? (
+                        <Image src={cover.src} alt={`Ảnh lĩnh vực ${category.name}`} fill sizes="72px" unoptimized={cover.uploaded} />
+                      ) : (
+                        <Icon name={categoryIcon(category.name)} size={20} />
+                      )}
+                    </span>
+                  </td>
+                  <td>
+                    <b>{category.name}</b>
+                    <span className="category-image-source">{category.imageUrl ? "Ảnh đã tải lên" : cover ? "Ảnh mặc định" : "Chưa có ảnh"}</span>
+                  </td>
                   <td>
                     {category.campaignCount > 0 && onShowCampaigns ? (
                       <button
@@ -178,6 +236,10 @@ export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (catego
                         <button type="button" aria-label={`Đưa ${category.name} xuống`} title="Đưa xuống" disabled={index === categories.length - 1 || busy !== null} onClick={() => move(index, 1)}>↓</button>
                       </span>
                       <button type="button" disabled={busy === category.id} onClick={() => rename(category)}>Đổi tên</button>
+                      <button type="button" disabled={busy === category.id} onClick={() => pickImage(category)}>Đổi ảnh</button>
+                      {category.imageUrl && (
+                        <button type="button" disabled={busy === category.id} onClick={() => void resetImage(category)}>Ảnh mặc định</button>
+                      )}
                       <button
                         className={category.isActive ? "table-danger-action" : undefined}
                         type="button"
@@ -197,7 +259,7 @@ export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (catego
       </div>
       {categories && <Pagination page={page} total={categories.length} onChange={setPage} />}
       <p className="risk-footnote">
-        <Icon name="shield" size={15} /> Thứ tự (#) là thứ tự lĩnh vực trong bộ lọc trang khám phá và form tạo chiến dịch. Ngừng nhận: không cho tạo chiến dịch mới trong lĩnh vực, chiến dịch cũ giữ nguyên. Đổi tên cập nhật luôn các chiến dịch. Mọi thay đổi được ghi nhật ký kiểm toán.
+        <Icon name="shield" size={15} /> Thứ tự (#) là thứ tự lĩnh vực trong bộ lọc trang khám phá và form tạo chiến dịch. Ngừng nhận: không cho tạo chiến dịch mới trong lĩnh vực, chiến dịch cũ giữ nguyên. Đổi tên cập nhật luôn các chiến dịch. Đổi ảnh: ảnh đại diện ở trang khám phá và trang lĩnh vực (JPEG/PNG/WebP, tối đa 5 MB, nên dùng ảnh ngang 3:2). Mọi thay đổi được ghi nhật ký kiểm toán.
       </p>
     </section>
   );

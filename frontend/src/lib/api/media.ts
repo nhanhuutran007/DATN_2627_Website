@@ -7,7 +7,8 @@ export type MediaPurpose =
   | "expense_receipt"
   | "refund_proof"
   | "organization_logo"
-  | "organization_document";
+  | "organization_document"
+  | "category_image";
 
 export type UploadedImage = {
   id: string;

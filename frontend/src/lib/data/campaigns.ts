@@ -53,7 +53,19 @@ export type Campaign = {
     | "seedling"
     | "graduate"
     | "water"
-    | "bridge";
+    | "bridge"
+    | "relief"
+    | "elderly"
+    | "wheelchair"
+    | "housing"
+    | "wildlife"
+    | "football"
+    | "memorial"
+    | "catru"
+    | "studio"
+    | "aodai"
+    | "streetfood"
+    | "homestay";
   /** Ảnh do chủ dự án cung cấp; không có thì giao diện hiển thị dạng chữ, không dùng ảnh minh họa. */
   imageUrl?: string | null;
   /** Ngày kết thúc dạng dd/mm/yyyy. */
@@ -358,8 +370,24 @@ export function formatCurrency(value: number): string {
   return new Intl.NumberFormat("vi-VN").format(value) + " ₫";
 }
 
+/**
+ * % đã đạt so với mục tiêu, có thể vượt 100% như Kickstarter: dự án vẫn nhận ủng hộ tới hết hạn
+ * sau khi đạt mục tiêu. Thanh tiến độ tự giới hạn ở 100%, chỉ con số hiện đúng tỉ lệ.
+ */
 export function campaignProgress(campaign: Campaign): number {
-  return Math.min(100, Math.round((campaign.raised / campaign.target) * 100));
+  if (!campaign.target || campaign.target <= 0) return 0;
+  return Math.max(0, Math.floor((campaign.raised / campaign.target) * 100));
+}
+
+/** Nhãn thời gian ở thẻ dự án: số ngày còn lại khi đang gây quỹ, ngược lại theo trạng thái. */
+export function campaignTimeLabel(campaign: Campaign): string {
+  if (campaign.status === "Đang gây quỹ") {
+    if (campaign.daysLeft > 1) return `Còn ${campaign.daysLeft.toLocaleString("vi-VN")} ngày`;
+    return campaign.daysLeft === 1 ? "Còn 1 ngày" : "Ngày cuối";
+  }
+  if (campaign.status === "Sắp mở gây quỹ") return "Sắp mở";
+  if (campaign.status === "Tạm dừng") return "Tạm dừng";
+  return "Đã kết thúc";
 }
 
 export function findCampaign(slug: string): Campaign | undefined {

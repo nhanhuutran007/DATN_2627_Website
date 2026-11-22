@@ -8,6 +8,8 @@ export type ApiCategory = {
   id: string;
   name: string;
   description?: string | null;
+  /** Ảnh đại diện admin tải lên; trống thì dùng ảnh minh họa có sẵn. */
+  imageUrl?: string | null;
   sortOrder: number;
   isActive: boolean;
 };
@@ -48,7 +50,7 @@ export function createCategory(payload: { name: string; description?: string }):
 
 export function updateCategory(
   id: string,
-  payload: Partial<Pick<ApiCategory, "name" | "description" | "sortOrder" | "isActive">>,
+  payload: Partial<Pick<ApiCategory, "name" | "description" | "sortOrder" | "isActive">> & { imageUrl?: string },
 ): Promise<ApiCategory> {
   return api.patch<ApiCategory>(`/admin/categories/${encodeURIComponent(id)}`, payload);
 }

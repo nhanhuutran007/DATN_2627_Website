@@ -174,7 +174,36 @@ describe("CategoriesService", () => {
       create: (value: any) => ({ id: "c3", ...value }),
       save: async (value: any) => value,
     };
-    service = new CategoriesService(categoryRepo, {} as never, audit.service);
+    const mediaRepo: any = {
+      findOne: async (opts: any) => media.find((m) => m.storageKey === opts.where.storageKey) ?? null,
+    };
+    service = new CategoriesService(categoryRepo, {} as never, audit.service, mediaRepo);
+  });
+
+  const CATEGORY_IMAGE = "/api/v1/media/categories/11111111-1111-4111-8111-111111111111.webp";
+  const media = [
+    { id: "m1", storageKey: "categories/11111111-1111-4111-8111-111111111111.webp", purpose: "category_image" },
+    { id: "m2", storageKey: "campaigns/22222222-2222-4222-8222-222222222222.webp", purpose: "campaign_image" },
+  ];
+
+  it("should set and clear a category image uploaded by an admin", async () => {
+    const saved = await service.update("c1", { imageUrl: CATEGORY_IMAGE }, ADMIN);
+    equal(saved.imageUrl, CATEGORY_IMAGE);
+    deepEqual(audit.entries[0].newValues, { imageUrl: CATEGORY_IMAGE });
+    const cleared = await service.update("c1", { imageUrl: "" }, ADMIN);
+    equal(cleared.imageUrl, null);
+  });
+
+  it("should reject images that were not uploaded as category images", async () => {
+    await expectStatus(
+      service.update("c1", { imageUrl: "/api/v1/media/campaigns/22222222-2222-4222-8222-222222222222.webp" }, ADMIN),
+      400,
+    );
+    await expectStatus(
+      service.update("c1", { imageUrl: "/api/v1/media/categories/33333333-3333-4333-8333-333333333333.webp" }, ADMIN),
+      400,
+    );
+    equal(categories[0].imageUrl, undefined);
   });
 
   it("should create a category at the end of the list", async () => {

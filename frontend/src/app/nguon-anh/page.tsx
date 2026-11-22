@@ -45,10 +45,10 @@ const CREDITS: Credit[] = [
   },
   {
     file: "cover-health.webp",
-    usage: "Trang chủ, lĩnh vực Y tế",
-    author: "Stephen M. Votaw / U.S. Navy",
+    usage: "Lĩnh vực Y tế; chủ đề khám mắt, khám cho trẻ",
+    author: "USAID Vietnam",
     source:
-      "https://commons.wikimedia.org/wiki/File:Flickr_-_Official_U.S._Navy_Imagery_-_A_doctor_checks_the_eyesight_of_a_Vietnamese_child..jpg",
+      "https://commons.wikimedia.org/wiki/File:Eye_screening_for_kindergarten_children_in_Quoc_Oai_district_of_Hanoi_(14124337307).jpg",
     license: "Public domain",
   },
   {
@@ -109,10 +109,9 @@ const CREDITS: Credit[] = [
   },
   {
     file: "cover-clinic.webp",
-    usage: "Lĩnh vực Y tế",
-    author: "Bryan M. Ilyankoff / U.S. Navy",
-    source:
-      "https://commons.wikimedia.org/wiki/File:US_Navy_070720-N-4954I-033_Volunteer_doctor_Capt._Yehudi_Yeo,_with_the_Singapore_navy,_listens_to_a_Vietnamese_patient%27s_breathing_pattern_at_the_Man_Thai_Ward_Medical_Station.jpg",
+    usage: "Lĩnh vực Y tế, Người cao tuổi; chủ đề trạm y tế, khám bệnh",
+    author: "JoAnn Moravac, U.S. Army",
+    source: "https://commons.wikimedia.org/wiki/File:Elderly_vietnamese_man_gets_examined.jpg",
     license: "Public domain",
   },
   {
@@ -213,6 +212,106 @@ const CREDITS: Credit[] = [
     source: "https://commons.wikimedia.org/wiki/File:Cau_khi_My_Tho.jpg",
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0/",
+  },
+  {
+    file: "cover-relief.webp",
+    usage: "Lĩnh vực Cứu trợ thiên tai, Tình nguyện; chủ đề lũ lụt, cứu trợ",
+    author: "USAID Vietnam",
+    source:
+      "https://commons.wikimedia.org/wiki/File:Flood_Relief_Beneficiary_Community_Members_in_Long_An_Province_(7438904860).jpg",
+    license: "Public domain",
+  },
+  {
+    file: "cover-elderly.webp",
+    usage: "Lĩnh vực Người cao tuổi",
+    author: "Peter van der Sluijs",
+    source: "https://commons.wikimedia.org/wiki/File:Sitting_elderly_female_and_children_Vietnam.jpg",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0/",
+  },
+  {
+    file: "cover-wheelchair.webp",
+    usage: "Lĩnh vực Người khuyết tật; chủ đề xe lăn",
+    author: "USAID Vietnam",
+    source:
+      "https://commons.wikimedia.org/wiki/File:USAID_Project_Supports_Rehabilitation_Department_for_Children_and_Wheelchair_Distribution_in_Danang_(9305239206).jpg",
+    license: "Public domain",
+  },
+  {
+    file: "cover-housing.webp",
+    usage: "Lĩnh vực Nhà ở & hạ tầng nông thôn; chủ đề nhà tình thương",
+    author: "Marissa Toohey, AVI / AusAID (Department of Foreign Affairs and Trade)",
+    source:
+      "https://commons.wikimedia.org/wiki/File:Housing_in_Vietnam._Australian_volunteer_Marissa_Toohey_worked_with_Habitat_for_Humanity_in_Vietnam_to_help_improve_basic_living_standards._Vietnam,_2010._Photo-_Marissa_Toohey,_AVI_-_AusAID_(10704006824).jpg",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0/",
+  },
+  {
+    file: "cover-wildlife.webp",
+    usage: "Lĩnh vực Bảo vệ động vật",
+    author: "Superbass",
+    source: "https://commons.wikimedia.org/wiki/File:2024-03-28-Pygathrix_cinerea_-3122.jpg",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
+  },
+  {
+    file: "cover-football.webp",
+    usage: "Lĩnh vực Thể thao cộng đồng",
+    author: "Baophucminh53G",
+    source:
+      "https://commons.wikimedia.org/wiki/File:Naughty_boys_at_Trung_K%C3%ADnh_H%E1%BA%A1_Football_Ground_06-03-2026_E1.jpg",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
+  },
+  {
+    file: "cover-memorial.webp",
+    usage: "Lĩnh vực Tưởng niệm",
+    author: "Liftold",
+    source:
+      "https://commons.wikimedia.org/wiki/File:Ngh%C4%A9a_trang_li%E1%BB%87t_s%C4%A9_Tr%C6%A1%E1%BB%9Dng_S%C6%A1n_2.JPG",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0/",
+  },
+  {
+    file: "cover-catru.webp",
+    usage: "Lĩnh vực Âm nhạc; chủ đề ca trù, nhạc cụ dân tộc",
+    author: "Michael Coghlan",
+    source: "https://commons.wikimedia.org/wiki/File:Ca_tr%C3%B9_performance.jpg",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0/",
+  },
+  {
+    file: "cover-studio.webp",
+    usage: "Lĩnh vực Điện ảnh & truyền thông",
+    author: "Jimmy Jefferson (Wikipedia tiếng Việt)",
+    source:
+      "https://commons.wikimedia.org/wiki/File:Tr%C6%B0%E1%BB%9Dng_quay_S14_c%E1%BB%A7a_VTV_ph%E1%BB%A5c_v%E1%BB%A5_ch%C6%B0%C6%A1ng_tr%C3%ACnh_%C4%90%C6%B0%E1%BB%9Dng_l%C3%AAn_%C4%91%E1%BB%89nh_Olympia_n%C4%83m_th%E1%BB%A9_15.jpg",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0/",
+  },
+  {
+    file: "cover-aodai.webp",
+    usage: "Lĩnh vực Thiết kế & thời trang",
+    author: "Diane Selwyn",
+    source: "https://commons.wikimedia.org/wiki/File:3-1-2012_Xuan_Huong_5.JPG",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0/",
+  },
+  {
+    file: "cover-streetfood.webp",
+    usage: "Lĩnh vực Ẩm thực",
+    author: "Christophe95",
+    source: "https://commons.wikimedia.org/wiki/File:Food_stand_in_Hu%E1%BA%BF.jpg",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/",
+  },
+  {
+    file: "cover-homestay.webp",
+    usage: "Lĩnh vực Du lịch cộng đồng",
+    author: "Ba Be National Park",
+    source: "https://commons.wikimedia.org/wiki/File:Pac_Ngoi_homestay.JPG",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0/",
   },
 ];
 

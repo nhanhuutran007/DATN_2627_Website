@@ -4,13 +4,13 @@ import Link from "next/link";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { Icon } from "@/components/ui/Icon";
 import { api } from "@/lib/api";
-import { apiCampaignToView, fetchCampaigns, hasCategoryImages, imageByCategory, spreadCategoryImages } from "@/lib/api/campaigns";
-import { categoryIcon, coverByKey } from "@/lib/covers";
+import { apiCampaignToView, fetchCampaigns, spreadCategoryImages } from "@/lib/api/campaigns";
+import { categoryCover, categoryIcon } from "@/lib/covers";
 import { campaigns as mockCampaigns, type Campaign } from "@/lib/data/campaigns";
 
 const PER_CATEGORY = 3;
 
-type CategoryGroup = { name: string; total: number; items: Campaign[] };
+type CategoryGroup = { name: string; imageUrl?: string | null; total: number; items: Campaign[] };
 
 type HubData = { live: boolean; groups: CategoryGroup[] };
 
@@ -20,11 +20,11 @@ export function categoryHref(name: string): string {
 
 async function loadHub(): Promise<HubData> {
   try {
-    const categories = await api.get<Array<{ name: string }>>("/categories");
+    const categories = await api.get<Array<{ name: string; imageUrl?: string | null }>>("/categories");
     const groups = await Promise.all(
-      categories.map(async ({ name }) => {
+      categories.map(async ({ name, imageUrl }) => {
         const response = await fetchCampaigns({ category: name, sort: "popular", limit: PER_CATEGORY });
-        return { name, total: response.total, items: response.items.map(apiCampaignToView) };
+        return { name, imageUrl, total: response.total, items: response.items.map(apiCampaignToView) };
       }),
     );
     return { live: true, groups };
@@ -60,12 +60,14 @@ export async function DiscoverHub() {
 
       <nav className="container discover-cats" aria-label="Lĩnh vực">
         <ul>
-          {groups.map((group) => (
+          {groups.map((group) => {
+            const cover = categoryCover(group.name, group.imageUrl);
+            return (
             <li key={group.name}>
               <Link className="discover-cat" href={categoryHref(group.name)}>
-                {hasCategoryImages(group.name) ? (
+                {cover ? (
                   <span className="discover-cat-photo">
-                    <Image src={coverByKey(imageByCategory(group.name)).src} alt="" fill sizes="(max-width: 700px) 30vw, 200px" />
+                    <Image src={cover.src} alt="" fill sizes="(max-width: 700px) 30vw, 200px" unoptimized={cover.uploaded} />
                     <span className="discover-cat-badge"><Icon name={categoryIcon(group.name)} size={22} /></span>
                   </span>
                 ) : (
@@ -74,7 +76,8 @@ export async function DiscoverHub() {
                 <span className="discover-cat-name">{group.name}</span>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </nav>
 

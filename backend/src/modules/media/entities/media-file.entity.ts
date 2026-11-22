@@ -12,6 +12,8 @@ export enum MediaPurpose {
   ORGANIZATION_LOGO = "organization_logo",
   /** Ảnh chụp giấy phép/quyết định thành lập để admin xác minh tổ chức. */
   ORGANIZATION_DOCUMENT = "organization_document",
+  /** Ảnh đại diện lĩnh vực — chỉ admin tải lên. */
+  CATEGORY_IMAGE = "category_image",
 }
 
 @Entity("media_files")
