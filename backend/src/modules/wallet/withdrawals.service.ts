@@ -2,20 +2,24 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, FindOptionsWhere, Like, Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
+import { vnDateRange } from "../../common/query/range";
 import { MediaFile, MediaPurpose } from "../media/entities/media-file.entity";
 import { MEDIA_URL_PREFIX } from "../media/media.service";
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { NotificationsService } from "../notifications/notifications.service";
 import type { User } from "../users/entities/user.entity";
 import { Wallet, WalletTxType, WalletWithdrawal, WithdrawalStatus } from "./entities/wallet.entity";
+import { WalletReconciliationService } from "./wallet-reconciliation.service";
 import { WalletService } from "./wallet.service";
 
 /** Rút tối thiểu mỗi lần (tránh phí chuyển khoản lẻ). */
@@ -73,6 +77,9 @@ export class WithdrawalsService {
     private readonly wallet: WalletService,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
+    @Optional()
+    @Inject(WalletReconciliationService)
+    private readonly reconciliation: WalletReconciliationService | null = null,
   ) {}
 
   async request(user: User, input: WithdrawalInput): Promise<WithdrawalView> {
@@ -85,6 +92,7 @@ export class WithdrawalsService {
       throw new ConflictException(`Bạn đang có ${pending} yêu cầu rút chờ xử lý. Vui lòng chờ hoặc hủy bớt.`);
     }
     const saved = await this.dataSource.transaction(async (manager) => {
+      await this.reconciliation?.assertConsistent(user.id, "user", manager);
       // Khóa tiền ngay: số dư → chờ rút (có điều kiện, không thể âm ví).
       const locked = await manager
         .createQueryBuilder()
@@ -149,9 +157,23 @@ export class WithdrawalsService {
     return rows.map((row) => this.toView(row, false));
   }
 
-  async adminList(status: WithdrawalStatus | undefined, offset = 0, limit = 20): Promise<WithdrawalPage> {
+  async adminList(
+    status: WithdrawalStatus | undefined,
+    offset = 0,
+    limit = 20,
+    filters: { q?: string; from?: string; to?: string } = {},
+  ): Promise<WithdrawalPage> {
+    const createdAt = vnDateRange(filters.from, filters.to);
+    const base: FindOptionsWhere<WalletWithdrawal> = {
+      ...(status ? { status } : {}),
+      ...(createdAt ? { createdAt } : {}),
+    };
+    const keyword = filters.q?.trim();
+    const like = keyword ? Like(`%${keyword}%`) : undefined;
     const [rows, total] = await this.withdrawalRepo.findAndCount({
-      where: status ? { status } : {},
+      where: like
+        ? [{ ...base, user: { name: like } }, { ...base, user: { email: like } }, { ...base, bankAccountName: like }]
+        : base,
       relations: { user: true },
       // Hàng chờ: cũ nhất trước để xử lý theo thứ tự; còn lại mới nhất trước.
       order: { createdAt: status === WithdrawalStatus.PENDING ? "ASC" : "DESC" },
@@ -169,6 +191,8 @@ export class WithdrawalsService {
     }
     const withdrawal = await this.get(id);
     if (withdrawal.userId === admin.id) throw new ForbiddenException("Không tự duyệt yêu cầu rút của chính mình.");
+    // Không chi tiền thật cho ví đang lệch sổ (vd. số dư bị sửa thẳng trong cơ sở dữ liệu).
+    await this.reconciliation?.assertConsistent(withdrawal.userId, "admin");
     const proofUrl = input.proofMediaId ? await this.resolveProof(input.proofMediaId, admin) : null;
     const amount = Number(withdrawal.amount);
     const reviewedAt = new Date();

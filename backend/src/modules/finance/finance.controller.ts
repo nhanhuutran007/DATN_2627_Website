@@ -23,6 +23,7 @@ import { RequireStepUp, StepUpGuard } from "../auth/guards/step-up.guard";
 import { StepUpPurpose } from "../auth/entities/step-up-code.entity";
 import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entity";
 import {
+  AutoRefundSummaryQueryDto,
   CreateRefundRequestDto,
   DirectRefundDto,
   RefundBankInfoDto,
@@ -84,8 +85,8 @@ export class AdminFinanceController {
 
   /** Theo dõi hoàn tiền tự động khi dự án không đạt mục tiêu (cam kết về ví, khoản tự hoàn, số chờ duyệt tay). */
   @Get("refunds/auto-summary")
-  autoRefundSummary() {
-    return this.financeService.autoRefundSummary();
+  autoRefundSummary(@Query() query: AutoRefundSummaryQueryDto) {
+    return this.financeService.autoRefundSummary(query);
   }
 
   /** CSV yêu cầu hoàn kèm tài khoản nhận để chuyển khoản trả lại (có dữ liệu cá nhân, ghi audit). */

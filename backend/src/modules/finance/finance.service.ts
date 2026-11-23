@@ -15,7 +15,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Between, DataSource, FindOptionsWhere, In, Like, Repository } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
-import { rangeFilter } from "../../common/query/range";
+import { rangeFilter, vnDateRange, vnDayEnd, vnDayStart } from "../../common/query/range";
 import type { PaymentGateway } from "../../integrations/payment/payment.gateway";
 import type { CardPledgeGateway } from "../../integrations/payment/stripe";
 import { WalletService } from "../wallet/wallet.service";
@@ -274,22 +274,26 @@ export class FinanceService {
    * Theo dõi hoàn tiền tự động cho admin: cam kết đã trả về ví (dự án không đạt mục tiêu), khoản đã thu
    * được hệ thống tự hoàn, và số yêu cầu còn chờ admin duyệt thủ công; kèm các sự kiện gần nhất.
    */
-  async autoRefundSummary(limit = 15): Promise<AutoRefundSummary> {
+  async autoRefundSummary(range: { from?: string; to?: string } = {}, limit = 15): Promise<AutoRefundSummary> {
+    // Lọc theo thời điểm hoàn: cam kết được nhả (updatedAt) / yêu cầu được tự duyệt (reviewedAt).
+    const when = vnDateRange(range.from, range.to);
+    const releasedSumQuery = this.donationRepo
+      .createQueryBuilder("d")
+      .select("COUNT(*)", "count")
+      .addSelect("COALESCE(SUM(d.amount), 0)", "amount")
+      .where("d.status = :status", { status: DonationStatus.RELEASED });
+    if (range.from) releasedSumQuery.andWhere("d.updated_at >= :from", { from: vnDayStart(range.from) });
+    if (range.to) releasedSumQuery.andWhere("d.updated_at <= :to", { to: vnDayEnd(range.to) });
     const [released, releasedSum, autoRefunds, pendingManual] = await Promise.all([
       this.donationRepo.find({
-        where: { status: DonationStatus.RELEASED },
+        where: { status: DonationStatus.RELEASED, ...(when ? { updatedAt: when } : {}) },
         relations: { campaign: true, user: true },
         order: { updatedAt: "DESC" },
         take: limit,
       }),
-      this.donationRepo
-        .createQueryBuilder("d")
-        .select("COUNT(*)", "count")
-        .addSelect("COALESCE(SUM(d.amount), 0)", "amount")
-        .where("d.status = :status", { status: DonationStatus.RELEASED })
-        .getRawOne<{ count: string | number; amount: string | number }>(),
+      releasedSumQuery.getRawOne<{ count: string | number; amount: string | number }>(),
       this.refundRepo.find({
-        where: { status: RefundRequestStatus.APPROVED, adminNotes: Like("Tự động:%") },
+        where: { status: RefundRequestStatus.APPROVED, adminNotes: Like("Tự động:%"), ...(when ? { reviewedAt: when } : {}) },
         relations: { donation: { campaign: true, user: true } },
         order: { reviewedAt: "DESC" },
       }),
@@ -338,7 +342,11 @@ export class FinanceService {
   async adminList(query: RefundQueryDto): Promise<RefundRequestList> {
     const offset = query.offset ?? 0;
     const limit = query.limit ?? 30;
-    const base: FindOptionsWhere<RefundRequest> = query.status ? { status: query.status } : {};
+    const createdAt = vnDateRange(query.from, query.to);
+    const base: FindOptionsWhere<RefundRequest> = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(createdAt ? { createdAt } : {}),
+    };
     const amount = rangeFilter(query.minAmount, query.maxAmount, "amount");
     const keyword = query.q?.trim();
     const like = keyword ? Like(`%${keyword}%`) : undefined;
@@ -758,8 +766,9 @@ export class FinanceService {
     actor: User,
     now = new Date(),
   ): Promise<{ filename: string; content: string; rows: number }> {
+    const createdAt = vnDateRange(query.from, query.to);
     const requests = await this.refundRepo.find({
-      where: query.status ? { status: query.status } : {},
+      where: { ...(query.status ? { status: query.status } : {}), ...(createdAt ? { createdAt } : {}) },
       relations: { donation: { campaign: true }, user: true },
       order: { createdAt: "ASC" },
       take: 5000,
@@ -780,9 +789,10 @@ export class FinanceService {
       userId: actor.id,
       action: "finance.export_refunds",
       entity: "refund_request",
-      newValues: { status: query.status ?? null, rows: rows.length },
+      newValues: { status: query.status ?? null, from: query.from ?? null, to: query.to ?? null, rows: rows.length },
     });
     const day = vnDay(now);
-    return { filename: `hoan-tien_${query.status ?? "tat-ca"}_${day}.csv`, content: toCsv(header, rows), rows: rows.length };
+    const period = query.from || query.to ? `_${query.from?.slice(0, 10) ?? "dau"}_${query.to?.slice(0, 10) ?? "nay"}` : "";
+    return { filename: `hoan-tien_${query.status ?? "tat-ca"}${period}_${day}.csv`, content: toCsv(header, rows), rows: rows.length };
   }
 }

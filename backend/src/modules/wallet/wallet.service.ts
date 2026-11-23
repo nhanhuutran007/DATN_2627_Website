@@ -25,6 +25,7 @@ import { NotificationType } from "../notifications/entities/notification.entity"
 import { NotificationsService } from "../notifications/notifications.service";
 import type { User } from "../users/entities/user.entity";
 import { TopupStatus, Wallet, WalletTopup, WalletTransaction, WalletTxType } from "./entities/wallet.entity";
+import { WalletReconciliationService } from "./wallet-reconciliation.service";
 
 /** Mức nạp tối thiểu/tối đa mỗi lần. */
 export const MIN_TOPUP = 10_000;
@@ -88,6 +89,9 @@ export class WalletService {
     @Optional()
     @Inject("WalletSepayGateway")
     private readonly sepay: SepayGateway | null = null,
+    @Optional()
+    @Inject(WalletReconciliationService)
+    private readonly reconciliation: WalletReconciliationService | null = null,
   ) {}
 
   /** Nạp thử không qua SePay: chỉ khi SePay không chạy production (giống ví demo cũ). */
@@ -134,6 +138,8 @@ export class WalletService {
   /** Ủng hộ bằng ví: số dư → tiền giữ. `false` nếu số dư không đủ (không đổi gì). */
   async hold(manager: EntityManager, donation: DonationRef): Promise<boolean> {
     const amount = Number(donation.amount);
+    // Ví lệch sổ (tiền thêm/bớt ngoài giao dịch) không được tiêu cho tới khi admin đối soát.
+    await this.reconciliation?.assertConsistent(donation.userId, "user", manager);
     // Một câu UPDATE có điều kiện (khóa X ngay): ví chưa có dòng = số dư 0 = không đủ.
     // Không INSERT IGNORE trước đó: khóa S của nó + UPDATE đồng thời gây deadlock.
     const result = await manager

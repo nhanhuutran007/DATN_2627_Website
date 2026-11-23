@@ -5,9 +5,10 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "r
 
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
-import { PAGE_SIZE, Pagination, pageSlice } from "@/components/ui/Pagination";
+import { Pagination, pageSlice } from "@/components/ui/Pagination";
 import { ApiError } from "@/lib/api";
 import { downloadCampaignStatsCsv, downloadDailyDonationsCsv } from "@/lib/api/admin";
+import { foldVietnamese } from "@/lib/api/campaigns";
 import { createCategory, fetchAdminCategories, reorderCategories, updateCategory, type AdminCategory } from "@/lib/api/categories";
 import { ACCEPTED_IMAGE_TYPES, uploadImage, validateImageFile } from "@/lib/api/media";
 import { categoryCover, categoryIcon } from "@/lib/covers";
@@ -20,11 +21,22 @@ function errorText(err: unknown, fallback: string): string {
 const isoDay = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
+type CategoryStatusFilter = "" | "active" | "inactive";
+
+/** Hậu tố tiêu đề theo bộ lọc trạng thái, vd. "25 lĩnh vực đang nhận chiến dịch". */
+const CATEGORY_STATUS_SUFFIX: Record<CategoryStatusFilter, string> = {
+  "": "",
+  active: " đang nhận chiến dịch",
+  inactive: " ngừng nhận chiến dịch",
+};
+
 /** Quản trị nội dung: danh mục lĩnh vực và xuất thống kê ẩn danh. */
 export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (category: string) => void }) {
   const dialog = useDialog();
   const [categories, setCategories] = useState<AdminCategory[] | null>(null);
   const [page, setPage] = useState(0);
+  const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<CategoryStatusFilter>("");
   const [requestKey, setRequestKey] = useState(0);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -156,20 +168,65 @@ export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (catego
     void run(categories[index].id, () => reorderCategories(ids), "Đã cập nhật thứ tự hiển thị.");
   };
 
-  const activeCount = categories?.filter((category) => category.isActive).length ?? 0;
+  const folded = foldVietnamese(keyword.trim());
+  const visible = (categories ?? []).filter((category) => {
+    if (statusFilter === "active" && !category.isActive) return false;
+    if (statusFilter === "inactive" && category.isActive) return false;
+    return !folded || foldVietnamese(category.name).includes(folded);
+  });
+  const filtering = Boolean(folded || statusFilter);
 
   return (
     <section className="admin-card admin-table-card" id="danh-muc">
       <div className="card-heading">
         <div>
           <p className="eyebrow">Nội dung</p>
-          <h2>{categories ? `${categories.length} lĩnh vực · ${activeCount} đang nhận` : "Lĩnh vực chiến dịch"}</h2>
+          <h2>{categories ? `${visible.length} lĩnh vực${CATEGORY_STATUS_SUFFIX[statusFilter]}` : "Lĩnh vực chiến dịch"}</h2>
         </div>
         <form className="category-create" onSubmit={create}>
           <label className="sr-only" htmlFor="new-category">Tên lĩnh vực mới</label>
           <input id="new-category" placeholder="Tên lĩnh vực mới" maxLength={100} value={name} onChange={(event) => setName(event.target.value)} />
           <button className="button button-primary button-sm" type="submit" disabled={busy === "create" || name.trim().length < 2}>Thêm</button>
         </form>
+      </div>
+      <div className="admin-filter-bar">
+        <input
+          className="filter-button admin-filter-search"
+          type="search"
+          placeholder="Tìm lĩnh vực theo tên…"
+          aria-label="Tìm lĩnh vực"
+          value={keyword}
+          onChange={(event) => {
+            setKeyword(event.target.value);
+            setPage(0);
+          }}
+        />
+        <select
+          className="filter-button"
+          aria-label="Lọc theo trạng thái nhận chiến dịch"
+          value={statusFilter}
+          onChange={(event) => {
+            setStatusFilter(event.target.value as CategoryStatusFilter);
+            setPage(0);
+          }}
+        >
+          <option value="">Tất cả trạng thái</option>
+          <option value="active">Đang nhận chiến dịch</option>
+          <option value="inactive">Ngừng nhận chiến dịch</option>
+        </select>
+        {filtering && (
+          <button
+            className="link-inline"
+            type="button"
+            onClick={() => {
+              setKeyword("");
+              setStatusFilter("");
+              setPage(0);
+            }}
+          >
+            Xóa bộ lọc
+          </button>
+        )}
       </div>
       {notice && (
         <p className={notice.tone === "ok" ? "admin-notice" : "form-error"} role={notice.tone === "ok" ? "status" : "alert"}>{notice.text}</p>
@@ -189,10 +246,12 @@ export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (catego
           <tbody>
             {categories === null ? (
               <tr><td colSpan={6}><span className="table-muted">Đang tải…</span></td></tr>
+            ) : visible.length === 0 ? (
+              <tr><td colSpan={6}><span className="table-muted">Không có lĩnh vực nào khớp bộ lọc.</span></td></tr>
             ) : (
-              pageSlice(categories, page).map((category, pageIndex) => {
-                // Vị trí trong toàn danh sách (dùng cho sắp xếp), không phải trong trang.
-                const index = page * PAGE_SIZE + pageIndex;
+              pageSlice(visible, page).map((category) => {
+                // Vị trí trong toàn danh sách (dùng cho sắp xếp và cột #), không phải trong trang đang lọc.
+                const index = categories.indexOf(category);
                 const cover = categoryCover(category.name, category.imageUrl);
                 return (
                 <tr key={category.id} className={category.isActive ? undefined : "category-inactive"}>
@@ -232,8 +291,8 @@ export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (catego
                   <td>
                     <div className="admin-actions category-actions">
                       <span className="category-move">
-                        <button type="button" aria-label={`Đưa ${category.name} lên`} title="Đưa lên" disabled={index === 0 || busy !== null} onClick={() => move(index, -1)}>↑</button>
-                        <button type="button" aria-label={`Đưa ${category.name} xuống`} title="Đưa xuống" disabled={index === categories.length - 1 || busy !== null} onClick={() => move(index, 1)}>↓</button>
+                        <button type="button" aria-label={`Đưa ${category.name} lên`} title="Đưa lên" disabled={filtering || index === 0 || busy !== null} onClick={() => move(index, -1)}>↑</button>
+                        <button type="button" aria-label={`Đưa ${category.name} xuống`} title="Đưa xuống" disabled={filtering || index === categories.length - 1 || busy !== null} onClick={() => move(index, 1)}>↓</button>
                       </span>
                       <button type="button" disabled={busy === category.id} onClick={() => rename(category)}>Đổi tên</button>
                       <button type="button" disabled={busy === category.id} onClick={() => pickImage(category)}>Đổi ảnh</button>
@@ -257,7 +316,7 @@ export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (catego
           </tbody>
         </table>
       </div>
-      {categories && <Pagination page={page} total={categories.length} onChange={setPage} />}
+      {categories && <Pagination page={page} total={visible.length} onChange={setPage} />}
       <p className="risk-footnote">
         <Icon name="shield" size={15} /> Thứ tự (#) là thứ tự lĩnh vực trong bộ lọc trang khám phá và form tạo chiến dịch. Ngừng nhận: không cho tạo chiến dịch mới trong lĩnh vực, chiến dịch cũ giữ nguyên. Đổi tên cập nhật luôn các chiến dịch. Đổi ảnh: ảnh đại diện ở trang khám phá và trang lĩnh vực (JPEG/PNG/WebP, tối đa 5 MB, nên dùng ảnh ngang 3:2). Mọi thay đổi được ghi nhật ký kiểm toán.
       </p>

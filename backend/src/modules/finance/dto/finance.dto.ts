@@ -140,6 +140,16 @@ export class RefundQueryDto {
   @Min(0)
   maxAmount?: number;
 
+  /** Ngày bắt đầu (yyyy-mm-dd, giờ VN, bao gồm). */
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  /** Ngày kết thúc (yyyy-mm-dd, giờ VN, bao gồm cả ngày). */
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -158,6 +168,29 @@ export class RefundExportQueryDto {
   @IsOptional()
   @IsEnum(RefundRequestStatus)
   status?: RefundRequestStatus;
+
+  /** Ngày bắt đầu (yyyy-mm-dd, giờ VN, bao gồm). */
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  /** Ngày kết thúc (yyyy-mm-dd, giờ VN, bao gồm cả ngày). */
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+}
+
+/** Khoảng thời gian cho bảng theo dõi hoàn tiền tự động (trống = mọi thời gian). */
+export class AutoRefundSummaryQueryDto {
+  /** Ngày bắt đầu (yyyy-mm-dd, giờ VN, bao gồm). */
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  /** Ngày kết thúc (yyyy-mm-dd, giờ VN, bao gồm cả ngày). */
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 }
 
 export class ReconciliationQueryDto {

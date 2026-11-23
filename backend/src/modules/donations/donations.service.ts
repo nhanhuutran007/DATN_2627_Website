@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Inject,
   Injectable,
   NotFoundException,
@@ -865,6 +866,8 @@ export class DonationsService {
         if (insufficient) {
           throw new BadRequestException(`Số dư ví không đủ để ủng hộ ${money(donation.amount)}. Vui lòng nạp thêm.`);
         }
+        // Lỗi nghiệp vụ có sẵn thông báo (vd. ví đang bị khóa vì lệch sổ) thì giữ nguyên.
+        if (error instanceof HttpException) throw error;
         throw new ConflictException("Ví đang xử lý một giao dịch khác. Vui lòng thử lại.");
       }
     }

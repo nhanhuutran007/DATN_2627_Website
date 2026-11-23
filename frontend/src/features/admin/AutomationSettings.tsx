@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 
 import { ApiError } from "@/lib/api";
+import { formatDateTime } from "@/lib/format";
+import { ALL_TIME, dateRangeParams, DateRangeFilter, hasDateRange, type DateRange } from "@/components/ui/DateRangeFilter";
 import {
   fetchAutomationSettings,
   fetchAutoRefundSummary,
@@ -111,13 +113,19 @@ export function ReviewAutomationPanel() {
   );
 }
 
-const DESTINATION_LABEL: Record<AutoRefundEvent["destination"], string> = {
-  wallet: "Về ví Góp Mầm",
-  pledge_cancelled: "Hủy cam kết thẻ (không trừ tiền)",
-  gateway: "Hoàn qua cổng thanh toán",
-};
+/**
+ * Một nhãn duy nhất cho mỗi cách hoàn (không thêm dòng phụ): chỉ "về ví" mới cần phân biệt
+ * nhả cam kết (chưa trừ tiền) với hoàn khoản đã thu.
+ */
+function refundLabel(event: AutoRefundEvent): { text: string; tone: string } {
+  if (event.destination === "gateway") return { text: "Hoàn qua cổng thanh toán", tone: "is-gateway" };
+  if (event.destination === "pledge_cancelled") return { text: "Hủy cam kết thẻ (chưa trừ tiền)", tone: "is-pledge_cancelled" };
+  return event.kind === "pledge_released"
+    ? { text: "Trả cam kết về ví", tone: "is-wallet" }
+    : { text: "Hoàn tiền đã thu về ví", tone: "is-wallet" };
+}
 
-const money = (value: number) => `${Math.round(value).toLocaleString("vi-VN")} ₫`;
+const money = (value: number) => `${Math.round(value).toLocaleString("vi-VN")}\u00A0₫`;
 
 /**
  * Theo dõi hoàn tiền tự động (đặt ở mục "Hoàn tiền"): khi dự án hết hạn mà không đạt mục tiêu hoặc bị hủy,
@@ -127,23 +135,27 @@ const money = (value: number) => `${Math.round(value).toLocaleString("vi-VN")} �
 export function RefundAutoMonitor({ refreshKey = 0 }: { refreshKey?: number }) {
   const [summary, setSummary] = useState<AutoRefundSummary | null>(null);
   const [error, setError] = useState("");
+  const [range, setRange] = useState<DateRange>(ALL_TIME);
 
   useEffect(() => {
     let active = true;
-    fetchAutoRefundSummary()
+    fetchAutoRefundSummary(dateRangeParams(range))
       .then((value) => active && setSummary(value))
       .catch((err: unknown) => active && setError(errorText(err, "Không tải được số liệu hoàn tiền tự động.")));
     return () => {
       active = false;
     };
-  }, [refreshKey]);
+  }, [refreshKey, range]);
 
   return (
-    <section className="admin-card automation-card" aria-labelledby="refund-monitor-title">
+    <section className="admin-card admin-table-card automation-card refund-monitor" aria-labelledby="refund-monitor-title">
       <div className="card-heading">
         <div>
           <p className="eyebrow">Theo dõi</p>
           <h2 id="refund-monitor-title">Hoàn tiền tự động khi dự án không đạt mục tiêu</h2>
+        </div>
+        <div className="risk-heading-actions">
+          <DateRangeFilter label="Lọc theo thời điểm hoàn" value={range} onChange={setRange} />
         </div>
       </div>
       <p className="automation-lead">
@@ -157,35 +169,39 @@ export function RefundAutoMonitor({ refreshKey = 0 }: { refreshKey?: number }) {
           <dl className="refund-monitor-stats">
             <div>
               <dt>Cam kết đã trả về ví</dt>
-              <dd><b>{summary.releasedPledges.count.toLocaleString("vi-VN")}</b> khoản · {money(summary.releasedPledges.amount)}</dd>
+              <dd><b>{money(summary.releasedPledges.amount)}</b></dd>
+              <dd className="stat-meta">{summary.releasedPledges.count.toLocaleString("vi-VN")} khoản</dd>
             </div>
             <div>
               <dt>Khoản đã thu được tự hoàn</dt>
-              <dd><b>{summary.autoRefunds.count.toLocaleString("vi-VN")}</b> khoản · {money(summary.autoRefunds.amount)}</dd>
+              <dd><b>{money(summary.autoRefunds.amount)}</b></dd>
+              <dd className="stat-meta">{summary.autoRefunds.count.toLocaleString("vi-VN")} khoản</dd>
             </div>
             <div className={summary.pendingManual > 0 ? "is-attention" : undefined}>
               <dt>Chờ admin duyệt thủ công</dt>
-              <dd><b>{summary.pendingManual.toLocaleString("vi-VN")}</b> yêu cầu</dd>
+              <dd><b>{summary.pendingManual.toLocaleString("vi-VN")}</b></dd>
+              <dd className="stat-meta">yêu cầu hoàn tiền đang chờ</dd>
             </div>
           </dl>
           {summary.recent.length === 0 ? (
-            <p className="table-muted">Chưa có khoản nào được hoàn tự động.</p>
+            <p className="table-muted">
+              {hasDateRange(range) ? "Không có khoản nào được hoàn tự động trong khoảng thời gian này." : "Chưa có khoản nào được hoàn tự động."}
+            </p>
           ) : (
             <div className="table-scroll">
               <table>
                 <thead>
-                  <tr><th>Thời điểm</th><th>Dự án</th><th>Người ủng hộ</th><th className="num">Số tiền</th><th>Hình thức</th></tr>
+                  <tr><th>Thời điểm</th><th>Dự án</th><th>Người ủng hộ</th><th className="num">Số tiền</th><th>Hình thức hoàn</th></tr>
                 </thead>
                 <tbody>
                   {summary.recent.map((event) => (
                     <tr key={`${event.kind}-${event.donationId}`}>
-                      <td className="nowrap">{new Date(event.at).toLocaleString("vi-VN")}</td>
+                      <td className="nowrap">{formatDateTime(event.at)}</td>
                       <td>{event.campaignTitle || "—"}</td>
                       <td>{event.donorName || "—"}</td>
                       <td className="num">{money(event.amount)}</td>
                       <td>
-                        {DESTINATION_LABEL[event.destination]}
-                        <small className="table-cell-note">{event.kind === "pledge_released" ? "Cam kết chưa trừ tiền" : "Khoản đã thu"}</small>
+                        <span className={`refund-destination ${refundLabel(event).tone}`}>{refundLabel(event).text}</span>
                       </td>
                     </tr>
                   ))}

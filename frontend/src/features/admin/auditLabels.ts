@@ -32,6 +32,8 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   "wallet.withdraw.cancel": "Hủy yêu cầu rút tiền",
   "wallet.withdraw.approve": "Duyệt chi tiền rút ví",
   "wallet.withdraw.reject": "Từ chối rút tiền ví",
+  "wallet.reconcile.mismatch_detected": "Phát hiện ví lệch sổ",
+  "wallet.reconcile.restore": "Khôi phục ví theo sổ giao dịch",
   "auth.register": "Đăng ký tài khoản",
   "auth.login.success": "Đăng nhập",
   "auth.google.login": "Đăng nhập bằng Google",

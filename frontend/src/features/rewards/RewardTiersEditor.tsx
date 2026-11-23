@@ -57,7 +57,7 @@ export function validateTiers(tiers: DraftTier[]): string {
     const label = tiers.length > 1 ? `Mức quà ${i + 1}` : "Mức quà";
     if (t.title.trim().length < 3) return `${label}: tên cần ít nhất 3 ký tự.`;
     if (t.description.trim().length < 10) return `${label}: mô tả phần quà cần ít nhất 10 ký tự.`;
-    if (!(Number(t.minAmount) >= MIN_REWARD_AMOUNT)) return `${label}: số tiền tối thiểu từ ${MIN_REWARD_AMOUNT.toLocaleString("vi-VN")} ₫.`;
+    if (!(Number(t.minAmount) >= MIN_REWARD_AMOUNT)) return `${label}: số tiền tối thiểu từ ${MIN_REWARD_AMOUNT.toLocaleString("vi-VN")}\u00A0₫.`;
     if (t.limit && !(Number(t.limit) >= 1 && Number.isInteger(Number(t.limit)))) return `${label}: số suất phải là số nguyên ≥ 1.`;
     for (const item of t.items) {
       if (!item.name.trim()) continue;

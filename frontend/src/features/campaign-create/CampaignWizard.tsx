@@ -779,7 +779,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                     <button className="button button-outline" type="button" onClick={() => setMilestones((c) => [...c, { ...emptyMilestone }])}>
                       + Thêm mốc
                     </button>
-                    <span>Tổng ngân sách các mốc: <b>{plannedBudget.toLocaleString("vi-VN")} ₫</b>{target > 0 && ` / mục tiêu ${target.toLocaleString("vi-VN")} ₫`}</span>
+                    <span>Tổng ngân sách các mốc: <b>{plannedBudget.toLocaleString("vi-VN")}&nbsp;₫</b>{target > 0 && ` / mục tiêu ${target.toLocaleString("vi-VN")}\u00A0₫`}</span>
                   </div>
                 </div>
               )}
@@ -795,7 +795,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                     <div><dt>Gây quỹ cho</dt><dd>{pickedOrganization ? pickedOrganization.name : "Dự án của tôi"}</dd></div>
                     <div><dt>Lĩnh vực</dt><dd>{draft.category || "—"}</dd></div>
                     <div><dt>Địa điểm</dt><dd>{draft.location || "—"}</dd></div>
-                    <div><dt>Mục tiêu</dt><dd>{target ? `${target.toLocaleString("vi-VN")} ₫` : "—"}</dd></div>
+                    <div><dt>Mục tiêu</dt><dd>{target ? `${target.toLocaleString("vi-VN")}\u00A0₫` : "—"}</dd></div>
                     <div><dt>Ngày kết thúc</dt><dd>{draft.deadline ? new Date(draft.deadline).toLocaleDateString("vi-VN") : "—"}</dd></div>
                     <div><dt>Số mốc</dt><dd>{milestones.filter((m) => m.title.trim()).length}</dd></div>
                     <div><dt>Mức quà</dt><dd>{tiersToPayloads(tiers).length || "Không có"}</dd></div>

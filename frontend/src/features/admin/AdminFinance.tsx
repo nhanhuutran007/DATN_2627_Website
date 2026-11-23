@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { useDialog } from "@/components/ui/DialogProvider";
+import { ALL_TIME, dateRangeParams, DateRangeFilter, hasDateRange, type DateRange } from "@/components/ui/DateRangeFilter";
 import { Icon } from "@/components/ui/Icon";
 import { PAGE_SIZE, Pagination, pageSlice } from "@/components/ui/Pagination";
 import { RefundAutoMonitor } from "@/features/admin/AutomationSettings";
@@ -20,7 +21,7 @@ import {
   type RefundRequest,
   type RefundRequestStatus,
 } from "@/lib/api/finance";
-import { formatVnd } from "@/lib/format";
+import { formatDateTime, formatVnd } from "@/lib/format";
 
 /** Ngày theo lịch địa phương dạng yyyy-mm-dd (toISOString lệch ngày trước 7h sáng giờ VN). */
 const isoDay = (date: Date) =>
@@ -51,8 +52,10 @@ const RECON_PRESETS: { label: string; range: () => [string, string] }[] = [
 /** Chênh lệch có dấu, vd. "+200.000 ₫" / "−1 lượt" (chỉ gọi khi khác 0). */
 const signed = (value: number, format: (n: number) => string) => (value > 0 ? "+" : "−") + format(Math.abs(value));
 
-type RefundFilters = { status: RefundRequestStatus | ""; q: string; minAmount: string; maxAmount: string };
-const DEFAULT_REFUND_FILTERS: RefundFilters = { status: "pending", q: "", minAmount: "", maxAmount: "" };
+type RefundFilters = { status: RefundRequestStatus | ""; q: string; minAmount: string; maxAmount: string; range: DateRange };
+const DEFAULT_REFUND_FILTERS: RefundFilters = { status: "pending", q: "", minAmount: "", maxAmount: "", range: ALL_TIME };
+/** Có điều kiện lọc ngoài trạng thái (để hiện "Xóa bộ lọc"). */
+const hasRefundSearch = (f: RefundFilters) => Boolean(f.q || f.minAmount || f.maxAmount || hasDateRange(f.range));
 /** Tiêu đề thẻ: "{số} yêu cầu …" theo trạng thái đang lọc. */
 const REFUND_COUNT_LABEL: Record<RefundRequestStatus | "", string> = {
   pending: "yêu cầu đang chờ xử lý",
@@ -98,7 +101,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
       setNotice({ tone: "error", text: "Số tiền \"từ\" không được lớn hơn số tiền \"đến\"" });
       return;
     }
-    const search = { q: filters.q.trim() || undefined, minAmount, maxAmount };
+    const search = { q: filters.q.trim() || undefined, minAmount, maxAmount, ...dateRangeParams(filters.range) };
     try {
       const fetchPage = (p: number) =>
         fetchAdminRefunds(filters.status || undefined, { offset: p * PAGE_SIZE, limit: PAGE_SIZE }, search);
@@ -175,7 +178,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
     setBusy("export-refunds");
     setNotice(null);
     try {
-      await downloadRefundsCsv(refundFilter.status || undefined);
+      await downloadRefundsCsv(refundFilter.status || undefined, dateRangeParams(refundFilter.range));
     } catch (err) {
       setNotice({ tone: "error", text: errorText(err, "Không xuất được CSV") });
     } finally {
@@ -298,6 +301,11 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
             <option value="rejected">Không chấp nhận</option>
             <option value="">Tất cả trạng thái</option>
           </select>
+          <DateRangeFilter
+            label="Lọc theo ngày gửi yêu cầu"
+            value={refundDraft.range}
+            onChange={(range) => applyRefundFilters({ ...refundDraft, range })}
+          />
           <label className="admin-filter-range">
             <span>Số tiền (đ)</span>
             <input
@@ -325,7 +333,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
             />
           </label>
           <button className="button button-primary admin-filter-submit" type="submit">Lọc</button>
-          {(refundFilter.q || refundFilter.minAmount || refundFilter.maxAmount) && (
+          {hasRefundSearch(refundFilter) && (
             <button
               className="link-inline"
               type="button"
@@ -343,7 +351,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
         <div className="risk-list">
           {refunds.length === 0 ? (
             <article>
-              {refundFilter.q || refundFilter.minAmount || refundFilter.maxAmount ? (
+              {hasRefundSearch(refundFilter) ? (
                 <p className="table-muted">
                   Không có yêu cầu nào khớp bộ lọc.{" "}
                   <button className="link-inline" type="button" onClick={() => applyRefundFilters({ ...DEFAULT_REFUND_FILTERS, status: refundFilter.status })}>
@@ -368,19 +376,26 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
                   {REFUND_STATUS_LABEL[r.status]}
                 </span>
                 <div>
-                  <h3>{formatVnd(Number(r.donation?.amount ?? 0))} · {r.donation?.campaign?.title ?? "Chiến dịch"}</h3>
-                  <p>
-                    {new Date(r.createdAt).toLocaleString("vi-VN")} · bởi {r.user ? `${r.user.name}${r.user.email ? ` (${r.user.email})` : ""}` : "người dùng"}
-                  </p>
+                  <div className="request-head">
+                    <h3>{r.donation?.campaign?.title ?? "Chiến dịch"}</h3>
+                    <strong className="request-amount num">{formatVnd(Number(r.donation?.amount ?? 0))}</strong>
+                  </div>
+                  <ul className="request-meta">
+                    <li><span>Gửi lúc</span> {formatDateTime(r.createdAt)}</li>
+                    <li><span>Người yêu cầu</span> {r.user?.name ?? "Người dùng"}</li>
+                    {r.user?.email && <li><span>Email</span> {r.user.email}</li>}
+                  </ul>
                   <p className="report-quote">{r.reason}</p>
                   {needsManualRefund(r.donation?.paymentMethod) && (
                     <div className="refund-bank-info">
                       <span className="refund-manual-tag">Hoàn thủ công qua chuyển khoản</span>
                       {r.bankAccountNumber ? (
-                        <span>
-                          {r.bankName} · <b className="mono">{r.bankAccountNumber}</b> · {r.bankAccountName}
-                          {r.donation?.transferCode && <> · mã ủng hộ <span className="mono">{r.donation.transferCode}</span></>}
-                        </span>
+                        <dl className="bank-grid">
+                          <div><dt>Ngân hàng</dt><dd>{r.bankName}</dd></div>
+                          <div><dt>Số tài khoản</dt><dd className="mono">{r.bankAccountNumber}</dd></div>
+                          <div><dt>Chủ tài khoản</dt><dd>{r.bankAccountName}</dd></div>
+                          {r.donation?.transferCode && <div><dt>Mã ủng hộ</dt><dd className="mono">{r.donation.transferCode}</dd></div>}
+                        </dl>
                       ) : (
                         <span className="table-muted">Người ủng hộ chưa khai tài khoản nhận hoàn</span>
                       )}
@@ -494,10 +509,10 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
         {report && (
           <>
             <dl className="recon-totals">
-              <div><dt>Đã xác nhận</dt><dd className="num">{formatVnd(report.totals.completedAmount)}<small> · {report.totals.completedCount} giao dịch</small></dd></div>
-              <div><dt>Đã hoàn</dt><dd className="num">{formatVnd(report.totals.refundedAmount)}<small> · {report.totals.refundedCount} giao dịch</small></dd></div>
-              <div><dt>Ròng trong kỳ</dt><dd className="num">{formatVnd(report.totals.netAmount)}</dd></div>
-              <div><dt>Chiến dịch lệch sổ</dt><dd className={report.mismatches ? "recon-bad" : "recon-ok"}>{report.mismatches}</dd></div>
+              <div><dt>Đã xác nhận</dt><dd className="num">{formatVnd(report.totals.completedAmount)}</dd><dd className="stat-meta">{report.totals.completedCount.toLocaleString("vi-VN")} giao dịch</dd></div>
+              <div><dt>Đã hoàn</dt><dd className="num">{formatVnd(report.totals.refundedAmount)}</dd><dd className="stat-meta">{report.totals.refundedCount.toLocaleString("vi-VN")} giao dịch</dd></div>
+              <div><dt>Ròng trong kỳ</dt><dd className="num">{formatVnd(report.totals.netAmount)}</dd><dd className="stat-meta">Đã xác nhận trừ đã hoàn</dd></div>
+              <div className={report.mismatches ? "is-alert" : undefined}><dt>Chiến dịch lệch sổ</dt><dd className={report.mismatches ? "recon-bad" : "recon-ok"}>{report.mismatches}</dd><dd className="stat-meta">{report.mismatches ? "Số trên chiến dịch khác sổ giao dịch" : "Mọi chiến dịch khớp sổ"}</dd></div>
             </dl>
             <div className="table-scroll">
               <table>

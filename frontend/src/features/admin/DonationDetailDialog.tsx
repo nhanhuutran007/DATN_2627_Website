@@ -7,7 +7,7 @@ import { RISK_LEVEL_LABEL } from "@/features/admin/labels";
 import type { AdminDonation } from "@/lib/api/admin";
 import { paymentMethodLabel } from "@/lib/format";
 
-const money = (value: number | string | null | undefined) => `${Number(value ?? 0).toLocaleString("vi-VN")} ₫`;
+const money = (value: number | string | null | undefined) => `${Number(value ?? 0).toLocaleString("vi-VN")}\u00A0₫`;
 const dateTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" }) : "—";
 

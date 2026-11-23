@@ -29,6 +29,7 @@ import {
   USER_STATUS_LABEL,
 } from "@/features/admin/labels";
 import { ADMIN_SECTION_GROUPS, ADMIN_SECTIONS, adminHref, findAdminSection } from "@/features/admin/sections";
+import { AdminReconciliation } from "@/features/admin/AdminReconciliation";
 import { AdminWithdrawals } from "@/features/admin/AdminWithdrawals";
 import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredictionCard";
 import {
@@ -144,6 +145,16 @@ function navBadge(slug: string, counts: AdminNavCounts | null): NavBadge | null 
     case "hoan-tien":
       return numeric(counts.pendingRefunds, "yêu cầu hoàn tiền chờ xử lý");
     case "doi-soat":
+      // Ví lệch là tiền có thể bị chi sai: ưu tiên báo nổi bật hơn chiến dịch lệch sổ.
+      if (counts.walletMismatches > 0) {
+        const total = counts.walletMismatches + counts.ledgerMismatches;
+        return {
+          text: String(total),
+          title: `${counts.walletMismatches} ví lệch sổ giao dịch, cần xử lý ngay` +
+            (counts.ledgerMismatches ? ` · ${counts.ledgerMismatches} chiến dịch lệch sổ (lũy kế)` : ""),
+          tone: "warn",
+        };
+      }
       return numeric(counts.ledgerMismatches, "chiến dịch lệch sổ (lũy kế)");
     case "sao-luu":
       if (counts.daysSinceBackup === null) return { text: "!", title: "Chưa từng sao lưu dữ liệu", tone: "warn" };
@@ -2093,7 +2104,16 @@ export function AdminDashboard() {
 
           {view === "hoan-tien" && <AdminFinance view="refunds" onChanged={() => { void loadDonations(donationFilter, donationPaging.page); void reloadOverview(); }} />}
           {view === "rut-tien" && <AdminWithdrawals />}
-          {view === "doi-soat" && <AdminFinance view="reconciliation" onChanged={() => { void loadDonations(donationFilter, donationPaging.page); void reloadOverview(); }} />}
+          {view === "doi-soat" && (
+            <AdminReconciliation
+              walletMismatches={navCounts?.walletMismatches ?? 0}
+              onChanged={() => {
+                void refreshNavCounts();
+                void loadDonations(donationFilter, donationPaging.page);
+                void reloadOverview();
+              }}
+            />
+          )}
 
           {view === "nguoi-dung" && (
           <section className="admin-card admin-table-card" id="nguoi-dung">
@@ -2184,7 +2204,7 @@ export function AdminDashboard() {
                             {isSelf && " (bạn)"}
                           </b>
                         </td>
-                        <td>
+                        <td className="cell-email">
                           {adminUser.email}
                           {!adminUser.emailVerified && <span className="user-unverified" title="Người dùng chưa bấm link xác thực email">Chưa xác thực</span>}
                         </td>

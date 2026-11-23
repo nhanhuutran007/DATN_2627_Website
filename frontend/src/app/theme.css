@@ -375,7 +375,8 @@ h3 {
   border-left: 2px solid var(--line);
 }
 
-#doi-soat .recon-diff {
+#doi-soat .recon-diff,
+#doi-soat-vi .recon-diff {
   display: block;
   margin-top: 4px;
   color: #b42318;
@@ -389,6 +390,284 @@ h3 {
 
 .recon-ok {
   color: #157f3d;
+}
+
+/*
+ * Thẻ số liệu: một số chính, thông tin phụ nằm dòng riêng (.stat-meta) thay vì nối "· …" cùng dòng;
+ * trạng thái khớp/lệch là nhãn màu (.stat-flag); nhiều số liên quan dùng danh sách có nhãn (.stat-lines).
+ */
+.recon-totals > div,
+.refund-monitor-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recon-totals dd,
+.refund-monitor-stats dd {
+  margin: 0;
+}
+
+.recon-totals dd.stat-meta,
+.refund-monitor-stats dd.stat-meta {
+  margin-top: auto;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.recon-totals > div.is-alert {
+  border: 1px solid #f5c2bd;
+  background: #fef3f2;
+}
+
+.stat-flag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.stat-flag.is-ok {
+  color: #157f3d;
+  background: #e7f6ec;
+}
+
+.stat-flag.is-bad {
+  color: #b42318;
+  background: #fde8e6;
+}
+
+.stat-lines {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.stat-lines li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stat-lines li + li {
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+
+.stat-lines span {
+  color: var(--muted);
+}
+
+.stat-lines b {
+  color: var(--navy);
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Cột số trong mọi bảng quản trị: căn phải, chữ số cùng độ rộng */
+.admin-table-card th.num,
+.admin-table-card td.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chi tiết ví: 3 thẻ so sánh số trong ví với sổ (số dư / đang giữ / chờ rút) */
+.wallet-compare {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.wallet-compare-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--white);
+}
+
+.wallet-compare-card.is-bad {
+  border-color: #f5c2bd;
+}
+
+.wallet-compare-card h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 760px) {
+  .wallet-compare {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Bảng có thanh cuộn ngang: email và số tiền không bị bẻ giữa chừng trên điện thoại */
+.table-scroll td.cell-email,
+.table-scroll td.num,
+.table-scroll th.num {
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .recon-totals {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Lọc theo khoảng thời gian: ô chọn nhanh, "Tùy chọn ngày…" mở thêm hai ô ngày */
+.date-range-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.date-range-inputs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.date-range-inputs input {
+  width: 150px;
+}
+
+@media (max-width: 560px) {
+  .date-range-filter,
+  .date-range-inputs {
+    width: 100%;
+  }
+
+  .date-range-filter select,
+  .date-range-inputs input {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
+}
+
+/* Hai tab trong mục Đối soát: giao dịch chiến dịch | ví người dùng */
+.recon-tabs {
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 16px;
+}
+
+.recon-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recon-tab-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #d92d20;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* Đối soát ví: tên + email, số phụ xuống dòng; dòng đang xem/giao dịch lệch tô nền */
+#doi-soat-vi td small,
+.wallet-recon-detail td small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+#doi-soat-vi tr.is-selected td,
+.wallet-recon-detail tr.is-selected td {
+  background: #fff4e5;
+}
+
+.wallet-recon-detail {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.wallet-recon-detail h2 small {
+  margin-left: 6px;
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+/* Ví lệch: cột trái "vì sao bị khóa", cột phải "cách mở khóa" theo bước */
+.wallet-recon-alert {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  padding: 16px 18px;
+  border: 1px solid #f5c2bd;
+  border-radius: 12px;
+  background: #fef3f2;
+  color: #7a271a;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.wallet-recon-alert > div + div {
+  padding-left: 20px;
+  border-left: 1px solid #f5c2bd;
+}
+
+.wallet-recon-alert h3 {
+  margin: 0 0 8px;
+  color: #7a271a;
+  font-size: 0.95rem;
+}
+
+.wallet-recon-alert ul,
+.wallet-recon-alert ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.wallet-recon-alert li + li {
+  margin-top: 6px;
+}
+
+@media (max-width: 860px) {
+  .wallet-recon-alert {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wallet-recon-alert > div + div {
+    padding-top: 16px;
+    padding-left: 0;
+    border-top: 1px solid #f5c2bd;
+    border-left: 0;
+  }
+}
+
+.wallet-recon-subhead {
+  margin: 4px 0 0;
+  font-size: 1rem;
 }
 
 @media (max-width: 960px) {
@@ -827,8 +1106,10 @@ h3 {
 }
 
 /* Trang ủng hộ: mỗi lựa chọn là một thẻ quà */
+/* Radio nằm trong góc trên-trái của thẻ (trước đây lơ lửng bên ngoài, lệch với ô "không nhận quà") */
 .reward-option-card {
-  align-items: start;
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
   padding: 0;
   border: 0;
   background: none;
@@ -839,7 +1120,16 @@ h3 {
 }
 
 .reward-option-card input {
-  margin-top: 22px;
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 0 0 3px var(--white), 0 2px 6px rgba(16, 24, 40, 0.25);
 }
 
 /* Trang quản lý: thẻ xem trước + sửa từng mức */
@@ -3594,6 +3884,8 @@ button {
 .auth-side-inner {
   position: relative;
   z-index: 1;
+  /* Không để khối chữ co theo nội dung (từng chỉ rộng ~230px, chữ rơi lẻ xuống dòng) */
+  width: 100%;
   max-width: 480px;
   padding: 48px;
 }
@@ -5141,6 +5433,39 @@ button {
 .table-cell-note.is-urgent {
   color: var(--primary);
   font-weight: 600;
+}
+
+/* Hoàn tiền tự động: hình thức hoàn là nhãn màu, tên dự án được xuống dòng trong cột rộng */
+.refund-monitor td:nth-child(2) {
+  min-width: 240px;
+}
+
+.refund-monitor .table-scroll {
+  margin-top: 4px;
+}
+
+.refund-destination {
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.refund-destination.is-gateway {
+  color: #1d4ed8;
+  background: #e8efff;
+}
+
+.refund-destination.is-wallet {
+  color: #157f3d;
+  background: #e7f6ec;
+}
+
+.refund-destination.is-pledge_cancelled {
+  color: #6b7385;
+  background: var(--soft);
 }
 
 .table-status {
@@ -10634,7 +10959,11 @@ html:has(dialog:modal) .admin-sidebar {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
-  margin-bottom: 10px;
+  min-width: 0;
+  margin: 0 0 10px;
+  /* Có nơi dùng <fieldset>: bỏ khung viền mặc định của trình duyệt */
+  padding: 0;
+  border: 0;
 }
 
 .donate-presets button {
@@ -12462,6 +12791,84 @@ html:has(dialog:modal) .admin-sidebar {
   font-size: 0.88rem;
 }
 
+/* Thẻ yêu cầu hoàn/rút: tiêu đề + số tiền tách riêng, thông tin phụ có nhãn (không nối bằng "·") */
+.request-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.request-head h3 {
+  margin: 0;
+}
+
+.request-amount {
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.request-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 6px 0 0;
+  padding: 0;
+  color: var(--text-2);
+  font-size: 0.84rem;
+  list-style: none;
+}
+
+.request-meta span {
+  margin-right: 4px;
+  color: var(--muted);
+}
+
+.bank-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px 16px;
+  width: 100%;
+  margin: 2px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.bank-grid dt {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.bank-grid dd {
+  margin: 2px 0 0;
+  color: var(--navy);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* Hộp duyệt chiến dịch: trạng thái là nhãn cạnh "Hồ sơ chiến dịch" */
+.review-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-status-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: var(--navy);
+  background: var(--soft);
+  font-size: 0.7rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .refund-manual-tag {
   padding: 2px 10px;
   border-radius: 999px;
@@ -12736,12 +13143,14 @@ html:has(dialog:modal) .admin-sidebar {
   display: grid;
   justify-items: center;
   gap: 6px;
-  padding: 10px 4px;
+  padding: 10px 2px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   line-height: 1.2;
   text-align: center;
+  /* Ô minh họa hẹp: giữ tên lĩnh vực trên một dòng ("Môi trường" từng bị bẻ đôi) */
+  white-space: nowrap;
 }
 
 .start-mock-row {
@@ -13141,6 +13550,7 @@ html:has(dialog:modal) .admin-sidebar {
 
 .wallet-balance {
   display: grid;
+  align-content: start;
   gap: 4px;
   padding: 20px;
   border: 1px solid var(--line);
@@ -13150,6 +13560,10 @@ html:has(dialog:modal) .admin-sidebar {
 
 /* Chỉ nhãn (con trực tiếp) — không áp vào span bên trong số tiền (MaskedAmount), nếu không số bị thu về cỡ nhãn */
 .wallet-balance > span {
+  /* Cùng chiều cao với hàng có nút con mắt để hai thẻ số dư thẳng hàng */
+  display: flex;
+  align-items: center;
+  min-height: 32px;
   color: var(--muted);
   font-size: 0.95rem;
   font-weight: 600;
@@ -14191,6 +14605,8 @@ html:has(dialog:modal) .admin-sidebar {
 }
 
 .org-directory-search select {
+  min-width: 0;
+  max-width: 100%;
   min-height: 50px;
   padding: 0 16px;
   border: 1px solid #c8c8c8;
