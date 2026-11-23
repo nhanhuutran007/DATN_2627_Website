@@ -79,9 +79,59 @@ export type AiPredictFeatures = {
   launchWeekday: number;
 };
 
+/** Một dự án Góp Mầm đã kết thúc: đặc trưng lúc ra mắt + kết quả thật — mẫu để AI tự học. */
+export type AiPlatformOutcome = {
+  campaignId: string;
+  title: string;
+  features: AiPredictFeatures;
+  reached: boolean;
+  /** Số tiền thực sự gọi được (VND). */
+  raised: number;
+};
+
 export type AiPredictRequest = {
   campaignId: string | null;
   features: AiPredictFeatures;
+  history?: AiPlatformOutcome[];
+};
+
+/** Phần hiệu chỉnh học từ các dự án Góp Mầm đã kết thúc. */
+export type AiPlatformAdjustment = {
+  samples: number;
+  similar: number;
+  observedRate: number;
+  modelRate: number;
+  /** 0…1: mức tin vào dữ liệu Góp Mầm so với mô hình gốc. */
+  weight: number;
+  baseProbability: number;
+};
+
+export type AiEstimateRequest = {
+  features: AiPredictFeatures;
+  history: AiPlatformOutcome[];
+  minDurationDays: number;
+};
+
+/** "category": dự án cùng lĩnh vực trên Góp Mầm; "platform": mọi dự án Góp Mầm; "model": mô hình. */
+export type AiSuggestionBasis = "category" | "platform" | "model";
+
+export type AiEstimateResponse = {
+  current: AiPredictResponse | null;
+  goal: { low: number; high: number; recommended: number; basis: AiSuggestionBasis };
+  duration: { days: number; probability: number; basis: AiSuggestionBasis };
+  options: Array<{ goalAmount: number; probability: number }>;
+  similar: Array<{
+    campaignId: string | null;
+    title: string | null;
+    goalAmount: number;
+    raised: number;
+    durationDays: number;
+    reached: boolean;
+    similarity: number;
+  }>;
+  samples: number;
+  similarReached: number;
+  notes: string[];
 };
 
 export type AiFactor = {
@@ -102,6 +152,8 @@ export type AiPredictResponse = {
   factors: AiFactor[];
   /** Lưu ý riêng cho lần ước lượng này (vd. lĩnh vực không có trong dữ liệu huấn luyện). */
   caveats?: string[];
+  /** Có khi đã hiệu chỉnh theo các dự án Góp Mầm đã kết thúc. */
+  platform?: AiPlatformAdjustment | null;
 };
 
 export type AiFraudEntityType = "USER" | "CAMPAIGN" | "CONTRIBUTION" | "TRANSACTION";
@@ -125,4 +177,4 @@ export type AiFraudResponse = {
   reasons: AiFraudReason[];
   evidences: Record<string, number>;
   fallback: boolean;
-};
+};

@@ -75,7 +75,59 @@ export type AiPredictData = {
   factors: AiFactor[];
   /** Lưu ý riêng cho lần ước lượng này (vd. lĩnh vực không có trong dữ liệu huấn luyện). */
   caveats?: string[];
+  /** Có khi AI đã hiệu chỉnh theo các dự án Góp Mầm đã kết thúc. */
+  platform?: AiPlatformAdjustment | null;
 };
+
+/** Phần AI tự học từ dự án Góp Mầm đã kết thúc. */
+export type AiPlatformAdjustment = {
+  /** Số dự án đã kết thúc dùng để học. */
+  samples: number;
+  /** Số dự án tương tự quy đổi (có trọng số). */
+  similar: number;
+  observedRate: number;
+  modelRate: number;
+  /** 0…1: mức tin vào dữ liệu Góp Mầm so với mô hình gốc. */
+  weight: number;
+  baseProbability: number;
+};
+
+/** "category": dự án cùng lĩnh vực trên Góp Mầm; "platform": mọi dự án Góp Mầm; "model": mô hình. */
+export type AiSuggestionBasis = "category" | "platform" | "model";
+
+export type AiGoalEstimate = {
+  current: AiPredictData | null;
+  goal: { low: number; high: number; recommended: number; basis: AiSuggestionBasis };
+  duration: { days: number; probability: number; basis: AiSuggestionBasis };
+  options: Array<{ goalAmount: number; probability: number }>;
+  similar: Array<{
+    campaignId: string | null;
+    title: string | null;
+    goalAmount: number;
+    raised: number;
+    durationDays: number;
+    reached: boolean;
+    similarity: number;
+  }>;
+  samples: number;
+  similarReached: number;
+  notes: string[];
+};
+
+export type AiGoalEstimateResult = { available: true; data: AiGoalEstimate } | { available: false };
+
+export type GoalEstimateInput = {
+  category: string;
+  goalAmount?: number;
+  /** ISO; bỏ trống khi chưa chọn ngày kết thúc. */
+  endDate?: string;
+  title?: string;
+};
+
+/** Gợi ý mục tiêu và thời hạn cho chiến dịch đang soạn (cần đăng nhập). */
+export function fetchGoalEstimate(input: GoalEstimateInput, signal?: AbortSignal): Promise<AiGoalEstimateResult> {
+  return api.post<AiGoalEstimateResult>("/ai/estimate", input, { signal });
+}
 
 export type AiPredictResult =
   | { available: true; campaignId: string; data: AiPredictData }

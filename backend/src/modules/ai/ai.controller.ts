@@ -6,6 +6,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 
+import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.module";
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -15,6 +16,7 @@ import { User, UserRole } from "../users/entities/user.entity";
 import { AiService } from "./ai.service";
 import {
   CreateBehaviorEventDto,
+  EstimateCampaignDto,
   FraudAiDto,
   PredictAiDto,
   RecommendAiDto,
@@ -41,6 +43,14 @@ export class AiController {
   @Roles(UserRole.ADMIN)
   predict(@Body() dto: PredictAiDto) {
     return this.aiService.predict(dto);
+  }
+
+  /** Gợi ý mục tiêu/thời hạn khi tạo chiến dịch, học từ các dự án Góp Mầm đã kết thúc. */
+  @Post("estimate")
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 40, windowMs: 60_000, keyPrefix: "campaign-estimate" })
+  estimate(@Body() dto: EstimateCampaignDto, @GetCurrentUser() user: User) {
+    return this.aiService.estimateDraft(dto, user);
   }
 
   @Post("fraud")

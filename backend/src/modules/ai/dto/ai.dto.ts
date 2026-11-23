@@ -2,8 +2,10 @@ import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
   IsArray,
+  IsDateString,
   IsEnum,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -39,6 +41,30 @@ export class RecommendAiDto {
 export class PredictAiDto {
   @IsUUID("4")
   campaignId!: string;
+}
+
+/** Chiến dịch đang soạn (chưa cần lưu) để AI gợi ý mục tiêu và thời hạn. */
+export class EstimateCampaignDto {
+  @IsString()
+  @MaxLength(100)
+  category!: string;
+
+  /** Bỏ trống = chưa nhập mục tiêu, chỉ cần gợi ý. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 0 })
+  @Min(0)
+  @Max(100_000_000_000)
+  goalAmount?: number;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  title?: string;
 }
 
 export class FraudAiDto {

@@ -174,6 +174,13 @@ function PredictionBody({ data, variant }: { data: AiPredictData; variant: "owne
       {(data.caveats ?? []).map((caveat) => (
         <p className="hint" role="note" key={caveat}>{caveat}</p>
       ))}
+      {data.platform && (
+        <p className="hint" role="note">
+          Đã tự hiệu chỉnh theo {data.platform.samples} dự án đã kết thúc trên Góp Mầm: mô hình gốc ước{" "}
+          {Math.round(data.platform.baseProbability * 100)}%, dữ liệu Góp Mầm chiếm {Math.round(data.platform.weight * 100)}% trong
+          kết quả (tăng dần khi có thêm dự án tương tự kết thúc).
+        </p>
+      )}
       {tips.length > 0 && (
         <div className="prediction-tips">
           <h4>Có thể cải thiện</h4>
@@ -189,7 +196,7 @@ function PredictionBody({ data, variant }: { data: AiPredictData; variant: "owne
         {" "}
         {data.fallback
           ? "Công thức kinh nghiệm xuất phát từ tỷ lệ thành công chung, không phải kết quả học máy."
-          : `Mô hình ${data.model ?? "dự đoán"} học từ dữ liệu gây quỹ thực tế (Kickstarter), chỉ dựa trên ${modelFeatureSummary(data.metrics)}.`}
+          : `Mô hình ${data.model ?? "dự đoán"} học từ dữ liệu gây quỹ thực tế (Kickstarter), chỉ dựa trên ${modelFeatureSummary(data.metrics)}${data.platform ? ", và tự học thêm từ các dự án đã kết thúc trên Góp Mầm" : ""}.`}
       </p>
     </>
   );

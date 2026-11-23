@@ -11,6 +11,7 @@ import { MoneyInput } from "@/components/ui/MoneyInput";
 import { PROVINCES } from "@/lib/provinces";
 import { escapeHtml, htmlToText } from "@/lib/rich-text";
 import { ImageUploader } from "@/features/media/ImageUploader";
+import { GoalEstimatePanel } from "@/features/campaign-create/GoalEstimatePanel";
 import { OrganizationPicker } from "@/features/organizations/OrganizationPicker";
 import {
   emptyTier,
@@ -112,6 +113,14 @@ function minDeadline() {
   const d = new Date();
   d.setMonth(d.getMonth() + 1);
   return toDateInput(d);
+}
+
+/** Ngày kết thúc sau `days` ngày kể từ hôm nay, không sớm hơn hạn tối thiểu (1 tháng). */
+function deadlineAfter(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const value = toDateInput(d);
+  return value < minDeadline() ? minDeadline() : value;
 }
 
 /** Hạn sớm nhất cho mốc thứ `index`: không ở quá khứ và không sớm hơn hạn của mốc trước. */
@@ -581,7 +590,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
           </div>
         ) : (
           <form ref={formRef} className="create-form" tabIndex={-1} onSubmit={submit} noValidate aria-label={STEPS[step].title}>
-            <div className="create-body">
+            <div className={`create-body${step === STEP_STORY || step === STEP_BUDGET ? " create-body-wide" : ""}`}>
               {reviewNote && step === STEP_BASICS && (
                 <p className="form-notice" role="status">
                   <b>Quản trị viên yêu cầu:</b> {reviewNote} Sửa các mục liên quan rồi gửi duyệt lại ở bước cuối.
@@ -675,6 +684,16 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                     <p>Cách hôm nay ít nhất 1 tháng.</p>
                     <input id="create-deadline" type="date" min={minDeadline()} value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
                   </div>
+                  {user && (
+                    <GoalEstimatePanel
+                      category={draft.category}
+                      goalAmount={target}
+                      deadline={draft.deadline}
+                      title={draft.title}
+                      onUseGoal={(amount) => update("target", String(Math.round(amount)))}
+                      onUseDuration={(days) => update("deadline", deadlineAfter(days))}
+                    />
+                  )}
                 </>
               )}
 

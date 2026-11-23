@@ -2974,9 +2974,49 @@ h3 {
 }
 
 /* Trình soạn thảo CKEditor trong form tạo chiến dịch. */
-.rich-editor .ck-editor__editable_inline {
+/* Khóa bề rộng: chuỗi dài không dấu cách (link, "ssss…") không được đẩy khung rộng ra ngoài cột */
+.rich-editor {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.rich-editor .ck.ck-editor,
+.rich-editor .ck.ck-editor__main {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Kéo góc dưới-phải để đổi chiều cao, giống textarea "Mô tả ngắn". Đặt resize ở khung bao
+   (không đặt trên vùng soạn thảo) vì CKEditor tự quản lý thuộc tính style của vùng đó. */
+.rich-editor .ck.ck-editor__main {
+  display: flex;
+  flex-direction: column;
+  height: 240px;
   min-height: 180px;
-  max-height: 520px;
+  max-height: 900px;
+  overflow: hidden;
+  resize: vertical;
+}
+
+.rich-editor .ck-editor__editable_inline {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rich-editor .ck-editor__editable_inline img,
+.rich-editor .ck-editor__editable_inline table {
+  max-width: 100%;
+}
+
+.rich-editor .ck.ck-toolbar > .ck-toolbar__items {
+  flex-wrap: wrap;
 }
 
 .rich-editor .ck.ck-editor__main > .ck-editor__editable,
@@ -6221,6 +6261,156 @@ button {
   max-width: 560px;
 }
 
+/* Gợi ý mục tiêu/thời hạn từ AI ở bước "Đặt mục tiêu gây quỹ" (GoalEstimatePanel) */
+.goal-estimate {
+  display: grid;
+  gap: 4px;
+  padding: 18px 20px;
+  border: 1px solid #cfe9d8;
+  border-radius: 14px;
+  background: #f6fbf8;
+}
+
+.goal-estimate-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.goal-estimate-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.goal-estimate-status {
+  margin-left: auto;
+}
+
+.goal-estimate-block {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px dashed #cfe9d8;
+}
+
+.goal-estimate-block:first-of-type {
+  border-top: 0;
+}
+
+.goal-estimate-block p {
+  margin: 0;
+}
+
+.goal-estimate-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.goal-estimate-range {
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+}
+
+.goal-estimate .model-figure,
+.goal-estimate .prediction-level {
+  margin: 0;
+}
+
+.goal-estimate-options,
+.goal-estimate-similar {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goal-estimate-options button {
+  display: grid;
+  grid-template-columns: 72px 1fr 44px;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.goal-estimate-options button:hover {
+  border-color: #cfe9d8;
+  background: var(--white);
+}
+
+.goal-estimate-options .is-current button {
+  border-color: var(--success);
+  background: var(--white);
+}
+
+.goal-estimate-amount {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.goal-estimate-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e3efe8;
+}
+
+.goal-estimate-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--success);
+}
+
+.goal-estimate-pct {
+  color: var(--text-2);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.goal-estimate-similar li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 6px 0;
+}
+
+.goal-estimate-similar-title {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-estimate-similar .hint {
+  grid-column: 1;
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.goal-estimate-similar .prediction-level-tag {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
 .prediction-head {
   display: flex;
   flex-wrap: wrap;
@@ -9212,6 +9402,11 @@ html:has(dialog:modal) .admin-sidebar {
   padding-block: 40px 56px;
 }
 
+/* Bước "Kể câu chuyện" và "Minh bạch ngân sách và rủi ro": form rộng hơn cho khung soạn thảo */
+.create-body.create-body-wide {
+  width: min(880px, 100% - 96px);
+}
+
 .create-q {
   display: grid;
   gap: 8px;
@@ -9425,7 +9620,8 @@ html:has(dialog:modal) .admin-sidebar {
     padding: 20px 20px 0;
   }
 
-  .create-body {
+  .create-body,
+  .create-body.create-body-wide {
     align-content: start;
     width: calc(100% - 40px);
     padding-block: 16px 40px;
@@ -10591,9 +10787,30 @@ html:has(dialog:modal) .admin-sidebar {
   box-shadow: inset 0 0 0 1px var(--navy);
 }
 
-.donate-methods label span {
+.donate-methods label > span {
   display: grid;
+  gap: 2px;
   line-height: 1.35;
+}
+
+/* "Ví Góp Mầm · số dư ••••••  (mắt)" nằm trên một dòng, cạnh tên phương thức */
+.donate-methods .donate-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.donate-methods .donate-balance .masked-amount {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.donate-methods .donate-balance .balance-toggle-sm {
+  margin-left: 2px;
 }
 
 .donate-methods small {

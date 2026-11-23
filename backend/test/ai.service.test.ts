@@ -3,6 +3,8 @@ import { beforeEach, describe, it } from "node:test";
 
 import type { AiGateway } from "../src/integrations/ai/ai.gateway";
 import type {
+  AiEstimateRequest,
+  AiEstimateResponse,
   AiFraudResponse,
   AiPredictRequest,
   AiPredictResponse,
@@ -12,6 +14,7 @@ import type {
 import {
   AiService,
   aiCategoryId,
+  campaignReached,
   countWords,
   launchCalendar,
   logAmountZScore,
@@ -102,6 +105,22 @@ class FakeAiGateway implements AiGateway {
       fallback: false,
       metrics: null,
       factors: [],
+    };
+  }
+
+  lastEstimate: AiEstimateRequest | null = null;
+  async estimate(request: AiEstimateRequest): Promise<AiEstimateResponse> {
+    this.lastEstimate = request;
+    if (this.unavailable) throw new Error("down");
+    return {
+      current: null,
+      goal: { low: 30_000_000, high: 60_000_000, recommended: 45_000_000, basis: "platform" },
+      duration: { days: 30, probability: 0.5, basis: "model" },
+      options: [],
+      similar: [],
+      samples: request.history.length,
+      similarReached: 0,
+      notes: [],
     };
   }
 
@@ -386,6 +405,82 @@ describe("AiService", () => {
         .predict({ campaignId: "missing" })
         .then(() => Promise.reject(new Error("should have thrown")))
         .catch((err) => equal(err.status, 404));
+    });
+  });
+
+  describe("platform learning", () => {
+    const FINISHED_A = "44444444-4444-4444-4444-444444444444";
+    const FINISHED_B = "55555555-5555-5555-5555-555555555555";
+
+    function finishedCampaigns() {
+      return [
+        makeCampaign({ id: FINISHED_A, status: CampaignStatus.SUCCESS, goalAmount: 40_000_000, currentAmount: 42_000_000 }),
+        makeCampaign({ id: FINISHED_B, status: CampaignStatus.FAILED, goalAmount: 90_000_000, currentAmount: 0 }),
+        makeCampaign({ id: CAMPAIGN_ID, status: CampaignStatus.ENDED, goalAmount: 50_000_000, currentAmount: 60_000_000 }),
+      ];
+    }
+
+    it("labels a finished campaign reached on SUCCESS or ENDED with the goal met", () => {
+      equal(campaignReached({ status: CampaignStatus.SUCCESS, currentAmount: 0, goalAmount: 10 } as any), true);
+      equal(campaignReached({ status: CampaignStatus.ENDED, currentAmount: 10, goalAmount: 10 } as any), true);
+      equal(campaignReached({ status: CampaignStatus.ENDED, currentAmount: 9, goalAmount: 10 } as any), false);
+      equal(campaignReached({ status: CampaignStatus.FAILED, currentAmount: 99, goalAmount: 10 } as any), false);
+      equal(campaignReached({ status: CampaignStatus.ACTIVE, currentAmount: 99, goalAmount: 10 } as any), false);
+    });
+
+    it("sends finished campaigns with the prediction, excluding the campaign itself", async () => {
+      repos.campaignRepo.find = async () => finishedCampaigns();
+      await service.predict({ campaignId: CAMPAIGN_ID });
+
+      const history = gateway.lastPredict?.history ?? [];
+      deepEqual(history.map((item) => [item.campaignId, item.reached, item.raised]), [
+        [FINISHED_A, true, 42_000_000],
+        [FINISHED_B, false, 0],
+      ]);
+      equal(history[0].features.goalAmount, 40_000_000);
+    });
+
+    it("caches the history instead of querying on every prediction", async () => {
+      let queries = 0;
+      repos.campaignRepo.find = async () => {
+        queries += 1;
+        return finishedCampaigns();
+      };
+      await service.predict({ campaignId: CAMPAIGN_ID });
+      await service.predict({ campaignId: CAMPAIGN_ID });
+      equal(queries, 1);
+    });
+
+    it("estimates a draft campaign from the form values and the platform history", async () => {
+      repos.campaignRepo.find = async () => finishedCampaigns();
+      const end = new Date(Date.now() + 45 * 86_400_000).toISOString();
+      const result = await service.estimateDraft(
+        { category: "Giáo dục", goalAmount: 50_000_000, endDate: end, title: "Thư viện cho điểm trường" },
+        makeUser() as any,
+      );
+
+      equal(result.available, true);
+      const request = gateway.lastEstimate;
+      ok(request);
+      equal(request.features.categoryId, 2);
+      equal(request.features.goalAmount, 50_000_000);
+      equal(request.features.durationDays, 45);
+      equal(request.features.nameWords, 5);
+      equal(request.features.ownerCampaignCount, 3); // 2 dự án đã có + dự án đang tạo
+      equal(request.minDurationDays, 30);
+      equal(request.history.length, 3);
+    });
+
+    it("estimates without a goal or end date (suggestion only)", async () => {
+      await service.estimateDraft({ category: "Y tế" }, makeUser() as any);
+      equal(gateway.lastEstimate?.features.goalAmount, 0);
+      equal(gateway.lastEstimate?.features.durationDays, 0);
+    });
+
+    it("reports unavailable when the AI service is down", async () => {
+      gateway.unavailable = true;
+      const result = await service.estimateDraft({ category: "Y tế" }, makeUser() as any);
+      equal(result.available, false);
     });
   });
 

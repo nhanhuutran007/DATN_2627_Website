@@ -531,7 +531,7 @@ export function DonationPanel({
                 {method.label}
                 {method.balance != null && (
                   <span className="donate-balance">
-                    {" · số dư "}
+                    · số dư
                     <MaskedAmount value={method.balance} shown={balanceShown} />
                     <BalanceToggle className="balance-toggle-sm" shown={balanceShown} onToggle={() => setBalanceShown((value) => !value)} />
                   </span>

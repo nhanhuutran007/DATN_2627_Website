@@ -6,8 +6,12 @@ import type {
   AiFraudEntityType,
   AiFraudReason,
   AiFraudRequest,
+  AiEstimateRequest,
+  AiEstimateResponse,
   AiFraudResponse,
   AiHealth,
+  AiPlatformOutcome,
+  AiPredictFeatures,
   AiPredictRequest,
   AiPredictResponse,
   AiRecommendResponse,
@@ -37,6 +41,7 @@ export interface AiGateway {
   health(): Promise<AiHealth>;
   recommend(payload: AiRecommendRequest): Promise<AiRecommendResponse>;
   predict(payload: AiPredictRequest): Promise<AiPredictResponse>;
+  estimate(payload: AiEstimateRequest): Promise<AiEstimateResponse>;
   getFraudScore(payload: AiFraudRequest): Promise<AiFraudResponse>;
 }
 
@@ -79,26 +84,46 @@ type WireRecommendResponse = {
   detail: string;
 };
 
+type WirePredictFeatures = {
+  category_id: number;
+  goal_amount: number;
+  duration_days: number;
+  profile_score: number;
+  content_length: number;
+  image_count: number;
+  has_video: boolean;
+  story_word_count: number;
+  owner_campaign_count: number;
+  owner_credential_approved: boolean;
+  has_budget_report: boolean;
+  early_views: number;
+  early_backers: number;
+  name_words: number;
+  launch_month: number;
+  launch_weekday: number;
+};
+
+type WirePlatformOutcome = {
+  campaign_id: string;
+  title: string;
+  features: WirePredictFeatures;
+  reached: boolean;
+  raised: number;
+};
+
 type WirePredictRequest = {
   campaign_id: string | null;
-  features: {
-    category_id: number;
-    goal_amount: number;
-    duration_days: number;
-    profile_score: number;
-    content_length: number;
-    image_count: number;
-    has_video: boolean;
-    story_word_count: number;
-    owner_campaign_count: number;
-    owner_credential_approved: boolean;
-    has_budget_report: boolean;
-    early_views: number;
-    early_backers: number;
-    name_words: number;
-    launch_month: number;
-    launch_weekday: number;
-  };
+  features: WirePredictFeatures;
+  history: WirePlatformOutcome[];
+};
+
+type WirePlatformAdjustment = {
+  samples: number;
+  similar: number;
+  observed_rate: number;
+  model_rate: number;
+  weight: number;
+  base_probability: number;
 };
 
 type WirePredictResponse = {
@@ -110,6 +135,26 @@ type WirePredictResponse = {
   metrics: Record<string, unknown> | null;
   factors: AiFactor[];
   caveats?: string[];
+  platform?: WirePlatformAdjustment | null;
+};
+
+type WireEstimateResponse = {
+  current: WirePredictResponse | null;
+  goal: AiEstimateResponse["goal"];
+  duration: AiEstimateResponse["duration"];
+  options: Array<{ goal_amount: number; probability: number }>;
+  similar: Array<{
+    campaign_id: string | null;
+    title: string | null;
+    goal_amount: number;
+    raised: number;
+    duration_days: number;
+    reached: boolean;
+    similarity: number;
+  }>;
+  samples: number;
+  similar_reached: number;
+  notes: string[];
 };
 
 type WireFraudRequest = {
@@ -165,26 +210,41 @@ export class HttpAiGateway implements AiGateway {
   async predict(payload: AiPredictRequest): Promise<AiPredictResponse> {
     const wire: WirePredictRequest = {
       campaign_id: payload.campaignId,
-      features: {
-        category_id: payload.features.categoryId,
-        goal_amount: payload.features.goalAmount,
-        duration_days: payload.features.durationDays,
-        profile_score: payload.features.profileScore,
-        content_length: payload.features.contentLength,
-        image_count: payload.features.imageCount,
-        has_video: payload.features.hasVideo,
-        story_word_count: payload.features.storyWordCount,
-        owner_campaign_count: payload.features.ownerCampaignCount,
-        owner_credential_approved: payload.features.ownerCredentialApproved,
-        has_budget_report: payload.features.hasBudgetReport,
-        early_views: payload.features.earlyViews,
-        early_backers: payload.features.earlyBackers,
-        name_words: payload.features.nameWords,
-        launch_month: payload.features.launchMonth,
-        launch_weekday: payload.features.launchWeekday,
-      },
+      features: toWireFeatures(payload.features),
+      history: (payload.history ?? []).map(toWireOutcome),
     };
-    return this.request<WirePredictResponse>("/api/v1/predict", { payload: wire });
+    return fromWirePredict(await this.request<WirePredictResponse>("/api/v1/predict", { payload: wire }));
+  }
+
+  async estimate(payload: AiEstimateRequest): Promise<AiEstimateResponse> {
+    const response = await this.request<WireEstimateResponse>("/api/v1/estimate", {
+      payload: {
+        features: toWireFeatures(payload.features),
+        history: payload.history.map(toWireOutcome),
+        min_duration_days: payload.minDurationDays,
+      },
+    });
+    return {
+      current: response.current ? fromWirePredict(response.current) : null,
+      goal: response.goal,
+      duration: response.duration,
+      options: response.options.map((option) => ({
+        goalAmount: option.goal_amount,
+        probability: option.probability,
+      })),
+      similar: response.similar.map((item) => ({
+        campaignId: item.campaign_id,
+        title: item.title,
+        goalAmount: item.goal_amount,
+        raised: item.raised,
+        durationDays: item.duration_days,
+        reached: item.reached,
+        similarity: item.similarity,
+      })),
+      samples: response.samples,
+      similarReached: response.similar_reached,
+      notes: response.notes,
+    };
   }
 
   async getFraudScore(payload: AiFraudRequest): Promise<AiFraudResponse> {
@@ -273,5 +333,52 @@ function toWireEvent(event: AiUserEvent): WireUserEvent {
     campaign_id: event.campaignId,
     event_type: event.eventType,
     category: event.category,
+  };
+}
+function toWireFeatures(features: AiPredictFeatures): WirePredictFeatures {
+  return {
+    category_id: features.categoryId,
+    goal_amount: features.goalAmount,
+    duration_days: features.durationDays,
+    profile_score: features.profileScore,
+    content_length: features.contentLength,
+    image_count: features.imageCount,
+    has_video: features.hasVideo,
+    story_word_count: features.storyWordCount,
+    owner_campaign_count: features.ownerCampaignCount,
+    owner_credential_approved: features.ownerCredentialApproved,
+    has_budget_report: features.hasBudgetReport,
+    early_views: features.earlyViews,
+    early_backers: features.earlyBackers,
+    name_words: features.nameWords,
+    launch_month: features.launchMonth,
+    launch_weekday: features.launchWeekday,
+  };
+}
+
+function toWireOutcome(outcome: AiPlatformOutcome): WirePlatformOutcome {
+  return {
+    campaign_id: outcome.campaignId,
+    title: outcome.title.slice(0, 200),
+    features: toWireFeatures(outcome.features),
+    reached: outcome.reached,
+    raised: Math.max(0, outcome.raised),
+  };
+}
+
+function fromWirePredict(response: WirePredictResponse): AiPredictResponse {
+  const { platform, ...rest } = response;
+  return {
+    ...rest,
+    platform: platform
+      ? {
+          samples: platform.samples,
+          similar: platform.similar,
+          observedRate: platform.observed_rate,
+          modelRate: platform.model_rate,
+          weight: platform.weight,
+          baseProbability: platform.base_probability,
+        }
+      : null,
   };
 }

@@ -6,11 +6,13 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Between, MoreThan, Repository } from "typeorm";
+import { Between, In, MoreThan, Repository } from "typeorm";
 
 import { AiGateway } from "../../integrations/ai/ai.gateway";
 import type {
+  AiEstimateResponse,
   AiFraudResponse,
+  AiPlatformOutcome,
   AiPredictFeatures,
   AiPredictResponse,
   AiRecommendResponse,
@@ -23,6 +25,7 @@ import { Donation, DonationStatus } from "../donations/entities/donation.entity"
 import { User, UserRole } from "../users/entities/user.entity";
 import {
   CreateBehaviorEventDto,
+  EstimateCampaignDto,
   FraudAiDto,
   PredictAiDto,
   RecommendAiDto,
@@ -110,6 +113,15 @@ const EVENT_TYPE_MAP: Record<BehaviorEventType, AiUserEvent["eventType"]> = {
 };
 
 const DAY_MS = 86_400_000;
+
+/** Trạng thái đã có kết quả cuối cùng — mẫu để AI tự học (ENDED: hết hạn, xét đạt theo số tiền). */
+const FINISHED_STATUSES = [CampaignStatus.SUCCESS, CampaignStatus.FAILED, CampaignStatus.ENDED];
+/** Số dự án đã kết thúc gần nhất gửi cho AI mỗi lần (khớp giới hạn MAX_HISTORY bên ai-service). */
+const PLATFORM_HISTORY_LIMIT = 1000;
+/** Dự án kết thúc ít khi thay đổi: lưu tạm danh sách 5 phút thay vì truy vấn mỗi lần dự đoán. */
+const PLATFORM_HISTORY_TTL_MS = 5 * 60 * 1000;
+/** Thời hạn gây quỹ ngắn nhất form tạo chiến dịch cho phép (≥ 1 tháng). */
+const MIN_CAMPAIGN_DAYS = 30;
 /** "Ban đầu" trong đặc trưng dự đoán = 7 ngày đầu gây quỹ (tổng hiện tại sẽ làm mô hình tự trả lời). */
 const EARLY_WINDOW_DAYS = 7;
 
@@ -157,12 +169,26 @@ export type PredictResult =
   | { available: true; campaignId: string; data: AiPredictResponse }
   | { available: false; campaignId: string };
 
+export type EstimateResult =
+  | { available: true; data: AiEstimateResponse }
+  | { available: false };
+
+/** Đạt mục tiêu: SUCCESS, hoặc ENDED (hết hạn) mà số tiền gọi được đã đủ mục tiêu. */
+export function campaignReached(campaign: Pick<Campaign, "status" | "currentAmount" | "goalAmount">): boolean {
+  if (campaign.status === CampaignStatus.SUCCESS) return true;
+  if (campaign.status !== CampaignStatus.ENDED) return false;
+  const goal = Number(campaign.goalAmount) || 0;
+  return goal > 0 && (Number(campaign.currentAmount) || 0) >= goal;
+}
+
 export type FraudResult =
   | { available: true; entityType: string; entityId: string; data: AiFraudResponse }
   | { available: false; entityType: string; entityId: string };
 
 @Injectable()
 export class AiService {
+  private platformHistory: { loadedAt: number; items: AiPlatformOutcome[] } | null = null;
+
   constructor(
     @InjectRepository(Campaign)
     private readonly campaignRepo: Repository<Campaign>,
@@ -265,17 +291,96 @@ export class AiService {
   }
 
   private async runPrediction(campaign: Campaign): Promise<PredictResult> {
-    const features = await this.buildPredictFeatures(campaign);
+    const [features, history] = await Promise.all([
+      this.buildPredictFeatures(campaign),
+      this.loadPlatformHistory(),
+    ]);
 
     try {
       const data = await this.aiGateway.predict({
         campaignId: campaign.id,
         features,
+        // Không tự học từ chính dự án đang dự đoán (nếu nó đã kết thúc, kết quả đã biết).
+        history: history.filter((item) => item.campaignId !== campaign.id),
       });
       return { available: true, campaignId: campaign.id, data };
     } catch {
       return { available: false, campaignId: campaign.id };
     }
+  }
+
+  /**
+   * Gợi ý mục tiêu và thời hạn cho chiến dịch đang soạn (chưa cần lưu), học từ các dự án Góp Mầm
+   * đã kết thúc. Chỉ là tham khảo cho người tạo, không ảnh hưởng xét duyệt.
+   */
+  async estimateDraft(dto: EstimateCampaignDto, user: User): Promise<EstimateResult> {
+    const now = new Date();
+    const end = dto.endDate ? new Date(dto.endDate) : null;
+    const durationDays = end && !Number.isNaN(end.getTime()) && end > now ? this.daysBetween(now, end) : 0;
+    const [ownerCampaignCount, history] = await Promise.all([
+      this.campaignRepo.count({ where: { ownerId: user.id } }),
+      this.loadPlatformHistory(),
+    ]);
+    const features: AiPredictFeatures = {
+      ...emptyPredictFeatures(),
+      categoryId: aiCategoryId(dto.category),
+      goalAmount: dto.goalAmount ?? 0,
+      durationDays,
+      // Chiến dịch mới: tính cả dự án đang tạo như khi đã lưu.
+      ownerCampaignCount: ownerCampaignCount + 1,
+      ownerCredentialApproved: Boolean(user.emailVerified),
+      nameWords: countWords(dto.title),
+      ...launchCalendar(now),
+    };
+
+    try {
+      const data = await this.aiGateway.estimate({ features, history, minDurationDays: MIN_CAMPAIGN_DAYS });
+      return { available: true, data };
+    } catch {
+      return { available: false };
+    }
+  }
+
+  /**
+   * Các dự án Góp Mầm đã kết thúc (mới nhất trước) kèm đặc trưng lúc ra mắt và kết quả thật.
+   * Gửi kèm mỗi lần dự đoán để AI tự hiệu chỉnh theo dữ liệu nền tảng — dự án vừa kết thúc có
+   * tác dụng ở lần dự đoán sau (tối đa trễ PLATFORM_HISTORY_TTL_MS), không cần huấn luyện lại.
+   * Chỉ lấy các trường có sẵn trên bảng chiến dịch, không truy vấn thêm cho từng dự án.
+   */
+  async loadPlatformHistory(): Promise<AiPlatformOutcome[]> {
+    const cached = this.platformHistory;
+    if (cached && Date.now() - cached.loadedAt < PLATFORM_HISTORY_TTL_MS) return cached.items;
+
+    const campaigns = await this.campaignRepo.find({
+      where: { status: In(FINISHED_STATUSES) },
+      order: { endDate: "DESC" },
+      take: PLATFORM_HISTORY_LIMIT,
+    });
+    const items = campaigns
+      .filter((campaign) => Number(campaign.goalAmount) > 0)
+      .map((campaign) => ({
+        campaignId: campaign.id,
+        title: campaign.title ?? "",
+        features: this.launchFeatures(campaign),
+        reached: campaignReached(campaign),
+        raised: Number(campaign.currentAmount) || 0,
+      }));
+    this.platformHistory = { loadedAt: Date.now(), items };
+    return items;
+  }
+
+  /** Đặc trưng lúc ra mắt lấy được ngay từ bản ghi chiến dịch (không cần truy vấn phụ). */
+  private launchFeatures(campaign: Campaign): AiPredictFeatures {
+    return {
+      ...emptyPredictFeatures(),
+      categoryId: aiCategoryId(campaign.category),
+      goalAmount: Number(campaign.goalAmount) || 0,
+      durationDays: this.daysBetween(campaign.startDate, campaign.endDate),
+      ...contentFeatures(campaign),
+      hasVideo: Boolean(campaign.videoUrl),
+      nameWords: countWords(campaign.title),
+      ...launchCalendar(campaign.startDate),
+    };
   }
 
   async getFraudScore(dto: FraudAiDto): Promise<FraudResult> {
@@ -417,20 +522,13 @@ export class AiService {
       }),
     ]);
 
-    // Mô tả là HTML từ trình soạn thảo: đếm chữ trên văn bản thuần, ảnh = ảnh bìa + ảnh chèn trong mô tả
-    const html = campaign.description ?? "";
-    const text = html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
-    const inlineImages = html.match(/<img\b/gi)?.length ?? 0;
-
     return {
       categoryId: aiCategoryId(campaign.category),
       goalAmount: Number(campaign.goalAmount) || 0,
       durationDays: this.daysBetween(campaign.startDate, campaign.endDate),
       profileScore: this.profileScore(campaign),
-      contentLength: text.length,
-      imageCount: (campaign.imageUrl ? 1 : 0) + inlineImages,
+      ...contentFeatures(campaign),
       hasVideo: Boolean(campaign.videoUrl),
-      storyWordCount: text ? text.split(" ").length : 0,
       ownerCampaignCount,
       ownerCredentialApproved: Boolean(campaign.owner?.emailVerified),
       hasBudgetReport: milestones.some((milestone) => milestone.budget != null),
@@ -593,6 +691,40 @@ export class AiService {
       .filter((word) => word.length >= 3 && !stopWords.has(word));
     return [...new Set(tokens)].slice(0, 10);
   }
+}
+
+/** Mô tả là HTML từ trình soạn thảo: đếm chữ trên văn bản thuần, ảnh = ảnh bìa + ảnh chèn trong mô tả. */
+function contentFeatures(
+  campaign: Pick<Campaign, "description" | "imageUrl">,
+): Pick<AiPredictFeatures, "contentLength" | "imageCount" | "storyWordCount"> {
+  const html = campaign.description ?? "";
+  const text = html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  return {
+    contentLength: text.length,
+    imageCount: (campaign.imageUrl ? 1 : 0) + (html.match(/<img\b/gi)?.length ?? 0),
+    storyWordCount: text ? text.split(" ").length : 0,
+  };
+}
+
+function emptyPredictFeatures(): AiPredictFeatures {
+  return {
+    categoryId: 0,
+    goalAmount: 0,
+    durationDays: 0,
+    profileScore: 0,
+    contentLength: 0,
+    imageCount: 0,
+    hasVideo: false,
+    storyWordCount: 0,
+    ownerCampaignCount: 0,
+    ownerCredentialApproved: false,
+    hasBudgetReport: false,
+    earlyViews: 0,
+    earlyBackers: 0,
+    nameWords: 0,
+    launchMonth: 1,
+    launchWeekday: 0,
+  };
 }
 
 function timeOf(value: Date | string | null | undefined): number {

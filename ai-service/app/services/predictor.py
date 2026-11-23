@@ -13,7 +13,7 @@ import joblib
 import numpy as np
 
 from app.core.config import settings
-from app.schemas.predict import Factor, PredictFeatures, PredictResponse
+from app.schemas.predict import Factor, PlatformOutcome, PredictFeatures, PredictResponse
 from app.services.catalog import CATEGORIES, CATEGORY_IDS, SUCCESS_FEATURES
 
 TOP_FACTORS = 6
@@ -171,7 +171,55 @@ class PredictorService:
             Path(features_path) if features_path else settings.success_features_path
         )
 
-    def predict(self, features: PredictFeatures, campaign_id: str | None = None) -> PredictResponse:
+    def predict(
+        self,
+        features: PredictFeatures,
+        campaign_id: str | None = None,
+        history: list[PlatformOutcome] | None = None,
+    ) -> PredictResponse:
+        """Dự đoán của mô hình gốc, rồi hiệu chỉnh theo các dự án Góp Mầm đã kết thúc (nếu có)."""
+        response = self._predict_base(features)
+        if not history:
+            return response
+        # Import muộn: platform_learning dùng PredictorService để chấm các dự án trong lịch sử.
+        from app.services.platform_learning import apply_platform_learning
+
+        return apply_platform_learning(self, response, features, history)
+
+    def score_many(self, rows: list[PredictFeatures], use_model: bool = True) -> np.ndarray:
+        """Xác suất của mô hình gốc (không hiệu chỉnh) cho nhiều chiến dịch một lượt.
+
+        ``use_model=False`` (hoặc không nạp được mô hình) thì dùng công thức kinh nghiệm, để
+        các dự án lịch sử được chấm cùng thang với dự đoán đang hiệu chỉnh.
+        """
+        if not rows:
+            return np.zeros(0, dtype=float)
+        metrics = _load_metrics(str(self._metrics_path))
+        if use_model:
+            model, trained_features, _ = _load_model_artifacts(
+                str(self._model_path), str(self._features_path)
+            )
+            if model is not None:
+                names = trained_features if trained_features else SUCCESS_FEATURES
+                try:
+                    matrix = [self._feature_vector(row, trained_features) for row in rows]
+                    trained_ids = self._trained_category_ids(metrics)
+                    probabilities = self._probabilities(model, matrix, names, trained_ids)
+                    if np.all(np.isfinite(probabilities)):
+                        return np.clip(probabilities, 0.0, 1.0)
+                except Exception:
+                    pass
+        return np.asarray([self._heuristic_probability(row, metrics) for row in rows])
+
+    def model_available(self) -> bool:
+        model, _, _ = _load_model_artifacts(str(self._model_path), str(self._features_path))
+        return model is not None
+
+    def base_rate(self) -> float:
+        """Tỷ lệ dự án đạt mục tiêu trong dữ liệu huấn luyện (mặt bằng chung)."""
+        return self._base_rate(_load_metrics(str(self._metrics_path)))
+
+    def _predict_base(self, features: PredictFeatures) -> PredictResponse:
         model, trained_features, version = _load_model_artifacts(
             str(self._model_path), str(self._features_path)
         )
@@ -323,14 +371,18 @@ class PredictorService:
         factors.sort(key=lambda factor: abs(factor.weight), reverse=True)
         return factors[:TOP_FACTORS]
 
-    def _heuristic_response(
-        self, features: PredictFeatures, metrics: dict | None
-    ) -> PredictResponse:
+    def _heuristic_probability(self, features: PredictFeatures, metrics: dict | None) -> float:
         base_rate = self._base_rate(metrics)
         terms = self._heuristic_terms(features)
         log_odds = math.log(base_rate / (1.0 - base_rate)) + sum(adj for _, adj, _ in terms)
         low, high = HEURISTIC_PROBABILITY_BOUNDS
-        probability = max(low, min(high, 1.0 / (1.0 + math.exp(-log_odds))))
+        return max(low, min(high, 1.0 / (1.0 + math.exp(-log_odds))))
+
+    def _heuristic_response(
+        self, features: PredictFeatures, metrics: dict | None
+    ) -> PredictResponse:
+        terms = self._heuristic_terms(features)
+        probability = self._heuristic_probability(features, metrics)
 
         factors = [
             Factor(
