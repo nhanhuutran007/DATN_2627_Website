@@ -45,7 +45,7 @@ export class AiController {
     return this.aiService.predict(dto);
   }
 
-  /** Gợi ý mục tiêu/thời hạn khi tạo chiến dịch, học từ các dự án Góp Mầm đã kết thúc. */
+  /** Gợi ý thời hạn cho số tiền người tạo đã đặt, học từ các dự án Góp Mầm đã kết thúc. */
   @Post("estimate")
   @UseGuards(JwtAuthGuard, RateLimitGuard)
   @RateLimit({ limit: 40, windowMs: 60_000, keyPrefix: "campaign-estimate" })

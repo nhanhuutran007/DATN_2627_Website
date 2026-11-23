@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { VideoPlayer } from "@/components/campaign/VideoPlayer";
 import { Icon } from "@/components/ui/Icon";
 import { CampaignScreeningPanel } from "@/features/admin/CampaignScreeningPanel";
 import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredictionCard";
@@ -139,6 +140,14 @@ export function CampaignReviewDialog({ campaign, statusLabel, actions, onClose }
             {detail.imageUrl && (
               // eslint-disable-next-line @next/next/no-img-element -- ảnh do người dùng tải lên, kích thước bất kỳ
               <img className="review-cover" src={resolveMediaUrl(detail.imageUrl)} alt={`Ảnh đại diện: ${detail.title}`} />
+            )}
+
+            {detail.videoUrl && (
+              <section className="review-video">
+                <h3>Video giới thiệu</h3>
+                <VideoPlayer url={detail.videoUrl} title={`Video giới thiệu: ${detail.title}`} />
+                <p className="hint">Nên dài 1–3 phút; video quá dài, lạc đề hoặc không phù hợp thì yêu cầu bổ sung.</p>
+              </section>
             )}
 
             <section>

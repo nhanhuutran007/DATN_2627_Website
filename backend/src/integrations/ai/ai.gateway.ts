@@ -140,9 +140,9 @@ type WirePredictResponse = {
 
 type WireEstimateResponse = {
   current: WirePredictResponse | null;
-  goal: AiEstimateResponse["goal"];
   duration: AiEstimateResponse["duration"];
-  options: Array<{ goal_amount: number; probability: number }>;
+  options: AiEstimateResponse["options"];
+  chosen_days: number | null;
   similar: Array<{
     campaign_id: string | null;
     title: string | null;
@@ -226,12 +226,9 @@ export class HttpAiGateway implements AiGateway {
     });
     return {
       current: response.current ? fromWirePredict(response.current) : null,
-      goal: response.goal,
       duration: response.duration,
-      options: response.options.map((option) => ({
-        goalAmount: option.goal_amount,
-        probability: option.probability,
-      })),
+      options: response.options,
+      chosenDays: response.chosen_days ?? null,
       similar: response.similar.map((item) => ({
         campaignId: item.campaign_id,
         title: item.title,

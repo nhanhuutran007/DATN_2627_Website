@@ -19,6 +19,7 @@
     "migration:generate": "typeorm-ts-node-commonjs -d typeorm.config.ts migration:generate",
     "seed": "ts-node scripts/seed.ts",
     "seed:extras": "ts-node scripts/seed-org-extras.ts",
+    "seed:ai-history": "ts-node scripts/seed-ai-history.ts",
     "sign-webhook": "ts-node scripts/sign-webhook.ts"
   },
   "dependencies": {

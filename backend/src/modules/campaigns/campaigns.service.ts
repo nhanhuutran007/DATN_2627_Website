@@ -362,6 +362,7 @@ export class CampaignsService {
       endDate: new Date(dto.endDate),
       status: CampaignStatus.DRAFT,
       imageUrl: dto.imageUrl,
+      videoUrl: dto.videoUrl ?? null,
       location: dto.location,
       organizationId: dto.organizationId ?? null,
       backerCount: 0,

@@ -1125,6 +1125,17 @@ h3 {
   font-size: 0.85rem;
 }
 
+.comment-edited {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+/* Ô sửa bình luận thay chỗ nội dung, không thụt lề như ô trả lời */
+.comment-composer.is-edit {
+  margin-top: 6px;
+}
+
 .comment-text {
   margin: 0;
   color: var(--text);
@@ -6334,7 +6345,7 @@ button {
 
 .goal-estimate-options button {
   display: grid;
-  grid-template-columns: 72px 1fr 44px;
+  grid-template-columns: minmax(96px, max-content) 1fr 44px;
   align-items: center;
   width: 100%;
   gap: 10px;
@@ -6359,8 +6370,26 @@ button {
 }
 
 .goal-estimate-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.goal-estimate-chosen {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e7f6ec;
+  color: var(--success);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.goal-estimate-ok {
+  color: var(--success);
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
 .goal-estimate-bar {
@@ -7318,6 +7347,162 @@ html:has(dialog:modal) .admin-sidebar {
   font-size: 0.72rem;
 }
 
+/* Video giới thiệu (CoverVideo, VideoPlayer, VideoInput) */
+.video-player {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 12px;
+  background: #000;
+}
+
+.cover-video-play {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  color: var(--white);
+  border: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.35));
+  cursor: pointer;
+}
+
+.cover-video-icon {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  padding-left: 4px;
+  color: var(--white);
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.cover-video-play:hover .cover-video-icon,
+.cover-video-play:focus-visible .cover-video-icon {
+  transform: scale(1.08);
+  background: var(--primary-dark);
+}
+
+.cover-video-play:focus-visible {
+  outline: 3px solid var(--white);
+  outline-offset: -6px;
+}
+
+.cover-video-label {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(21, 29, 54, 0.6);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.detail-cover .cover-video-player {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  height: 100%;
+  border-radius: 0;
+}
+
+.video-input {
+  display: grid;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.video-input .hint {
+  margin: 0;
+}
+
+.video-input-modes {
+  display: inline-flex;
+  justify-self: start;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--soft);
+}
+
+.video-input-modes button {
+  padding: 8px 16px;
+  color: var(--text-2);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.video-input-modes button[aria-selected="true"] {
+  color: var(--text);
+  background: var(--white);
+  box-shadow: 0 1px 4px rgba(21, 29, 54, 0.12);
+}
+
+.video-input-modes button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.video-input-drop {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 22px 16px;
+  color: var(--text-2);
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+  background: #fafbfc;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.video-input-drop:hover:not(:disabled),
+.video-input-drop:focus-visible {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.video-input-drop span {
+  font-size: 0.82rem;
+}
+
+.video-input-progress {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+}
+
+.video-input-preview {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.review-video {
+  display: grid;
+  gap: 8px;
+  margin-block: 16px;
+}
+
+.review-video .video-player {
+  max-width: 560px;
+}
+
 .organizer-avatar,
 .donor-avatar {
   display: grid;
@@ -7521,77 +7706,125 @@ html:has(dialog:modal) .admin-sidebar {
   margin-top: 12px;
 }
 
-/* Thẻ gây quỹ */
-.detail-page .detail-side {
-  position: sticky;
-  top: 96px;
+/* Phần đầu như Kickstarter: ảnh bìa (+ người tổ chức) bên trái, thẻ gây quỹ bên phải;
+   thanh tab và nội dung nằm bên dưới. */
+.detail-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  align-items: start;
+  gap: 24px 40px;
+  padding-block: 24px 40px;
 }
 
-/* Nhảy tới mục từ mục lục/anchor: chừa chỗ cho header dính. */
+.detail-hero > .notice-sample {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.detail-hero-media {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.detail-hero-side {
+  min-width: 0;
+}
+
+/* Không có phần quà: nội dung một cột, giữ độ dài dòng dễ đọc. */
+.detail-page .detail-layout.detail-layout-single {
+  grid-template-columns: minmax(0, 820px);
+}
+
+/* Nhảy tới mục từ thanh tab/anchor: chừa chỗ cho header dính (72px) + thanh tab (~54px). */
 .detail-page .detail-main > section[id] {
-  scroll-margin-top: 96px;
+  scroll-margin-top: 140px;
 }
 
-/* Mục lục cột trái (như Kickstarter) — chỉ hiện ở màn hình rộng, xem media query bên dưới. */
-.detail-toc {
+/* Thanh tab ngang dính dưới header (như Kickstarter) — DetailToc */
+.detail-tabs {
+  position: sticky;
+  top: 73px;
+  z-index: 40;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--white);
+}
+
+.detail-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.detail-tabs-action {
+  flex: none;
+}
+
+.detail-tabs-action[hidden] {
   display: none;
 }
 
-@media (min-width: 1280px) {
-  .detail-page .container.detail-head,
-  .detail-page .container.detail-layout {
-    width: min(1440px, calc(100% - 64px));
+.detail-tabs ul {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 4px 36px;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+
+.detail-tabs ul::-webkit-scrollbar {
+  display: none;
+}
+
+.detail-tabs li {
+  flex: none;
+}
+
+.detail-tabs a {
+  display: block;
+  padding: 16px 0 14px;
+  border-bottom: 3px solid transparent;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.detail-tabs a:hover {
+  color: var(--primary-dark);
+}
+
+.detail-tabs a[aria-current="location"] {
+  border-bottom-color: var(--text);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.detail-tabs a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+@media (max-width: 960px) {
+  .detail-tabs {
+    top: 65px;
   }
 
-  .detail-page .detail-layout {
-    grid-template-columns: 200px minmax(0, 1fr) 380px;
-    gap: 40px;
+  .detail-tabs ul {
+    gap: 24px;
   }
 
-  .detail-toc {
-    display: block;
-    position: sticky;
-    top: 96px;
-  }
-
-  .detail-toc-title {
-    margin: 0 0 10px;
-    color: var(--muted);
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .detail-toc ul {
-    display: grid;
-    gap: 2px;
-    margin: 0;
-    padding: 0;
-    border-left: 2px solid var(--line);
-    list-style: none;
-  }
-
-  .detail-toc a {
-    display: block;
-    margin-left: -2px;
-    padding: 7px 0 7px 14px;
-    border-left: 2px solid transparent;
-    color: var(--text-2);
-    font-size: 0.92rem;
-    line-height: 1.35;
-    text-decoration: none;
-    transition: color 0.15s ease, border-color 0.15s ease;
-  }
-
-  .detail-toc a:hover {
-    color: var(--text);
-  }
-
-  .detail-toc a[aria-current="location"] {
-    border-left-color: var(--primary);
-    color: var(--text);
-    font-weight: 700;
+  .detail-tabs a {
+    padding: 13px 0 11px;
+    font-size: 0.9rem;
   }
 }
 
@@ -7803,30 +8036,20 @@ html:has(dialog:modal) .admin-sidebar {
   color: var(--text-2);
 }
 
-/* Một cột: trộn hai cột để thứ tự là ảnh → thẻ gây quỹ → nội dung → thông tin hồ sơ */
+/* Một cột: ảnh bìa → thẻ gây quỹ → thanh tab → nội dung → phần quà */
 @media (max-width: 960px) {
-  .detail-page .detail-layout {
+  .detail-hero {
+    grid-template-columns: minmax(0, 1fr);
+    padding-bottom: 24px;
+  }
+
+  .detail-page .detail-layout,
+  .detail-page .detail-layout.detail-layout-single {
+    grid-template-columns: minmax(0, 1fr);
     gap: 24px;
   }
 
-  .detail-page .detail-main,
-  .detail-page .detail-side {
-    display: contents;
-  }
-
-  .detail-page .detail-layout > .notice-sample {
-    order: -3;
-  }
-
-  .detail-page .detail-cover {
-    order: -2;
-  }
-
-  .detail-page .fund-card {
-    order: -1;
-  }
-
-  .detail-page .detail-side > .panel:not(.fund-card) {
+  .detail-page .detail-layout .detail-side {
     order: 1;
   }
 }

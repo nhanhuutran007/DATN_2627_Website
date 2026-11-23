@@ -85,8 +85,9 @@ export class Campaign extends BaseEntity {
   @Column({ name: "image_url", length: 500, nullable: true })
   imageUrl?: string;
 
-  @Column({ name: "video_url", length: 500, nullable: true })
-  videoUrl?: string;
+  /** Link YouTube (dạng `youtube.com/watch?v=…`) hoặc video tải lên (`/api/v1/media/campaign-videos/…`). */
+  @Column({ name: "video_url", type: "varchar", length: 500, nullable: true })
+  videoUrl?: string | null;
 
   @Column({ name: "location", length: 255, nullable: true })
   location?: string;

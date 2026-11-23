@@ -20,7 +20,7 @@ import { NonAdminGuard } from "../auth/guards/non-admin.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entity";
 import { CommentsService } from "./comments.service";
-import { AdminCommentQueryDto, CommentListQueryDto, CreateCommentDto, HideCommentDto } from "./dto/comment.dto";
+import { AdminCommentQueryDto, CommentListQueryDto, CreateCommentDto, HideCommentDto, UpdateCommentDto } from "./dto/comment.dto";
 
 @Controller()
 export class CommentsController {
@@ -41,6 +41,15 @@ export class CommentsController {
     @GetCurrentUser() user: User,
   ) {
     return this.commentsService.create(campaignId, dto, user);
+  }
+
+  /** Người viết sửa bình luận của mình; trả về nội dung mới và thời điểm sửa. */
+  @Patch("comments/:id")
+  @UseGuards(JwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 20, windowMs: 10 * 60_000, keyPrefix: "comment-update" })
+  async update(@Param("id", ParseUUIDPipe) id: string, @Body() dto: UpdateCommentDto, @GetCurrentUser() user: User) {
+    const comment = await this.commentsService.update(id, dto, user);
+    return { id: comment.id, content: comment.content, editedAt: comment.editedAt ?? null };
   }
 
   @Delete("comments/:id")

@@ -92,14 +92,19 @@ export type AiPlatformAdjustment = {
   baseProbability: number;
 };
 
-/** "category": dự án cùng lĩnh vực trên Góp Mầm; "platform": mọi dự án Góp Mầm; "model": mô hình. */
-export type AiSuggestionBasis = "category" | "platform" | "model";
+/** "platform": dữ liệu Góp Mầm chiếm phần lớn trong hiệu chỉnh; "model": chủ yếu mô hình gốc. */
+export type AiSuggestionBasis = "platform" | "model";
 
-export type AiGoalEstimate = {
+/** Gợi ý thời hạn cho số tiền người tạo tự đặt (AI không gợi ý số tiền). */
+export type AiDurationEstimate = {
+  /** Ước lượng cho thời hạn đang chọn; null khi chưa chọn ngày kết thúc. */
   current: AiPredictData | null;
-  goal: { low: number; high: number; recommended: number; basis: AiSuggestionBasis };
-  duration: { days: number; probability: number; basis: AiSuggestionBasis };
-  options: Array<{ goalAmount: number; probability: number }>;
+  /** `days`: thời hạn ngắn nhất gần bằng mức tốt nhất; `low`–`high`: các thời hạn tốt gần như nhau. */
+  duration: { days: number; low: number; high: number; probability: number; basis: AiSuggestionBasis };
+  /** Khả năng đạt ở từng thời hạn (đường đã làm mượt), cùng số tiền đã đặt. */
+  options: Array<{ days: number; probability: number }>;
+  /** Thời hạn của ngày kết thúc đang chọn (có trong `options`); null khi chưa chọn. */
+  chosenDays: number | null;
   similar: Array<{
     campaignId: string | null;
     title: string | null;
@@ -114,19 +119,23 @@ export type AiGoalEstimate = {
   notes: string[];
 };
 
-export type AiGoalEstimateResult = { available: true; data: AiGoalEstimate } | { available: false };
+export type AiDurationEstimateResult = { available: true; data: AiDurationEstimate } | { available: false };
 
-export type GoalEstimateInput = {
+export type DurationEstimateInput = {
   category: string;
-  goalAmount?: number;
+  /** Số tiền người tạo đã đặt (bắt buộc). */
+  goalAmount: number;
   /** ISO; bỏ trống khi chưa chọn ngày kết thúc. */
   endDate?: string;
   title?: string;
 };
 
-/** Gợi ý mục tiêu và thời hạn cho chiến dịch đang soạn (cần đăng nhập). */
-export function fetchGoalEstimate(input: GoalEstimateInput, signal?: AbortSignal): Promise<AiGoalEstimateResult> {
-  return api.post<AiGoalEstimateResult>("/ai/estimate", input, { signal });
+/** Gợi ý thời hạn cho số tiền của chiến dịch đang soạn (cần đăng nhập). */
+export function fetchDurationEstimate(
+  input: DurationEstimateInput,
+  signal?: AbortSignal,
+): Promise<AiDurationEstimateResult> {
+  return api.post<AiDurationEstimateResult>("/ai/estimate", input, { signal });
 }
 
 export type AiPredictResult =

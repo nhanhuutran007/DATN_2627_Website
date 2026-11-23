@@ -1,19 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 export type DetailTocItem = { id: string; label: string };
 
 type DetailTocProps = {
   items: DetailTocItem[];
+  /** Nút bên phải thanh tab (vd. "Ủng hộ"), chỉ hiện khi đã cuộn qua phần tử `#${watchId}`. */
+  action?: ReactNode;
+  watchId?: string;
 };
 
 /**
- * Mục lục dính ở cột trái trang dự án (như thanh điều hướng mục của Kickstarter):
- * bấm để nhảy tới mục, mục đang đọc được tô đậm. Chỉ hiện trên màn hình rộng (xem `.detail-toc`).
+ * Thanh tab ngang dính ngay dưới header trang dự án (như Kickstarter: Campaign · Rewards ·
+ * Creator · FAQ…), đặt dưới phần đầu (ảnh bìa + thẻ gây quỹ): bấm để nhảy tới mục, mục đang đọc
+ * được gạch chân. Màn hình hẹp thì vuốt ngang.
  */
-export function DetailToc({ items }: DetailTocProps) {
+export function DetailToc({ items, action, watchId = "the-gay-quy" }: DetailTocProps) {
   const [active, setActive] = useState(items[0]?.id ?? "");
+  const [showAction, setShowAction] = useState(false);
+  const listRef = useRef<HTMLUListElement>(null);
+  const hasAction = Boolean(action);
+
+  // Như nút "Back this project" của Kickstarter: hiện khi thẻ gây quỹ ở phần đầu đã khuất.
+  useEffect(() => {
+    const target = hasAction ? document.getElementById(watchId) : null;
+    if (!target) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      setShowAction(!entry.isIntersecting && entry.boundingClientRect.top < 0);
+    });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasAction, watchId]);
 
   useEffect(() => {
     const sections = items
@@ -32,22 +50,39 @@ export function DetailToc({ items }: DetailTocProps) {
     return () => observer.disconnect();
   }, [items]);
 
+  // Màn hình hẹp: giữ tab đang đọc trong tầm nhìn của thanh cuộn ngang (không cuộn cả trang).
+  useEffect(() => {
+    const list = listRef.current;
+    const link = list?.querySelector<HTMLElement>(`a[href="#${CSS.escape(active)}"]`);
+    if (!list || !link) return;
+    const left = link.offsetLeft - list.offsetLeft;
+    if (left < list.scrollLeft || left + link.offsetWidth > list.scrollLeft + list.clientWidth) {
+      list.scrollTo({ left: left - 16, behavior: "smooth" });
+    }
+  }, [active]);
+
   return (
-    <nav className="detail-toc" aria-label="Các mục của dự án">
-      <p className="detail-toc-title">Trong trang này</p>
-      <ul>
-        {items.map((item) => (
-          <li key={item.id}>
-            <a
-              href={`#${item.id}`}
-              aria-current={active === item.id ? "location" : undefined}
-              onClick={() => setActive(item.id)}
-            >
-              {item.label}
-            </a>
-          </li>
-        ))}
-      </ul>
+    <nav className="detail-tabs" aria-label="Các mục của dự án">
+      <div className="container detail-tabs-bar">
+        <ul ref={listRef}>
+          {items.map((item) => (
+            <li key={item.id}>
+              <a
+                href={`#${item.id}`}
+                aria-current={active === item.id ? "location" : undefined}
+                onClick={() => setActive(item.id)}
+              >
+                {item.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+        {action && (
+          <div className="detail-tabs-action" hidden={!showAction}>
+            {action}
+          </div>
+        )}
+      </div>
     </nav>
   );
 }

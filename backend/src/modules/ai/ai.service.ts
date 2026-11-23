@@ -310,8 +310,8 @@ export class AiService {
   }
 
   /**
-   * Gợi ý mục tiêu và thời hạn cho chiến dịch đang soạn (chưa cần lưu), học từ các dự án Góp Mầm
-   * đã kết thúc. Chỉ là tham khảo cho người tạo, không ảnh hưởng xét duyệt.
+   * Gợi ý thời hạn cho chiến dịch đang soạn (chưa cần lưu) với số tiền người tạo tự đặt, học từ
+   * các dự án Góp Mầm đã kết thúc. AI không gợi ý số tiền. Chỉ tham khảo, không ảnh hưởng xét duyệt.
    */
   async estimateDraft(dto: EstimateCampaignDto, user: User): Promise<EstimateResult> {
     const now = new Date();
@@ -324,7 +324,7 @@ export class AiService {
     const features: AiPredictFeatures = {
       ...emptyPredictFeatures(),
       categoryId: aiCategoryId(dto.category),
-      goalAmount: dto.goalAmount ?? 0,
+      goalAmount: dto.goalAmount,
       durationDays,
       // Chiến dịch mới: tính cả dự án đang tạo như khi đã lưu.
       ownerCampaignCount: ownerCampaignCount + 1,

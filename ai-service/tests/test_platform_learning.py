@@ -2,7 +2,9 @@
 
 from dataclasses import replace
 
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 import app.core.security as security
 from app.main import app
@@ -64,47 +66,55 @@ def test_similarity_prefers_same_category_and_close_goal() -> None:
     assert similarity(query, _features(2, 60_000_000)) > similarity(query, _features(2, 1e9))
 
 
-def test_estimate_suggests_goal_from_successful_same_category_projects() -> None:
-    history = _outcomes(2, True, 4, goal=40_000_000) + _outcomes(2, False, 3, goal=300_000_000)
+def test_estimate_requires_goal_amount() -> None:
+    # Số tiền do người tạo tự quyết; AI không gợi ý số tiền nên không nhận yêu cầu thiếu số tiền.
+    with pytest.raises(ValidationError):
+        EstimateRequest(features=_features(2, 0, 0))
+
+
+def test_estimate_suggests_duration_for_the_given_goal() -> None:
+    history = _outcomes(2, True, 4) + _outcomes(2, False, 3)
     result = estimate(
-        PredictorService(), EstimateRequest(features=_features(2, 0, 0), history=history)
+        PredictorService(), EstimateRequest(features=_features(2, 50_000_000, 0), history=history)
     )
 
-    assert result.goal.basis == "category"
-    # Các dự án đạt gọi được 44 triệu: gợi ý quanh mức đó, không phải 300 triệu của dự án thất bại.
-    assert result.goal.low <= result.goal.recommended <= result.goal.high
-    assert 30_000_000 <= result.goal.recommended <= 60_000_000
-    assert result.current is None
-    assert result.duration.days >= 30
+    assert result.current is None and result.chosen_days is None  # chưa chọn ngày kết thúc
+    assert [option.days for option in result.options] == [30, 45, 60, 90]
+    duration = result.duration
+    assert 30 <= duration.low <= duration.days <= duration.high <= 90
+    # Mức gợi ý không kém mức tốt nhất trong bảng quá 2 điểm.
+    assert duration.probability >= max(o.probability for o in result.options) - 0.02 - 1e-9
     assert result.samples == 7
+    assert not hasattr(result, "goal")
 
 
-def test_estimate_uses_all_platform_successes_when_category_has_few() -> None:
-    history = _outcomes(3, True, 2) + _outcomes(0, True, 2)
+def test_duration_curve_has_no_round_number_dip() -> None:
+    # Mô hình gốc có "đáy giả" ở đúng 30 ngày (mặc định Kickstarter): sau khi làm mượt, 30 và 31
+    # ngày phải gần như bằng nhau.
     result = estimate(
-        PredictorService(), EstimateRequest(features=_features(2, 0, 0), history=history)
+        PredictorService(), EstimateRequest(features=_features(2, 50_000_000, 31))
     )
-    assert result.goal.basis == "platform"
+    by_days = {option.days: option.probability for option in result.options}
+    assert abs(by_days[30] - by_days[31]) < 0.02
 
 
-def test_estimate_falls_back_to_model_without_history() -> None:
-    result = estimate(PredictorService(), EstimateRequest(features=_features(2, 0, 0)))
-    assert result.goal.basis == "model"
-    assert result.goal.low <= result.goal.recommended <= result.goal.high
-    assert result.similar == []
-    assert result.notes  # ghi chú còn ít dữ liệu
-
-
-def test_estimate_current_matches_option_at_same_goal() -> None:
+def test_estimate_includes_chosen_duration_and_matches_current() -> None:
     history = _outcomes(2, True, 5) + _outcomes(2, False, 2)
     result = estimate(
         PredictorService(),
         EstimateRequest(features=_features(2, 50_000_000, 40), history=history),
     )
+    assert result.chosen_days == 40
     assert result.current is not None
-    option = next(o for o in result.options if o.goal_amount == 50_000_000)
+    option = next(o for o in result.options if o.days == 40)
     assert abs(option.probability - result.current.probability) < 1e-6
     assert result.similar and result.similar[0].similarity >= result.similar[-1].similarity
+
+
+def test_estimate_without_history_notes_few_samples() -> None:
+    result = estimate(PredictorService(), EstimateRequest(features=_features(2, 50_000_000, 0)))
+    assert result.similar == []
+    assert result.notes
 
 
 def test_estimate_respects_minimum_duration() -> None:
@@ -113,6 +123,7 @@ def test_estimate_respects_minimum_duration() -> None:
         EstimateRequest(features=_features(2, 50_000_000, 10), min_duration_days=30),
     )
     assert result.duration.days >= 30
+    assert all(option.days >= 30 for option in result.options)
 
 
 def test_estimate_endpoint(monkeypatch) -> None:
@@ -136,3 +147,7 @@ def test_estimate_endpoint(monkeypatch) -> None:
     assert body["samples"] == 1
     assert body["current"]["platform"]["samples"] == 1
     assert body["similar"][0]["campaign_id"] == "a"
+    assert "goal" not in body
+
+    payload["features"]["goal_amount"] = 0
+    assert client.post("/api/v1/estimate", json=payload).status_code == 422

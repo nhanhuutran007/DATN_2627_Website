@@ -9,6 +9,8 @@ export type CampaignCommentView = {
   kind: CommentKind;
   content: string;
   createdAt: string;
+  /** Có khi người viết đã sửa nội dung. */
+  editedAt?: string | null;
   author: { id: string; name: string; avatar: string | null };
   /** Người viết là chủ dự án. */
   isOwner: boolean;
@@ -62,6 +64,11 @@ export function postComment(
   payload: { content: string; kind?: CommentKind; parentId?: string },
 ): Promise<CampaignCommentView> {
   return api.post<CampaignCommentView>(`/campaigns/${encodeURIComponent(campaignId)}/comments`, payload);
+}
+
+/** Người viết sửa bình luận của mình. */
+export function updateComment(id: string, content: string): Promise<{ id: string; content: string; editedAt: string | null }> {
+  return api.patch(`/comments/${encodeURIComponent(id)}`, { content });
 }
 
 export async function deleteComment(id: string): Promise<void> {

@@ -5,7 +5,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { useDialog } from "@/components/ui/DialogProvider";
 import { ApiError } from "@/lib/api";
-import { COMMENT_MAX, deleteComment, type CampaignCommentView } from "@/lib/api/comments";
+import { COMMENT_MAX, deleteComment, updateComment, type CampaignCommentView } from "@/lib/api/comments";
 import { fetchPostComments, postPostComment, type ApiPost } from "@/lib/api/posts";
 import { useAuthUser, type AuthUser } from "@/lib/auth";
 import { timeAgo } from "@/lib/time";
@@ -77,6 +77,66 @@ function Composer({ postId, parentId, placeholder, autoFocus, onPosted, onCancel
   );
 }
 
+type EditFormProps = {
+  commentId: string;
+  initial: string;
+  onSaved: (saved: { content: string; editedAt: string | null }) => void;
+  onCancel: () => void;
+};
+
+/** Sửa bình luận của mình ngay tại chỗ. */
+function EditForm({ commentId, initial, onSaved, onCancel }: EditFormProps) {
+  const id = useId();
+  const [content, setContent] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const length = content.trim().length;
+  const unchanged = content.trim() === initial.trim();
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (length < 2 || busy) return;
+    if (unchanged) {
+      onCancel();
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await updateComment(commentId, content.trim());
+      onSaved(saved);
+    } catch (err) {
+      setError(errorText(err, "Không lưu được. Vui lòng thử lại."));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="comment-composer is-edit" onSubmit={submit}>
+      <label className="sr-only" htmlFor={`${id}-edit`}>Sửa bình luận</label>
+      <textarea
+        id={`${id}-edit`}
+        rows={3}
+        maxLength={COMMENT_MAX}
+        value={content}
+        autoFocus
+        onChange={(event) => setContent(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onCancel();
+        }}
+      />
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <div className="comment-composer-actions">
+        <span className="hint">{length}/{COMMENT_MAX}</span>
+        <button className="button button-ghost button-sm" type="button" onClick={onCancel}>Huỷ</button>
+        <button className="button button-primary button-sm" type="submit" disabled={busy || length < 2}>
+          {busy ? "Đang lưu…" : "Lưu"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 type ItemProps = {
   comment: CampaignCommentView;
   post: ApiPost;
@@ -91,10 +151,14 @@ function CommentItem({ comment, post, user, isReply, onReplyPosted, onDeleted }:
   const [replying, setReplying] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+  // Nội dung sau khi người viết sửa (danh sách cha không phải tải lại).
+  const [content, setContent] = useState(comment.content);
+  const [editedAt, setEditedAt] = useState(comment.editedAt ?? null);
+  const [editing, setEditing] = useState(false);
   const mine = user?.id === comment.author.id;
   const isAdminViewer = user?.role === "admin";
-  // Trả lời: người quản lý bài (chủ dự án, quản trị viên, đội ngũ) hoặc chính người viết bình luận gốc.
-  const canReply = !isReply && (post.canReply || mine);
+  // Trả lời: người quản lý bài (chủ dự án, quản trị viên, đội ngũ). Người viết thì sửa bình luận của mình.
+  const canReply = !isReply && post.canReply;
 
   const remove = async () => {
     const ok = await dialog.confirm({
@@ -123,14 +187,33 @@ function CommentItem({ comment, post, user, isReply, onReplyPosted, onDeleted }:
           {comment.isOwner && <span className="tag tag-green">Chủ dự án</span>}
           {comment.isAdmin && <span className="tag tag-blue">Quản trị viên</span>}
           <time dateTime={comment.createdAt}>{timeAgo(comment.createdAt)}</time>
+          {editedAt && <span className="comment-edited" title={`Sửa lúc ${new Date(editedAt).toLocaleString("vi-VN")}`}>(đã chỉnh sửa)</span>}
         </header>
-        <p className="comment-text">{comment.content}</p>
+        {editing ? (
+          <EditForm
+            commentId={comment.id}
+            initial={content}
+            onSaved={(saved) => {
+              setContent(saved.content);
+              setEditedAt(saved.editedAt);
+              setEditing(false);
+            }}
+            onCancel={() => setEditing(false)}
+          />
+        ) : (
+          <p className="comment-text">{content}</p>
+        )}
         {error && <p className="form-error" role="alert">{error}</p>}
-        {(canReply || mine || isAdminViewer) && (
+        {!editing && (canReply || mine || isAdminViewer) && (
           <div className="comment-actions">
             {canReply && (
               <button type="button" className="link-button" onClick={() => setReplying((value) => !value)}>
-                {mine && !post.canReply ? "Hỏi thêm" : "Trả lời"}
+                Trả lời
+              </button>
+            )}
+            {mine && (
+              <button type="button" className="link-button" onClick={() => { setEditing(true); setReplying(false); setError(""); }}>
+                Chỉnh sửa
               </button>
             )}
             {(mine || isAdminViewer) && (
@@ -142,7 +225,7 @@ function CommentItem({ comment, post, user, isReply, onReplyPosted, onDeleted }:
           <Composer
             postId={post.id}
             parentId={comment.id}
-            placeholder={post.canReply ? `Trả lời ${comment.author.name}…` : "Hỏi thêm người tổ chức…"}
+            placeholder={`Trả lời ${comment.author.name}…`}
             autoFocus
             onPosted={(reply) => {
               onReplyPosted(reply);

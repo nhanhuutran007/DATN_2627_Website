@@ -10,8 +10,10 @@ import { Icon } from "@/components/ui/Icon";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { PROVINCES } from "@/lib/provinces";
 import { escapeHtml, htmlToText } from "@/lib/rich-text";
+import { isUploadedVideo, videoSource } from "@/lib/video";
 import { ImageUploader } from "@/features/media/ImageUploader";
-import { GoalEstimatePanel } from "@/features/campaign-create/GoalEstimatePanel";
+import { DurationEstimatePanel } from "@/features/campaign-create/DurationEstimatePanel";
+import { VideoInput } from "@/features/campaign-create/VideoInput";
 import { OrganizationPicker } from "@/features/organizations/OrganizationPicker";
 import {
   emptyTier,
@@ -73,6 +75,8 @@ type Draft = {
   target: string;
   deadline: string;
   imageUrl: string;
+  /** Link YouTube hoặc video đã tải lên; rỗng = không có video. */
+  videoUrl: string;
   summary: string;
   story: string;
   budget: string;
@@ -88,6 +92,7 @@ const initialDraft: Draft = {
   target: "",
   deadline: "",
   imageUrl: "",
+  videoUrl: "",
   summary: "",
   story: "",
   budget: "",
@@ -302,6 +307,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
           target: String(Number(campaign.goalAmount)),
           deadline: campaign.endDate ? toDateInput(new Date(campaign.endDate)) : "",
           imageUrl: campaign.imageUrl ?? "",
+          videoUrl: campaign.videoUrl ?? "",
           ...splitDescription(campaign.description),
         });
         const loadedMilestones = toDraftMilestones(campaign);
@@ -384,6 +390,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
     }
     if (index === STEP_IMAGE) {
       if (draft.imageUrl.trim() && !isImageValue(draft.imageUrl.trim())) return "Link ảnh phải bắt đầu bằng http:// hoặc https://";
+      if (draft.videoUrl.trim() && !videoSource(draft.videoUrl.trim())) return "Video phải là link YouTube hoặc file đã tải lên.";
     }
     if (index === STEP_STORY) {
       if (!draft.title.trim()) return "Vui lòng đặt tên cho chiến dịch.";
@@ -432,6 +439,8 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
       location: draft.location.trim(),
       description: parts.filter(Boolean).join("\n"),
       ...(isImageValue(draft.imageUrl.trim()) ? { imageUrl: draft.imageUrl.trim() } : {}),
+      // Bản nháp đã lưu: gửi null để bỏ video khi người dùng gỡ.
+      ...(videoSource(draft.videoUrl.trim()) ? { videoUrl: draft.videoUrl.trim() } : campaignId ? { videoUrl: null } : {}),
       // Bản nháp đã lưu: gửi null để bỏ gắn khi người dùng đổi sang gây quỹ cho dự án của mình.
       ...(pickedOrganization ? { organizationId: pickedOrganization.id } : campaignId ? { organizationId: null } : {}),
     };
@@ -685,12 +694,12 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                     <input id="create-deadline" type="date" min={minDeadline()} value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
                   </div>
                   {user && (
-                    <GoalEstimatePanel
+                    <DurationEstimatePanel
                       category={draft.category}
                       goalAmount={target}
+                      minGoal={MIN_TARGET}
                       deadline={draft.deadline}
                       title={draft.title}
-                      onUseGoal={(amount) => update("target", String(Math.round(amount)))}
                       onUseDuration={(days) => update("deadline", deadlineAfter(days))}
                     />
                   )}
@@ -706,6 +715,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                     disabled={busy}
                     hint="Bỏ trống sẽ dùng ảnh minh họa theo lĩnh vực."
                   />
+                  <VideoInput value={draft.videoUrl} onChange={(url) => update("videoUrl", url)} disabled={busy} />
                 </div>
               )}
 
@@ -794,6 +804,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                     <div><dt>Tên chiến dịch</dt><dd>{draft.title || "—"}</dd></div>
                     <div><dt>Gây quỹ cho</dt><dd>{pickedOrganization ? pickedOrganization.name : "Dự án của tôi"}</dd></div>
                     <div><dt>Lĩnh vực</dt><dd>{draft.category || "—"}</dd></div>
+                    <div><dt>Video</dt><dd>{videoSource(draft.videoUrl) ? (isUploadedVideo(draft.videoUrl) ? "Video tải lên" : "Video YouTube") : "Không có"}</dd></div>
                     <div><dt>Địa điểm</dt><dd>{draft.location || "—"}</dd></div>
                     <div><dt>Mục tiêu</dt><dd>{target ? `${target.toLocaleString("vi-VN")} ₫` : "—"}</dd></div>
                     <div><dt>Ngày kết thúc</dt><dd>{draft.deadline ? new Date(draft.deadline).toLocaleDateString("vi-VN") : "—"}</dd></div>

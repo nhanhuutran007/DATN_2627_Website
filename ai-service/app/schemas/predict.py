@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class PredictFeatures(BaseModel):
@@ -86,29 +86,31 @@ class PredictResponse(BaseModel):
 
 
 class EstimateRequest(BaseModel):
-    # goal_amount = 0: chưa nhập mục tiêu, chỉ cần gợi ý
+    # Số tiền do người tạo tự đặt (bắt buộc); duration_days = 0 khi chưa chọn ngày kết thúc
     features: PredictFeatures = Field(default_factory=PredictFeatures)
     history: list[PlatformOutcome] = Field(default_factory=list, max_length=MAX_HISTORY)
     # Thời hạn ngắn nhất được phép chọn (nền tảng yêu cầu ≥ 1 tháng)
     min_duration_days: int = Field(30, ge=1, le=365)
 
+    @field_validator("features")
+    @classmethod
+    def _goal_required(cls, value: PredictFeatures) -> PredictFeatures:
+        if value.goal_amount <= 0:
+            raise ValueError("goal_amount phải lớn hơn 0: AI chỉ gợi ý thời hạn cho số tiền đã đặt")
+        return value
 
-class GoalOption(BaseModel):
-    goal_amount: float
+
+class DurationOption(BaseModel):
+    days: int
     probability: float
 
 
-class GoalSuggestion(BaseModel):
-    low: float
-    high: float
-    recommended: float
-    # Số tiền các dự án đã đạt mục tiêu trên Góp Mầm thực sự gọi được — "category": cùng lĩnh vực,
-    # "platform": mọi lĩnh vực (chưa đủ dự án cùng lĩnh vực); "model": quét mô hình đã hiệu chỉnh.
-    basis: Literal["category", "platform", "model"]
-
-
 class DurationSuggestion(BaseModel):
-    days: int
+    days: int  # thời hạn ngắn nhất có khả năng đạt gần bằng mức tốt nhất (đường đã làm mượt)
+    # Khoảng thời hạn có khả năng đạt gần bằng mức tốt nhất (dữ liệu không phân biệt được
+    # chênh lệch trong khoảng này)
+    low: int
+    high: int
     probability: float
     basis: Literal["platform", "model"]
 
@@ -124,10 +126,10 @@ class SimilarCampaign(BaseModel):
 
 
 class EstimateResponse(BaseModel):
-    current: PredictResponse | None  # ước lượng cho mục tiêu/thời hạn đang nhập (nếu đã nhập)
-    goal: GoalSuggestion
+    current: PredictResponse | None  # ước lượng cho thời hạn đang chọn (nếu đã chọn ngày kết thúc)
     duration: DurationSuggestion
-    options: list[GoalOption]  # khả năng đạt ở vài mức mục tiêu quanh mức gợi ý
+    options: list[DurationOption]  # khả năng đạt ở từng thời hạn, cùng số tiền đã đặt
+    chosen_days: int | None = None  # thời hạn của ngày kết thúc đang chọn (có trong options)
     similar: list[SimilarCampaign]
     samples: int  # số dự án Góp Mầm đã kết thúc dùng để học
     similar_reached: int  # trong các dự án tương tự hiển thị, bao nhiêu dự án đạt
