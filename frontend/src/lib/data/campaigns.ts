@@ -68,6 +68,8 @@ export type Campaign = {
     | "homestay";
   /** Ảnh do chủ dự án cung cấp; không có thì giao diện hiển thị dạng chữ, không dùng ảnh minh họa. */
   imageUrl?: string | null;
+  /** Video giới thiệu: link YouTube hoặc video đã tải lên (`/api/v1/media/campaign-videos/…`). */
+  videoUrl?: string | null;
   /** Ngày kết thúc dạng dd/mm/yyyy. */
   endDate?: string;
   /** Ngày tạo chiến dịch dạng dd/mm/yyyy; dữ liệu mẫu không có. */

@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { jsonLdString } from "@/lib/json-ld";
 
-import { AiRecommendations } from "@/components/ai/AiRecommendations";
+import { SuccessStories } from "@/components/home/SuccessStories";
 import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { HeroMarquee } from "@/components/home/HeroMarquee";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -27,6 +27,7 @@ type HomeData = {
   featured: Campaign[];
   all: Campaign[];
   newest: Campaign[];
+  stories: Campaign[];
 };
 
 async function loadHome(): Promise<HomeData> {
@@ -38,12 +39,15 @@ async function loadHome(): Promise<HomeData> {
       fetchCampaigns({ sort: "newest", limit: 3 }),
       fetchPlatformStats().catch(() => null),
     ]);
+    // Câu chuyện thành công: dự án thật đã đạt mục tiêu (backend đã loại dữ liệu mô phỏng).
+    const stories = await fetchCampaigns({ status: ["success", "ended"], minProgress: 100, sort: "popular", limit: 4 }).catch(() => null);
     return {
       live: true,
       stats,
       featured: featured.items.map(apiCampaignToView),
       all: all.items.map(apiCampaignToView),
       newest: newest.items.map(apiCampaignToView),
+      stories: stories ? stories.items.map(apiCampaignToView) : [],
     };
   } catch {
     return {
@@ -52,6 +56,7 @@ async function loadHome(): Promise<HomeData> {
       featured: mockCampaigns.slice(0, 3),
       all: mockCampaigns,
       newest: mockCampaigns.slice(0, 3),
+      stories: [],
     };
   }
 }
@@ -80,7 +85,7 @@ const features: Array<{ icon: IconName; title: string; text: string }> = [
 ];
 
 export default async function Home() {
-  const { live, stats, featured, all, newest } = await loadHome();
+  const { live, stats, featured, all, stories } = await loadHome();
 
   const organizationLd = {
     "@context": "https://schema.org",
@@ -240,7 +245,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <AiRecommendations fallback={newest} />
+      <SuccessStories campaigns={stories} />
 
       <section className="cta-band" aria-labelledby="cta-title">
         <div className="container cta-inner">

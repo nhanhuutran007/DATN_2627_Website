@@ -49,6 +49,10 @@ export class CampaignComment extends BaseEntity {
   @Column({ type: "text" })
   content!: string;
 
+  /** Lần người viết sửa nội dung gần nhất; `null` = chưa sửa. */
+  @Column({ name: "edited_at", type: "datetime", nullable: true })
+  editedAt?: Date | null;
+
   @Column({ type: "enum", enum: CommentStatus, default: CommentStatus.VISIBLE })
   status!: CommentStatus;
 

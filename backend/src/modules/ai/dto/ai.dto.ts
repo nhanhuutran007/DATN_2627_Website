@@ -43,19 +43,18 @@ export class PredictAiDto {
   campaignId!: string;
 }
 
-/** Chiến dịch đang soạn (chưa cần lưu) để AI gợi ý mục tiêu và thời hạn. */
+/** Chiến dịch đang soạn (chưa cần lưu) để AI gợi ý thời hạn cho số tiền người tạo tự đặt. */
 export class EstimateCampaignDto {
   @IsString()
   @MaxLength(100)
   category!: string;
 
-  /** Bỏ trống = chưa nhập mục tiêu, chỉ cần gợi ý. */
-  @IsOptional()
+  /** Số tiền do người tạo tự quyết (bắt buộc) — AI không gợi ý số tiền. */
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 0 })
-  @Min(0)
+  @Min(1)
   @Max(100_000_000_000)
-  goalAmount?: number;
+  goalAmount!: number;
 
   @IsOptional()
   @IsDateString()

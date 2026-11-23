@@ -112,14 +112,19 @@ export type AiEstimateRequest = {
   minDurationDays: number;
 };
 
-/** "category": dự án cùng lĩnh vực trên Góp Mầm; "platform": mọi dự án Góp Mầm; "model": mô hình. */
-export type AiSuggestionBasis = "category" | "platform" | "model";
+/** "platform": dữ liệu Góp Mầm chiếm phần lớn trong hiệu chỉnh; "model": chủ yếu mô hình gốc. */
+export type AiSuggestionBasis = "platform" | "model";
 
+/** Gợi ý thời hạn cho số tiền người tạo tự đặt (AI không gợi ý số tiền). */
 export type AiEstimateResponse = {
+  /** Ước lượng cho thời hạn đang chọn; null khi chưa chọn ngày kết thúc. */
   current: AiPredictResponse | null;
-  goal: { low: number; high: number; recommended: number; basis: AiSuggestionBasis };
-  duration: { days: number; probability: number; basis: AiSuggestionBasis };
-  options: Array<{ goalAmount: number; probability: number }>;
+  /** `days`: thời hạn ngắn nhất gần bằng mức tốt nhất; `low`–`high`: các thời hạn tốt gần như nhau. */
+  duration: { days: number; low: number; high: number; probability: number; basis: AiSuggestionBasis };
+  /** Khả năng đạt ở từng thời hạn (đường đã làm mượt), cùng số tiền đã đặt. */
+  options: Array<{ days: number; probability: number }>;
+  /** Thời hạn của ngày kết thúc đang chọn (có trong `options`); null khi chưa chọn. */
+  chosenDays: number | null;
   similar: Array<{
     campaignId: string | null;
     title: string | null;

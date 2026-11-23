@@ -1435,15 +1435,14 @@ paths:
           description: Chiến dịch không tồn tại
   /ai/estimate:
     post:
-      operationId: aiEstimateGoal
-      summary: Gợi ý mục tiêu và thời hạn cho chiến dịch đang soạn
+      operationId: aiEstimateDuration
+      summary: Gợi ý thời hạn gây quỹ cho số tiền người tạo tự đặt
       description: >-
-        AI học từ các dự án Góp Mầm đã kết thúc (SUCCESS, FAILED, ENDED): khoảng mục tiêu lấy
-        từ số tiền các dự án đã đạt mục tiêu thực sự gọi được (`basis`: `category` cùng lĩnh
-        vực, `platform` toàn nền tảng, `model` khi chưa đủ dữ liệu); xác suất của mô hình gốc
-        (Kickstarter) được hiệu chỉnh theo tỷ lệ đạt thực tế của các dự án tương tự. Chỉ tham
-        khảo, không ảnh hưởng xét duyệt. `available: false` khi AI service lỗi/timeout.
-        Giới hạn 40 lần/phút.
+        AI không gợi ý số tiền: `goalAmount` bắt buộc, do người tạo tự quyết. Với số tiền đó, AI
+        so khả năng đạt mục tiêu ở các thời hạn 30/45/60/90 ngày (và thời hạn đang chọn), dùng
+        mô hình gốc (Kickstarter) đã hiệu chỉnh theo tỷ lệ đạt thực tế của các dự án Góp Mầm
+        đã kết thúc tương tự (SUCCESS, FAILED, ENDED). Chỉ tham khảo, không ảnh hưởng xét
+        duyệt. `available: false` khi AI service lỗi/timeout. Giới hạn 40 lần/phút.
       security:
         - bearerAuth: []
       requestBody:
@@ -1452,14 +1451,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [category]
+              required: [category, goalAmount]
               properties:
                 category: { type: string, maxLength: 100 }
-                goalAmount:
-                  type: integer
-                  minimum: 0
-                  description: Bỏ trống khi chưa nhập mục tiêu (chỉ cần gợi ý)
-                endDate: { type: string, format: date-time }
+                goalAmount: { type: integer, minimum: 1, description: Số tiền người tạo đã đặt }
+                endDate:
+                  type: string
+                  format: date-time
+                  description: Bỏ trống khi chưa chọn ngày kết thúc
                 title: { type: string, maxLength: 200 }
       responses:
         "200":
@@ -1475,30 +1474,33 @@ paths:
                     type: object
                     properties:
                       current:
-                        description: Ước lượng cho mục tiêu/thời hạn đang nhập (null nếu chưa nhập mục tiêu)
-                      goal:
-                        type: object
-                        properties:
-                          low: { type: number }
-                          high: { type: number }
-                          recommended: { type: number }
-                          basis: { type: string, enum: [category, platform, model] }
+                        description: Ước lượng cho ngày kết thúc đang chọn (null nếu chưa chọn)
                       duration:
                         type: object
+                        description: >-
+                          `low`–`high`: các thời hạn có khả năng đạt gần bằng mức tốt nhất (đường
+                          đã làm mượt theo ngày); `days`: thời hạn ngắn nhất trong khoảng đó.
                         properties:
                           days: { type: integer }
+                          low: { type: integer }
+                          high: { type: integer }
                           probability: { type: number }
                           basis: { type: string, enum: [platform, model] }
                       options:
                         type: array
+                        description: Khả năng đạt ở từng thời hạn, cùng số tiền đã đặt
                         items:
                           type: object
                           properties:
-                            goalAmount: { type: number }
+                            days: { type: integer }
                             probability: { type: number }
+                      chosenDays:
+                        type: integer
+                        nullable: true
+                        description: Thời hạn của ngày kết thúc đang chọn (có trong options)
                       similar:
                         type: array
-                        description: Tối đa 5 dự án đã kết thúc giống nhất
+                        description: Tối đa 5 dự án đã kết thúc giống nhất (cùng lĩnh vực, số tiền gần nhau)
                         items:
                           type: object
                           properties:
@@ -1513,7 +1515,7 @@ paths:
                       similarReached: { type: integer }
                       notes: { type: array, items: { type: string } }
         "400":
-          description: Dữ liệu không hợp lệ
+          description: Dữ liệu không hợp lệ (thiếu số tiền…)
         "401":
           description: Chưa đăng nhập
         "429":
@@ -2656,6 +2658,7 @@ paths:
                 purpose:
                   type: string
                   enum: [campaign_image, progress_image, avatar, expense_receipt, refund_proof, organization_logo, organization_document, category_image]
+                  description: Video dùng `POST /media/videos`, không qua endpoint này
                   default: campaign_image
       responses:
         "201":
@@ -2672,14 +2675,53 @@ paths:
           description: Ảnh lớn hơn 5 MB
         "429":
           $ref: "#/components/responses/TooManyRequests"
+  /media/videos:
+    post:
+      operationId: uploadVideo
+      summary: Tải video giới thiệu dự án lên
+      description: >-
+        `multipart/form-data` với field `file`. Nhận diện theo nội dung file: MP4/MOV (họ ISO
+        BMFF, lưu thành `.mp4`) hoặc WebM; tối đa 100 MB (nginx cho phép thân yêu cầu 110 MB).
+        Khóa lưu trữ do server sinh, thư mục `campaign-videos`. Rate limit 10 lần/giờ/IP. Ghi
+        audit `media.upload`. `url` trả về dùng cho `videoUrl` của chiến dịch.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Đã lưu video
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedImage"
+        "400":
+          description: Thiếu file, file rỗng hoặc không phải video MP4/MOV/WebM
+        "401":
+          description: Chưa đăng nhập
+        "413":
+          description: Video lớn hơn 100 MB
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /media/{folder}/{file}:
     get:
       operationId: getMediaFile
-      summary: Trả ảnh đã tải lên (công khai)
+      summary: Trả ảnh/video đã tải lên (công khai)
       description: >-
         Chỉ trả file có bản ghi trong `media_files` và chưa bị xóa. Header
         `Cache-Control: public, max-age=31536000, immutable` (tên file là UUID, nội dung
-        không đổi) và `Cross-Origin-Resource-Policy: cross-origin`.
+        không đổi) và `Cross-Origin-Resource-Policy: cross-origin`. Hỗ trợ `Range: bytes=a-b`
+        (một đoạn) để tua video: trả `206 Partial Content`, mỗi phản hồi tối đa 4 MB;
+        đoạn ngoài file trả `416`.
       parameters:
         - name: folder
           in: path
@@ -2692,7 +2734,7 @@ paths:
           required: true
           schema:
             type: string
-            pattern: '^[0-9a-f-]{36}\.(jpg|png|webp)$'
+            pattern: '^[0-9a-f-]{36}\.(jpg|png|webp|mp4|webm)$'
       responses:
         "200":
           description: Nội dung ảnh
@@ -2700,8 +2742,14 @@ paths:
             image/jpeg: {}
             image/png: {}
             image/webp: {}
+            video/mp4: {}
+            video/webm: {}
+        "206":
+          description: Một đoạn của file (khi gửi header Range)
         "404":
           $ref: "#/components/responses/NotFound"
+        "416":
+          description: Đoạn byte yêu cầu nằm ngoài file
 
   /notifications:
     get:
@@ -3107,6 +3155,46 @@ paths:
         "429":
           $ref: "#/components/responses/TooManyRequests"
   /comments/{id}:
+    patch:
+      operationId: updateComment
+      summary: Người viết sửa bình luận của mình
+      description: >-
+        Chỉ tác giả (admin không sửa hộ, chỉ ẩn/xóa); bình luận đang bị ẩn không sửa được.
+        Nội dung được làm sạch như khi tạo (2–2000 ký tự). Ghi `edited_at` (giao diện hiện
+        "đã chỉnh sửa") và audit `comment.update` kèm nội dung cũ. Nội dung không đổi thì không
+        ghi lần sửa. Giới hạn 20 lần/10 phút.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, minLength: 2, maxLength: 2000 }
+      responses:
+        "200":
+          description: Nội dung mới
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  content: { type: string }
+                  editedAt: { type: string, format: date-time, nullable: true }
+        "400":
+          description: Nội dung rỗng hoặc quá dài
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
     delete:
       operationId: deleteComment
       summary: Xóa (mềm) bình luận của mình; admin xóa được mọi bình luận
@@ -4129,6 +4217,13 @@ components:
         imageUrl:
           type: string
           format: uri
+        videoUrl:
+          type: string
+          maxLength: 500
+          description: >-
+            Link YouTube (watch, youtu.be, shorts, embed — server chuẩn hóa về
+            `https://www.youtube.com/watch?v=<id>`) hoặc đường dẫn video do `POST /media/videos`
+            trả về.
         location:
           type: string
           maxLength: 255
@@ -4155,6 +4250,14 @@ components:
         imageUrl:
           type: string
           format: uri
+        videoUrl:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: >-
+            Link YouTube (watch, youtu.be, shorts, embed — server chuẩn hóa về
+            `https://www.youtube.com/watch?v=<id>`) hoặc đường dẫn video do `POST /media/videos`
+            trả về. `null` = bỏ video.
         location:
           type: string
           maxLength: 255

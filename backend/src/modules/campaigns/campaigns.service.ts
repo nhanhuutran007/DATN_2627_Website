@@ -206,6 +206,8 @@ export class CampaignsService {
       qb.where("c.status IN (:...statuses)", { statuses: statuses ?? PUBLIC_STATUSES });
       if (query.category) qb.andWhere("c.category = :category", { category: query.category });
     }
+    // Dự án mô phỏng chỉ dành cho AI học, không lẫn vào danh sách công khai hay của chủ dự án.
+    qb.andWhere("c.isSimulated = :simulated", { simulated: false });
     if (query.organizationId) {
       qb.andWhere("c.organizationId = :organizationId", { organizationId: query.organizationId });
     }
@@ -362,6 +364,7 @@ export class CampaignsService {
       endDate: new Date(dto.endDate),
       status: CampaignStatus.DRAFT,
       imageUrl: dto.imageUrl,
+      videoUrl: dto.videoUrl ?? null,
       location: dto.location,
       organizationId: dto.organizationId ?? null,
       backerCount: 0,
@@ -588,6 +591,8 @@ export class CampaignsService {
       .addSelect("SUM(CASE WHEN c.status = :active THEN 1 ELSE 0 END)", "activeCampaigns")
       .addSelect("SUM(CASE WHEN c.status = :success THEN 1 ELSE 0 END)", "successfulCampaigns")
       .where("c.status IN (:...statuses)", { statuses: STATS_STATUSES })
+      // Số liệu công khai chỉ tính dự án thật.
+      .andWhere("c.isSimulated = :simulated", { simulated: false })
       .setParameters({ active: CampaignStatus.ACTIVE, success: CampaignStatus.SUCCESS })
       .getRawOne<Record<keyof PlatformStats, string | number | null>>();
 

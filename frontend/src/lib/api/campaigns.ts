@@ -164,6 +164,8 @@ export type CreateCampaignPayload = {
   startDate?: string;
   location?: string;
   imageUrl?: string;
+  /** Link YouTube hoặc video đã tải lên; `null` khi cập nhật = bỏ video. */
+  videoUrl?: string | null;
   /** `null` khi cập nhật = bỏ gắn tổ chức. */
   organizationId?: string | null;
 };
@@ -438,6 +440,7 @@ export function apiCampaignToView(api: ApiCampaign): Campaign {
     apiStatus: api.status,
     image: imageForCampaign({ category: api.category, title: api.title, summary: toSummary(api), id: api.id }),
     imageUrl: api.imageUrl ?? null,
+    videoUrl: api.videoUrl ?? null,
     endDate: formatDate(api.endDate),
     ...(api.createdAt ? { createdDate: formatDate(api.createdAt) } : {}),
     aiReason: "",

@@ -142,6 +142,34 @@ describe("CommentsService", () => {
     equal((audit.entries.at(-1)?.newValues as any).byAdmin, true);
   });
 
+  it("tác giả sửa được bình luận của mình: làm sạch nội dung, ghi thời điểm sửa và audit", async () => {
+    const c = await service.create(CAMPAIGN_ID, { content: "Bản đầu" }, ALICE);
+    equal(c.editedAt, null);
+    const updated = await service.update(c.id, { content: "  Bản đã sửa\u0007 " }, ALICE);
+    equal(updated.content, "Bản đã sửa");
+    ok(updated.editedAt instanceof Date);
+    equal(audit.entries.at(-1)?.action, "comment.update");
+    equal((audit.entries.at(-1)?.oldValues as any).content, "Bản đầu");
+  });
+
+  it("không sửa bình luận của người khác (kể cả admin), bình luận bị ẩn hoặc nội dung rỗng", async () => {
+    const c = await service.create(CAMPAIGN_ID, { content: "Của Alice" }, ALICE);
+    await rejects(service.update(c.id, { content: "Bob sửa" }, BOB), ForbiddenException);
+    await rejects(service.update(c.id, { content: "Admin sửa" }, ADMIN), ForbiddenException);
+    await rejects(service.update(c.id, { content: "\u0007 " }, ALICE), BadRequestException);
+    await rejects(service.update("khong-co", { content: "Nội dung" }, ALICE), NotFoundException);
+    await service.hide(c.id, "Vi phạm", ADMIN);
+    await rejects(service.update(c.id, { content: "Lách kiểm duyệt" }, ALICE), ForbiddenException);
+  });
+
+  it("sửa mà nội dung không đổi thì không ghi lần sửa", async () => {
+    const c = await service.create(CAMPAIGN_ID, { content: "Giữ nguyên" }, ALICE);
+    const auditCount = audit.entries.length;
+    const same = await service.update(c.id, { content: "Giữ nguyên" }, ALICE);
+    equal(same.editedAt ?? null, null);
+    equal(audit.entries.length, auditCount);
+  });
+
   it("admin ẩn/hiện: có audit, báo tác giả khi ẩn, không ẩn hai lần", async () => {
     const c = await service.create(CAMPAIGN_ID, { content: "Spam" }, BOB);
     notifier.notified.length = 0;

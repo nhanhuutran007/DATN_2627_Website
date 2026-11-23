@@ -1,7 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 
-import { GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, HeadObjectCommand, NoSuchKey, NotFound, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { Logger } from "@nestjs/common";
 
 /**
@@ -13,10 +13,14 @@ export interface StorageGateway {
   put(key: string, body: Buffer, contentType: string): Promise<void>;
   /** Trả `null` nếu không có file. */
   get(key: string): Promise<Buffer | null>;
+  /** Kích thước file (byte), `null` nếu không có. */
+  size(key: string): Promise<number | null>;
+  /** Đoạn byte `[start, end]` (gồm cả hai đầu) — phát video có tua không cần đọc cả file. */
+  getRange(key: string, start: number, end: number): Promise<Buffer | null>;
 }
 
 /** Chỉ chấp nhận khóa dạng `<thư-mục>/<uuid>.<đuôi>` để chặn path traversal. */
-export const STORAGE_KEY_PATTERN = /^[a-z-]+\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+export const STORAGE_KEY_PATTERN = /^[a-z-]+\/[0-9a-f-]{36}\.(jpg|png|webp|mp4|webm)$/;
 
 function assertSafeKey(key: string): void {
   if (!STORAGE_KEY_PATTERN.test(key)) {
@@ -56,6 +60,32 @@ export class LocalStorageGateway implements StorageGateway {
       throw error;
     }
   }
+
+  async size(key: string): Promise<number | null> {
+    try {
+      return (await stat(this.pathFor(key))).size;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
+  }
+
+  async getRange(key: string, start: number, end: number): Promise<Buffer | null> {
+    let handle;
+    try {
+      handle = await open(this.pathFor(key), "r");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
+    try {
+      const buffer = Buffer.alloc(end - start + 1);
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, start);
+      return buffer.subarray(0, bytesRead);
+    } finally {
+      await handle.close();
+    }
+  }
 }
 
 /** Lưu lên S3 (AWS: container Fargate không có ổ đĩa bền vững). Quyền qua IAM task role. */
@@ -84,6 +114,31 @@ export class S3StorageGateway implements StorageGateway {
     assertSafeKey(key);
     try {
       const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      if (!result.Body) return null;
+      return Buffer.from(await result.Body.transformToByteArray());
+    } catch (error) {
+      if (error instanceof NoSuchKey) return null;
+      throw error;
+    }
+  }
+
+  async size(key: string): Promise<number | null> {
+    assertSafeKey(key);
+    try {
+      const result = await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+      return result.ContentLength ?? null;
+    } catch (error) {
+      if (error instanceof NotFound || error instanceof NoSuchKey) return null;
+      throw error;
+    }
+  }
+
+  async getRange(key: string, start: number, end: number): Promise<Buffer | null> {
+    assertSafeKey(key);
+    try {
+      const result = await this.client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: `bytes=${start}-${end}` }),
+      );
       if (!result.Body) return null;
       return Buffer.from(await result.Body.transformToByteArray());
     } catch (error) {

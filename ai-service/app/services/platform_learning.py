@@ -10,23 +10,22 @@ lần, nên dự án vừa kết thúc có tác dụng ngay ở lần dự đoá
    dự án đó. Chênh lệch (thang log-odds) được cộng vào dự đoán, nhân với mức tin
    ``n / (n + PRIOR_STRENGTH)``: ít dữ liệu thì gần như giữ nguyên mô hình gốc, càng nhiều dự án
    tương tự thì dữ liệu Góp Mầm càng có tiếng nói.
-2. **Gợi ý mục tiêu và thời hạn**: khi đủ dự án cùng lĩnh vực đã đạt mục tiêu, khoảng gợi ý lấy
-   từ số tiền các dự án đó thực sự gọi được; chưa đủ thì quét mô hình đã hiệu chỉnh.
+2. **Gợi ý thời hạn**: với số tiền người tạo tự đặt (AI không gợi ý số tiền), tính khả năng đạt
+   đã hiệu chỉnh cho từng ngày, làm mượt, rồi gợi ý khoảng thời hạn tốt gần như nhau.
 """
 
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from app.schemas.predict import (
+    DurationOption,
     DurationSuggestion,
     EstimateRequest,
     EstimateResponse,
-    GoalOption,
-    GoalSuggestion,
     PlatformAdjustment,
     PlatformOutcome,
     PredictFeatures,
@@ -47,17 +46,19 @@ OTHER_CATEGORY_WEIGHT = 0.25
 # Mục tiêu chênh 3 lần thì trọng số còn e^-0,5 ≈ 0,61; chênh 10 lần còn ≈ 0,07.
 GOAL_SCALE = math.log(3.0)
 DURATION_SCALE_DAYS = 30.0
-# Cần ít nhất bấy nhiêu dự án cùng lĩnh vực đã đạt mục tiêu thì mới gợi ý theo số liệu Góp Mầm.
-MIN_PLATFORM_SUCCESSES = 3.0
 # Ít hơn số dự án đã kết thúc này thì ghi chú rằng gợi ý chủ yếu dựa vào mô hình gốc.
 FEW_SAMPLES = 30
 
-GOAL_GRID: tuple[float, ...] = (
-    5e6, 1e7, 2e7, 3e7, 5e7, 7.5e7, 1e8, 1.5e8, 2e8, 3e8, 5e8, 7.5e8, 1e9, 2e9,
-)
+# Các mốc hiển thị để so sánh; đường khả năng đạt được tính theo từng ngày rồi làm mượt.
 DURATION_GRID: tuple[int, ...] = (30, 45, 60, 90)
-# Chọn thời hạn ngắn hơn nếu khả năng chỉ kém thời hạn tốt nhất không quá 1 điểm phần trăm.
-DURATION_TOLERANCE = 0.01
+MAX_DURATION_DAYS = 90
+# Làm mượt theo thời hạn (Gauss, độ lệch chuẩn 7 ngày): mô hình học từ Kickstarter có "đáy giả" ở
+# đúng 30 và 60 ngày (mặc định và mức tối đa cũ của Kickstarter, hay được người tạo qua loa giữ
+# nguyên) khiến 30 ngày thấp hơn 31 ngày cả chục điểm — đó là thói quen chọn số tròn, không phải
+# quy luật thật của thời hạn.
+SMOOTHING_DAYS = 7.0
+# Thời hạn có khả năng đạt kém mức tốt nhất không quá 2 điểm phần trăm được coi là tốt như nhau.
+DURATION_RANGE_TOLERANCE = 0.02
 SIMILAR_LIMIT = 5
 MIN_SIMILARITY = 0.05
 # Số từ điển hình của tên chiến dịch, dùng khi chưa đặt tên.
@@ -161,134 +162,75 @@ def apply_platform_learning(
     )
 
 
-def _nice(amount: float) -> float:
-    """Làm tròn số tiền về 2 chữ số có nghĩa (37.400.000 → 37.000.000), tối thiểu 1 triệu."""
-    if amount <= 0:
-        return 0.0
-    magnitude = 10 ** max(6, math.floor(math.log10(amount)) - 1)
-    return float(max(1_000_000, round(amount / magnitude) * magnitude))
-
-
-def _weighted_quantile(values: np.ndarray, weights: np.ndarray, q: float) -> float:
-    order = np.argsort(values)
-    values, weights = values[order], weights[order]
-    cumulative = np.cumsum(weights) - 0.5 * weights
-    return float(np.interp(q * weights.sum(), cumulative, values))
-
-
-def _goal_from_successes(
-    history: list[PlatformOutcome],
-    mask: np.ndarray,
-    weights: np.ndarray,
-    basis: Literal["category", "platform"],
-) -> GoalSuggestion:
-    """Khoảng 25–75% (trung vị là mức gợi ý) số tiền các dự án đã đạt mục tiêu thực sự gọi được."""
-    raised = np.asarray([item.raised for item in history], dtype=float)[mask]
-    chosen = np.asarray(weights, dtype=float)[mask]
-    return GoalSuggestion(
-        low=_nice(_weighted_quantile(raised, chosen, 0.25)),
-        high=_nice(_weighted_quantile(raised, chosen, 0.75)),
-        recommended=_nice(_weighted_quantile(raised, chosen, 0.5)),
-        basis=basis,
-    )
+def _smooth(values: np.ndarray, sigma: float) -> np.ndarray:
+    """Làm mượt Gauss; ở hai đầu chỉ lấy trung bình các điểm có thật (không kéo về 0)."""
+    if len(values) < 2 or sigma <= 0:
+        return values
+    offsets = np.arange(len(values))
+    weights = np.exp(-0.5 * ((offsets[:, None] - offsets[None, :]) / sigma) ** 2)
+    return (weights @ values) / weights.sum(axis=1)
 
 
 def estimate(predictor: PredictorService, request: EstimateRequest) -> EstimateResponse:
+    """Gợi ý thời hạn gây quỹ cho số tiền người dùng tự đặt (AI không gợi ý số tiền)."""
     features = request.features
     if features.name_words <= 0:
         # Ở bước đặt mục tiêu thường chưa có tên; tên 0 từ nằm ngoài dữ liệu huấn luyện.
         features = features.model_copy(update={"name_words": TYPICAL_NAME_WORDS})
     history = request.history
     min_days = request.min_duration_days
-    durations = sorted(
-        {d for d in DURATION_GRID if d >= min_days}
-        | {min_days}
-        | ({features.duration_days} if features.duration_days >= min_days else set())
-    )
+    chosen_days = features.duration_days if features.duration_days >= min_days else None
+    max_days = max(MAX_DURATION_DAYS, chosen_days or 0, min_days)
 
-    # Dự đoán cho phương án đang nhập (kèm yếu tố giải thích) nếu đã có mục tiêu.
-    current = predictor.predict(features, history=history) if features.goal_amount > 0 else None
+    # Ước lượng (kèm yếu tố giải thích) cho thời hạn đang chọn, nếu đã chọn ngày kết thúc.
+    current = predictor.predict(features, history=history) if chosen_days else None
     use_model = not current.fallback if current else predictor.model_available()
     learner = PlatformLearner(predictor, history, use_model=use_model)
-    duration_now = features.duration_days if features.duration_days >= min_days else min_days
 
-    # --- Mục tiêu -------------------------------------------------------------------------
-    # Dự án cùng lĩnh vực đã đạt mục tiêu: số tiền họ thật sự gọi được là căn cứ tốt nhất.
-    # Căn cứ theo thứ tự: dự án cùng lĩnh vực đã đạt → mọi dự án Góp Mầm đã đạt (dự án khác lĩnh
-    # vực tính nửa trọng số) → quét mô hình. Không lọc theo mục tiêu vì đang đi tìm mục tiêu.
-    reached = np.asarray([item.reached and item.raised > 0 for item in history], dtype=bool)
-    same_category = np.asarray(
-        [item.features.category_id == features.category_id for item in history], dtype=bool
-    )
-    goal: GoalSuggestion | None = None
-    if (reached & same_category).sum() >= MIN_PLATFORM_SUCCESSES:
-        goal = _goal_from_successes(
-            history, reached & same_category, np.ones(len(history)), "category"
-        )
-    elif reached.sum() >= MIN_PLATFORM_SUCCESSES:
-        goal = _goal_from_successes(
-            history, reached, np.where(same_category, 1.0, 0.5), "platform"
-        )
-    if goal is None:
-        scan = [features.model_copy(update={"goal_amount": g, "duration_days": duration_now})
-                for g in GOAL_GRID]
-        scan_probs = learner.calibrated(scan)
-        # Mức lớn nhất mà khả năng đạt không thấp hơn mặt bằng chung; gợi ý lùi một nấc cho an toàn.
-        base_rate = predictor.base_rate()
-        feasible = [g for g, p in zip(GOAL_GRID, scan_probs, strict=True) if p >= base_rate]
-        top = max(feasible) if feasible else GOAL_GRID[0]
-        index = GOAL_GRID.index(top)
-        goal = GoalSuggestion(
-            low=GOAL_GRID[max(0, index - 2)],
-            high=top,
-            recommended=GOAL_GRID[max(0, index - 1)],
-            basis="model",
-        )
-    goal = goal.model_copy(update={"low": min(goal.low, goal.recommended),
-                                   "high": max(goal.high, goal.recommended)})
+    # --- Đường khả năng đạt theo từng ngày (cùng số tiền đã đặt), đã hiệu chỉnh rồi làm mượt ---
+    days_axis = np.arange(min_days, max_days + 1)
+    rows = [features.model_copy(update={"duration_days": int(days)}) for days in days_axis]
+    curve = _smooth(np.asarray(learner.calibrated(rows)), SMOOTHING_DAYS)
 
-    # --- Thời hạn -------------------------------------------------------------------------
-    goal_for_duration = features.goal_amount if features.goal_amount > 0 else goal.recommended
-    duration_rows = [
-        features.model_copy(update={"goal_amount": goal_for_duration, "duration_days": days})
-        for days in durations
-    ]
-    duration_probs = learner.calibrated(duration_rows)
-    best = max(duration_probs)
-    best_days = next(
-        days for days, p in zip(durations, duration_probs, strict=True)
-        if p >= best - DURATION_TOLERANCE
-    )
-    # Thời hạn luôn lấy từ mô hình đã hiệu chỉnh (để không mâu thuẫn với ước lượng hiện tại);
-    # ghi nguồn "platform" khi dữ liệu Góp Mầm đã chiếm phần lớn trong hiệu chỉnh.
-    best_row = duration_rows[durations.index(best_days)]
-    best_base = float(predictor.score_many([best_row], learner.use_model)[0])
-    adjusted = learner.adjust(best_row, best_base)
+    def at(days: int) -> float:
+        return float(curve[days - min_days])
+
+    best = float(curve.max())
+    # Thời hạn ngắn nhất mà khả năng đạt gần bằng mức tốt nhất: kéo dài thêm không đáng nếu chỉ
+    # hơn vài điểm (và dữ liệu không phân biệt được chênh lệch nhỏ như vậy).
+    best_index = int(np.argmax(curve >= best - DURATION_RANGE_TOLERANCE))
+    # Khoảng liền nhau từ đó mà khả năng đạt không kém quá DURATION_RANGE_TOLERANCE.
+    low = high = best_index
+    while low > 0 and curve[low - 1] >= best - DURATION_RANGE_TOLERANCE:
+        low -= 1
+    while high < len(curve) - 1 and curve[high + 1] >= best - DURATION_RANGE_TOLERANCE:
+        high += 1
+    best_days = int(days_axis[best_index])
+
+    base = float(predictor.score_many([rows[best_index]], learner.use_model)[0])
+    adjusted = learner.adjust(rows[best_index], base)
     trusted = adjusted is not None and adjusted[0].weight >= PLATFORM_BASIS_TRUST
     duration = DurationSuggestion(
         days=best_days,
-        probability=round(duration_probs[durations.index(best_days)], 6),
+        low=int(days_axis[low]),
+        high=int(days_axis[high]),
+        probability=round(float(curve[best_index]), 6),
         basis="platform" if trusted else "model",
     )
-
-    # --- Vài mức mục tiêu để so sánh ----------------------------------------------------------
-    anchor = min(
-        range(len(GOAL_GRID)), key=lambda i: abs(math.log(GOAL_GRID[i] / goal.recommended))
+    shown = sorted(
+        {d for d in DURATION_GRID if min_days <= d <= max_days}
+        | {min_days}
+        | ({chosen_days} if chosen_days else set())
     )
-    around = {GOAL_GRID[i] for i in range(max(0, anchor - 2), min(len(GOAL_GRID), anchor + 3))}
-    # Kèm đúng mức đang nhập để người dùng so được với các mức khác.
-    picks = sorted(around | ({features.goal_amount} if features.goal_amount > 0 else set()))
-    # Cùng thời hạn với phương án đang nhập để các mức so sánh khớp với ước lượng hiện tại.
-    option_rows = [features.model_copy(update={"goal_amount": g, "duration_days": duration_now})
-                   for g in picks]
-    options = [
-        GoalOption(goal_amount=g, probability=round(p, 6))
-        for g, p in zip(picks, learner.calibrated(option_rows), strict=True)
-    ]
+    options = [DurationOption(days=d, probability=round(at(d), 6)) for d in shown]
+    if current:
+        # Cùng số với bảng so sánh (đường đã làm mượt), giữ nguyên phần giải thích của mô hình.
+        current = current.model_copy(update={"probability": round(at(chosen_days), 6)})
 
-    # --- Dự án tương tự đã kết thúc ------------------------------------------------------------
+    # --- Dự án tương tự đã kết thúc (cùng lĩnh vực, số tiền gần nhau; không xét thời hạn) ---------
+    query = features.model_copy(update={"duration_days": 0})
     ranked = sorted(
-        zip(history, learner.weights(features), strict=True), key=lambda pair: pair[1], reverse=True
+        zip(history, learner.weights(query), strict=True), key=lambda pair: pair[1], reverse=True
     )
     similar = [
         SimilarCampaign(
@@ -316,9 +258,9 @@ def estimate(predictor: PredictorService, request: EstimateRequest) -> EstimateR
 
     return EstimateResponse(
         current=current,
-        goal=goal,
         duration=duration,
         options=options,
+        chosen_days=chosen_days,
         similar=similar,
         samples=len(history),
         similar_reached=sum(1 for item in similar if item.reached),

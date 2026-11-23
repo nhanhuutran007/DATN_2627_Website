@@ -82,11 +82,19 @@ export class Campaign extends BaseEntity {
   @Column({ name: "featured_at", type: "datetime", nullable: true })
   featuredAt?: Date | null;
 
+  /**
+   * Dự án mô phỏng (`npm run seed:ai-history`) chỉ để AI có dữ liệu học: không hiện ở danh sách,
+   * tìm kiếm, "Câu chuyện thành công" hay số liệu công khai.
+   */
+  @Column({ name: "is_simulated", default: false })
+  isSimulated!: boolean;
+
   @Column({ name: "image_url", length: 500, nullable: true })
   imageUrl?: string;
 
-  @Column({ name: "video_url", length: 500, nullable: true })
-  videoUrl?: string;
+  /** Link YouTube (dạng `youtube.com/watch?v=…`) hoặc video tải lên (`/api/v1/media/campaign-videos/…`). */
+  @Column({ name: "video_url", type: "varchar", length: 500, nullable: true })
+  videoUrl?: string | null;
 
   @Column({ name: "location", length: 255, nullable: true })
   location?: string;

@@ -20,6 +20,7 @@ import {
   CommentThreadPage,
   CommentView,
   CreateCommentDto,
+  UpdateCommentDto,
 } from "./dto/comment.dto";
 import { CampaignComment, CommentKind, CommentStatus } from "./entities/campaign-comment.entity";
 import { Report, ReportStatus } from "../moderation/entities/report.entity";
@@ -101,6 +102,7 @@ export class CommentsService {
       kind: comment.kind,
       content: comment.content,
       createdAt: comment.createdAt,
+      editedAt: comment.editedAt ?? null,
       author: {
         id: comment.userId,
         name: comment.user?.name ?? "Người dùng",
@@ -213,6 +215,42 @@ export class CommentsService {
   }
 
   /** Xóa mềm: tác giả xóa bình luận của mình, admin xóa bất kỳ (có audit). */
+  /**
+   * Người viết sửa nội dung bình luận của mình (kể cả bình luận dưới bài cập nhật). Admin không
+   * sửa hộ — chỉ ẩn/xóa. Bình luận đang bị ẩn không sửa được (tránh lách quyết định kiểm duyệt).
+   */
+  async update(id: string, dto: UpdateCommentDto, user: User): Promise<CampaignComment> {
+    const comment = await this.commentRepo.findOne({ where: { id }, relations: { user: true } });
+    if (!comment) {
+      throw new NotFoundException("Comment not found");
+    }
+    if (comment.userId !== user.id) {
+      throw new ForbiddenException("Bạn chỉ sửa được bình luận của mình.");
+    }
+    if (comment.status !== CommentStatus.VISIBLE) {
+      throw new ForbiddenException("Bình luận đang bị ẩn, không sửa được.");
+    }
+    const content = sanitizeCommentContent(dto.content);
+    if (content.length < 2) {
+      throw new BadRequestException("Nội dung cần ít nhất 2 ký tự.");
+    }
+    if (content === comment.content) return comment;
+
+    const oldContent = comment.content;
+    comment.content = content;
+    comment.editedAt = new Date();
+    const saved = await this.commentRepo.save(comment);
+    await this.auditService.record({
+      userId: user.id,
+      action: "comment.update",
+      entity: "campaign_comment",
+      entityId: id,
+      oldValues: { content: truncateForAudit(oldContent) },
+      newValues: { content: truncateForAudit(content) },
+    });
+    return saved;
+  }
+
   async remove(id: string, user: User): Promise<void> {
     const comment = await this.commentRepo.findOne({ where: { id } });
     if (!comment) {

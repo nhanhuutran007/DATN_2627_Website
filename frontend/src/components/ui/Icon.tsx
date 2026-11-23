@@ -25,6 +25,8 @@ export type IconName =
   | "menu"
   | "message"
   | "palette"
+  | "play"
+  | "video"
   | "receipt"
   | "scale"
   | "rocket"
@@ -48,6 +50,8 @@ type IconProps = {
 
 const paths: Record<IconName, React.ReactNode> = {
   "arrow-right": <path d="M5 12h14m-5-5 5 5-5 5" />,
+  play: <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" fill="currentColor" />,
+  video: <><rect x="2" y="6" width="14" height="12" rx="2" /><path d="m16 10 6-3v10l-6-3" /></>,
   database: <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" /></>,
   bell: <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />,
   book: <><path d="M4 5a2 2 0 0 1 2-2h14v15H6a2 2 0 0 0-2 2V5Z" /><path d="M4 20a2 2 0 0 0 2 2h14v-4M9 8h7" /></>,

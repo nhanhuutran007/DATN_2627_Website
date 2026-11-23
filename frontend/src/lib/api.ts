@@ -304,6 +304,57 @@ export async function apiFetch<T>(
   return (payload ?? undefined) as T;
 }
 
+/**
+ * Tải file lên kèm tiến độ (0–1) — `fetch` chưa báo được tiến độ gửi nên dùng XMLHttpRequest.
+ * Token hết hạn thì làm mới rồi gửi lại một lần như `apiFetch`.
+ */
+export function apiUpload<T>(
+  path: string,
+  body: FormData,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
+  retry = true,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${apiBaseUrl()}${path}`);
+    xhr.setRequestHeader("Accept", "application/json");
+    const accessToken = readStorage(ACCESS_TOKEN_KEY);
+    if (accessToken) xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+    };
+    const onAbort = () => xhr.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    xhr.onabort = () => reject(new DOMException("Đã hủy tải lên.", "AbortError"));
+    xhr.onerror = () => reject(new ApiError(0, "Không kết nối được máy chủ. Vui lòng thử lại.", "network_error"));
+    xhr.onload = async () => {
+      signal?.removeEventListener("abort", onAbort);
+      let payload: unknown = null;
+      try {
+        payload = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+      } catch {
+        payload = null;
+      }
+      if (xhr.status === 401 && retry) {
+        if (await refreshAccessToken()) {
+          apiUpload<T>(path, body, onProgress, signal, false).then(resolve, reject);
+          return;
+        }
+        clearSession();
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const errorPayload = payload as ErrorPayload | null;
+        const fallback = xhr.status === 413 ? "File quá lớn." : `Yêu cầu thất bại (HTTP ${xhr.status})`;
+        reject(new ApiError(xhr.status, getErrorMessage(errorPayload, fallback), errorPayload?.code ?? "request_failed"));
+        return;
+      }
+      resolve(payload as T);
+    };
+    xhr.send(body);
+  });
+}
+
 /** Tải file (vd. CSV) có xác thực; trả nội dung + tên file từ Content-Disposition. */
 export async function apiDownload(
   path: string,

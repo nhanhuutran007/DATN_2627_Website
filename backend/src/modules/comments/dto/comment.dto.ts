@@ -22,6 +22,15 @@ export class CreateCommentDto {
   parentId?: string;
 }
 
+/** Người viết sửa nội dung bình luận của mình. */
+export class UpdateCommentDto {
+  @Transform(trim)
+  @IsString()
+  @MinLength(2, { message: "Nội dung cần ít nhất 2 ký tự." })
+  @MaxLength(2000, { message: "Nội dung tối đa 2000 ký tự." })
+  content!: string;
+}
+
 export class CommentListQueryDto {
   @IsOptional()
   @Type(() => Number)
@@ -80,6 +89,8 @@ export type CommentView = {
   kind: CommentKind;
   content: string;
   createdAt: Date;
+  /** Có khi người viết đã sửa nội dung (hiển thị "đã chỉnh sửa"). */
+  editedAt: Date | null;
   author: CommentAuthor;
   /** Người viết là chủ dự án (hiển thị nhãn "Chủ dự án"). */
   isOwner: boolean;

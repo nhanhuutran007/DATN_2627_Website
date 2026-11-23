@@ -216,6 +216,7 @@ export class PostsService {
       kind: comment.kind,
       content: comment.content,
       createdAt: comment.createdAt,
+      editedAt: comment.editedAt ?? null,
       author: { id: comment.userId, name: comment.user?.name ?? "Người dùng", avatar: comment.user?.avatar ?? null },
       isOwner: comment.userId === campaign.ownerId,
       isAdmin: comment.user?.role === UserRole.ADMIN,

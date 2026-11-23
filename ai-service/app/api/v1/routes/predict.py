@@ -23,5 +23,5 @@ def predict(payload: PredictRequest) -> PredictResponse:
 
 @router.post("/estimate", response_model=EstimateResponse)
 def estimate(payload: EstimateRequest) -> EstimateResponse:
-    """Gợi ý mục tiêu và thời hạn hợp lý khi tạo chiến dịch, học từ dự án Góp Mầm đã kết thúc."""
+    """Gợi ý thời hạn cho số tiền người tạo tự đặt, học từ dự án Góp Mầm đã kết thúc."""
     return estimate_campaign(_get_service(), payload)

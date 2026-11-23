@@ -27,6 +27,8 @@ function memoryStorage(): StorageGateway & { files: Map<string, Buffer> } {
       files.set(key, body);
     },
     get: async (key) => files.get(key) ?? null,
+    size: async (key) => files.get(key)?.length ?? null,
+    getRange: async (key, start, end) => files.get(key)?.subarray(start, end + 1) ?? null,
   };
 }
 

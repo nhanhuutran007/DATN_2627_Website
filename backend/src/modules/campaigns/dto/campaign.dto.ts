@@ -20,6 +20,7 @@ import {
 import { PROVINCES } from "../../../common/constants/provinces";
 
 import { IsImageUrl } from "../../../common/validators/is-image-url";
+import { IsCampaignVideoUrl, normalizeVideoUrl } from "../../../common/validators/is-video-url";
 import { CampaignStatus } from "../entities/campaign.entity";
 
 export class CreateCampaignDto {
@@ -50,6 +51,13 @@ export class CreateCampaignDto {
   @IsOptional()
   @IsImageUrl()
   imageUrl?: string;
+
+  /** Link YouTube (chuẩn hóa về `youtube.com/watch?v=…`) hoặc video đã tải lên `/media/videos`. */
+  @IsOptional()
+  @Transform(({ value }: TransformFnParams) => (typeof value === "string" ? normalizeVideoUrl(value) : value))
+  @IsCampaignVideoUrl()
+  @MaxLength(500)
+  videoUrl?: string;
 
   @IsOptional()
   @IsIn(PROVINCES, { message: "Địa điểm phải là một trong 34 tỉnh/thành phố" })
@@ -93,6 +101,14 @@ export class UpdateCampaignDto {
   @IsOptional()
   @IsImageUrl()
   imageUrl?: string;
+
+  /** Link YouTube hoặc video đã tải lên; `null` = bỏ video. */
+  @IsOptional()
+  @Transform(({ value }: TransformFnParams) => (typeof value === "string" ? normalizeVideoUrl(value) : value))
+  @ValidateIf((_, value) => value !== null)
+  @IsCampaignVideoUrl()
+  @MaxLength(500)
+  videoUrl?: string | null;
 
   @IsOptional()
   @IsIn(PROVINCES, { message: "Địa điểm phải là một trong 34 tỉnh/thành phố" })

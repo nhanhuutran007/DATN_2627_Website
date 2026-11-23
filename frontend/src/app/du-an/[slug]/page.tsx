@@ -19,6 +19,7 @@ import { CampaignPosts } from "@/features/posts/CampaignPosts";
 import { ProgressTimeline } from "@/features/progress/ProgressTimeline";
 import { TransparencyScoreCard } from "@/features/progress/TransparencyScoreCard";
 import { ContactOrganizerButton } from "@/features/campaigns/ContactOrganizerButton";
+import { CoverVideo } from "@/components/campaign/CoverVideo";
 import { DetailToc, type DetailTocItem } from "@/features/campaigns/DetailToc";
 import { UnpublishedCampaignPreview } from "@/features/campaigns/UnpublishedCampaignPreview";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
@@ -147,17 +148,17 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   const stateById = new Map((progress?.milestoneStates ?? []).map((item) => [item.id, item.state]));
   const transparencyScore = progress?.transparencyScore;
 
-  // Mục lục cột trái (màn hình rộng): chỉ các mục thực sự hiển thị.
+  // Thanh tab ngang dưới tiêu đề (như Kickstarter): nhãn ngắn, chỉ các mục thực sự hiển thị.
   const tocItems: DetailTocItem[] = [
     { id: "cau-chuyen", label: "Câu chuyện" },
     { id: "cap-nhat", label: "Cập nhật" },
-    { id: "nhat-ky", label: "Nhật ký chi tiêu" },
+    { id: "nhat-ky", label: "Chi tiêu" },
     ...(published ? [{ id: "chia-se", label: "Chia sẻ" }] : []),
-    { id: "nguoi-to-chuc", label: campaign.organization ? "Người tổ chức & thụ hưởng" : "Người tổ chức" },
+    { id: "nguoi-to-chuc", label: "Người tổ chức" },
     ...(published ? [{ id: "loi-dong-vien", label: "Lời động viên" }] : []),
-    { id: "ke-hoach-ngan-sach", label: "Kế hoạch và ngân sách" },
-    { id: "hoi-dap", label: "Hỏi đáp & bình luận" },
-    { id: "cau-hoi-thuong-gap", label: "Câu hỏi thường gặp" },
+    { id: "ke-hoach-ngan-sach", label: "Ngân sách" },
+    { id: "hoi-dap", label: "Bình luận" },
+    { id: "cau-hoi-thuong-gap", label: "Hỏi đáp" },
   ];
 
   const crumbs = [{ href: "/", label: "Trang chủ" }, { href: "/du-an", label: "Dự án" }, { label: campaign.category }];
@@ -187,7 +188,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(breadcrumbJsonLd) }} />
       </div>
 
-      <div className="container detail-layout">
+      <div className="container detail-hero">
         {published && <CampaignViewTracker campaignId={campaign.slug} />}
         {!live && <p className="notice-sample">Dữ liệu mẫu — không phải chiến dịch thật trên hệ thống.</p>}
         {live && !published && (
@@ -196,13 +197,12 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           </p>
         )}
 
-        <DetailToc items={tocItems} />
-
-        <div className="detail-main">
+        <div className="detail-hero-media">
           <figure className="detail-cover">
             <Image src={cover.src} alt={cover.alt} fill priority sizes="(max-width: 960px) 100vw, 720px" unoptimized={!cover.illustrative} />
             {!open && <span className="detail-cover-status">{campaign.status}</span>}
-            {cover.illustrative && <figcaption>Ảnh minh họa theo lĩnh vực</figcaption>}
+            {cover.illustrative && !campaign.videoUrl && <figcaption>Ảnh minh họa theo lĩnh vực</figcaption>}
+            {campaign.videoUrl && <CoverVideo url={campaign.videoUrl} title={campaign.title} />}
           </figure>
 
           <a className="detail-organizer" href="#nguoi-to-chuc">
@@ -237,7 +237,76 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               </span>
             </Link>
           )}
+        </div>
 
+        <aside className="detail-hero-side" id="the-gay-quy">
+          <section className="panel fund-card" aria-label="Tiến độ gây quỹ">
+            {/* Thanh tiến độ, số tiền, rồi lượt ủng hộ + ngày còn lại nằm cùng một hàng. */}
+            <div className="fund-stats">
+              <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
+              <div className="fund-stat">
+                <p className="fund-amount" title={formatVnd(campaign.raised)}>{formatVndCompact(campaign.raised)}</p>
+                <p className="fund-target">
+                  đã ủng hộ trên mục tiêu <abbr title={formatVnd(campaign.target)}>{formatVndCompact(campaign.target)}</abbr>
+                  <span className="fund-percent num">{percent}%</span>
+                </p>
+              </div>
+              <div className="fund-stat-row">
+                <div className="fund-stat">
+                  <p className="fund-stat-value num">{campaign.backers.toLocaleString("vi-VN")}</p>
+                  <p className="fund-stat-label">lượt ủng hộ</p>
+                </div>
+                <div className="fund-stat">
+                  {open ? (
+                    <>
+                      <p className="fund-stat-value num">{campaign.daysLeft.toLocaleString("vi-VN")}</p>
+                      <p className="fund-stat-label">ngày còn lại</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="fund-stat-value">{campaign.status}</p>
+                      <p className="fund-stat-label">trạng thái gây quỹ</p>
+                    </>
+                  )}
+                </div>
+              </div>
+              {open && percent >= 100 && (
+                <p className="fund-overfunded" role="status">
+                  <Icon name="check" size={16} /> Đã đạt mục tiêu! Dự án vẫn tiếp tục nhận ủng hộ đến hết
+                  {campaign.endDate ? ` ngày ${campaign.endDate}` : " thời hạn gây quỹ"} — mọi khoản thêm giúp dự án làm được nhiều hơn.
+                </p>
+              )}
+            </div>
+            {open && published && (
+              <div className="fund-actions">
+                <DonateLink className="button button-primary button-block button-lg" href={donateHref}>Ủng hộ ngay</DonateLink>
+                <ShareCampaignButton
+                  campaignId={campaign.slug}
+                  title={campaign.title}
+                  className="button button-dark button-block button-lg"
+                />
+              </div>
+            )}
+            {transparencyScore?.status === "rated" && (
+              <a className={`fund-transparency fund-transparency-${transparencyScore.grade}`} href="#minh-bach">
+                <Icon name="shield" size={16} />
+                <span>Điểm minh bạch <b>{transparencyScore.score}/100</b></span>
+                <small>{TRANSPARENCY_GRADE_LABEL[transparencyScore.grade]}</small>
+              </a>
+            )}
+            {/* key theo số lượt ủng hộ: tải lại khi trang làm mới sau một khoản ủng hộ mới. */}
+            {published && <DonorHighlights key={campaign.backers} campaignId={campaign.slug} />}
+          </section>
+        </aside>
+      </div>
+
+      <DetailToc
+        items={tocItems}
+        action={open && published ? <DonateLink className="button button-primary button-sm" href={donateHref}>Ủng hộ</DonateLink> : null}
+      />
+
+      <div className={`container detail-layout${rewardTiers.length > 0 ? "" : " detail-layout-single"}`}>
+        <div className="detail-main">
           <section className="detail-story-block" id="cau-chuyen" aria-labelledby="gioi-thieu-du-an">
             <h2 id="gioi-thieu-du-an" className="sr-only">Câu chuyện dự án</h2>
             <CollapsibleStory>
@@ -461,66 +530,8 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           )}
         </div>
 
-        <aside className="detail-side">
-          <section className="panel fund-card" aria-label="Tiến độ gây quỹ">
-            {/* Thanh tiến độ, số tiền, rồi lượt ủng hộ + ngày còn lại nằm cùng một hàng. */}
-            <div className="fund-stats">
-              <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
-              <div className="fund-stat">
-                <p className="fund-amount" title={formatVnd(campaign.raised)}>{formatVndCompact(campaign.raised)}</p>
-                <p className="fund-target">
-                  đã ủng hộ trên mục tiêu <abbr title={formatVnd(campaign.target)}>{formatVndCompact(campaign.target)}</abbr>
-                  <span className="fund-percent num">{percent}%</span>
-                </p>
-              </div>
-              <div className="fund-stat-row">
-                <div className="fund-stat">
-                  <p className="fund-stat-value num">{campaign.backers.toLocaleString("vi-VN")}</p>
-                  <p className="fund-stat-label">lượt ủng hộ</p>
-                </div>
-                <div className="fund-stat">
-                  {open ? (
-                    <>
-                      <p className="fund-stat-value num">{campaign.daysLeft.toLocaleString("vi-VN")}</p>
-                      <p className="fund-stat-label">ngày còn lại</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="fund-stat-value">{campaign.status}</p>
-                      <p className="fund-stat-label">trạng thái gây quỹ</p>
-                    </>
-                  )}
-                </div>
-              </div>
-              {open && percent >= 100 && (
-                <p className="fund-overfunded" role="status">
-                  <Icon name="check" size={16} /> Đã đạt mục tiêu! Dự án vẫn tiếp tục nhận ủng hộ đến hết
-                  {campaign.endDate ? ` ngày ${campaign.endDate}` : " thời hạn gây quỹ"} — mọi khoản thêm giúp dự án làm được nhiều hơn.
-                </p>
-              )}
-            </div>
-            {open && published && (
-              <div className="fund-actions">
-                <DonateLink className="button button-primary button-block button-lg" href={donateHref}>Ủng hộ ngay</DonateLink>
-                <ShareCampaignButton
-                  campaignId={campaign.slug}
-                  title={campaign.title}
-                  className="button button-dark button-block button-lg"
-                />
-              </div>
-            )}
-            {transparencyScore?.status === "rated" && (
-              <a className={`fund-transparency fund-transparency-${transparencyScore.grade}`} href="#minh-bach">
-                <Icon name="shield" size={16} />
-                <span>Điểm minh bạch <b>{transparencyScore.score}/100</b></span>
-                <small>{TRANSPARENCY_GRADE_LABEL[transparencyScore.grade]}</small>
-              </a>
-            )}
-            {/* key theo số lượt ủng hộ: tải lại khi trang làm mới sau một khoản ủng hộ mới. */}
-            {published && <DonorHighlights key={campaign.backers} campaignId={campaign.slug} />}
-          </section>
-
-          {rewardTiers.length > 0 && (
+        {rewardTiers.length > 0 && (
+          <aside className="detail-side">
             <section className="reward-side" aria-labelledby="phan-qua">
               <h2 id="phan-qua">Chọn phần quà</h2>
               {rewardTiers.map((tier) => (
@@ -537,8 +548,8 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                 />
               ))}
             </section>
-          )}
-        </aside>
+          </aside>
+        )}
       </div>
 
       {related.length > 0 && (

@@ -114,9 +114,9 @@ class FakeAiGateway implements AiGateway {
     if (this.unavailable) throw new Error("down");
     return {
       current: null,
-      goal: { low: 30_000_000, high: 60_000_000, recommended: 45_000_000, basis: "platform" },
-      duration: { days: 30, probability: 0.5, basis: "model" },
-      options: [],
+      duration: { days: 30, low: 30, high: 36, probability: 0.5, basis: "model" },
+      options: [{ days: 30, probability: 0.5 }],
+      chosenDays: null,
       similar: [],
       samples: request.history.length,
       similarReached: 0,
@@ -471,15 +471,15 @@ describe("AiService", () => {
       equal(request.history.length, 3);
     });
 
-    it("estimates without a goal or end date (suggestion only)", async () => {
-      await service.estimateDraft({ category: "Y tế" }, makeUser() as any);
-      equal(gateway.lastEstimate?.features.goalAmount, 0);
+    it("estimates before an end date is chosen (duration suggestion only)", async () => {
+      await service.estimateDraft({ category: "Y tế", goalAmount: 20_000_000 }, makeUser() as any);
+      equal(gateway.lastEstimate?.features.goalAmount, 20_000_000);
       equal(gateway.lastEstimate?.features.durationDays, 0);
     });
 
     it("reports unavailable when the AI service is down", async () => {
       gateway.unavailable = true;
-      const result = await service.estimateDraft({ category: "Y tế" }, makeUser() as any);
+      const result = await service.estimateDraft({ category: "Y tế", goalAmount: 20_000_000 }, makeUser() as any);
       equal(result.available, false);
     });
   });
