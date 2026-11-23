@@ -249,6 +249,7 @@ async function main() {
         startDate: at(plan.startedDaysAgo, 0),
         endDate: at(plan.startedDaysAgo - plan.durationDays, 23),
         status: plan.reached ? CampaignStatus.SUCCESS : CampaignStatus.FAILED,
+        isSimulated: true,
         submittedAt: at(plan.startedDaysAgo + 2),
         createdAt: at(plan.startedDaysAgo + 3, 8),
       }),

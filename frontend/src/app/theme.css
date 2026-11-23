@@ -15322,3 +15322,24 @@ html:has(dialog:modal) .admin-sidebar {
   font-size: 0.82rem;
   color: #6b7385;
 }
+
+/* Câu chuyện thành công (trang chủ) — SuccessStories */
+.success-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.success-list { display: grid; gap: 18px; }
+.success-card { display: grid; gap: 14px; }
+.success-list .success-card { grid-template-columns: 160px minmax(0, 1fr); align-items: center; }
+.success-media { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 14px; background: var(--soft); }
+.success-media img { object-fit: cover; }
+.success-badge { position: absolute; left: 10px; top: 10px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; color: var(--white); border-radius: 999px; background: var(--success); font-size: 0.78rem; font-weight: 700; }
+.success-body { display: grid; gap: 6px; min-width: 0; }
+.success-body h3 { margin: 0; font-size: 1.05rem; line-height: 1.35; }
+.success-card.is-lead .success-body h3 { font-size: 1.45rem; }
+.success-body h3 a { color: var(--text); text-decoration: none; }
+.success-body h3 a:hover { color: var(--primary); }
+.success-category { color: var(--muted); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.success-summary, .success-facts { margin: 0; color: var(--text-2); font-size: 0.92rem; }
+.success-more { display: inline-flex; align-items: center; gap: 6px; color: var(--primary); font-weight: 700; text-decoration: none; }
+@media (max-width: 900px) {
+  .success-grid { grid-template-columns: minmax(0, 1fr); }
+  .success-list .success-card { grid-template-columns: 120px minmax(0, 1fr); }
+}
