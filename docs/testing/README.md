@@ -11,7 +11,7 @@ Tài liệu này mô tả các tầng kiểm thử đang có, cách chạy và n
 | Test AI service | `pytest` | `ai-service/tests/` | Hợp đồng API gợi ý, dự đoán, phát hiện gian lận, health, bảo mật, phương án dự phòng |
 | Kiểm tra tĩnh | TypeScript, ESLint, Ruff | toàn bộ mã nguồn | Kiểu dữ liệu và quy ước mã |
 | Smoke test | Docker Compose + Nginx | `infra/compose.yaml` | Sáu dịch vụ chạy cùng nhau, các trang và API chính phản hồi |
-| Kiểm thử thủ công | Trình duyệt | [`TESTCASE_GOPMAM.xlsx`](../../TESTCASE_GOPMAM.xlsx) và kịch bản bên dưới | 198 test case theo 14 nhóm module: chức năng, phân quyền, bảo mật, giao diện, tích hợp, phi chức năng |
+| Kiểm thử thủ công | Trình duyệt | [`TESTCASE_GOPMAM.xlsx`](../../Document/05_KiemThu/TESTCASE_GOPMAM.xlsx) và kịch bản bên dưới | 198 test case theo 14 nhóm module: chức năng, phân quyền, bảo mật, giao diện, tích hợp, phi chức năng |
 
 Kết quả lần chạy ngày 17/11/2026: backend 554 test, frontend 36 test, AI service 34 test, tất cả đều đạt; ESLint, TypeScript và Ruff không báo lỗi.
 
@@ -92,7 +92,7 @@ Dùng dữ liệu seed (`npm run seed`, mật khẩu chung `Test@123`):
 
 ## Bộ test case thủ công
 
-File [`TESTCASE_GOPMAM.xlsx`](../../TESTCASE_GOPMAM.xlsx) ở gốc repo gồm 198 test case chia 14 sheet theo module, sheet `ThongKe` tự tính số Pass/Fail/Blocked/Not Run và sheet `BaoCaoLoi` để ghi lỗi. Người kiểm thử điền các cột J–Q (kết quả thực tế, trạng thái, mức độ lỗi, người/ngày/môi trường kiểm thử, ghi chú).
+File [`TESTCASE_GOPMAM.xlsx`](../../Document/05_KiemThu/TESTCASE_GOPMAM.xlsx) (thư mục `Document/05_KiemThu/`) gồm 198 test case chia 14 sheet theo module, sheet `ThongKe` tự tính số Pass/Fail/Blocked/Not Run và sheet `BaoCaoLoi` để ghi lỗi. Người kiểm thử điền các cột J–Q (kết quả thực tế, trạng thái, mức độ lỗi, người/ngày/môi trường kiểm thử, ghi chú).
 
 Đợt 14–16/11/2026 trên Docker Compose local: đã chạy 171/198 test case (86,4%), 164 Pass, 5 Fail, 2 Blocked; nhóm 09 (bình luận, theo dõi, thông báo) và 10 (kiểm duyệt) chưa chạy. Ngày 17/11/2026 đã sửa cả 5 Fail và các góp ý ghi trong những test case Pass; các test case đó được ghi "(Đã fix 17/11)" ở cột Ghi chú, trạng thái giữ nguyên để người kiểm thử chạy lại:
 

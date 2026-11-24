@@ -382,6 +382,12 @@ cd ..
 #   10 cộng tác viên tổ chức, 24 mức quà tặng kèm người đã chọn quà
 # Thêm riêng phần tổ chức/cộng tác viên/mức quà vào DB đã seed (bỏ qua phần đã có):
 #   ..\scripts\npm-local.cmd run seed:extras
+# 150 dự án mô phỏng đã kết thúc cho AI tự học (có video/ảnh/câu chuyện ngẫu nhiên, ẩn khỏi trang công khai):
+#   ..\scripts\npm-local.cmd run seed:ai-history
+# Bổ sung đủ trường hợp (chạy lặp lại an toàn): dự án cho 19 lĩnh vực còn trống, trạng thái bị từ chối/bị hủy,
+# yêu cầu hoàn tiền + báo cáo vi phạm đang chờ, bình luận bị ẩn, bài chỉ cho người ủng hộ, tổ chức bị từ chối/
+# tạm ngưng, tài khoản bị khóa user9, ví user3 có nạp tiền và đủ 3 kiểu yêu cầu rút:
+#   ..\scripts\npm-local.cmd run seed:coverage
 
 # 4. Chạy ba dịch vụ (mỗi lệnh một terminal)
 .\scripts\npm-local.cmd run dev:frontend
@@ -413,7 +419,7 @@ cd backend
 | Unit test frontend | `node --test`           | Hộp hỏi đáp nhanh: bỏ dấu, khớp từ khóa câu hỏi gõ tự do với câu hỏi thường gặp                                                                                                            |
 | Kiểm tra tĩnh     | TypeScript, ESLint, Ruff | Kiểu dữ liệu, quy ước mã                                                                                                                                                                    |
 | Smoke test        | Docker Compose + Nginx   | Toàn bộ 6 dịch vụ                                                                                                                                                                           |
-| Kiểm thử thủ công | Bộ test case [`TESTCASE_GOPMAM.xlsx`](TESTCASE_GOPMAM.xlsx) | 198 test case trong 14 nhóm module: chức năng, phân quyền, bảo mật, giao diện/responsive, tích hợp, phi chức năng; chạy trên Docker Compose local với dữ liệu seed |
+| Kiểm thử thủ công | Bộ test case [`TESTCASE_GOPMAM.xlsx`](Document/05_KiemThu/TESTCASE_GOPMAM.xlsx) | 198 test case trong 14 nhóm module: chức năng, phân quyền, bảo mật, giao diện/responsive, tích hợp, phi chức năng; chạy trên Docker Compose local với dữ liệu seed |
 
 ```powershell
 .\scripts\npm-local.cmd run check          # typecheck + lint + unit test
@@ -423,7 +429,7 @@ cd backend
 cd backend; ..\scripts\npm-local.cmd run test:coverage   # unit test backend kèm độ phủ mã
 ```
 
-Lần chạy ngày 23/11/2026 (sau khi thêm duyệt tự động, hoàn tiền tự động và ảnh lĩnh vực): backend 621 test, frontend 36 test đều đạt; typecheck, ESLint và build không báo lỗi. AI service không đổi từ lần chạy 17/11/2026 (34 test đạt, Ruff không báo lỗi). Độ phủ của unit test backend (đo ngày 14/11/2026) là 89,1% dòng lệnh, 79,3% nhánh và 83,3% hàm, tính trên các file được test nạp vào (service, guard, DTO); phần lớn controller được kiểm tra qua smoke test và kiểm thử thủ công nên không nằm trong phép đo này.
+Lần chạy ngày 25/11/2026 (sau khi thêm cài đặt email, giới hạn 60 ngày và phần AI học nội dung): backend 678 test, frontend 36 test, AI service 49 test đều đạt; typecheck, ESLint, Ruff và build không báo lỗi. Lần chạy trước (23/11/2026): backend 621 test; AI service 34 test (17/11/2026, Ruff không báo lỗi). Độ phủ của unit test backend (đo ngày 14/11/2026) là 89,1% dòng lệnh, 79,3% nhánh và 83,3% hàm, tính trên các file được test nạp vào (service, guard, DTO); phần lớn controller được kiểm tra qua smoke test và kiểm thử thủ công nên không nằm trong phép đo này.
 
 **Kết quả kiểm thử thủ công (đợt 14–16/11/2026):**
 
@@ -499,7 +505,15 @@ DATN_2627_Website/
 │   ├── data/                 # Hướng dẫn dữ liệu; data/raw (không đưa vào Git)
 │   └── tests/
 ├── infra/                    # Docker Compose, Nginx, Terraform
-├── docs/                     # Kiến trúc, API, cơ sở dữ liệu, kiểm thử, vận hành
+├── docs/                     # Tài liệu kỹ thuật: kiến trúc, API, cơ sở dữ liệu, kiểm thử, vận hành
+├── Document/                 # Tài liệu báo cáo đồ án (Word/PDF/draw.io/LaTeX)
+│   ├── 00_DeCuong/           # Đề cương gốc (main.pdf)
+│   ├── 01_TaiLieuPhanTich/   # SRS, actor, use case, cơ chế AI
+│   ├── 02_TaiLieuThietKe/    # ERD, kiến trúc hệ thống, wireframe/UI-UX
+│   ├── 03_SoDoUML/           # Use case, activity, sequence, class, state
+│   ├── 04_HuongDanSuDung/
+│   ├── 05_KiemThu/           # Bộ test case TESTCASE_GOPMAM.xlsx
+│   └── 06_ThuyetTrinh/       # Kịch bản giới thiệu và thuyết trình
 └── scripts/                  # Script chạy Node/Python cục bộ
 ```
 
@@ -557,8 +571,15 @@ DATN_2627_Website/
   - **Ảnh lĩnh vực**: đủ ảnh cho 25 lĩnh vực (12 ảnh mới chụp tại Việt Nam, thay 2 ảnh Y tế có bác sĩ nước ngoài, ghi nguồn ở `/nguon-anh`); admin đổi ảnh đại diện lĩnh vực trong mục "Lĩnh vực" (`categories.image_url`, ảnh `purpose=category_image` chỉ admin tải).
   - **Thẻ dự án kiểu Kickstarter**: bên trái thời gian còn lại, bên phải % đã đạt; % có thể vượt 100% vì dự án vẫn nhận ủng hộ tới hết hạn sau khi đạt mục tiêu (trang dự án hiện dòng "Đã đạt mục tiêu! Dự án vẫn tiếp tục nhận ủng hộ…"). Thẻ dự án của tổ chức dùng cùng kiểu.
   - Số tiền dự án rút gọn (100k, 1M, 1,5M; rê chuột xem số đầy đủ); vòng tròn % ở trang ủng hộ và khung chia sẻ đổi thành thanh ngang; số dư ví Góp Mầm hiển thị to hơn.
+- Quản trị, AI và dữ liệu mẫu (24–25/11/2026, migration `1790000000029`–`1790000000031` cần chạy khi deploy):
+  - **Cài đặt email**: admin bật/tắt 16 loại email gửi người dùng (xác minh, OTP, xét duyệt, ủng hộ, quyết toán cam kết, hoàn tiền, rút tiền…) hoặc tắt tất cả, để giữ hạn mức gửi của nhà cung cấp (Resend gói miễn phí 100 thư/ngày). Email bị tắt chỉ ghi log, thông báo trong web vẫn tạo; `GET/PATCH /admin/email-settings`, ghi nhật ký kiểm toán.
+  - **Sidebar quản trị gọn lại** (16 → 11 mục): các mục gộp thành trang có tab — *Cài đặt* (Lĩnh vực, Email, Liên hệ hỗ trợ, Sao lưu), *Báo cáo & bình luận*, *Hoàn & rút tiền*; link cũ tự chuyển sang tab tương ứng; bỏ bớt ghi chú hướng dẫn dài.
+  - **Thời gian gây quỹ tối đa 60 ngày** (như Kickstarter, cũng là vùng mô hình dự đoán có nhiều dữ liệu nhất): chặn khi tạo, sửa và gửi duyệt; form tạo chiến dịch giới hạn ngày; AI chỉ gợi ý thời hạn 30–60 ngày và ghi chú cho hồ sơ cũ vượt 60 ngày.
+  - **AI học thêm từ nội dung** của dự án Góp Mầm đã kết thúc (Kickstarter không có): có video, từ 3 ảnh, câu chuyện từ 300 từ — hồi quy logistic có phạt trên phần chênh lệch so với mô hình gốc, cần ≥ 15 dự án mỗi nhóm mới học. Thử với 150 dự án mô phỏng có ảnh hưởng tự đặt: video học sát (+0,96 so với +0,8), ảnh/câu chuyện còn dao động; lặp với 1.500 dự án thì học lại gần đúng cả ba (chi tiết ở `ai-service/models/README.md`).
+  - Notebook huấn luyện thêm **mô hình riêng cho Giáo dục** trên DonorsChoose (dự án đủ tiền / hết hạn), so với mô hình Kickstarter trên cùng tập kiểm tra; chưa đưa vào ai-service, chờ kết quả chạy Colab.
+  - Dữ liệu mẫu đủ trường hợp (`npm run seed:coverage`): đủ 25/25 lĩnh vực, đủ trạng thái chiến dịch (kể cả bị từ chối, bị hủy), yêu cầu hoàn tiền và báo cáo vi phạm đang chờ, ví có đủ kiểu yêu cầu rút. Tài liệu báo cáo gom về `Document/` (đề cương, bộ test case, wireframe, sơ đồ kiến trúc, kịch bản thuyết trình).
 
-_Cập nhật lần cuối: 23/11/2026._
+_Cập nhật lần cuối: 25/11/2026._
 
 ### 15.2. Hạn chế
 
@@ -589,7 +610,7 @@ _Cập nhật lần cuối: 23/11/2026._
 | Quyết định kiến trúc   | [`docs/architecture/adr-001-backend-stack.md`](docs/architecture/adr-001-backend-stack.md) |
 | Thiết kế cơ sở dữ liệu | [`docs/database/`](docs/database/README.md)                                                |
 | Kiểm thử               | [`docs/testing/`](docs/testing/README.md)                                                  |
-| Bộ test case thủ công  | [`TESTCASE_GOPMAM.xlsx`](TESTCASE_GOPMAM.xlsx)                                             |
+| Bộ test case thủ công  | [`TESTCASE_GOPMAM.xlsx`](Document/05_KiemThu/TESTCASE_GOPMAM.xlsx)                         |
 | Vận hành               | [`docs/operations/`](docs/operations/README.md)                                            |
 | Hạ tầng                | [`infra/README.md`](infra/README.md)                                                       |
 | Dữ liệu và mô hình AI  | [`ai-service/data/README.md`](ai-service/data/README.md)                                   |

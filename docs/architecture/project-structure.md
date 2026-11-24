@@ -28,7 +28,8 @@ Repository dùng mô hình monorepo, nhưng mỗi dịch vụ vẫn có vòng đ
 │   ├── models/               Model .pkl + metrics/metadata (chỉ nạp file của dự án)
 │   └── tests/                Kiểm thử hợp đồng AI
 ├── infra/                    Docker Compose và Nginx
-└── docs/                     Kiến trúc, API, dữ liệu, vận hành và kiểm thử
+├── docs/                     Tài liệu kỹ thuật: kiến trúc, API, dữ liệu, vận hành và kiểm thử
+└── Document/                 Tài liệu báo cáo đồ án: đề cương, phân tích, thiết kế, UML, kiểm thử, thuyết trình
 ```
 
 ## Ranh giới trách nhiệm

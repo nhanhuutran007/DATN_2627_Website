@@ -19,5 +19,5 @@ Tài liệu đề tài ban đầu mô tả backend Spring Boot. Sau khi cân nh�
 
 - Giảm số ngôn ngữ phải dùng cho phần web.
 - Vẫn giữ ranh giới nghiệp vụ, phân quyền và giao dịch ở backend.
-- `main.pdf` là bản mô tả đề tài gốc và chưa được sửa theo quyết định kỹ thuật này.
+- `Document/00_DeCuong/main.pdf` là bản mô tả đề tài gốc và chưa được sửa theo quyết định kỹ thuật này.
 - Nếu nhà trường bắt buộc Spring Boot, cần thay scaffold `backend/` trước khi phát triển các vertical slice.

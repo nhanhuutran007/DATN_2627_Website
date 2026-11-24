@@ -60,5 +60,5 @@ Thumbs.db
 baocao/
 nhlsports*.sql
 
-# Tài liệu báo cáo đồ án (Word/PDF/draw.io) – chỉ lưu cục bộ, không đưa lên GitHub
-TaiLieuWeb/
+# Bộ dữ liệu mẫu (dump SQL + ảnh upload, có email thật) – chỉ lưu cục bộ, gửi trực tiếp cho nhóm
+infra/database_mau/
