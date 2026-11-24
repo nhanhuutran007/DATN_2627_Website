@@ -29,7 +29,7 @@ export function SuccessStories({ campaigns }: SuccessStoriesProps) {
             <h2 id="cau-chuyen-thanh-cong">Câu chuyện thành công</h2>
             <p>Những dự án đã thành hiện thực nhờ cộng đồng — xem tiền ủng hộ đã được dùng vào việc gì.</p>
           </div>
-          <Link className="button button-outline button-sm" href="/tim-kiem">Xem các dự án đã thành công</Link>
+          <Link className="button button-outline button-sm" href="/tim-kiem?trang-thai=success">Xem các dự án đã thành công</Link>
         </div>
 
         <div className="success-grid">

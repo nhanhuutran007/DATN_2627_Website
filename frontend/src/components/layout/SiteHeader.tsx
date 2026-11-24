@@ -127,6 +127,8 @@ export function SiteHeader() {
     ? [
         isAdmin ? { href: "/admin", label: "Trang quản trị" } : { href: "/dashboard", label: "Hoạt động của bạn" },
         ...(isAdmin ? [] : [{ href: "/vi", label: "Ví Góp Mầm" }]),
+        // Như "Recommended for you" trong menu tài khoản Kickstarter: dự án AI gợi ý kèm lý do.
+        ...(isAdmin ? [] : [{ href: "/goi-y-cho-ban", label: "Gợi ý cho bạn" }]),
         { href: "/thong-bao", label: "Thông báo" },
         { href: "/ho-so", label: "Cài đặt tài khoản" },
       ]

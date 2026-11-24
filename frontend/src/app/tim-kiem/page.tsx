@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 type SearchPageProps = {
-  searchParams: Promise<{ q?: string; category?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; "trang-thai"?: string }>;
 };
 
 /** Trang tìm kiếm toàn bộ dự án, bố cục theo GoFundMe /s: ô tìm kiếm lớn, các nút lọc bo tròn, lưới dự án. */
@@ -17,10 +17,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
   const q = params.q?.trim() ?? "";
   const category = params.category?.trim() ?? "";
+  const status = params["trang-thai"]?.trim() ?? "";
 
   return (
     <main className="container search-page">
-      <CampaignExplorer key={`${q}:${category}`} initialQuery={q} initialCategory={category} />
+      <CampaignExplorer key={`${q}:${category}:${status}`} initialQuery={q} initialCategory={category} initialStatus={status} />
     </main>
   );
 }

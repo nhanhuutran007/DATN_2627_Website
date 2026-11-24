@@ -15343,3 +15343,25 @@ html:has(dialog:modal) .admin-sidebar {
   .success-grid { grid-template-columns: minmax(0, 1fr); }
   .success-list .success-card { grid-template-columns: 120px minmax(0, 1fr); }
 }
+
+/* Trang "Gợi ý cho bạn" (mở từ menu tài khoản) — RecommendationsPage */
+.recs-page {
+  padding-block: 40px 72px;
+}
+
+.recs-head {
+  display: grid;
+  gap: 8px;
+  max-width: 720px;
+  margin-bottom: 28px;
+}
+
+.recs-head h1 {
+  margin: 0;
+  font-size: clamp(1.7rem, 3vw, 2.3rem);
+}
+
+.recs-head p {
+  margin: 0;
+  color: var(--text-2);
+}

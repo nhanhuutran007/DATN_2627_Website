@@ -19,6 +19,8 @@ import { campaigns as mockCampaigns, type Campaign } from "@/lib/data/campaigns"
 type CampaignExplorerProps = {
   initialQuery?: string;
   initialCategory?: string;
+  /** Khóa trong STATUS_OPTIONS (vd. `success` từ link "Câu chuyện thành công"); khóa lạ bị bỏ qua. */
+  initialStatus?: string;
 };
 
 const PAGE_SIZE = 12;
@@ -114,8 +116,13 @@ const EMPTY_FILTERS: Filters = {
   sort: "popular",
 };
 
-export function CampaignExplorer({ initialQuery = "", initialCategory = "" }: CampaignExplorerProps) {
-  const [filters, setFilters] = useState<Filters>({ ...EMPTY_FILTERS, q: initialQuery, category: initialCategory });
+export function CampaignExplorer({ initialQuery = "", initialCategory = "", initialStatus = "" }: CampaignExplorerProps) {
+  const [filters, setFilters] = useState<Filters>({
+    ...EMPTY_FILTERS,
+    q: initialQuery,
+    category: initialCategory,
+    status: initialStatus in STATUS_OPTIONS ? initialStatus : "",
+  });
   const categories = useCategories();
   // Ô gõ chữ chỉ gửi lên server sau khi người dùng ngừng gõ.
   const [text, setText] = useState({ q: initialQuery.trim(), location: "" });
