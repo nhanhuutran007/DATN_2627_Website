@@ -279,8 +279,7 @@ export function BackupManager() {
       )}
 
       <p className="risk-footnote">
-        <Icon name="shield" size={15} /> File sao lưu chứa dữ liệu cá nhân (email, số điện thoại, mật khẩu đã băm): chỉ lưu ở nơi an toàn.
-        Mỗi lần sao lưu và khôi phục đều được ghi nhật ký kiểm toán.
+        <Icon name="shield" size={15} /> File sao lưu có dữ liệu cá nhân — chỉ lưu ở nơi an toàn.
       </p>
     </section>
   );

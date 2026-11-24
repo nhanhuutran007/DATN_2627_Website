@@ -15781,3 +15781,135 @@ html:has(dialog:modal) .admin-sidebar {
   margin: 0;
   color: var(--text-2);
 }
+
+/* ---------- Cài đặt email (admin) ---------- */
+.stat-flag.is-warn {
+  color: #9a5b00;
+  background: #fff4e0;
+}
+
+.email-settings {
+  display: grid;
+  gap: 20px;
+}
+
+.email-master-row,
+.email-category {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.email-master-row h2 {
+  margin: 0 0 8px;
+}
+
+.email-master-row .automation-lead {
+  max-width: 760px;
+  margin: 0;
+}
+
+.email-master-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.email-master-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.email-warning {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #f3d19c;
+  border-radius: 12px;
+  color: #6b4a00;
+  background: #fff8ea;
+  line-height: 1.55;
+}
+
+.email-category-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.email-category {
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.email-category:first-child {
+  border-top: 0;
+}
+
+.email-category-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.email-category-desc {
+  margin: 4px 0 0;
+  color: #6b7385;
+  line-height: 1.5;
+}
+
+.email-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 8px 40px;
+}
+
+.email-group h3 {
+  margin: 4px 0 6px;
+  color: var(--text-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.email-groups .email-category {
+  align-items: center;
+  padding: 10px 0;
+}
+
+.email-groups.is-muted .email-category {
+  opacity: 0.55;
+}
+
+@media (max-width: 560px) {
+  .email-master-actions {
+    margin-left: 0;
+  }
+}
+
+/* ---------- Thanh tab của mục gộp (Cài đặt, Báo cáo & bình luận, Hoàn & rút tiền) ---------- */
+.section-tabs {
+  overflow-x: auto;
+  margin-bottom: 16px;
+  scrollbar-width: none;
+}
+
+.section-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.section-tabs button {
+  flex-shrink: 0;
+}

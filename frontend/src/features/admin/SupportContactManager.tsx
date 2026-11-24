@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 
-import { Icon } from "@/components/ui/Icon";
 import { ApiError } from "@/lib/api";
 import { fetchSupportContact, updateSupportContact, type SupportContact } from "@/lib/api/support";
 
@@ -115,9 +114,6 @@ export function SupportContactManager() {
       )}
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-notice" role="status">{notice}</p>}
-      <p className="risk-footnote">
-        <Icon name="mail" size={15} /> Để trống mục nào thì mục đó không hiển thị. Mỗi lần lưu được ghi vào nhật ký kiểm toán.
-      </p>
     </section>
   );
 }

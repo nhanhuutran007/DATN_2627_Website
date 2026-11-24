@@ -145,10 +145,6 @@ export function AdminWithdrawals() {
             <h2>{total} {COUNT_LABEL[status]}</h2>
           </div>
         </div>
-        <p className="table-muted">
-          Chuyển khoản từ tài khoản Góp Mầm tới đúng tài khoản người dùng khai, rồi bấm duyệt và nhập mã giao dịch
-          (kèm ảnh chứng từ nếu có). Tiền đã bị khóa trong ví từ lúc người dùng gửi yêu cầu.
-        </p>
         <form
           className="admin-filter-bar"
           onSubmit={(event) => {

@@ -428,9 +428,7 @@ export function AdminFinance({ view, onChanged }: { view: "refunds" | "reconcili
             ))
           )}
         </div>
-        <Pagination page={refundPage} total={refundTotal} onChange={(page) => void loadRefunds(refundFilter, page)} />
-        <p className="risk-footnote"><Icon name="shield" size={15} /> Ví demo hoàn qua cổng thanh toán sandbox; khoản qua SePay phải chuyển khoản trả lại thủ công rồi nhập mã giao dịch. Mọi lần hoàn đều trừ số liệu chiến dịch, trả lại suất quà và ghi nhật ký kiểm toán.</p>
-      </section>
+        <Pagination page={refundPage} total={refundTotal} onChange={(page) => void loadRefunds(refundFilter, page)} />      </section>
       )}
 
       {view === "reconciliation" && (

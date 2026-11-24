@@ -13,6 +13,8 @@ import { PAGE_SIZE, Pagination } from "@/components/ui/Pagination";
 import { CategoryManager, StatsExport } from "@/features/admin/AdminContent";
 import { BackupManager } from "@/features/admin/BackupManager";
 import { SupportContactManager } from "@/features/admin/SupportContactManager";
+import { EmailSettingsManager } from "@/features/admin/EmailSettingsManager";
+import { SectionTabBar, useSectionTab, type TabBadge } from "@/features/admin/AdminTabs";
 import { OrganizationReview } from "@/features/admin/OrganizationReview";
 import { AdminFinance } from "@/features/admin/AdminFinance";
 import { ReviewAutomationPanel } from "@/features/admin/AutomationSettings";
@@ -136,13 +138,11 @@ function navBadge(slug: string, counts: AdminNavCounts | null): NavBadge | null 
       return numeric(counts.pendingOrganizations, "hồ sơ tổ chức chờ xác minh");
     case "rui-ro":
       return numeric(counts.openRisks, "cảnh báo rủi ro chưa xử lý");
-    case "bao-cao-vi-pham":
-      return numeric(counts.openReports, "báo cáo vi phạm cần xử lý");
-    case "binh-luan":
-      return numeric(counts.reportedComments, "bình luận đang bị báo cáo");
+    case "bao-cao":
+      return numeric(counts.openReports + counts.reportedComments, "báo cáo vi phạm và bình luận bị báo cáo cần xử lý");
     case "giao-dich":
       return numeric(counts.stalePendingSepay, "giao dịch SePay chờ quá 30 phút, nên đối soát");
-    case "hoan-tien":
+    case "hoan-rut-tien":
       return numeric(counts.pendingRefunds, "yêu cầu hoàn tiền chờ xử lý");
     case "doi-soat":
       // Ví lệch là tiền có thể bị chi sai: ưu tiên báo nổi bật hơn chiến dịch lệch sổ.
@@ -156,14 +156,41 @@ function navBadge(slug: string, counts: AdminNavCounts | null): NavBadge | null 
         };
       }
       return numeric(counts.ledgerMismatches, "chiến dịch lệch sổ (lũy kế)");
-    case "sao-luu":
-      if (counts.daysSinceBackup === null) return { text: "!", title: "Chưa từng sao lưu dữ liệu", tone: "warn" };
-      return counts.daysSinceBackup >= BACKUP_STALE_DAYS
-        ? { text: "!", title: `Đã ${counts.daysSinceBackup} ngày chưa sao lưu`, tone: "warn" }
-        : null;
+    case "cai-dat": {
+      // Mục Cài đặt chứa phần Sao lưu: nhắc khi lâu chưa sao lưu.
+      const backup = backupBadge(counts);
+      return backup ? { ...backup, tone: "warn" } : null;
+    }
     default:
       return null;
   }
+}
+
+/** Số việc chờ của từng tab trong mục gộp. */
+function tabBadges(section: string, counts: AdminNavCounts | null): Record<string, TabBadge> {
+  if (!counts) return {};
+  const numeric = (value: number, title: string): TabBadge =>
+    value > 0 ? { text: value > 99 ? "99+" : String(value), title: `${value} ${title}` } : null;
+  switch (section) {
+    case "bao-cao":
+      return {
+        "vi-pham": numeric(counts.openReports, "báo cáo vi phạm cần xử lý"),
+        "binh-luan": numeric(counts.reportedComments, "bình luận đang bị báo cáo"),
+      };
+    case "hoan-rut-tien":
+      return { "hoan-tien": numeric(counts.pendingRefunds, "yêu cầu hoàn tiền chờ xử lý") };
+    case "cai-dat":
+      return { "sao-luu": backupBadge(counts) };
+    default:
+      return {};
+  }
+}
+
+/** Nhắc sao lưu (dùng cho mục "Cài đặt" trên sidebar và tab "Sao lưu" bên trong). */
+function backupBadge(counts: AdminNavCounts | null): { text: string; title: string } | null {
+  if (!counts) return null;
+  if (counts.daysSinceBackup === null) return { text: "!", title: "Chưa từng sao lưu dữ liệu" };
+  return counts.daysSinceBackup >= BACKUP_STALE_DAYS ? { text: "!", title: `Đã ${counts.daysSinceBackup} ngày chưa sao lưu` } : null;
 }
 
 /** Tiêu đề thẻ: "{số} {danh từ} {trạng thái đang lọc}", thay cho tên trang lặp lại. */
@@ -349,6 +376,9 @@ export function AdminDashboard() {
   const slug = pathname.replace(/^\/admin\/?/, "").split("/")[0] ?? "";
   const section = findAdminSection(slug) ?? ADMIN_SECTIONS[0];
   const view = section.slug;
+  // Phần đang mở trong mục gộp (Báo cáo & bình luận, Hoàn & rút tiền, Cài đặt); mục thường là "".
+  const [tab, selectTab] = useSectionTab(view);
+  const showing = (sectionSlug: string, tabSlug: string) => view === sectionSlug && tab === tabSlug;
 
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [campaigns, setCampaigns] = useState<AdminCampaign[]>([]);
@@ -1366,6 +1396,8 @@ export function AdminDashboard() {
             </div>
           )}
 
+          <SectionTabBar section={view} value={tab} onSelect={selectTab} badges={tabBadges(view, navCounts)} />
+
           {view === "" && (
             <>
           <section className="admin-stat-grid">
@@ -1743,7 +1775,7 @@ export function AdminDashboard() {
           </section>
           )}
 
-          {view === "bao-cao-vi-pham" && (
+          {showing("bao-cao", "vi-pham") && (
           <section className="admin-card risk-card" id="bao-cao-vi-pham">
             <div className="card-heading">
               <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>{countTitle(reportPaging.total, "báo cáo", reportFilter.status, REPORT_COUNT_LABEL)}</h2></div>
@@ -1841,12 +1873,10 @@ export function AdminDashboard() {
                 ))
               )}
             </div>
-            <Pagination page={reportPaging.page} total={reportPaging.total} onChange={(page) => void loadReports(reportFilter, page)} />
-            <p className="risk-footnote"><Icon name="shield" size={15} /> Hệ thống không tự ẩn hay tạm dừng chiến dịch theo số lượng báo cáo. Quản trị viên xem xét, ghi lý do và mọi quyết định được lưu vào nhật ký kiểm toán.</p>
-          </section>
+            <Pagination page={reportPaging.page} total={reportPaging.total} onChange={(page) => void loadReports(reportFilter, page)} />          </section>
           )}
 
-          {view === "binh-luan" && (
+          {showing("bao-cao", "binh-luan") && (
           <section className="admin-card risk-card" id="binh-luan">
             <div className="card-heading">
               <div><p className="eyebrow">Kiểm duyệt nội dung</p><h2>{countTitle(commentPaging.total, "bình luận & câu hỏi", commentFilter.status, COMMENT_COUNT_LABEL)}</h2></div>
@@ -1932,7 +1962,7 @@ export function AdminDashboard() {
                         )}
                         {comment.post && <span className="comment-flag">Cập nhật #{comment.post.number}</span>}
                         {comment.openReportCount > 0 && (
-                          <Link className="comment-flag is-reported" href={adminHref("bao-cao-vi-pham")} title="Xem báo cáo vi phạm">
+                          <Link className="comment-flag is-reported" href={adminHref("bao-cao")} onClick={(event) => { event.preventDefault(); selectTab("vi-pham"); }} title="Xem báo cáo vi phạm">
                             Bị báo cáo{comment.openReportCount > 1 ? ` (${comment.openReportCount})` : ""}
                           </Link>
                         )}
@@ -1967,9 +1997,7 @@ export function AdminDashboard() {
                 ))
               )}
             </div>
-            <Pagination page={commentPaging.page} total={commentPaging.total} onChange={(page) => void loadComments(commentFilter, page)} />
-            <p className="risk-footnote"><Icon name="shield" size={15} /> Ẩn bình luận cần ghi lý do; tác giả được thông báo và thao tác được lưu vào nhật ký kiểm toán.</p>
-          </section>
+            <Pagination page={commentPaging.page} total={commentPaging.total} onChange={(page) => void loadComments(commentFilter, page)} />          </section>
           )}
 
           {view === "giao-dich" && (
@@ -2102,8 +2130,8 @@ export function AdminDashboard() {
             />
           )}
 
-          {view === "hoan-tien" && <AdminFinance view="refunds" onChanged={() => { void loadDonations(donationFilter, donationPaging.page); void reloadOverview(); }} />}
-          {view === "rut-tien" && <AdminWithdrawals />}
+          {showing("hoan-rut-tien", "hoan-tien") && <AdminFinance view="refunds" onChanged={() => { void loadDonations(donationFilter, donationPaging.page); void reloadOverview(); }} />}
+          {showing("hoan-rut-tien", "rut-tien") && <AdminWithdrawals />}
           {view === "doi-soat" && (
             <AdminReconciliation
               walletMismatches={navCounts?.walletMismatches ?? 0}
@@ -2240,7 +2268,7 @@ export function AdminDashboard() {
           </section>
           )}
 
-          {view === "danh-muc" && (
+          {showing("cai-dat", "linh-vuc") && (
             <CategoryManager
               onShowCampaigns={(category) => {
                 void applyCampaignFilters({ ...DEFAULT_CAMPAIGN_FILTERS, status: "", category });
@@ -2248,8 +2276,9 @@ export function AdminDashboard() {
               }}
             />
           )}
-          {view === "sao-luu" && <BackupManager />}
-          {view === "lien-he" && <SupportContactManager />}
+          {showing("cai-dat", "email") && <EmailSettingsManager />}
+          {showing("cai-dat", "lien-he") && <SupportContactManager />}
+          {showing("cai-dat", "sao-luu") && <BackupManager />}
           {view === "to-chuc" && <OrganizationReview />}
 
           {view === "nhat-ky-kiem-toan" && (

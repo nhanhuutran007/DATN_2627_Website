@@ -317,9 +317,6 @@ export function CategoryManager({ onShowCampaigns }: { onShowCampaigns?: (catego
         </table>
       </div>
       {categories && <Pagination page={page} total={visible.length} onChange={setPage} />}
-      <p className="risk-footnote">
-        <Icon name="shield" size={15} /> Thứ tự (#) là thứ tự lĩnh vực trong bộ lọc trang khám phá và form tạo chiến dịch. Ngừng nhận: không cho tạo chiến dịch mới trong lĩnh vực, chiến dịch cũ giữ nguyên. Đổi tên cập nhật luôn các chiến dịch. Đổi ảnh: ảnh đại diện ở trang khám phá và trang lĩnh vực (JPEG/PNG/WebP, tối đa 5 MB, nên dùng ảnh ngang 3:2). Mọi thay đổi được ghi nhật ký kiểm toán.
-      </p>
     </section>
   );
 }

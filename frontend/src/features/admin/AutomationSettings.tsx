@@ -158,10 +158,6 @@ export function RefundAutoMonitor({ refreshKey = 0 }: { refreshKey?: number }) {
           <DateRangeFilter label="Lọc theo thời điểm hoàn" value={range} onChange={setRange} />
         </div>
       </div>
-      <p className="automation-lead">
-        Khi dự án hết hạn mà chưa đạt mục tiêu (hoặc bị hủy), hệ thống tự trả khoản cam kết của người ủng hộ về ví Góp Mầm và tự hoàn
-        khoản đã thu qua ví. Yêu cầu hoàn do người ủng hộ gửi, khoản qua SePay và yêu cầu rút tiền vẫn do admin kiểm tra và duyệt thủ công.
-      </p>
       {error && <p className="form-error" role="alert">{error}</p>}
       {!summary && !error && <p className="hint">Đang tải…</p>}
       {summary && (
