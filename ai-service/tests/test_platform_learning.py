@@ -79,9 +79,9 @@ def test_estimate_suggests_duration_for_the_given_goal() -> None:
     )
 
     assert result.current is None and result.chosen_days is None  # chưa chọn ngày kết thúc
-    assert [option.days for option in result.options] == [30, 45, 60, 90]
+    assert [option.days for option in result.options] == [30, 45, 60]
     duration = result.duration
-    assert 30 <= duration.low <= duration.days <= duration.high <= 90
+    assert 30 <= duration.low <= duration.days <= duration.high <= 60
     # Mức gợi ý không kém mức tốt nhất trong bảng quá 2 điểm.
     assert duration.probability >= max(o.probability for o in result.options) - 0.02 - 1e-9
     assert result.samples == 7
@@ -151,3 +151,78 @@ def test_estimate_endpoint(monkeypatch) -> None:
 
     payload["features"]["goal_amount"] = 0
     assert client.post("/api/v1/estimate", json=payload).status_code == 422
+
+
+def _content_history(
+    video_success: float, video_fail: float, count: int = 30
+) -> list[PlatformOutcome]:
+    """Lịch sử cùng lĩnh vực/mục tiêu/thời hạn; tỷ lệ có video khác nhau ở nhóm đạt và không đạt."""
+    items: list[PlatformOutcome] = []
+    for reached, share in ((True, video_success), (False, video_fail)):
+        for index in range(count):
+            has_video = index < round(share * count)
+            items.append(
+                PlatformOutcome(
+                    campaign_id=f"c-{reached}-{index}",
+                    title=f"Dự án {index}",
+                    features=_features().model_copy(
+                        update={"has_video": has_video, "image_count": 1, "story_word_count": 300}
+                    ),
+                    reached=reached,
+                    raised=1.0,
+                )
+            )
+    return items
+
+
+def test_content_effect_is_learned_when_projects_differ() -> None:
+    # Dự án đạt phần lớn có video, dự án không đạt phần lớn không có → video được học là có ích.
+    history = _content_history(video_success=0.8, video_fail=0.2)
+    service = PredictorService()
+    video = _features().model_copy(update={"has_video": True})
+    no_video = _features().model_copy(update={"has_video": False})
+    with_video = service.predict(video, history=history)
+    without = service.predict(no_video, history=history)
+
+    assert with_video.probability > without.probability
+    effects = {effect.feature: effect for effect in with_video.platform.content}
+    assert effects["has_video"].status == "learned" and effects["has_video"].impact > 0
+    # Ảnh và câu chuyện giống hệt nhau ở mọi dự án → chưa đủ dữ liệu, không ảnh hưởng.
+    assert effects["image_count"].status == "insufficient_data"
+    assert effects["image_count"].impact is None
+    assert any(f.feature == "has_video" and f.direction == "UP" for f in with_video.factors)
+
+
+def test_content_is_ignored_when_every_project_looks_the_same() -> None:
+    history = _content_history(video_success=0.0, video_fail=0.0)
+    video = _features().model_copy(update={"has_video": True})
+    result = PredictorService().predict(video, history=history)
+    assert all(effect.status == "insufficient_data" for effect in result.platform.content)
+    content = {"has_video", "image_count", "story_word_count"}
+    assert not any(f.feature in content for f in result.factors)
+
+
+def test_content_shift_is_bounded() -> None:
+    # Video tách tuyệt đối hai nhóm: ridge + chặn giữ điều chỉnh trong giới hạn (≤ 1 log-odds).
+    history = _content_history(video_success=1.0, video_fail=0.0)
+    service = PredictorService()
+    result = service.predict(_features().model_copy(update={"has_video": True}), history=history)
+    no_content = service.predict(_features(), history=_content_history(0.0, 0.0))
+    import math
+
+    def logit(p: float) -> float:
+        return math.log(p / (1 - p))
+
+    # Xác suất trả về đã làm tròn 6 chữ số nên cho sai số nhỏ.
+    assert logit(result.probability) - logit(no_content.probability) <= 1.0 + 1e-4
+
+
+def test_a_few_unusual_projects_are_not_enough_to_learn() -> None:
+    # 9/60 dự án có video (đều đạt): dưới 15 dự án mỗi nhóm nên chưa học, tránh học nhầm như khi
+    # vài dự án thật nằm giữa nhiều dự án mô phỏng giống hệt nhau.
+    history = _content_history(video_success=0.3, video_fail=0.0)
+    video = _features().model_copy(update={"has_video": True})
+    result = PredictorService().predict(video, history=history)
+    effects = {effect.feature: effect for effect in result.platform.content}
+    assert effects["has_video"].status == "insufficient_data"
+    assert not any(f.feature == "has_video" for f in result.factors)

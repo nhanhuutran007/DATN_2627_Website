@@ -45,7 +45,8 @@ FEATURE_LABELS: dict[str, str] = {
 REFERENCE_GRIDS: dict[str, tuple[float, ...]] = {
     "category_id": tuple(float(index) for index in range(len(CATEGORIES))),
     "goal_amount": (5e6, 1e7, 2e7, 5e7, 1e8, 2e8, 5e8, 1e9),
-    "duration_days": (7.0, 14.0, 21.0, 30.0, 45.0, 60.0, 90.0),
+    # Góp Mầm cho tối đa 60 ngày nên chỉ so với các thời hạn hợp lệ.
+    "duration_days": (7.0, 14.0, 21.0, 30.0, 45.0, 60.0),
     "profile_score": (20.0, 40.0, 60.0, 80.0, 100.0),
     "content_length": (500.0, 2000.0, 5000.0, 10000.0),
     "image_count": (0.0, 1.0, 2.0, 4.0, 8.0),
@@ -94,6 +95,12 @@ DEFAULT_FACTOR_NOTES = (
 )
 # Chênh lệch nhỏ hơn nửa điểm phần trăm coi như không ảnh hưởng, không nêu thành yếu tố.
 MIN_FACTOR_IMPACT = 0.005
+
+MAX_DURATION_DAYS = 60
+LONG_DURATION_CAVEAT = (
+    "Thời hạn trên 60 ngày vượt mức tối đa hiện nay và ít có trong dữ liệu huấn luyện nên "
+    "ước lượng kém chắc chắn hơn."
+)
 
 UNTRAINED_CATEGORY_CAVEAT = (
     "Dữ liệu huấn luyện không có lĩnh vực này nên ước lượng lấy trung bình trên các lĩnh vực "
@@ -241,13 +248,16 @@ class PredictorService:
                     and "category_id" in names
                     and vector[names.index("category_id")] not in trained_ids
                 )
+                caveats = [UNTRAINED_CATEGORY_CAVEAT] if untrained else []
+                if features.duration_days > MAX_DURATION_DAYS:
+                    caveats.append(LONG_DURATION_CAVEAT)
                 return self._build_response(
                     probability=probability,
                     model=version or type(model).__name__,
                     fallback=False,
                     metrics=metrics,
                     factors=factors,
-                    caveats=[UNTRAINED_CATEGORY_CAVEAT] if untrained else [],
+                    caveats=caveats,
                 )
             except Exception:
                 pass

@@ -104,6 +104,18 @@ export type AiPlatformAdjustment = {
   /** 0…1: mức tin vào dữ liệu Góp Mầm so với mô hình gốc. */
   weight: number;
   baseProbability: number;
+  /** Video / ảnh / câu chuyện: học riêng từ dự án Góp Mầm (mô hình gốc không có các thông tin này). */
+  content: AiContentEffect[];
+};
+
+export type AiContentEffect = {
+  feature: string;
+  label: string;
+  /** "insufficient_data": các dự án đã kết thúc gần như giống nhau ở thông tin này. */
+  status: "learned" | "insufficient_data";
+  coefficient: number;
+  /** Chênh lệch xác suất của chiến dịch này do thông tin đó; null nếu chưa học được. */
+  impact: number | null;
 };
 
 export type AiEstimateRequest = {

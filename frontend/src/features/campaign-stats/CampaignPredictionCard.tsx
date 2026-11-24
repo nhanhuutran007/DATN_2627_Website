@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { ApiError } from "@/lib/api";
-import { fetchCampaignPrediction, type AiFactor, type AiPredictData } from "@/lib/api/ai";
+import { fetchCampaignPrediction, type AiContentEffect, type AiFactor, type AiPredictData } from "@/lib/api/ai";
 
 /** Gợi ý hành động cho chủ dự án ứng với yếu tố đang kéo khả năng thành công xuống. */
 const IMPROVEMENT_TIPS: Record<string, string> = {
@@ -79,6 +79,11 @@ type CampaignPredictionCardProps = {
   /** `owner`: kèm gợi ý cải thiện; `admin`: bản gọn cho hàng đợi xét duyệt. */
   variant: "owner" | "admin";
 };
+
+/** Tên các thông tin nội dung AI chưa học được (vd. "Có video giới thiệu, Số lượng hình ảnh"), rỗng nếu không có. */
+function untrainedContent(content: AiContentEffect[] | undefined): string {
+  return (content ?? []).filter((effect) => effect.status === "insufficient_data").map((effect) => effect.label).join(", ");
+}
 
 /**
  * Ước lượng khả năng đạt mục tiêu từ mô hình — chỉ hiển thị cho chủ dự án/admin,
@@ -179,6 +184,7 @@ function PredictionBody({ data, variant }: { data: AiPredictData; variant: "owne
           Đã tự hiệu chỉnh theo {data.platform.samples} dự án đã kết thúc trên Góp Mầm: mô hình gốc ước{" "}
           {Math.round(data.platform.baseProbability * 100)}%, dữ liệu Góp Mầm chiếm {Math.round(data.platform.weight * 100)}% trong
           kết quả (tăng dần khi có thêm dự án tương tự kết thúc).
+          {untrainedContent(data.platform.content) && ` ${untrainedContent(data.platform.content)}: chưa đủ dữ liệu để học.`}
         </p>
       )}
       {tips.length > 0 && (

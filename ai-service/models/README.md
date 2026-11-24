@@ -76,6 +76,30 @@ thấp nhất, Y tế như Giáo dục). Để tránh sai lệch đó, `ai-servi
 trên các lĩnh vực mô hình đã học** (đọc từ `dataset.category_mapping`), không nêu lĩnh vực thành
 yếu tố ảnh hưởng và trả kèm `caveats` để giao diện ghi rõ.
 
+## Tự học từ dự án Góp Mầm đã kết thúc
+
+Mỗi lần dự đoán, backend gửi kèm các dự án đã kết thúc (`app/services/platform_learning.py`, không
+cần huấn luyện lại):
+
+1. **Hiệu chỉnh mức chung** theo các dự án tương tự (lĩnh vực, mục tiêu, thời hạn gần nhau).
+2. **Học thêm từ nội dung** mà Kickstarter không có: *có video*, *từ 3 ảnh trở lên*, *câu chuyện
+   từ 300 từ trở lên*. Hồi quy logistic có phạt (ridge) trên phần chênh lệch giữa kết quả thật và
+   mô hình gốc; mỗi thông tin cần **≥ 15 dự án ở mỗi nhóm có/không** mới được học (ít hơn thì báo
+   `insufficient_data`, không ảnh hưởng), tổng điều chỉnh tối đa ±0,75 log-odds. Thông tin học được
+   hiện thành yếu tố giải thích như các đặc trưng khác.
+
+   **Thử nghiệm bằng dữ liệu mô phỏng** (`backend/scripts/seed-ai-history.ts`): 150 dự án có nội
+   dung ngẫu nhiên với ảnh hưởng **tự đặt** (log-odds) video +0,8, từ 3 ảnh +0,5, câu chuyện ≥300
+   từ +0,6. Trên bộ đang nạp (150 mô phỏng + 9 dự án thật), AI học được ≈ +0,96 / +0,23 / −0,26 —
+   video đúng, câu chuyện sai chiều vì trong mẫu này dự án câu chuyện dài tình cờ đạt ít hơn
+   (57,8% so với 64,0%). Lặp 20 lần với dữ liệu sinh cùng quy luật: 150 dự án học trung bình
+   +0,66 / +0,36 / +0,45 (dao động ±0,3, sai chiều 0 / 4 / 3 lần trên 20); 1.500 dự án
+   +0,72 / +0,39 / +0,54 (±0,1, không lần nào sai chiều). Kết luận: cơ chế học lại đúng quy luật
+   khi đủ dữ liệu; 150 dự án mới cho xu hướng, chưa đủ để tin từng con số.
+
+Thời hạn gây quỹ tối đa **60 ngày** (như Kickstarter): gợi ý thời hạn chỉ trong 30–60 ngày, dự án
+cũ vượt 60 ngày được trả kèm `caveats` vì ít có trong dữ liệu huấn luyện.
+
 ## Dữ liệu chấm rủi ro ở cấp chiến dịch
 
 Mô hình gian lận học trên đặc trưng của **một khách hàng** (IEEE-CIS). Khi quét một chiến dịch,

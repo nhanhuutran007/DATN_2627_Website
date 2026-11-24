@@ -49,6 +49,19 @@ class PredictRequest(BaseModel):
     history: list[PlatformOutcome] = Field(default_factory=list, max_length=MAX_HISTORY)
 
 
+class ContentEffect(BaseModel):
+    """Thông tin nội dung mô hình gốc (Kickstarter) không có, học riêng từ dữ liệu Góp Mầm."""
+
+    feature: str
+    label: str
+    # "learned": đủ dự án khác nhau để học; "insufficient_data": các dự án gần như giống nhau
+    status: Literal["learned", "insufficient_data"]
+    # Hệ số trên thang log-odds cho mỗi độ lệch chuẩn (đã co về 0 khi ít dữ liệu)
+    coefficient: float = 0.0
+    # Chênh lệch xác suất của chính chiến dịch này do thông tin đó (−1…1), None nếu chưa học được
+    impact: float | None = None
+
+
 class PlatformAdjustment(BaseModel):
     """Phần hiệu chỉnh học từ dự án Góp Mầm đã kết thúc (cộng thêm vào dự đoán của mô hình gốc)."""
 
@@ -58,6 +71,8 @@ class PlatformAdjustment(BaseModel):
     model_rate: float  # tỷ lệ mô hình gốc dự đoán cho chính các dự án đó
     weight: float  # 0…1: mức tin vào dữ liệu Góp Mầm, tăng dần theo số dự án tương tự
     base_probability: float  # dự đoán của mô hình gốc trước khi hiệu chỉnh
+    # Ảnh hưởng của nội dung (video, ảnh, câu chuyện) học từ chính các dự án Góp Mầm đã kết thúc
+    content: list[ContentEffect] = Field(default_factory=list)
 
 
 class Factor(BaseModel):

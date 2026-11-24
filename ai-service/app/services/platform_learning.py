@@ -10,7 +10,12 @@ lần, nên dự án vừa kết thúc có tác dụng ngay ở lần dự đoá
    dự án đó. Chênh lệch (thang log-odds) được cộng vào dự đoán, nhân với mức tin
    ``n / (n + PRIOR_STRENGTH)``: ít dữ liệu thì gần như giữ nguyên mô hình gốc, càng nhiều dự án
    tương tự thì dữ liệu Góp Mầm càng có tiếng nói.
-2. **Gợi ý thời hạn**: với số tiền người tạo tự đặt (AI không gợi ý số tiền), tính khả năng đạt
+2. **Học thêm từ nội dung**: có video, có từ 3 ảnh, câu chuyện từ 300 từ — Kickstarter không có
+   các thông tin này nên mô hình gốc không biết. Hồi quy logistic có phạt trên phần chênh lệch
+   giữa kết quả thật và mô hình gốc ước lượng mỗi thông tin đi cùng khả năng đạt cao hay thấp
+   hơn; thông tin chưa đủ dự án ở cả hai nhóm có/không (vd. chưa ai có video) được báo "chưa đủ
+   dữ liệu" và không ảnh hưởng.
+3. **Gợi ý thời hạn**: với số tiền người tạo tự đặt (AI không gợi ý số tiền), tính khả năng đạt
    đã hiệu chỉnh cho từng ngày, làm mượt, rồi gợi ý khoảng thời hạn tốt gần như nhau.
 """
 
@@ -22,10 +27,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from app.schemas.predict import (
+    ContentEffect,
     DurationOption,
     DurationSuggestion,
     EstimateRequest,
     EstimateResponse,
+    Factor,
     PlatformAdjustment,
     PlatformOutcome,
     PredictFeatures,
@@ -50,8 +57,9 @@ DURATION_SCALE_DAYS = 30.0
 FEW_SAMPLES = 30
 
 # Các mốc hiển thị để so sánh; đường khả năng đạt được tính theo từng ngày rồi làm mượt.
-DURATION_GRID: tuple[int, ...] = (30, 45, 60, 90)
-MAX_DURATION_DAYS = 90
+DURATION_GRID: tuple[int, ...] = (30, 45, 60)
+# Góp Mầm cho gây quỹ tối đa 60 ngày (như Kickstarter), nên chỉ gợi ý trong khoảng này.
+MAX_DURATION_DAYS = 60
 # Làm mượt theo thời hạn (Gauss, độ lệch chuẩn 7 ngày): mô hình học từ Kickstarter có "đáy giả" ở
 # đúng 30 và 60 ngày (mặc định và mức tối đa cũ của Kickstarter, hay được người tạo qua loa giữ
 # nguyên) khiến 30 ngày thấp hơn 31 ngày cả chục điểm — đó là thói quen chọn số tròn, không phải
@@ -65,6 +73,95 @@ MIN_SIMILARITY = 0.05
 TYPICAL_NAME_WORDS = 6
 # Mức tin vào dữ liệu Góp Mầm từ ngưỡng này trở lên thì ghi nguồn gợi ý thời hạn là "platform".
 PLATFORM_BASIS_TRUST = 0.5
+
+
+# --- Học thêm ảnh hưởng của nội dung (mô hình gốc không có các thông tin này) -----------------
+# Kickstarter không có ảnh, video, độ dài câu chuyện lúc ra mắt, nên phần này chỉ học được từ dự
+# án Góp Mầm đã kết thúc: hồi quy logistic có phạt (ridge) trên phần dư so với mô hình gốc
+# (offset = log-odds mô hình gốc). Mỗi thông tin là CÓ/KHÔNG theo một mức có ý nghĩa (có video,
+# từ 3 ảnh, câu chuyện từ 300 từ): dễ giải thích, và vài dự án có giá trị lệch hẳn (vd. mô tả rất
+# ngắn) không chi phối được kết quả như khi dùng giá trị liên tục.
+CONTENT_FEATURES: tuple[tuple[str, str, float], ...] = (
+    ("has_video", "Video giới thiệu", 1.0),
+    ("image_count", "Từ 3 ảnh trở lên", 3.0),
+    ("story_word_count", "Câu chuyện từ 300 từ trở lên", 300.0),
+)
+# Ít hơn số dự án này thì chưa học phần nội dung.
+CONTENT_MIN_SAMPLES = 20
+# Mỗi thông tin cần ít nhất ngần này dự án ở MỖI nhóm (có / không) mới học được.
+CONTENT_MIN_GROUP = 15
+# Mức phạt ridge: tương đương "thêm" vài dự án không có ảnh hưởng, kéo hệ số về 0 khi ít dữ liệu.
+CONTENT_RIDGE = 4.0
+# Tổng điều chỉnh do nội dung tối đa ±0,75 log-odds (≈ ±18 điểm quanh mức 50%).
+CONTENT_SHIFT_LIMIT = 0.75
+CONTENT_NOTE_UP = "Học từ dự án Góp Mầm đã kết thúc: đi cùng khả năng đạt cao hơn"
+CONTENT_NOTE_DOWN = "Học từ dự án Góp Mầm đã kết thúc: đi cùng khả năng đạt thấp hơn"
+# Chênh lệch dưới nửa điểm phần trăm không nêu thành yếu tố (như mô hình gốc).
+CONTENT_MIN_IMPACT = 0.005
+
+
+def _content_flags(features: PredictFeatures) -> np.ndarray:
+    """1/0 cho từng thông tin nội dung (đạt mức có ý nghĩa hay không)."""
+    return np.asarray(
+        [
+            1.0 if float(getattr(features, name)) >= level else 0.0
+            for name, _, level in CONTENT_FEATURES
+        ]
+    )
+
+
+class ContentModel:
+    """Hệ số nội dung học từ lịch sử; thông tin không đủ dự án ở cả hai nhóm thì để 0."""
+
+    def __init__(self, history: list[PlatformOutcome], model_probs: np.ndarray) -> None:
+        self.samples = len(history)
+        k = len(CONTENT_FEATURES)
+        self.mean = np.zeros(k)
+        self.std = np.ones(k)
+        self.coef = np.zeros(k)
+        self.learned = np.zeros(k, dtype=bool)
+        if self.samples < CONTENT_MIN_SAMPLES:
+            return
+        values = np.asarray([_content_flags(item.features) for item in history])
+        for j in range(k):
+            column = values[:, j]
+            with_flag = int(column.sum())
+            if min(with_flag, self.samples - with_flag) >= CONTENT_MIN_GROUP:
+                self.mean[j], self.std[j], self.learned[j] = column.mean(), column.std(), True
+        if not self.learned.any():
+            return
+        outcomes = np.asarray([1.0 if item.reached else 0.0 for item in history])
+        clipped = np.clip(model_probs, 1e-4, 1 - 1e-4)
+        offset = np.log(clipped / (1 - clipped))
+        columns = np.flatnonzero(self.learned)
+        z = (values[:, columns] - self.mean[columns]) / self.std[columns]
+        self.coef[columns] = _ridge_logistic(z, outcomes, offset)
+
+    def shift_terms(self, features: PredictFeatures) -> np.ndarray:
+        """Phần log-odds mỗi thông tin đóng góp cho chiến dịch này (0 nếu chưa học được)."""
+        z = (_content_flags(features) - self.mean) / self.std
+        return np.where(self.learned, self.coef * z, 0.0)
+
+    def trust(self) -> float:
+        return self.samples / (self.samples + PRIOR_STRENGTH) if self.samples else 0.0
+
+
+def _ridge_logistic(z: np.ndarray, y: np.ndarray, offset: np.ndarray) -> np.ndarray:
+    """Hồi quy logistic có offset + hệ số chặn (không phạt) + phạt ridge cho hệ số (Newton/IRLS)."""
+    n, k = z.shape
+    design = np.hstack([np.ones((n, 1)), z])
+    penalty = np.diag([0.0] + [CONTENT_RIDGE] * k)
+    beta = np.zeros(k + 1)
+    for _ in range(50):
+        p = 1.0 / (1.0 + np.exp(-(offset + design @ beta)))
+        weights = p * (1.0 - p)
+        gradient = design.T @ (y - p) - penalty @ beta
+        hessian = design.T @ (design * weights[:, None]) + penalty + 1e-9 * np.eye(k + 1)
+        step = np.linalg.solve(hessian, gradient)
+        beta += step
+        if float(np.max(np.abs(step))) < 1e-8:
+            break
+    return beta[1:]
 
 
 def _logit(p: float) -> float:
@@ -99,6 +196,7 @@ class PlatformLearner:
         self.use_model = use_model
         self.model_probs = predictor.score_many([item.features for item in history], use_model)
         self.outcomes = np.asarray([1.0 if item.reached else 0.0 for item in history])
+        self.content = ContentModel(history, self.model_probs)
 
     def weights(self, query: PredictFeatures, use_goal: bool = True) -> np.ndarray:
         return np.asarray([similarity(query, item.features, use_goal) for item in self.history])
@@ -118,7 +216,29 @@ class PlatformLearner:
         model_rate = float(weights @ self.model_probs) / n_similar
         shift = max(-SHIFT_LIMIT, min(SHIFT_LIMIT, _logit(observed) - _logit(model_rate)))
         trust = n_similar / (n_similar + PRIOR_STRENGTH)
-        probability = _sigmoid(_logit(base_probability) + trust * shift)
+        calibrated_logit = _logit(base_probability) + trust * shift
+
+        # Nội dung: cộng phần học từ Góp Mầm (có chặn), rồi tính ảnh hưởng của từng thông tin.
+        terms = self.content.trust() * self.content.shift_terms(query)
+        total = float(terms.sum())
+        if abs(total) > CONTENT_SHIFT_LIMIT:
+            terms = terms * (CONTENT_SHIFT_LIMIT / abs(total))
+            total = float(terms.sum())
+        probability = _sigmoid(calibrated_logit + total)
+        content = [
+            ContentEffect(
+                feature=name,
+                label=label,
+                status="learned" if self.content.learned[j] else "insufficient_data",
+                coefficient=round(float(self.content.coef[j]), 6),
+                impact=(
+                    round(probability - _sigmoid(calibrated_logit + total - float(terms[j])), 6)
+                    if self.content.learned[j]
+                    else None
+                ),
+            )
+            for j, (name, label, _) in enumerate(CONTENT_FEATURES)
+        ]
         detail = PlatformAdjustment(
             samples=len(self.history),
             similar=round(n_similar, 3),
@@ -126,6 +246,7 @@ class PlatformLearner:
             model_rate=round(model_rate, 6),
             weight=round(trust, 6),
             base_probability=round(base_probability, 6),
+            content=content,
         )
         return detail, probability
 
@@ -152,12 +273,28 @@ def apply_platform_learning(
         return response
     platform, probability = adjusted
     probability = max(0.0, min(1.0, probability))
+    # Thông tin nội dung học được và có ảnh hưởng đáng kể thì thêm vào danh sách yếu tố giải thích.
+    content_factors = [
+        Factor(
+            feature=effect.feature,
+            label=effect.label,
+            direction="UP" if effect.impact > 0 else "DOWN",
+            weight=effect.impact,
+            note=CONTENT_NOTE_UP if effect.impact > 0 else CONTENT_NOTE_DOWN,
+        )
+        for effect in platform.content
+        if effect.impact is not None and abs(effect.impact) >= CONTENT_MIN_IMPACT
+    ]
+    factors = sorted(
+        [*response.factors, *content_factors], key=lambda f: abs(f.weight), reverse=True
+    )
     return response.model_copy(
         update={
             "probability": round(probability, 6),
             "prediction": "LIKELY" if probability >= 0.5 else "UNLIKELY",
             "confidence": round(2.0 * abs(probability - 0.5), 6),
             "platform": platform,
+            "factors": factors,
         }
     )
 
@@ -180,6 +317,7 @@ def estimate(predictor: PredictorService, request: EstimateRequest) -> EstimateR
     history = request.history
     min_days = request.min_duration_days
     chosen_days = features.duration_days if features.duration_days >= min_days else None
+    # Ngày đã chọn vượt 60 ngày (hồ sơ cũ) vẫn được vẽ tới đó để so sánh, nhưng gợi ý chỉ ≤ 60.
     max_days = max(MAX_DURATION_DAYS, chosen_days or 0, min_days)
 
     # Ước lượng (kèm yếu tố giải thích) cho thời hạn đang chọn, nếu đã chọn ngày kết thúc.
@@ -195,15 +333,17 @@ def estimate(predictor: PredictorService, request: EstimateRequest) -> EstimateR
     def at(days: int) -> float:
         return float(curve[days - min_days])
 
-    best = float(curve.max())
+    # Chỉ gợi ý trong thời hạn cho phép (trục ngày tăng dần nên phần cho phép nằm ở đầu).
+    allowed = max(1, int(np.count_nonzero(days_axis <= MAX_DURATION_DAYS)))
+    best = float(curve[:allowed].max())
     # Thời hạn ngắn nhất mà khả năng đạt gần bằng mức tốt nhất: kéo dài thêm không đáng nếu chỉ
     # hơn vài điểm (và dữ liệu không phân biệt được chênh lệch nhỏ như vậy).
-    best_index = int(np.argmax(curve >= best - DURATION_RANGE_TOLERANCE))
+    best_index = int(np.argmax(curve[:allowed] >= best - DURATION_RANGE_TOLERANCE))
     # Khoảng liền nhau từ đó mà khả năng đạt không kém quá DURATION_RANGE_TOLERANCE.
     low = high = best_index
     while low > 0 and curve[low - 1] >= best - DURATION_RANGE_TOLERANCE:
         low -= 1
-    while high < len(curve) - 1 and curve[high + 1] >= best - DURATION_RANGE_TOLERANCE:
+    while high < allowed - 1 and curve[high + 1] >= best - DURATION_RANGE_TOLERANCE:
         high += 1
     best_days = int(days_axis[best_index])
 

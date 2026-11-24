@@ -5,6 +5,12 @@
  * nhiên, nên AI học lại đúng quy luật này — chỉ để minh họa khả năng tự hiệu chỉnh theo dữ liệu
  * nền tảng, KHÔNG phải bằng chứng về hành vi người ủng hộ thật và không dùng làm số liệu đánh giá.
  *
+ * Từ 25/11/2026 mỗi dự án còn có nội dung ngẫu nhiên — có video (~40%), từ 3 ảnh (~45%), câu
+ * chuyện từ 300 từ (~45%) — với ảnh hưởng TỰ ĐẶT trong GROUND_TRUTH (video +0,8, ảnh +0,5, câu
+ * chuyện +0,6 log-odds) để thử phần AI học nội dung (`ContentModel` ở ai-service). AI học lại đúng
+ * các con số này, nên kết quả chỉ chứng minh cơ chế hoạt động, không nói gì về người ủng hộ thật.
+ * Thời hạn ≤ 60 ngày như quy định hiện hành.
+ *
  * Số tiền của dự án được cộng từ các khoản ủng hộ (như seed chính): dự án đạt có các khoản
  * `completed`; dự án không đạt có các khoản đã hoàn (`refunded`, như cơ chế tự hoàn khi kết thúc
  * không đạt) nên số tiền còn lại bằng 0.
@@ -35,7 +41,36 @@ const GROUND_TRUTH = {
   /** Mỗi ngày dài hơn 30 ngày giảm 0,03 (60 ngày: −0,9). */
   durationSlope: -0.03,
   noise: 0.7,
+  /**
+   * Ảnh hưởng của nội dung (TỰ ĐẶT để thử AI học lại — không phải số liệu thật): có video,
+   * có từ 3 ảnh, câu chuyện từ 300 từ. Khớp ngưỡng `CONTENT_FEATURES` trong
+   * ai-service/app/services/platform_learning.py.
+   */
+  videoEffect: 0.8,
+  imagesEffect: 0.5,
+  storyEffect: 0.6,
 };
+
+/** Tỷ lệ dự án mô phỏng có từng thông tin nội dung. */
+const CONTENT_SHARE = { video: 0.4, images: 0.45, story: 0.45 };
+/** Link video giữ chỗ (dự án mô phỏng bị ẩn khỏi trang công khai; AI chỉ cần biết có video hay không). */
+const SIM_VIDEO_URL = "https://www.youtube.com/watch?v=GopMamDemo1";
+const SIM_IMAGES = [
+  "cover-library", "cover-reading", "cover-graduate", "cover-clinic", "cover-health", "cover-water",
+  "cover-seedling", "cover-mangrove", "cover-farm", "cover-vegetable", "cover-relief", "cover-elderly",
+  "cover-meal", "cover-housing", "cover-computer", "cover-robot", "cover-startup", "cover-music",
+].map((name) => `/images/${name}.webp`);
+/** Câu ghép thành câu chuyện dài/ngắn (đếm từ giống backend: bỏ thẻ HTML rồi tách theo khoảng trắng). */
+const STORY_SENTENCES = [
+  "Chúng tôi đã khảo sát thực tế cùng chính quyền địa phương và người dân trước khi lập kế hoạch.",
+  "Toàn bộ kinh phí được chia theo từng mốc, mỗi mốc đều có báo cáo chi tiêu và hình ảnh kèm theo.",
+  "Đội ngũ tình nguyện viên gồm giáo viên, cán bộ y tế và sinh viên đã đồng hành cùng dự án nhiều năm.",
+  "Sau khi hoàn thành, công trình được bàn giao cho cộng đồng tự quản lý và duy trì lâu dài.",
+  "Người ủng hộ có thể theo dõi tiến độ hằng tuần qua mục cập nhật và nhật ký chi tiêu của dự án.",
+  "Chúng tôi ưu tiên mua vật tư tại địa phương để hỗ trợ sinh kế của bà con trong vùng.",
+  "Mỗi gia đình hưởng lợi đều được trao đổi trực tiếp để hiểu rõ nhu cầu thực sự của họ.",
+  "Nếu quyên góp vượt mục tiêu, phần dư sẽ được dùng cho giai đoạn tiếp theo và công khai đầy đủ.",
+];
 
 type CategorySpec = {
   name: string;
@@ -110,7 +145,8 @@ const CATEGORIES: CategorySpec[] = [
   },
 ];
 
-const DURATIONS: Array<[number, number]> = [[30, 0.3], [35, 0.1], [40, 0.1], [45, 0.2], [60, 0.2], [75, 0.05], [90, 0.05]];
+/** Thời hạn ≤ 60 ngày (mức tối đa của nền tảng, như Kickstarter). */
+const DURATIONS: Array<[number, number]> = [[30, 0.3], [35, 0.1], [40, 0.15], [45, 0.2], [50, 0.1], [60, 0.15]];
 const AMOUNTS = [100_000, 200_000, 200_000, 300_000, 500_000, 500_000, 1_000_000, 1_500_000, 2_000_000, 3_000_000, 5_000_000];
 
 /** PRNG có seed cố định (mulberry32), giống seed chính. */
@@ -135,6 +171,8 @@ type Plan = {
   startedDaysAgo: number;
   reached: boolean;
   fundedRatio: number;
+  imageUrl: string | null;
+  videoUrl: string | null;
 };
 
 function buildPlans(random: () => number): Plan[] {
@@ -165,14 +203,34 @@ function buildPlans(random: () => number): Plan[] {
       const durationDays = weighted(DURATIONS);
       const startedDaysAgo = durationDays + 3 + Math.floor(random() * (700 - durationDays));
 
+      // Nội dung: độc lập với mục tiêu/thời hạn để AI tách được ảnh hưởng riêng.
+      const hasVideo = random() < CONTENT_SHARE.video;
+      const imageCount = random() < CONTENT_SHARE.images ? 3 + Math.floor(random() * 4) : Math.floor(random() * 3);
+      const longStory = random() < CONTENT_SHARE.story;
+
       const logOdds =
         spec.effect +
         GROUND_TRUTH.goalSlope * Math.log10(goal / GROUND_TRUTH.goalReference) +
         GROUND_TRUTH.durationSlope * (durationDays - 30) +
+        (hasVideo ? GROUND_TRUTH.videoEffect : 0) +
+        (imageCount >= 3 ? GROUND_TRUTH.imagesEffect : 0) +
+        (longStory ? GROUND_TRUTH.storyEffect : 0) +
         GROUND_TRUTH.noise * gaussian();
       const reached = random() < 1 / (1 + Math.exp(-logOdds));
       const fundedRatio = reached ? 1 + random() * 0.3 : 0.1 + random() * 0.8;
       const location = PROVINCES[Math.floor(random() * PROVINCES.length)];
+
+      // Ảnh: 1 ảnh đại diện + (imageCount − 1) ảnh trong câu chuyện (backend đếm cả hai).
+      const images = Array.from({ length: imageCount }, () => pick(SIM_IMAGES));
+      const inlineImages = images.slice(1).map((src) => `<p><img src="${src}" alt="Hình ảnh dự án"></p>`).join("");
+      // Câu chuyện ngắn ~60–150 từ, dài ~320–520 từ (mỗi câu ~20 từ).
+      const sentenceCount = longStory ? 16 + Math.floor(random() * 10) : 2 + Math.floor(random() * 5);
+      const story = Array.from({ length: sentenceCount }, () => pick(STORY_SENTENCES));
+      const storyHtml = [0, 1, 2, 3]
+        .map((part) => story.filter((_, index) => index % 4 === part).join(" "))
+        .filter(Boolean)
+        .map((text) => `<p>${text}</p>`)
+        .join("");
 
       plans.push({
         title,
@@ -183,10 +241,14 @@ function buildPlans(random: () => number): Plan[] {
         startedDaysAgo,
         reached,
         fundedRatio,
+        imageUrl: images[0] ?? null,
+        videoUrl: hasVideo ? SIM_VIDEO_URL : null,
         description:
           `<p>${spec.why}</p>` +
           `<p>Dự án "${title}" cần ${goal.toLocaleString("vi-VN")} ₫ trong ${durationDays} ngày để triển khai tại ${location}. ` +
           `Mọi khoản chi đều được báo cáo kèm chứng từ trên Góp Mầm.</p>` +
+          storyHtml +
+          inlineImages +
           `<p><em>Dữ liệu mô phỏng để minh họa chức năng AI.</em></p>`,
       });
     }
@@ -203,12 +265,20 @@ async function main() {
   const campaignRepo = dataSource.getRepository(Campaign);
   const donationRepo = dataSource.getRepository(Donation);
 
-  const existing = await campaignRepo.find({ where: { title: In(plans.map((plan) => plan.title)) }, select: { id: true } });
+  // Nhận ra theo cờ is_simulated (không theo tiêu đề): đổi cách sinh dữ liệu vẫn xóa được bản cũ.
+  const existing = await campaignRepo.find({ where: { isSimulated: true }, select: { id: true } });
   if (remove) {
     const ids = existing.map((campaign) => campaign.id);
     if (ids.length > 0) {
       await dataSource.transaction(async (manager) => {
-        await manager.delete(Donation, { campaignId: In(ids) });
+        const list = ids.map(() => "?").join(",");
+        const donationIds = `SELECT id FROM donations WHERE campaign_id IN (${list})`;
+        // Bảng phụ trỏ tới khoản ủng hộ / chiến dịch mô phỏng (vd. dữ liệu nhập từ máy khác).
+        await manager.query(`DELETE FROM refund_requests WHERE donation_id IN (${donationIds})`, ids);
+        await manager.query(`DELETE FROM reward_recipients WHERE donation_id IN (${donationIds})`, ids);
+        for (const table of ["donations", "campaign_follows", "campaign_view_daily", "behavior_events", "campaign_screenings", "reward_tiers"]) {
+          await manager.query(`DELETE FROM ${table} WHERE campaign_id IN (${list})`, ids);
+        }
         await manager.delete(Campaign, { id: In(ids) });
       });
     }
@@ -240,6 +310,8 @@ async function main() {
         description: plan.description,
         category: plan.category,
         location: plan.location,
+        imageUrl: plan.imageUrl ?? undefined,
+        videoUrl: plan.videoUrl,
         ownerId: pick(owners).id,
         organizationId: null,
         goalAmount: plan.goal,

@@ -124,6 +124,15 @@ type WirePlatformAdjustment = {
   model_rate: number;
   weight: number;
   base_probability: number;
+  content?: WireContentEffect[];
+};
+
+type WireContentEffect = {
+  feature: string;
+  label: string;
+  status: "learned" | "insufficient_data";
+  coefficient: number;
+  impact: number | null;
 };
 
 type WirePredictResponse = {
@@ -375,6 +384,13 @@ function fromWirePredict(response: WirePredictResponse): AiPredictResponse {
           modelRate: platform.model_rate,
           weight: platform.weight,
           baseProbability: platform.base_probability,
+          content: (platform.content ?? []).map((effect) => ({
+            feature: effect.feature,
+            label: effect.label,
+            status: effect.status,
+            coefficient: effect.coefficient,
+            impact: effect.impact,
+          })),
         }
       : null,
   };

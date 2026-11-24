@@ -90,6 +90,16 @@ export type AiPlatformAdjustment = {
   /** 0…1: mức tin vào dữ liệu Góp Mầm so với mô hình gốc. */
   weight: number;
   baseProbability: number;
+  /** Video / ảnh / câu chuyện: học riêng từ dự án Góp Mầm (bản cũ của AI không trả trường này). */
+  content?: AiContentEffect[];
+};
+
+export type AiContentEffect = {
+  feature: string;
+  label: string;
+  status: "learned" | "insufficient_data";
+  coefficient: number;
+  impact: number | null;
 };
 
 /** "platform": dữ liệu Góp Mầm chiếm phần lớn trong hiệu chỉnh; "model": chủ yếu mô hình gốc. */
