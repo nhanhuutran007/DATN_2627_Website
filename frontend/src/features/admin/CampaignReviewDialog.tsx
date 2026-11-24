@@ -20,7 +20,7 @@ type Props = {
   onClose: () => void;
 };
 
-const money = (value: number | string | null | undefined) => `${Number(value ?? 0).toLocaleString("vi-VN")} ₫`;
+const money = (value: number | string | null | undefined) => `${Number(value ?? 0).toLocaleString("vi-VN")}\u00A0₫`;
 const date = (value?: string | null) => (value ? new Date(value).toLocaleDateString("vi-VN") : "—");
 
 const FRAME_STYLE = `
@@ -108,7 +108,7 @@ export function CampaignReviewDialog({ campaign, statusLabel, actions, onClose }
     >
       <header className="review-head">
         <div>
-          <p className="eyebrow">Hồ sơ chiến dịch · {statusLabel}</p>
+          <p className="eyebrow review-eyebrow">Hồ sơ chiến dịch <span className="review-status-tag">{statusLabel}</span></p>
           <h2 id="review-title">{campaign.title}</h2>
         </div>
         <button className="review-close" type="button" aria-label="Đóng" onClick={onClose}>

@@ -25,8 +25,10 @@ export type AutoRefundSummary = {
   recent: AutoRefundEvent[];
 };
 
-export function fetchAutoRefundSummary(): Promise<AutoRefundSummary> {
-  return api.get<AutoRefundSummary>("/admin/refunds/auto-summary");
+export function fetchAutoRefundSummary(range: { from?: string; to?: string } = {}): Promise<AutoRefundSummary> {
+  const params = new URLSearchParams(range);
+  const qs = params.toString();
+  return api.get<AutoRefundSummary>(`/admin/refunds/auto-summary${qs ? `?${qs}` : ""}`);
 }
 
 export type ScreeningLevel = "low" | "medium" | "high";

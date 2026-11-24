@@ -124,13 +124,15 @@ export function fetchMyRefundRequests(): Promise<RefundRequest[]> {
 export function fetchAdminRefunds(
   status?: RefundRequestStatus,
   page: { offset?: number; limit?: number } = {},
-  filters: { q?: string; minAmount?: number; maxAmount?: number } = {},
+  filters: { q?: string; minAmount?: number; maxAmount?: number; from?: string; to?: string } = {},
 ): Promise<RefundRequestList> {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
   if (filters.q) params.set("q", filters.q);
   if (filters.minAmount !== undefined) params.set("minAmount", String(filters.minAmount));
   if (filters.maxAmount !== undefined) params.set("maxAmount", String(filters.maxAmount));
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
   if (page.offset !== undefined) params.set("offset", String(page.offset));
   if (page.limit !== undefined) params.set("limit", String(page.limit));
   const qs = params.toString();
@@ -150,8 +152,14 @@ export function refundDonationDirectly(donationId: string, reason: string, manua
 }
 
 /** Tải CSV yêu cầu hoàn kèm tài khoản nhận (để chuyển khoản trả lại). */
-export async function downloadRefundsCsv(status?: RefundRequestStatus): Promise<void> {
-  const { blob, filename } = await apiDownload(`/admin/refunds/export${status ? `?status=${status}` : ""}`);
+export async function downloadRefundsCsv(
+  status?: RefundRequestStatus,
+  range: { from?: string; to?: string } = {},
+): Promise<void> {
+  const params = new URLSearchParams(range);
+  if (status) params.set("status", status);
+  const qs = params.toString();
+  const { blob, filename } = await apiDownload(`/admin/refunds/export${qs ? `?${qs}` : ""}`);
   saveBlob(blob, filename ?? "hoan-tien.csv");
 }
 

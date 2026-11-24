@@ -110,9 +110,17 @@ export function cancelWithdrawal(id: string): Promise<Withdrawal> {
   return api.post<Withdrawal>(`/wallet/withdrawals/${encodeURIComponent(id)}/cancel`);
 }
 
-export function fetchAdminWithdrawals(status?: WithdrawalStatus, offset = 0, limit = 20): Promise<WithdrawalPage> {
+export function fetchAdminWithdrawals(
+  status?: WithdrawalStatus,
+  offset = 0,
+  limit = 20,
+  filters: { q?: string; from?: string; to?: string } = {},
+): Promise<WithdrawalPage> {
   const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
   if (status) params.set("status", status);
+  if (filters.q) params.set("q", filters.q);
+  if (filters.from) params.set("from", filters.from);
+  if (filters.to) params.set("to", filters.to);
   return api.get<WithdrawalPage>(`/admin/wallet-withdrawals?${params.toString()}`);
 }
 
@@ -149,4 +157,96 @@ export function confirmDemoTopup(id: string): Promise<WalletTopup> {
 
 export function cancelTopup(id: string): Promise<WalletTopup> {
   return api.post<WalletTopup>(`/wallet/topups/${encodeURIComponent(id)}/cancel`);
+}
+
+// ---------- Admin: đối soát ví ----------
+
+export type WalletBuckets = { balance: number; held: number; withdrawing: number };
+
+export type WalletReconRow = {
+  userId: string;
+  name: string;
+  email: string;
+  wallet: WalletBuckets;
+  /** Số dư dựng lại từ sổ giao dịch. */
+  ledger: WalletBuckets;
+  /** Ví thực tế − sổ; khác 0 = tiền bị thêm/bớt ngoài sổ. */
+  diff: WalletBuckets;
+  totalTopup: number;
+  totalCaptured: number;
+  totalWithdrawn: number;
+  totalRefunded: number;
+  txCount: number;
+  lastActivityAt: string | null;
+  sourceIssues: number;
+  status: "ok" | "mismatch";
+  summary: string | null;
+};
+
+export type WalletReconTotals = {
+  wallets: number;
+  mismatched: number;
+  liability: number;
+  ledgerLiability: number;
+  totalTopup: number;
+  totalCaptured: number;
+  totalWithdrawn: number;
+};
+
+export type WalletReconPage = {
+  items: WalletReconRow[];
+  total: number;
+  offset: number;
+  limit: number;
+  totals: WalletReconTotals;
+  checkedAt: string;
+};
+
+export type WalletSourceIssue = {
+  kind: string;
+  message: string;
+  txId: string | null;
+  type: WalletTxType | null;
+  amount: number;
+  at: string | null;
+};
+
+export type WalletReconDetail = WalletReconRow & {
+  issues: WalletSourceIssue[];
+  firstBreak: {
+    txId: string;
+    type: WalletTxType;
+    createdAt: string;
+    expected: WalletBuckets;
+    recorded: WalletBuckets;
+    jump: WalletBuckets;
+  } | null;
+  changedAfterLastTx: { at: string; diff: WalletBuckets } | null;
+  canRestore: boolean;
+  transactions: Array<{
+    id: string;
+    type: WalletTxType;
+    amount: number;
+    balanceAfter: number;
+    heldAfter: number;
+    withdrawingAfter: number;
+    note: string | null;
+    createdAt: string;
+  }>;
+};
+
+export function fetchAdminWallets(query: { q?: string; issuesOnly?: boolean; offset?: number; limit?: number }): Promise<WalletReconPage> {
+  const params = new URLSearchParams({ offset: String(query.offset ?? 0), limit: String(query.limit ?? 20) });
+  if (query.q) params.set("q", query.q);
+  if (query.issuesOnly) params.set("issuesOnly", "true");
+  return api.get<WalletReconPage>(`/admin/wallets?${params.toString()}`);
+}
+
+export function fetchAdminWalletDetail(userId: string): Promise<WalletReconDetail> {
+  return api.get<WalletReconDetail>(`/admin/wallets/${encodeURIComponent(userId)}`);
+}
+
+/** Đưa ví về đúng sổ giao dịch (cần mã OTP, hộp nhập mã tự hiện). */
+export function restoreAdminWallet(userId: string, reason: string): Promise<WalletReconDetail> {
+  return api.post<WalletReconDetail>(`/admin/wallets/${encodeURIComponent(userId)}/restore`, { reason });
 }

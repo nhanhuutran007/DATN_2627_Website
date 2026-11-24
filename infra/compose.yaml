@@ -136,7 +136,7 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-crowdfunding}
       MYSQL_USER: ${MYSQL_USER:-crowdfunding_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-local-only-change-me}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-root-change-me}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-gopmam@123}
     ports:
       - "${MYSQL_PORT:-3307}:3306"
     volumes:

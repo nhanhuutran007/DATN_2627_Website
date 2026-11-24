@@ -1,14 +1,16 @@
 const vndFormatter = new Intl.NumberFormat("vi-VN");
+/** Khoảng trắng không ngắt dòng: số tiền không bị tách "₫"/"triệu" xuống dòng riêng. */
+const NBSP = "\u00A0";
 
 /** 32600000 → "32.600.000 ₫" */
 export function formatVnd(value: number): string {
-  return `${vndFormatter.format(Math.round(value))} ₫`;
+  return `${vndFormatter.format(Math.round(value))}${NBSP}₫`;
 }
 
 /** 32600000 → "32,6 triệu" — dùng cho chỗ hẹp, luôn kèm số đầy đủ ở nơi khác. */
 export function formatVndShort(value: number): string {
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tỷ`;
-  if (value >= 1_000_000) return `${(value / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} triệu`;
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}${NBSP}tỷ`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })}${NBSP}triệu`;
   return formatVnd(value);
 }
 
@@ -30,7 +32,7 @@ export function formatVndCompact(value: number): string {
       return `${scaled.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}${suffix}`;
     }
   }
-  return `${amount.toLocaleString("vi-VN")} ₫`;
+  return `${amount.toLocaleString("vi-VN")}${NBSP}₫`;
 }
 
 /** "25/09/2026" */

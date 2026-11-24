@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import {
@@ -18,6 +20,7 @@ import { CampaignScreening } from "../campaigns/entities/campaign-screening.enti
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
 import { User, UserRole, UserStatus } from "../users/entities/user.entity";
+import { WalletReconciliationService } from "../wallet/wallet-reconciliation.service";
 import {
   AdminCampaignQueryDto,
   AdminDonationQueryDto,
@@ -79,6 +82,8 @@ export type AdminNavCounts = {
   pendingOrganizations: number;
   /** Chiến dịch có số ghi trên chiến dịch lệch với tổng giao dịch thành công (lũy kế). */
   ledgerMismatches: number;
+  /** Ví có số dư lệch sổ giao dịch hoặc giao dịch không khớp chứng từ gốc. */
+  walletMismatches: number;
   /** Ngày từ lần sao lưu gần nhất; null nếu chưa từng sao lưu. */
   daysSinceBackup: number | null;
 };
@@ -98,6 +103,9 @@ export class AdminService {
     @InjectRepository(RiskAlert)
     private readonly riskAlertRepo: Repository<RiskAlert>,
     private readonly auditService: AuditService,
+    @Optional()
+    @Inject(WalletReconciliationService)
+    private readonly walletReconciliation: WalletReconciliationService | null = null,
   ) {}
 
   /** Đếm nhanh bằng SQL (mỗi mục một COUNT) để sidebar làm mới thường xuyên mà không tải danh sách. */
@@ -116,6 +124,7 @@ export class AdminService {
       pendingOrganizations,
       ledgerMismatches,
       lastBackupRows,
+      walletMismatches,
     ] = await Promise.all([
       count("SELECT COUNT(*) AS n FROM `campaigns` WHERE `status` = 'pending'"),
       count("SELECT COUNT(*) AS n FROM `risk_alerts` WHERE `status` = 'open'"),
@@ -142,6 +151,7 @@ export class AdminService {
       this.userRepo.manager.query(
         "SELECT `created_at` AS createdAt FROM `audit_logs` WHERE `action` = 'backup.export' ORDER BY `created_at` DESC LIMIT 1",
       ) as Promise<Array<{ createdAt: Date | string }>>,
+      this.walletReconciliation ? this.walletReconciliation.countMismatched() : Promise.resolve(0),
     ]);
     const lastBackup = lastBackupRows[0]?.createdAt;
     return {
@@ -153,6 +163,7 @@ export class AdminService {
       pendingRefunds,
       pendingOrganizations,
       ledgerMismatches,
+      walletMismatches,
       daysSinceBackup: lastBackup ? Math.floor((now.getTime() - new Date(lastBackup).getTime()) / 86_400_000) : null,
     };
   }

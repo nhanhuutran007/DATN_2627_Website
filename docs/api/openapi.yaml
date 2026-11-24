@@ -2091,6 +2091,9 @@ paths:
         `refund.auto_approve`). Yêu cầu do người ủng hộ gửi, khoản SePay và rút tiền ví luôn chờ admin duyệt thủ công.
       security:
         - bearerAuth: []
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: "Từ ngày (yyyy-mm-dd, giờ VN, bao gồm)" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Đến ngày (yyyy-mm-dd, giờ VN, bao gồm cả ngày); from > to → 400" }
       responses:
         "200":
           description: Tổng hợp và tối đa 15 sự kiện gần nhất
@@ -2114,6 +2117,126 @@ paths:
                         amount: { type: number }
                         destination: { type: string, enum: [wallet, pledge_cancelled, gateway] }
                         at: { type: string, format: date-time }
+  /admin/wallet-withdrawals:
+    get:
+      operationId: adminListWalletWithdrawals
+      summary: Hàng chờ rút tiền ví (chỉ admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [pending, completed, rejected, cancelled] } }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: Tên/email người rút hoặc tên chủ tài khoản nhận }
+        - { name: from, in: query, schema: { type: string, format: date }, description: "Từ ngày (yyyy-mm-dd, giờ VN, bao gồm)" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Đến ngày (yyyy-mm-dd, giờ VN, bao gồm cả ngày); from > to → 400" }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: "Danh sách yêu cầu (admin thấy đủ số tài khoản), chờ xử lý cũ nhất trước"
+  /admin/wallets:
+    get:
+      operationId: adminListWallets
+      summary: Ví người dùng và đối soát với sổ giao dịch (chỉ admin)
+      description: >-
+        Số dư mỗi ví (`wallets`) so với số dựng lại từ `wallet_transactions` (nạp − giữ + nhả + hoàn − yêu cầu rút +
+        hủy rút; đang giữ = giữ − trừ − nhả; chờ rút = yêu cầu rút − đã chuyển − hủy rút), và mỗi dòng sổ phải khớp chứng
+        từ gốc (đơn nạp đã thanh toán, khoản ủng hộ, yêu cầu rút). Ví lệch bị chặn ủng hộ/rút tiền (409) cho tới khi admin
+        xử lý; cron 10 phút ghi audit `wallet.reconcile.mismatch_detected` và báo cho admin khi có ví mới lệch.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: Tên hoặc email }
+        - { name: issuesOnly, in: query, schema: { type: boolean }, description: Chỉ ví lệch sổ }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: Ví lệch lên đầu, kèm tổng toàn nền tảng
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/WalletReconRow" } }
+                  total: { type: integer }
+                  offset: { type: integer }
+                  limit: { type: integer }
+                  checkedAt: { type: string, format: date-time }
+                  totals:
+                    type: object
+                    properties:
+                      wallets: { type: integer }
+                      mismatched: { type: integer }
+                      liability: { type: number, description: Tổng số dư + đang giữ + chờ rút theo bảng ví (tiền nền tảng giữ hộ) }
+                      ledgerLiability: { type: number, description: Cùng số trên nhưng dựng lại từ sổ }
+                      totalTopup: { type: number }
+                      totalCaptured: { type: number }
+                      totalWithdrawn: { type: number }
+  /admin/wallets/{userId}:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: adminGetWallet
+      summary: Chi tiết đối soát một ví (chỉ admin)
+      description: >-
+        Gồm chênh lệch từng ngăn, các dòng sổ không khớp chứng từ, lần đầu số dư nhảy ngoài sổ giữa hai giao dịch
+        (`firstBreak`), thay đổi sau giao dịch cuối (`changedAfterLastTx`) và tối đa 200 giao dịch gần nhất.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Chi tiết ví
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/WalletReconRow"
+                  - type: object
+                    properties:
+                      issues:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            kind: { type: string }
+                            message: { type: string }
+                            txId: { type: string, nullable: true }
+                            type: { type: string, nullable: true }
+                            amount: { type: number }
+                            at: { type: string, format: date-time, nullable: true }
+                      firstBreak: { type: object, nullable: true }
+                      changedAfterLastTx: { type: object, nullable: true }
+                      canRestore: { type: boolean }
+                      transactions: { type: array, items: { type: object } }
+        "404":
+          description: Người dùng chưa có ví
+  /admin/wallets/{userId}/restore:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      operationId: adminRestoreWallet
+      summary: Đưa ví về đúng số dư theo sổ giao dịch (chỉ admin, cần OTP)
+      description: >-
+        Cần header `X-Step-Up-Token` mục đích `admin_withdraw`. Bỏ phần tiền thêm/bớt ngoài sổ, ghi audit
+        `wallet.reconcile.restore` (số cũ, số mới, lý do) và báo cho người dùng. Không sửa được dòng sổ sai chứng từ.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 10, maxLength: 500 }
+      responses:
+        "200":
+          description: Chi tiết ví sau khi khôi phục
+        "403":
+          description: Thiếu mã OTP (`step_up_required`)
+        "409":
+          description: Ví đã khớp, hoặc sổ cho ra số âm (tiền ngoài sổ đã được dùng — xử lý các khoản đó trước)
   /admin/campaigns/{id}/screening:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -3362,6 +3485,11 @@ paths:
         - name: status
           in: query
           schema: { type: string, enum: [pending, approved, rejected] }
+        - { name: q, in: query, schema: { type: string, maxLength: 200 }, description: Tên chiến dịch, tên/email người yêu cầu, lý do }
+        - { name: minAmount, in: query, schema: { type: number, minimum: 0 } }
+        - { name: maxAmount, in: query, schema: { type: number, minimum: 0 } }
+        - { name: from, in: query, schema: { type: string, format: date }, description: "Từ ngày (yyyy-mm-dd, giờ VN, bao gồm)" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Đến ngày (yyyy-mm-dd, giờ VN, bao gồm cả ngày); from > to → 400" }
       responses:
         "200":
           description: Danh sách yêu cầu kèm giao dịch, chiến dịch, người yêu cầu
@@ -3382,6 +3510,8 @@ paths:
         - name: status
           in: query
           schema: { type: string, enum: [pending, approved, rejected] }
+        - { name: from, in: query, schema: { type: string, format: date }, description: "Từ ngày (yyyy-mm-dd, giờ VN, bao gồm)" }
+        - { name: to, in: query, schema: { type: string, format: date }, description: "Đến ngày (yyyy-mm-dd, giờ VN, bao gồm cả ngày); from > to → 400" }
       responses:
         "200":
           description: File CSV (UTF-8 có BOM)
@@ -3884,6 +4014,30 @@ components:
         - failed
         - cancelled
         - ended
+    WalletBuckets:
+      type: object
+      properties:
+        balance: { type: number }
+        held: { type: number }
+        withdrawing: { type: number }
+    WalletReconRow:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string }
+        wallet: { $ref: "#/components/schemas/WalletBuckets" }
+        ledger: { $ref: "#/components/schemas/WalletBuckets" }
+        diff: { $ref: "#/components/schemas/WalletBuckets" }
+        totalTopup: { type: number }
+        totalCaptured: { type: number }
+        totalWithdrawn: { type: number }
+        totalRefunded: { type: number }
+        txCount: { type: integer }
+        lastActivityAt: { type: string, format: date-time, nullable: true }
+        sourceIssues: { type: integer, description: Số dòng sổ không khớp chứng từ gốc }
+        status: { type: string, enum: [ok, mismatch] }
+        summary: { type: string, nullable: true, example: "số dư +40.000.000 ₫" }
     AutomationSettings:
       type: object
       properties:

@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { Transform, Type } from "class-transformer";
-import { IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
+import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
 
 import { RateLimit, RateLimitGuard } from "../../common/rate-limit/rate-limit.module";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -48,6 +48,22 @@ export class WithdrawalQueryDto {
   @IsOptional()
   @IsEnum(WithdrawalStatus)
   status?: WithdrawalStatus;
+
+  /** Tìm theo tên/email người rút hoặc tên chủ tài khoản nhận. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  /** Ngày gửi yêu cầu từ (yyyy-mm-dd, giờ VN, bao gồm). */
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  /** Ngày gửi yêu cầu đến (yyyy-mm-dd, giờ VN, bao gồm cả ngày). */
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -99,7 +115,11 @@ export class AdminWithdrawalsController {
 
   @Get()
   list(@Query() query: WithdrawalQueryDto) {
-    return this.withdrawalsService.adminList(query.status, query.offset, query.limit);
+    return this.withdrawalsService.adminList(query.status, query.offset, query.limit, {
+      q: query.q,
+      from: query.from,
+      to: query.to,
+    });
   }
 
   @Patch(":id/approve")

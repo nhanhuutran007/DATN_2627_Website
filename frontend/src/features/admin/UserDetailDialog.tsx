@@ -21,7 +21,7 @@ import {
 } from "@/lib/api/admin";
 import type { ApiCampaignStatus } from "@/lib/api/campaigns";
 
-const money = (value: number | string | null | undefined) => `${Number(value ?? 0).toLocaleString("vi-VN")} ₫`;
+const money = (value: number | string | null | undefined) => `${Number(value ?? 0).toLocaleString("vi-VN")}\u00A0₫`;
 const date = (value?: string | null) => (value ? new Date(value).toLocaleDateString("vi-VN") : "—");
 
 const ROLE_OPTIONS: AdminUserRole[] = ["user", "campaign_owner", "admin"];
