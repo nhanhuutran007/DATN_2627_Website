@@ -155,6 +155,7 @@ export class FollowsService {
           link: `/du-an/${follow.campaign.id}/ung-ho`,
           relatedId: follow.campaign.id,
           email: true,
+          emailCategory: "follow_reminder",
         })
         .catch(() => undefined);
       sent += 1;

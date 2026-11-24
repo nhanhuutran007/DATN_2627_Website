@@ -314,6 +314,7 @@ export class OrganizationsService {
         link: saved.status === OrganizationStatus.VERIFIED ? `/to-chuc/${saved.slug}` : "/to-chuc/cua-toi",
         relatedId: saved.id,
         email: true,
+        emailCategory: "organizations",
       });
     }
     return saved;

@@ -172,6 +172,7 @@ export class PledgeSettlementService {
           link: `/bien-nhan/${donation.id}`,
           relatedId: saved.id,
           email: true,
+          emailCategory: "pledge_settlement",
         })
         .catch(() => undefined);
     }

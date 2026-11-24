@@ -2081,6 +2081,51 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AutomationSettings"
+  /admin/email-settings:
+    get:
+      operationId: adminGetEmailSettings
+      summary: Cài đặt bật/tắt email gửi người dùng (chỉ admin)
+      description: >-
+        Công tắc tổng và từng loại email (xác minh tài khoản, OTP, xét duyệt, ủng hộ, quyết toán cam kết, hoàn tiền…).
+        Chưa lưu thì mọi loại đều bật. Email bị tắt chỉ ghi log backend; thông báo trong web vẫn được tạo.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cài đặt hiện tại kèm danh sách loại email
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailSettings"
+    patch:
+      operationId: adminUpdateEmailSettings
+      summary: Bật/tắt email (chỉ admin)
+      description: >-
+        Chỉ gửi phần muốn đổi; loại không gửi giữ nguyên. Tên loại lạ hoặc giá trị không phải boolean → 400.
+        Ghi audit `admin.email_settings.update`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean, description: "Công tắc tổng" }
+                categories:
+                  type: object
+                  additionalProperties: { type: boolean }
+                  example: { campaign_updates: false, pledge_settlement: false }
+      responses:
+        "200":
+          description: Đã lưu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailSettings"
+        "400":
+          description: Loại email không hợp lệ
   /admin/refunds/auto-summary:
     get:
       operationId: adminAutoRefundSummary
@@ -4045,6 +4090,31 @@ components:
           type: string
           enum: [manual_all, auto_low_risk]
           description: "`manual_all`: mọi chiến dịch chờ admin duyệt; `auto_low_risk`: tự phát hành hồ sơ đạt cả 4 bước và rủi ro thấp."
+        updatedAt: { type: string, format: date-time, nullable: true }
+    EmailSettings:
+      type: object
+      properties:
+        enabled: { type: boolean, description: "Công tắc tổng: false = không gửi email nào" }
+        categories:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                enum: [account_verification, password_reset, password_changed, step_up_code, campaign_owner, campaign_backers, campaign_updates, follow_reminder, donation_receipt, donation_received, pledge_settlement, refunds, wallet, organizations, comments, other]
+              group: { type: string, enum: [account, campaign, donation, other] }
+              label: { type: string }
+              description: { type: string }
+              bulk: { type: boolean, description: "Có thể gửi hàng loạt cùng lúc" }
+              enabled: { type: boolean }
+        groups:
+          type: array
+          items:
+            type: object
+            properties:
+              key: { type: string }
+              label: { type: string }
         updatedAt: { type: string, format: date-time, nullable: true }
     CampaignScreening:
       type: object

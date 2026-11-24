@@ -236,6 +236,7 @@ export class WithdrawalsService {
         link: "/vi",
         relatedId: id,
         email: true,
+        emailCategory: "wallet",
       })
       .catch(() => undefined);
     return this.toView({ ...withdrawal, status: WithdrawalStatus.COMPLETED, transferReference: reference, proofUrl, adminNotes: input.adminNotes, reviewedAt } as WalletWithdrawal, true);
@@ -269,6 +270,7 @@ export class WithdrawalsService {
         link: "/vi",
         relatedId: id,
         email: true,
+        emailCategory: "wallet",
       })
       .catch(() => undefined);
     return this.toView({ ...withdrawal, status: WithdrawalStatus.REJECTED, adminNotes, reviewedAt } as WalletWithdrawal, true);

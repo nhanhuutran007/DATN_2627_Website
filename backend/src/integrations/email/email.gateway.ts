@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Logger } from "@nestjs/common";
 import { createTransport, type Transporter } from "nodemailer";
 
+import type { EmailCategory } from "./email-categories";
 import { EMAIL_LOGO_CID, EMAIL_LOGO_PNG_BASE64 } from "./email-logo";
 
 export type PasswordResetEmail = {
@@ -63,6 +64,8 @@ export type NotificationEmail = {
   linkLabel?: string;
   /** Có thì dùng template "Cần xử lý" thay cho email thông báo chung. */
   chargeFailed?: ChargeFailedDetails;
+  /** Loại email để admin bật/tắt (xem `email-categories.ts`); thiếu thì tính là "other". */
+  category?: EmailCategory;
 };
 
 export interface EmailGateway {

@@ -127,6 +127,7 @@ export class OrganizationMembersService {
         link: "/to-chuc/cua-toi#loi-moi",
         relatedId: saved.id,
         email: true,
+        emailCategory: "organizations",
         emailSubject: `${user.name} mời bạn cộng tác với tổ chức ${organization.name}`,
       })
       .catch(() => undefined);
@@ -186,6 +187,7 @@ export class OrganizationMembersService {
         relatedId: organizationId,
         // Mất quyền (hoặc mất một thành viên đội ngũ) là thay đổi quan trọng nên báo cả qua email.
         email: true,
+        emailCategory: "organizations",
         emailSubject: self
           ? `${user.name} đã rời tổ chức ${organization.name}`
           : revokedInvite

@@ -7,6 +7,8 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { User, UserRole } from "../users/entities/user.entity";
 import { AutomationSettingsService } from "./automation-settings.service";
 import { UpdateAutomationSettingsDto } from "./dto/automation-settings.dto";
+import { UpdateEmailSettingsDto } from "./dto/email-settings.dto";
+import { EmailSettingsService } from "./email-settings.service";
 import { UpdateSupportContactDto } from "./dto/support-contact.dto";
 import { SupportService } from "./support.service";
 
@@ -36,6 +38,27 @@ export class AdminSupportContactController {
   @Patch()
   update(@Body() dto: UpdateSupportContactDto, @GetCurrentUser() admin: User) {
     return this.supportService.updateContact(dto, admin);
+  }
+}
+
+/**
+ * Bật/tắt từng loại email gửi người dùng (hoặc tắt tất cả) để tiết kiệm hạn mức gửi của nhà cung cấp
+ * (vd. Resend gói miễn phí 100 thư/ngày). Thông báo trong web không bị ảnh hưởng. Ghi nhật ký kiểm toán.
+ */
+@Controller("admin/email-settings")
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN)
+export class AdminEmailSettingsController {
+  constructor(private readonly emailSettings: EmailSettingsService) {}
+
+  @Get()
+  get() {
+    return this.emailSettings.get();
+  }
+
+  @Patch()
+  update(@Body() dto: UpdateEmailSettingsDto, @GetCurrentUser() admin: User) {
+    return this.emailSettings.update(dto, admin);
   }
 }
 

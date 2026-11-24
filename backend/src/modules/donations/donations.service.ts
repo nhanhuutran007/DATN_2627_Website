@@ -521,6 +521,7 @@ export class DonationsService {
         link: donation.paymentMethod === WALLET_BALANCE_METHOD ? "/vi" : `/du-an/${donation.campaignId}`,
         relatedId: donation.id,
         email: true,
+        emailCategory: "pledge_settlement",
       })
       .catch(() => undefined);
     return true;
@@ -546,6 +547,7 @@ export class DonationsService {
         link: `/du-an/${donation.campaignId}`,
         relatedId: donation.id,
         email: true,
+        emailCategory: "pledge_settlement",
       })
       .catch(() => undefined);
     return true;
@@ -1173,6 +1175,7 @@ export class DonationsService {
       link: `/bien-nhan/${donation.id}`,
       relatedId: donation.id,
       email: true,
+      emailCategory: "pledge_settlement",
     });
   }
 
@@ -1189,6 +1192,7 @@ export class DonationsService {
       link,
       relatedId: donation.id,
       email: true,
+      emailCategory: "pledge_settlement",
       chargeFailed: {
         campaignTitle: campaign?.title ?? "",
         amount: Number(donation.amount),

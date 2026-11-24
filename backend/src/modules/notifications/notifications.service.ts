@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { In, Repository } from "typeorm";
 
+import type { EmailCategory } from "../../integrations/email/email-categories";
 import type { ChargeFailedDetails, EmailGateway } from "../../integrations/email/email.gateway";
 import { COUNTED_DONATION_STATUSES, Donation } from "../donations/entities/donation.entity";
 import { CampaignFollow } from "../follows/entities/campaign-follow.entity";
@@ -28,7 +29,37 @@ export type NotifyInput = {
   emailSubject?: string;
   /** Email dùng template "Cần xử lý" (trừ tiền cam kết thất bại) thay cho email thông báo chung. */
   chargeFailed?: ChargeFailedDetails;
+  /** Loại email cho cài đặt bật/tắt của admin; thiếu thì suy từ `type` (`emailCategoryForType`). */
+  emailCategory?: EmailCategory;
 };
+
+const CATEGORY_BY_TYPE: Record<NotificationType, EmailCategory> = {
+  [NotificationType.CAMPAIGN_APPROVED]: "campaign_owner",
+  [NotificationType.CAMPAIGN_REJECTED]: "campaign_owner",
+  [NotificationType.CAMPAIGN_NEEDS_INFO]: "campaign_owner",
+  [NotificationType.CAMPAIGN_PAUSED]: "campaign_owner",
+  [NotificationType.CAMPAIGN_RESUMED]: "campaign_owner",
+  [NotificationType.CAMPAIGN_ENDED]: "campaign_owner",
+  [NotificationType.MILESTONE_OVERDUE]: "campaign_owner",
+  [NotificationType.DONATION_RECEIVED]: "donation_received",
+  [NotificationType.DONATION_CONFIRMED]: "donation_receipt",
+  [NotificationType.MILESTONE_COMPLETED]: "campaign_updates",
+  [NotificationType.PROGRESS_UPDATE]: "campaign_updates",
+  [NotificationType.MILESTONE_RESCHEDULED]: "campaign_updates",
+  [NotificationType.REFUND_APPROVED]: "refunds",
+  [NotificationType.REFUND_REJECTED]: "refunds",
+  [NotificationType.DONATION_REFUNDED]: "refunds",
+  [NotificationType.COMMENT_NEW]: "comments",
+  [NotificationType.COMMENT_REPLY]: "comments",
+  [NotificationType.COMMENT_HIDDEN]: "comments",
+  [NotificationType.REPORT_RESOLVED]: "other",
+  [NotificationType.SYSTEM]: "other",
+};
+
+/** Loại email của một thông báo: ghi rõ ở `emailCategory`, không có thì suy từ loại thông báo. */
+export function emailCategoryOf(input: Pick<NotifyInput, "type" | "emailCategory">): EmailCategory {
+  return input.emailCategory ?? CATEGORY_BY_TYPE[input.type] ?? "other";
+}
 
 export type NotificationPage = {
   items: Notification[];
@@ -154,6 +185,7 @@ export class NotificationsService {
             paragraphs: [i.message],
             link: i.link,
             chargeFailed: i.chargeFailed,
+            category: emailCategoryOf(i),
           })
           .catch((error: Error) =>
             this.logger.error(`Gửi email thông báo cho user ${user.id} thất bại: ${error.message}`),
@@ -188,7 +220,7 @@ export class NotificationsService {
       const userIds = [...new Set([...backers, ...follows].map((r) => r.userId))].filter(
         (id) => id && !exclude.has(id),
       );
-      await this.notify(userIds.map((userId) => ({ ...base, userId })));
+      await this.notify(userIds.map((userId) => ({ emailCategory: "campaign_backers" as const, ...base, userId })));
       return userIds.length;
     } catch (error) {
       this.logger.error(`Không tìm được người ủng hộ của chiến dịch ${campaignId}: ${(error as Error).message}`);
@@ -214,7 +246,9 @@ export class NotificationsService {
       const userIds = [...new Set(follows.map((r) => r.userId))].filter(
         (id) => id && !exclude.has(id) && (!only || only.has(id)),
       );
-      await this.notify(userIds.map((userId) => ({ ...base, userId, email: true })));
+      await this.notify(
+        userIds.map((userId) => ({ emailCategory: "campaign_updates" as const, ...base, userId, email: true })),
+      );
       return userIds.length;
     } catch (error) {
       this.logger.error(`Không tìm được người theo dõi của chiến dịch ${campaignId}: ${(error as Error).message}`);

@@ -4,7 +4,10 @@ import { PassportModule } from "@nestjs/passport";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { createEmailGateway } from "../../integrations/email/email.gateway";
+import { PolicyEmailGateway } from "../../integrations/email/policy-email.gateway";
 import { createGoogleIdentityGateway } from "../../integrations/identity/google-identity.gateway";
+import { EmailSettingsService } from "../support/email-settings.service";
+import { SupportModule } from "../support/support.module";
 import { UsersModule } from "../users/users.module";
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
@@ -22,6 +25,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
 @Module({
   imports: [
     UsersModule,
+    SupportModule,
     TypeOrmModule.forFeature([PasswordResetToken, EmailVerificationToken, RevokedToken, StepUpCode]),
     PassportModule.register({ defaultStrategy: "jwt" }),
     JwtModule.register({
@@ -38,8 +42,11 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
     StepUpGuard,
     JwtStrategy,
     {
+      // Mọi email đi qua bộ lọc cài đặt của admin (mục "Cài đặt email").
       provide: "EmailGateway",
-      useFactory: () => createEmailGateway(),
+      useFactory: (emailSettings: EmailSettingsService) =>
+        new PolicyEmailGateway(createEmailGateway(), emailSettings, process.env.NODE_ENV !== "production"),
+      inject: [EmailSettingsService],
     },
     {
       provide: "GoogleIdentityGateway",
