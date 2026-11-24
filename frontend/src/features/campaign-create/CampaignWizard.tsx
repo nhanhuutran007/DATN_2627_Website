@@ -120,12 +120,23 @@ function minDeadline() {
   return toDateInput(d);
 }
 
-/** Ngày kết thúc sau `days` ngày kể từ hôm nay, không sớm hơn hạn tối thiểu (1 tháng). */
+/** Thời gian gây quỹ tối đa (như Kickstarter); khớp `MAX_CAMPAIGN_DURATION_DAYS` ở backend. */
+const MAX_DURATION_DAYS = 60;
+
+/** Ngày kết thúc muộn nhất cho phép: hôm nay + 60 ngày. */
+function maxDeadline() {
+  const d = new Date();
+  d.setDate(d.getDate() + MAX_DURATION_DAYS);
+  return toDateInput(d);
+}
+
+/** Ngày kết thúc sau `days` ngày kể từ hôm nay, nằm trong khoảng cho phép (1 tháng – 60 ngày). */
 function deadlineAfter(days: number) {
   const d = new Date();
   d.setDate(d.getDate() + days);
   const value = toDateInput(d);
-  return value < minDeadline() ? minDeadline() : value;
+  if (value < minDeadline()) return minDeadline();
+  return value > maxDeadline() ? maxDeadline() : value;
 }
 
 /** Hạn sớm nhất cho mốc thứ `index`: không ở quá khứ và không sớm hơn hạn của mốc trước. */
@@ -387,6 +398,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
       if (target < MIN_TARGET) return "Mục tiêu tối thiểu là 1.000.000 ₫.";
       if (!draft.deadline) return "Vui lòng chọn ngày kết thúc gây quỹ.";
       if (draft.deadline < minDeadline()) return "Ngày kết thúc phải cách hôm nay ít nhất 1 tháng.";
+      if (draft.deadline > maxDeadline()) return `Thời gian gây quỹ tối đa ${MAX_DURATION_DAYS} ngày.`;
     }
     if (index === STEP_IMAGE) {
       if (draft.imageUrl.trim() && !isImageValue(draft.imageUrl.trim())) return "Link ảnh phải bắt đầu bằng http:// hoặc https://";
@@ -690,8 +702,8 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                   </div>
                   <div className="create-q">
                     <label htmlFor="create-deadline">Khi nào kết thúc gây quỹ?</label>
-                    <p>Cách hôm nay ít nhất 1 tháng.</p>
-                    <input id="create-deadline" type="date" min={minDeadline()} value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
+                    <p>Từ 1 tháng đến {MAX_DURATION_DAYS} ngày kể từ hôm nay.</p>
+                    <input id="create-deadline" type="date" min={minDeadline()} max={maxDeadline()} value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
                   </div>
                   {user && (
                     <DurationEstimatePanel

@@ -18,6 +18,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { Organization, OrganizationStatus } from "../organizations/entities/organization.entity";
 import { AutomationSettingsService } from "../support/automation-settings.service";
 import { User, UserRole } from "../users/entities/user.entity";
+import { exceedsMaxDuration, MAX_CAMPAIGN_DURATION_DAYS } from "./campaign-duration";
 import { campaignStatusNotifications } from "./campaign-notifications";
 import { CampaignScreeningService, type ScreeningView } from "./campaign-screening.service";
 import {
@@ -351,8 +352,17 @@ export class CampaignsService {
     }
   }
 
+  /** Tối đa 60 ngày kể từ ngày bắt đầu (hoặc từ hôm nay nếu ngày bắt đầu đã qua). */
+  private assertMaxDuration(endDate: string, startDate?: string | Date | null): void {
+    const start = startDate ? new Date(startDate) : null;
+    if (exceedsMaxDuration(new Date(endDate), start)) {
+      throw new BadRequestException(`Thời gian gây quỹ tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày`);
+    }
+  }
+
   async create(dto: CreateCampaignDto, owner: User): Promise<Campaign> {
     this.assertMinDuration(dto.endDate);
+    this.assertMaxDuration(dto.endDate, dto.startDate);
     const campaign = this.campaignRepo.create({
       title: dto.title,
       description: sanitizeRichText(dto.description),
@@ -387,7 +397,10 @@ export class CampaignsService {
       );
     }
 
-    if (dto.endDate) this.assertMinDuration(dto.endDate);
+    if (dto.endDate) {
+      this.assertMinDuration(dto.endDate);
+      this.assertMaxDuration(dto.endDate, dto.startDate ?? campaign.startDate);
+    }
     if (dto.description !== undefined) dto.description = sanitizeRichText(dto.description);
 
     const current = campaign as unknown as Record<string, unknown>;
@@ -420,6 +433,13 @@ export class CampaignsService {
     if (!SUBMITTABLE_STATUSES.includes(campaign.status)) {
       throw new ForbiddenException(
         "Only draft, rejected or needs-info campaigns can be submitted for review",
+      );
+    }
+
+    // Hồ sơ tạo trước khi có giới hạn 60 ngày phải sửa ngày kết thúc trước khi gửi duyệt.
+    if (exceedsMaxDuration(new Date(campaign.endDate), campaign.startDate ? new Date(campaign.startDate) : null)) {
+      throw new BadRequestException(
+        `Thời gian gây quỹ tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày — hãy sửa ngày kết thúc trước khi gửi duyệt`,
       );
     }
 

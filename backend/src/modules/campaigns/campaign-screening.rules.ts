@@ -5,7 +5,9 @@
  * chỉ có thể tự phát hành hồ sơ rủi ro thấp khi admin bật chế độ đó.
  */
 
-export const SCREENING_RULES_VERSION = "2026.11-r1";
+import { campaignDurationDays, exceedsMaxDuration, MAX_CAMPAIGN_DURATION_DAYS } from "./campaign-duration";
+
+export const SCREENING_RULES_VERSION = "2026.11-r2";
 
 export type ScreeningLevel = "low" | "medium" | "high";
 /** `auto_approve`: đủ điều kiện tự phát hành; `manual_review`: admin xét; `needs_info`: nên yêu cầu bổ sung. */
@@ -164,9 +166,10 @@ function checkCompleteness(input: ScreeningInput): ScreeningCheck {
   if (campaign.endDate.getTime() <= now.getTime()) {
     findings.push({ status: "fail", message: "Ngày kết thúc gây quỹ đã qua.", points: 10 });
   } else {
-    const start = campaign.startDate && campaign.startDate.getTime() > now.getTime() ? campaign.startDate : now;
-    const days = Math.round((campaign.endDate.getTime() - start.getTime()) / DAY_MS);
-    if (days > 90) findings.push({ status: "warn", message: `Thời gian gây quỹ dài (${days} ngày, khuyến nghị ≤ 90 ngày).`, points: 4 });
+    const days = Math.round(campaignDurationDays(campaign.endDate, campaign.startDate, now));
+    if (exceedsMaxDuration(campaign.endDate, campaign.startDate, now)) {
+      findings.push({ status: "fail", message: `Thời gian gây quỹ ${days} ngày, vượt tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày.`, points: 10 });
+    }
   }
   return makeCheck("completeness", "Đủ thông tin bắt buộc", findings);
 }
