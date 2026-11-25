@@ -1,7 +1,8 @@
 import { api } from "../api";
 
 /**
- * `pledged`: đã cam kết (lưu thẻ/ví), CHƯA trừ tiền — chỉ trừ khi chiến dịch đạt mục tiêu.
+ * `pledged`: đã cam kết, CHƯA trả tiền — chỉ phải trả khi chiến dịch đạt mục tiêu.
+ * `awaiting_payment`: chiến dịch đã đạt mục tiêu, người ủng hộ cần quét QR SePay trong hạn.
  * `charge_failed`: đạt mục tiêu nhưng trừ thẻ thất bại, cần đổi thẻ trong hạn.
  * `released`: chiến dịch không đạt, cam kết được hủy, không trừ tiền.
  */
@@ -14,7 +15,8 @@ export type ApiDonationStatus =
   | "cancelled"
   | "pledged"
   | "charge_failed"
-  | "released";
+  | "released"
+  | "awaiting_payment";
 
 export type ApiDonation = {
   id: string;
@@ -37,6 +39,8 @@ export type ApiDonation = {
   /** Lần trừ tiền thất bại đầu tiên — hạn đổi thẻ tính từ mốc này. */
   chargeFailedAt?: string | null;
   lastChargeError?: string | null;
+  /** Lúc được yêu cầu thanh toán (chiến dịch đạt mục tiêu) — hạn trả tính từ mốc này. */
+  paymentRequestedAt?: string | null;
   createdAt?: string;
   campaign?: {
     id: string;
@@ -54,7 +58,8 @@ export type ApiDonation = {
 export type CreateDonationPayload = {
   campaignId: string;
   amount: number;
-  paymentMethod: string;
+  /** Chỉ còn `sepay` (cam kết, trả qua QR SePay khi dự án đạt mục tiêu). */
+  paymentMethod?: "sepay";
   message?: string;
   isAnonymous?: boolean;
   idempotencyKey: string;
@@ -113,9 +118,13 @@ export type PaymentOptions = {
 /** Hạn đổi thẻ sau khi trừ tiền cam kết thất bại (khớp `CHARGE_RETRY_DAYS` ở backend). */
 export const CHARGE_RETRY_DAYS = 7;
 
-/** Kênh trả ngay (tiền chuyển đi lúc ủng hộ); các kênh khác chỉ cam kết. */
-export function isPledgeMethod(method: string | null | undefined): boolean {
-  return method !== "sepay";
+/** Hạn thanh toán sau khi chiến dịch đạt mục tiêu (khớp `PAYMENT_WINDOW_DAYS` ở backend, như Kickstarter). */
+export const PAYMENT_WINDOW_DAYS = 7;
+
+/** Hạn chót thanh toán của cam kết đang chờ trả. */
+export function paymentDeadline(donation: Pick<ApiDonation, "paymentRequestedAt">): Date {
+  const requestedAt = donation.paymentRequestedAt ? new Date(donation.paymentRequestedAt) : new Date();
+  return new Date(requestedAt.getTime() + PAYMENT_WINDOW_DAYS * 86_400_000);
 }
 
 /** Mở Stripe Checkout để lưu thẻ (cam kết) hoặc đổi thẻ khi trừ tiền thất bại. */

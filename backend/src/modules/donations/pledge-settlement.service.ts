@@ -1,14 +1,19 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
-import { In, LessThan, Repository } from "typeorm";
+import { Between, In, IsNull, LessThan, Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { RefundRequest, RefundRequestStatus } from "../finance/entities/refund-request.entity";
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { NotificationsService } from "../notifications/notifications.service";
-import { CHARGE_RETRY_DAYS, DonationsService } from "./donations.service";
+import {
+  CHARGE_RETRY_DAYS,
+  DonationsService,
+  PAYMENT_REMINDER_DAYS_LEFT,
+  PAYMENT_WINDOW_DAYS,
+} from "./donations.service";
 import { Donation, DonationStatus } from "./entities/donation.entity";
 
 /** Số khoản tối đa mỗi loại xử lý mỗi lần chạy, tránh một lần quét quá dài. */
@@ -24,6 +29,11 @@ const FAILED_STATUSES = [CampaignStatus.FAILED, CampaignStatus.CANCELLED, Campai
 export type SettlementResult = {
   charged: number;
   chargeFailed: number;
+  /** Cam kết trả sau vừa được gửi yêu cầu thanh toán (QR SePay). */
+  paymentRequested: number;
+  paymentReminded: number;
+  /** Quá hạn thanh toán → hủy cam kết. */
+  paymentExpired: number;
   released: number;
   expiredFailures: number;
   refundRequests: number;
@@ -61,8 +71,18 @@ export class PledgeSettlementService {
   }
 
   async settle(now: Date = new Date()): Promise<SettlementResult> {
-    const result: SettlementResult = { charged: 0, chargeFailed: 0, released: 0, expiredFailures: 0, refundRequests: 0 };
+    const result: SettlementResult = {
+      charged: 0,
+      chargeFailed: 0,
+      paymentRequested: 0,
+      paymentReminded: 0,
+      paymentExpired: 0,
+      released: 0,
+      expiredFailures: 0,
+      refundRequests: 0,
+    };
     await this.settlePledges(result, now);
+    await this.followUpUnpaid(result, now);
     await this.expireChargeFailures(result, now);
     await this.createAutoRefundRequests(result);
     return result;
@@ -98,6 +118,7 @@ export class PledgeSettlementService {
           const charged = await this.donationsService.chargePledge(pledge.id, now);
           if (charged.status === DonationStatus.COMPLETED) result.charged += 1;
           else if (charged.status === DonationStatus.CHARGE_FAILED) result.chargeFailed += 1;
+          else if (charged.status === DonationStatus.AWAITING_PAYMENT) result.paymentRequested += 1;
         } else if (outcome === "missed") {
           if (await this.donationsService.releasePledge(pledge, pledge.campaign.title)) result.released += 1;
         }
@@ -105,6 +126,35 @@ export class PledgeSettlementService {
         // Lỗi mạng tới cổng thẻ: để nguyên `pledged`, lần chạy sau thử lại cùng khóa idempotency.
         this.logger.error(`Không tất toán được cam kết ${pledge.id}: ${(error as Error).message}`);
       }
+    }
+  }
+
+  /**
+   * Cam kết đang chờ thanh toán: nhắc một lần khi còn `PAYMENT_REMINDER_DAYS_LEFT` ngày,
+   * quá `PAYMENT_WINDOW_DAYS` ngày chưa trả thì hủy (bỏ khỏi tiến độ, trả suất quà).
+   */
+  private async followUpUnpaid(result: SettlementResult, now: Date): Promise<void> {
+    const expireBefore = new Date(now.getTime() - PAYMENT_WINDOW_DAYS * DAY_MS);
+    const remindBefore = new Date(now.getTime() - (PAYMENT_WINDOW_DAYS - PAYMENT_REMINDER_DAYS_LEFT) * DAY_MS);
+    const overdue = await this.donationRepo.find({
+      where: { status: DonationStatus.AWAITING_PAYMENT, paymentRequestedAt: LessThan(expireBefore) },
+      relations: { campaign: true },
+      order: { paymentRequestedAt: "ASC" },
+      take: BATCH_SIZE,
+    });
+    for (const donation of overdue) {
+      if (await this.donationsService.expireUnpaid(donation, donation.campaign?.title ?? "")) result.paymentExpired += 1;
+    }
+    const due = await this.donationRepo.find({
+      where: {
+        status: DonationStatus.AWAITING_PAYMENT,
+        paymentRequestedAt: Between(expireBefore, remindBefore),
+        paymentRemindedAt: IsNull(),
+      },
+      take: BATCH_SIZE,
+    });
+    for (const donation of due) {
+      if (await this.donationsService.remindPayment(donation, now)) result.paymentReminded += 1;
     }
   }
 

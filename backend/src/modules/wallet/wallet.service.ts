@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   BadRequestException,
   ConflictException,
   Inject,
@@ -28,6 +29,13 @@ import { TopupStatus, Wallet, WalletTopup, WalletTransaction, WalletTxType } fro
 import { WalletReconciliationService } from "./wallet-reconciliation.service";
 
 /** Mức nạp tối thiểu/tối đa mỗi lần. */
+/**
+ * Nạp ví đã tắt (không giữ tiền người dùng). Bật lại chỉ để kiểm thử dữ liệu cũ: `WALLET_TOPUP_ENABLED=true`.
+ */
+export function topupsEnabled(): boolean {
+  return process.env.WALLET_TOPUP_ENABLED === "true";
+}
+
 export const MIN_TOPUP = 10_000;
 export const MAX_TOPUP = 100_000_000;
 /** Đơn nạp chưa thanh toán tự hết hạn (khớp TTL đơn ủng hộ SePay). */
@@ -198,6 +206,10 @@ export class WalletService {
   // ---------- Nạp ví qua SePay ----------
 
   async createTopup(user: User, amount: number): Promise<TopupStart> {
+    // Mô hình trả sau: Góp Mầm không giữ tiền người dùng nên ngừng nhận nạp ví. Số dư cũ vẫn rút được.
+    if (!topupsEnabled()) {
+      throw new ForbiddenException("Ví Góp Mầm đã ngừng nhận nạp tiền. Ủng hộ bằng cam kết, chỉ thanh toán khi dự án đạt mục tiêu.");
+    }
     if (!Number.isInteger(amount) || amount < MIN_TOPUP || amount > MAX_TOPUP) {
       throw new BadRequestException(`Số tiền nạp từ ${money(MIN_TOPUP)} đến ${money(MAX_TOPUP)}.`);
     }

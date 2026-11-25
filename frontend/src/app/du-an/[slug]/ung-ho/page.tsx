@@ -22,10 +22,13 @@ type DonatePageProps = {
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SEPAY_RESULTS: readonly SepayReturn[] = ["success", "error", "cancel"];
 
-/** `?donation=<uuid>&payment=success|error|cancel` do SePay chuyển hướng về. */
+/**
+ * `?donation=<uuid>&payment=success|error|cancel` do SePay chuyển hướng về, hoặc chỉ
+ * `?donation=<uuid>` từ thông báo "mời thanh toán" (result = null: mở trang thanh toán cam kết).
+ */
 function parseSepayReturn(query: { donation?: string; payment?: string }) {
-  const result = SEPAY_RESULTS.find((value) => value === query.payment);
-  if (!query.donation || !UUID_PATTERN.test(query.donation) || !result) return null;
+  if (!query.donation || !UUID_PATTERN.test(query.donation)) return null;
+  const result = SEPAY_RESULTS.find((value) => value === query.payment) ?? null;
   return { donationId: query.donation, result };
 }
 

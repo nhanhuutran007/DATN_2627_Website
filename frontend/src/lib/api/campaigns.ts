@@ -189,6 +189,49 @@ export async function deleteCampaign(id: string): Promise<void> {
   return api.del<void>(`/campaigns/${encodeURIComponent(id)}`);
 }
 
+/** Tài khoản ngân hàng nhận tiền gây quỹ (chỉ chủ dự án và admin xem). */
+export type PayoutAccount = {
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
+  updatedAt: string;
+};
+
+/** Lần giải ngân tiền gây quỹ cho chủ dự án (một lần sau khi thu xong). */
+export type PayoutDisbursement = {
+  amount: number;
+  donationCount: number;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
+  transferReference: string;
+  proofUrl: string | null;
+  disbursedAt: string;
+};
+
+/** `account` null = chủ dự án chưa khai báo; `disbursement` null = chưa giải ngân. */
+export async function fetchPayoutInfo(
+  campaignId: string,
+): Promise<{ account: PayoutAccount | null; disbursement: PayoutDisbursement | null }> {
+  const res = await api.get<{ account: PayoutAccount | null; disbursement?: PayoutDisbursement | null }>(
+    `/campaigns/${encodeURIComponent(campaignId)}/payout-account`,
+  );
+  return { account: res.account, disbursement: res.disbursement ?? null };
+}
+
+/** `null` = chủ dự án chưa khai báo. */
+export async function fetchPayoutAccount(campaignId: string): Promise<PayoutAccount | null> {
+  return (await fetchPayoutInfo(campaignId)).account;
+}
+
+/** Cần mã OTP gửi email; hộp nhập mã tự mở rồi gửi lại. */
+export function savePayoutAccount(
+  campaignId: string,
+  input: { bankName: string; bankAccountNumber: string; bankAccountName: string },
+): Promise<PayoutAccount> {
+  return api.put<PayoutAccount>(`/campaigns/${encodeURIComponent(campaignId)}/payout-account`, input);
+}
+
 function toParams(query: CampaignQuery): string {
   const params = new URLSearchParams();
   if (query.q) params.set("q", query.q);
@@ -473,4 +516,8 @@ export type PlatformStats = {
 /** Thống kê thật toàn nền tảng (tổng tiền đã được cổng thanh toán xác nhận). */
 export async function fetchPlatformStats(): Promise<PlatformStats> {
   return api.get<PlatformStats>("/campaigns/stats");
+}
+/** Tài khoản đã khai báo ở các chiến dịch trước của mình (gợi ý dùng lại khi tạo chiến dịch mới). */
+export function fetchMyPayoutAccounts(): Promise<Array<{ bankName: string; bankAccountNumber: string; bankAccountName: string }>> {
+  return api.get("/campaigns/payout-accounts/mine");
 }

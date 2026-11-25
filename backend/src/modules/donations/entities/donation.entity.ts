@@ -23,16 +23,29 @@ export enum DonationStatus {
   CHARGE_FAILED = "charge_failed",
   /** Chiến dịch không đạt mục tiêu (hoặc bị hủy): cam kết được giải phóng, không trừ tiền. */
   RELEASED = "released",
+  /**
+   * Chiến dịch đã đạt mục tiêu: người ủng hộ được yêu cầu thanh toán (quét QR SePay) trong
+   * `PAYMENT_WINDOW_DAYS` ngày. Quá hạn → `expired` và bị bỏ khỏi tiến độ.
+   */
+  AWAITING_PAYMENT = "awaiting_payment",
 }
 
 /**
  * Trạng thái được tính vào `currentAmount`/`backerCount` của chiến dịch: tiền đã thu
- * (`completed`) và cam kết chưa trừ (`pledged`, `charge_failed` còn trong hạn đổi thẻ).
+ * (`completed`) và cam kết chưa thu (`pledged`, `awaiting_payment`, `charge_failed` còn trong hạn).
  */
 export const COUNTED_DONATION_STATUSES: readonly DonationStatus[] = [
   DonationStatus.COMPLETED,
   DonationStatus.PLEDGED,
   DonationStatus.CHARGE_FAILED,
+  DonationStatus.AWAITING_PAYMENT,
+];
+
+/** Cam kết chưa thu xong tiền: chiến dịch còn khoản này thì chưa giải ngân được. */
+export const OUTSTANDING_DONATION_STATUSES: readonly DonationStatus[] = [
+  DonationStatus.PLEDGED,
+  DonationStatus.CHARGE_FAILED,
+  DonationStatus.AWAITING_PAYMENT,
 ];
 
 export enum RefundMethod {
@@ -130,6 +143,14 @@ export class Donation extends BaseEntity {
   /** Phiên lưu thẻ gần nhất (Stripe Checkout `cs_…`), để đối soát khi webhook không tới. */
   @Column({ name: "setup_session_ref", type: "varchar", length: 255, nullable: true })
   setupSessionRef?: string | null;
+
+  /** Lúc gửi yêu cầu thanh toán (chiến dịch đạt mục tiêu): mốc tính hạn trả. */
+  @Column({ name: "payment_requested_at", type: "datetime", nullable: true })
+  paymentRequestedAt?: Date | null;
+
+  /** Đã gửi lời nhắc sắp hết hạn thanh toán (chỉ nhắc một lần). */
+  @Column({ name: "payment_reminded_at", type: "datetime", nullable: true })
+  paymentRemindedAt?: Date | null;
 
   @Column({ name: "charge_attempts", type: "int", default: 0 })
   chargeAttempts!: number;

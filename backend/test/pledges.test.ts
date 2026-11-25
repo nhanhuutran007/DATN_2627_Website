@@ -56,7 +56,12 @@ function makeWorld(opts: { campaign?: Partial<Campaign>; donations?: Array<Parti
   const refundRequests: Array<Record<string, unknown>> = [];
 
   const matches = (row: Row, where: Record<string, unknown>) =>
-    Object.entries(where).every(([k, v]) => (row as unknown as Record<string, unknown>)[k] === v);
+    Object.entries(where).every(([k, v]) => {
+      const actual = (row as unknown as Record<string, unknown>)[k];
+      // `IsNull()` của TypeORM trong update có điều kiện.
+      if (v && typeof v === "object" && (v as { type?: string }).type === "isNull") return actual == null;
+      return actual === v;
+    });
   const update = async (a: unknown, b: unknown, c?: unknown) => {
     const [where, patch] = (c === undefined ? [a, b] : [b, c]) as [Record<string, unknown>, Partial<Row>];
     const row = rows.find((r) => matches(r, where));
@@ -97,8 +102,26 @@ function makeWorld(opts: { campaign?: Partial<Campaign>; donations?: Array<Parti
     },
     update: (where: Record<string, unknown>, patch: Partial<Row>) => update(where, patch),
     // Bộ lọc của job tất toán: trạng thái + (tuỳ chọn) trạng thái chiến dịch.
-    find: async ({ where }: { where: { status: DonationStatus } }) =>
-      rows.filter((r) => r.status === where.status).map((r) => ({ ...r, campaign })),
+    // Hiểu thêm các toán tử TypeORM job dùng cho cam kết chờ thanh toán (LessThan/Between/IsNull).
+    find: async ({ where }: { where: { status: DonationStatus } & Record<string, unknown> }) =>
+      rows
+        .filter((r) => r.status === where.status)
+        .filter((r) =>
+          Object.entries(where).every(([key, op]) => {
+            if (key === "status" || key === "campaign" || !op || typeof op !== "object" || !("type" in op)) return true;
+            const { type, value } = op as { type: string; value: unknown };
+            const actual = (r as unknown as Record<string, unknown>)[key] as Date | null | undefined;
+            if (type === "isNull") return actual == null;
+            if (actual == null) return false;
+            if (type === "lessThan") return actual.getTime() < (value as Date).getTime();
+            if (type === "between") {
+              const [from, to] = value as [Date, Date];
+              return actual.getTime() >= from.getTime() && actual.getTime() <= to.getTime();
+            }
+            return true;
+          }),
+        )
+        .map((r) => ({ ...r, campaign })),
     createQueryBuilder: () => {
       const chain = {
         innerJoinAndSelect: () => chain,
@@ -186,7 +209,7 @@ describe("Gây quỹ tất cả hoặc không — cam kết", () => {
       ok(world.rows[0].pledgedAt);
       equal(world.rows[0].completedAt, undefined);
       equal(world.increments.join(","), "currentAmount,backerCount");
-      ok(notifier.notified[0].message.includes("CHƯA bị trừ tiền"));
+      ok(notifier.notified[0].message.includes("CHƯA phải trả tiền"));
     });
 
     it("chiến dịch đã chốt trong lúc lưu thẻ → không nhận cam kết muộn", async () => {
@@ -304,6 +327,67 @@ describe("Gây quỹ tất cả hoặc không — cam kết", () => {
 
     beforeEach(() => {
       world = makeWorld();
+    });
+
+    it("trả sau (SePay): đạt mục tiêu → yêu cầu thanh toán, không tự trừ", async () => {
+      world = makeWorld({ campaign: { status: CampaignStatus.SUCCESS }, donations: [{ paymentMethod: "sepay" }] });
+      const { job, notifier } = settlement(world);
+      const result = await job.settle();
+      equal(result.paymentRequested, 1);
+      equal(result.charged, 0);
+      equal(world.rows[0].status, DonationStatus.AWAITING_PAYMENT);
+      ok(world.rows[0].paymentRequestedAt);
+      ok(notifier.notified.some((n) => n.link?.includes(`donation=${world.rows[0].id}`)));
+      // Vẫn tính vào tiến độ trong lúc chờ trả.
+      equal(world.uncounted.length, 0);
+    });
+
+    it("trả sau (SePay): chiến dịch không đạt → giải phóng, không phát sinh thanh toán", async () => {
+      world = makeWorld({ campaign: { status: CampaignStatus.FAILED }, donations: [{ paymentMethod: "sepay" }] });
+      const result = await settlement(world).job.settle();
+      equal(result.released, 1);
+      equal(world.rows[0].status, DonationStatus.RELEASED);
+    });
+
+    it("trả sau (SePay): quá 7 ngày chưa trả → hủy, bỏ khỏi tiến độ; còn 2 ngày → nhắc một lần", async () => {
+      const now = new Date();
+      world = makeWorld({
+        campaign: { status: CampaignStatus.SUCCESS },
+        donations: [
+          { paymentMethod: "sepay", status: DonationStatus.AWAITING_PAYMENT, paymentRequestedAt: new Date(now.getTime() - 8 * DAY) },
+          { paymentMethod: "sepay", status: DonationStatus.AWAITING_PAYMENT, paymentRequestedAt: new Date(now.getTime() - 6 * DAY) },
+          { paymentMethod: "sepay", status: DonationStatus.AWAITING_PAYMENT, paymentRequestedAt: new Date(now.getTime() - 1 * DAY) },
+        ],
+      });
+      const first = await settlement(world).job.settle(now);
+      equal(first.paymentExpired, 1);
+      equal(first.paymentReminded, 1);
+      equal(world.rows[0].status, DonationStatus.EXPIRED);
+      equal(world.uncounted.length, 1);
+      equal(world.rows[1].status, DonationStatus.AWAITING_PAYMENT);
+      ok(world.rows[1].paymentRemindedAt);
+      equal(world.rows[2].paymentRemindedAt, undefined);
+      const second = await settlement(world).job.settle(now);
+      equal(second.paymentReminded, 0);
+    });
+
+    it("trả sau: thanh toán thử (chưa cấu hình SePay) hoàn tất cam kết mà không cộng tiến độ lần nữa", async () => {
+      world = makeWorld({
+        campaign: { status: CampaignStatus.SUCCESS },
+        donations: [{ paymentMethod: "sepay", status: DonationStatus.AWAITING_PAYMENT, paymentRequestedAt: new Date(), transferCode: "GMTEST2345" }],
+      });
+      const { service } = makeService(world);
+      const paid = await service.confirmDemoPayment(world.rows[0].id, "completed", donor);
+      equal(paid.status, DonationStatus.COMPLETED);
+      equal(world.increments.length, 0);
+    });
+
+    it("trả sau: không rút được cam kết sau khi dự án thành công", async () => {
+      world = makeWorld({
+        campaign: { status: CampaignStatus.SUCCESS },
+        donations: [{ paymentMethod: "sepay", status: DonationStatus.AWAITING_PAYMENT, paymentRequestedAt: new Date() }],
+      });
+      await rejects(makeService(world).service.cancel(world.rows[0].id, donor), (err: { status?: number }) => err.status === 409);
     });
 
     it("chiến dịch đạt mục tiêu → trừ tiền mọi cam kết", async () => {

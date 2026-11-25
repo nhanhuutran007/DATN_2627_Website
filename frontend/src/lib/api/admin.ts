@@ -13,7 +13,8 @@ export type AdminDonationStatus =
   | "cancelled"
   | "pledged"
   | "charge_failed"
-  | "released";
+  | "released"
+  | "awaiting_payment";
 
 export type AdminOverview = {
   users: {

@@ -41,11 +41,13 @@ export class CreateDonationDto {
   amount!: number;
 
   /**
-   * `sepay`: trả ngay; `balance` (ví Góp Mầm), `stripe`, `wallet` (ví demo cũ): cam kết,
-   * chỉ trừ tiền khi chiến dịch đạt mục tiêu.
+   * Chỉ còn `sepay`: tạo cam kết, không thu tiền lúc ủng hộ; chiến dịch đạt mục tiêu mới
+   * yêu cầu quét QR SePay. Ví Góp Mầm (`balance`), thẻ Stripe và ví demo (`wallet`) đã ngừng
+   * nhận khoản mới (dữ liệu cũ vẫn được tất toán như trước).
    */
-  @IsIn(["wallet", "sepay", "stripe", "balance"])
-  paymentMethod!: string;
+  @IsOptional()
+  @IsIn(["sepay"], { message: "Chỉ hỗ trợ cam kết ủng hộ, thanh toán qua SePay khi dự án đạt mục tiêu." })
+  paymentMethod: string = "sepay";
 
   @IsOptional()
   @IsString()

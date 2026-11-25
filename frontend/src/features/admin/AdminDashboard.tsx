@@ -32,7 +32,7 @@ import {
 } from "@/features/admin/labels";
 import { ADMIN_SECTION_GROUPS, ADMIN_SECTIONS, adminHref, findAdminSection } from "@/features/admin/sections";
 import { AdminReconciliation } from "@/features/admin/AdminReconciliation";
-import { AdminWithdrawals } from "@/features/admin/AdminWithdrawals";
+import { AdminDisbursements } from "@/features/admin/AdminDisbursements";
 import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredictionCard";
 import {
   fetchAdminCampaigns,
@@ -95,6 +95,7 @@ const DONATION_STATUS_LABEL: Record<AdminDonation["status"], string> = {
   pledged: "Đã cam kết (chưa trừ tiền)",
   charge_failed: "Trừ tiền thất bại",
   released: "Không trừ tiền (không đạt)",
+  awaiting_payment: "Chờ người ủng hộ thanh toán",
 };
 
 const DONATION_STATUS_TONE: Record<AdminDonation["status"], string> = {
@@ -107,6 +108,7 @@ const DONATION_STATUS_TONE: Record<AdminDonation["status"], string> = {
   pledged: "pending",
   charge_failed: "failed",
   released: "draft",
+  awaiting_payment: "pending",
 };
 
 /** Lọc theo trạng thái, hoặc "flagged" = giao dịch có cảnh báo rủi ro đang mở. */
@@ -2028,6 +2030,7 @@ export function AdminDashboard() {
                 <option value="expired">Hết hạn</option>
                 <option value="cancelled">Đã hủy</option>
                 <option value="pledged">Đã cam kết</option>
+                <option value="awaiting_payment">Chờ thanh toán</option>
                 <option value="charge_failed">Trừ tiền thất bại</option>
                 <option value="released">Không trừ tiền</option>
                 <option value="flagged">Có cảnh báo rủi ro</option>
@@ -2131,7 +2134,7 @@ export function AdminDashboard() {
           )}
 
           {showing("hoan-rut-tien", "hoan-tien") && <AdminFinance view="refunds" onChanged={() => { void loadDonations(donationFilter, donationPaging.page); void reloadOverview(); }} />}
-          {showing("hoan-rut-tien", "rut-tien") && <AdminWithdrawals />}
+          {showing("hoan-rut-tien", "giai-ngan") && <AdminDisbursements />}
           {view === "doi-soat" && (
             <AdminReconciliation
               walletMismatches={navCounts?.walletMismatches ?? 0}

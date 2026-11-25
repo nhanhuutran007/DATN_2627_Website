@@ -63,7 +63,7 @@ export function SepayPaymentStatus({ donation, result, onChange }: SepayPaymentS
           : fetchDonation(donation.id);
       check
         .then((latest) => {
-          if (active && latest.status !== "pending") onChange(latest);
+          if (active && latest.status !== donation.status) onChange(latest);
         })
         .catch(() => undefined);
     }, POLL_MS);
@@ -71,7 +71,7 @@ export function SepayPaymentStatus({ donation, result, onChange }: SepayPaymentS
       active = false;
       window.clearInterval(timer);
     };
-  }, [donation.id, onChange]);
+  }, [donation.id, donation.status, onChange]);
 
   const payAgain = async () => {
     setOpening(true);
@@ -114,9 +114,12 @@ export function SepayPaymentStatus({ donation, result, onChange }: SepayPaymentS
         <button className="button button-primary button-lg" type="button" disabled={opening || cancelling} onClick={payAgain}>
           {opening ? "Đang mở trang thanh toán…" : result === "success" ? "Mở lại trang thanh toán" : "Thanh toán lại"}
         </button>
-        <button className="button button-outline button-lg" type="button" disabled={cancelling} onClick={cancel}>
-          {cancelling ? "Đang hủy…" : "Hủy giao dịch"}
-        </button>
+        {/* Cam kết của dự án đã thành công không rút được; quá hạn chưa trả thì tự hủy. */}
+        {donation.status === "pending" && (
+          <button className="button button-outline button-lg" type="button" disabled={cancelling} onClick={cancel}>
+            {cancelling ? "Đang hủy…" : "Hủy giao dịch"}
+          </button>
+        )}
       </div>
     </div>
   );

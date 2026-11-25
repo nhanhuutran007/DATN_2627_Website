@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useId, useState } from "react";
 
 import { Icon } from "@/components/ui/Icon";
-import { BalanceToggle, MaskedAmount } from "@/components/ui/MaskedAmount";
 import { PledgeStatus } from "@/features/donations/PledgeStatus";
 import { RewardCard } from "@/features/rewards/RewardCard";
 import { SepayPaymentStatus, type SepayReturn } from "@/features/donations/SepayPaymentStatus";
@@ -14,24 +13,20 @@ import { ApiError, hasSession } from "@/lib/api";
 import { useAuthUser, useIsAdmin } from "@/lib/auth";
 import {
   cancelDonation,
-  confirmDonation,
   createDonation,
-  createStripeCheckout,
   fetchCampaignLedger,
   fetchDonation,
   fetchPaymentOptions,
   generateIdempotencyKey,
-  isPledgeMethod,
+  PAYMENT_WINDOW_DAYS,
   type ApiDonation,
   type ApiDonationStatus,
   type LedgerEntry,
   type PaymentOptions,
   syncSepayDonation,
-  syncStripeDonation,
 } from "@/lib/api/donations";
 import { formatVnd, paymentMethodLabel } from "@/lib/format";
 import { isRewardAvailable, type RewardTier } from "@/lib/api/rewards";
-import { refreshWallet, useWalletSummary } from "@/lib/wallet-store";
 
 type DonationPanelProps = {
   campaignId: string;
@@ -40,8 +35,11 @@ type DonationPanelProps = {
   enabled?: boolean;
   /** Mức quà đang nhận của chiến dịch. */
   rewardTiers?: RewardTier[];
-  /** Quay về từ trang SePay/Stripe (`?donation=…&payment=…`): hiện trạng thái đơn đó. */
-  sepayReturn?: { donationId: string; result: SepayReturn } | null;
+  /**
+   * `?donation=…` (từ thông báo mời thanh toán, `result` = null) hoặc quay về từ SePay
+   * (`&payment=…`): hiện trạng thái khoản đó.
+   */
+  sepayReturn?: { donationId: string; result: SepayReturn | null } | null;
   /** Ngày kết thúc gây quỹ (đã định dạng dd/mm/yyyy): mốc trừ tiền các khoản cam kết nếu đạt mục tiêu. */
   endDate?: string;
   /** Mức quà chọn sẵn từ nút "Chọn quà này" ở trang dự án (`?qua=`). */
@@ -49,7 +47,7 @@ type DonationPanelProps = {
 };
 
 /** Trạng thái riêng của khoản cam kết (tất cả hoặc không), hiển thị bằng `PledgeStatus`. */
-const PLEDGE_STATES: ApiDonationStatus[] = ["pledged", "charge_failed", "released"];
+const PLEDGE_STATES: ApiDonationStatus[] = ["pledged", "awaiting_payment", "charge_failed", "released"];
 
 const PRESETS = [50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000];
 const SUGGESTED = 200_000;
@@ -67,42 +65,12 @@ function recipientError(recipient: { name: string; phone: string; address: strin
 const MESSAGE_MAX = 500;
 const MAX_DIGITS = 12;
 
-/** `balance`: số dư ví hiển thị (che mặc định) sau nhãn của lựa chọn "Ví Góp Mầm". */
-type PaymentMethod = { value: string; label: string; note: string; balance?: number | null };
-
-const DEMO_METHODS: PaymentMethod[] = [
-  { value: "wallet", label: "Ví demo Góp Mầm", note: "Cam kết bằng ví demo, chỉ “trừ” khi dự án đạt mục tiêu (không có tiền thật)" },
-];
-
-/**
- * Ví Góp Mầm đứng đầu (tiền giữ trong ví, không thể trừ thất bại), rồi thẻ Stripe. SePay không
- * còn là kênh ủng hộ trực tiếp: chỉ dùng để nạp tiền vào ví ở trang /vi. Có ví thì ẩn ví demo cũ.
- */
-function paymentMethods(options: PaymentOptions | null, balance: number | null): PaymentMethod[] {
-  if (!options) return DEMO_METHODS;
-  const wallet: PaymentMethod[] = options.balance
-    ? [{
-        value: "balance",
-        label: "Ví Góp Mầm",
-        balance,
-        note: "Tiền được giữ trong ví; đạt mục tiêu mới trừ, không đạt tự hoàn về ví",
-      }]
-    : [];
-  const stripe: PaymentMethod[] = options.stripe
-    ? [{
-        value: "stripe",
-        label: options.stripe.testMode ? "Thẻ Visa/Mastercard · Stripe (thử nghiệm)" : "Thẻ Visa/Mastercard · Stripe",
-        note: "Chỉ lưu thẻ hôm nay; trừ tiền khi dự án đạt mục tiêu, không đạt thì không trừ",
-      }]
-    : [];
-  return [...wallet, ...stripe, ...(options.demoWallet && !options.balance ? DEMO_METHODS : [])];
-}
-
 const vnNumber = new Intl.NumberFormat("vi-VN");
 
 /**
  * Form ủng hộ trên trang /du-an/[id]/ung-ho (bố cục theo trang donate của GoFundMe):
- * chọn nhanh số tiền hoặc nhập ô lớn → quà (nếu có) → kênh thanh toán → tóm tắt → xác nhận.
+ * chọn nhanh số tiền hoặc nhập ô lớn → quà (nếu có) → tóm tắt → cam kết. Như Kickstarter, Góp Mầm
+ * không thu tiền lúc ủng hộ: dự án đạt mục tiêu mới mời người ủng hộ quét QR SePay.
  */
 export function DonationPanel({
   campaignId,
@@ -121,7 +89,6 @@ export function DonationPanel({
   const [anonymous, setAnonymous] = useState(true);
   const [message, setMessage] = useState("");
   const user = useAuthUser();
-  const [payment, setPayment] = useState("wallet");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   // Hủy có trạng thái riêng: người dùng vẫn hủy được khi "Thanh toán lại" đang chạy (TC_DON_010).
@@ -132,11 +99,6 @@ export function DonationPanel({
   const [recipient, setRecipient] = useState({ name: "", phone: "", address: "" });
   const [recent, setRecent] = useState<LedgerEntry | null>(null);
   const [options, setOptions] = useState<PaymentOptions | null>(null);
-  // Số dư ví của người đang đăng nhập (null = khách hoặc chưa tải), dùng chung với header.
-  const walletBalance = useWalletSummary()?.balance ?? null;
-  const methods = paymentMethods(options, walletBalance);
-  // Số dư ví che mặc định (kể cả khi 0 ₫); bấm con mắt mới hiện.
-  const [balanceShown, setBalanceShown] = useState(false);
   const amountId = useId();
   const selectedTier = rewardTiers.find((tier) => tier.id === rewardTierId) ?? null;
   // Quà số/ghi danh không cần địa chỉ; mức quà cũ (API chưa có trường) coi như gửi tận nơi.
@@ -163,11 +125,7 @@ export function DonationPanel({
     let active = true;
     fetchPaymentOptions()
       .then((data) => {
-        if (!active) return;
-        setOptions(data);
-        if (data.balance) setPayment("balance");
-        else if (data.stripe) setPayment("stripe");
-        else if (!data.demoWallet) setPayment("");
+        if (active) setOptions(data);
       })
       .catch(() => undefined);
     return () => {
@@ -175,20 +133,18 @@ export function DonationPanel({
     };
   }, []);
 
-  // Quay về từ SePay/Stripe: tải lại đơn (trạng thái thật do IPN/webhook quyết định, không theo URL).
+  // Mở từ thông báo hoặc quay về từ SePay: tải lại khoản đó (trạng thái thật do IPN quyết định, không theo URL).
   const returnDonationId = sepayReturn?.donationId;
+  const returnedFromSepay = !!sepayReturn?.result;
   useEffect(() => {
     if (!returnDonationId || !hasSession()) return;
     let active = true;
     fetchDonation(returnDonationId)
-      // Đơn SePay chưa ghi nhận (kể cả đã hết hạn): hỏi thẳng SePay một lần phòng IPN bị lỡ.
+      // Vừa quay về từ SePay mà chưa ghi nhận: hỏi thẳng SePay một lần phòng IPN bị lỡ.
       .then((found) => {
-        if (found.paymentMethod === "sepay" && found.status !== "completed" && found.status !== "refunded") {
+        const unpaid = ["pending", "awaiting_payment", "expired", "cancelled"].includes(found.status);
+        if (returnedFromSepay && found.paymentMethod === "sepay" && unpaid) {
           return syncSepayDonation(found.id).then((result) => result.donation, () => found);
-        }
-        // Thẻ vừa lưu (hoặc vừa đổi thẻ): webhook có thể chưa tới, nhờ server hỏi thẳng Stripe.
-        if (found.paymentMethod === "stripe" && ["pending", "expired", "charge_failed"].includes(found.status)) {
-          return syncStripeDonation(found.id).then((result) => result.donation, () => found);
         }
         return found;
       })
@@ -199,7 +155,7 @@ export function DonationPanel({
     return () => {
       active = false;
     };
-  }, [returnDonationId]);
+  }, [returnDonationId, returnedFromSepay]);
 
   const handleStatusChange = useCallback((next: ApiDonation) => setDonation(next), []);
 
@@ -208,11 +164,6 @@ export function DonationPanel({
   useEffect(() => {
     if (counted) router.refresh();
   }, [counted, router]);
-  const pledging = isPledgeMethod(payment);
-  const payByWallet = payment === "balance";
-  // Ủng hộ bằng ví mà thiếu tiền: gợi ý nạp đúng phần còn thiếu rồi quay lại trang này.
-  const shortfall = payByWallet && walletBalance !== null ? Math.max(0, amount - walletBalance) : 0;
-  const topupHref = `/vi?nap=${Math.max(shortfall, 10_000)}&next=${encodeURIComponent(`/du-an/${campaignId}/ung-ho${rewardTierId ? `?qua=${rewardTierId}` : ""}`)}`;
 
   const setAmount = (value: number) => setDigits(String(value));
 
@@ -225,10 +176,6 @@ export function DonationPanel({
     }
     if (amount < MIN_AMOUNT) {
       setError(`Số tiền tối thiểu là ${formatVnd(MIN_AMOUNT)}.`);
-      return;
-    }
-    if (shortfall > 0) {
-      setError(`Số dư ví còn thiếu ${formatVnd(shortfall)}. Vui lòng nạp thêm rồi ủng hộ.`);
       return;
     }
     if (selectedTier && amount < selectedTier.minAmount) {
@@ -244,12 +191,11 @@ export function DonationPanel({
     }
 
     setLoading(true);
-    let created: ApiDonation | null = null;
     try {
-      created = await createDonation({
+      const created = await createDonation({
         campaignId,
         amount,
-        paymentMethod: payment,
+        paymentMethod: "sepay",
         isAnonymous: anonymous,
         ...(message.trim() ? { message: message.trim() } : {}),
         idempotencyKey: generateIdempotencyKey(),
@@ -258,37 +204,10 @@ export function DonationPanel({
           ? { rewardRecipient: { name: recipient.name.trim(), phone: recipient.phone.trim(), address: recipient.address.trim() } }
           : {}),
       });
-      // Đơn đã tạo: dù xác nhận lỗi vẫn hiển thị để người dùng thanh toán lại hoặc hủy.
+      // Máy chủ ghi nhận cam kết ngay (không có bước thanh toán lúc này).
       setDonation(created);
-      if (payment === "balance") {
-        // Ví: máy chủ đã giữ tiền và ghi nhận cam kết ngay khi tạo (không có bước thanh toán ngoài).
-        setDonation(created);
-        void refreshWallet();
-        return;
-      }
-      if (payment === "stripe") {
-        // Sang Stripe Checkout (chế độ lưu thẻ, không trừ tiền); kết quả về qua webhook/đối soát.
-        window.location.assign((await createStripeCheckout(created.id)).url);
-        return;
-      }
-      setDonation(await confirmDonation({ donationId: created.id, status: "completed" }));
     } catch (err) {
-      if (err instanceof ApiError) setError(err.message);
-      else if (created) setError("Chưa xác nhận được thanh toán do lỗi kết nối. Bạn có thể thanh toán lại hoặc hủy giao dịch.");
-      else setError("Không kết nối được máy chủ. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const retryPayment = async () => {
-    if (!donation) return;
-    setLoading(true);
-    setError("");
-    try {
-      setDonation(await confirmDonation({ donationId: donation.id, status: "completed" }));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Chưa xác nhận được thanh toán. Vui lòng thử lại.");
+      setError(err instanceof ApiError ? err.message : "Không kết nối được máy chủ. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -323,23 +242,29 @@ export function DonationPanel({
     );
   }
 
-  if (donation?.status === "pending" && donation.paymentMethod === "sepay") {
+  // Vừa quay về từ SePay (hoặc đơn SePay cũ đang chờ): chờ IPN xác nhận.
+  const waitingSepay =
+    donation?.paymentMethod === "sepay" &&
+    (donation.status === "pending" ||
+      (donation.status === "awaiting_payment" && sepayReturn?.donationId === donation.id && !!sepayReturn.result));
+  if (donation && waitingSepay) {
     return (
       <SepayPaymentStatus
         donation={donation}
-        result={sepayReturn?.donationId === donation.id ? sepayReturn.result : "error"}
+        result={sepayReturn?.donationId === donation.id && sepayReturn.result ? sepayReturn.result : "error"}
         onChange={handleStatusChange}
       />
     );
   }
 
-  if (donation && (PLEDGE_STATES.includes(donation.status) || (donation.status === "pending" && donation.paymentMethod === "stripe"))) {
+  if (donation && PLEDGE_STATES.includes(donation.status)) {
     return (
       <PledgeStatus
         donation={donation}
         campaignId={campaignId}
         campaignTitle={campaignTitle}
         endDate={endDate}
+        options={options}
         rewardTitle={donation.rewardTierId ? rewardTiers.find((tier) => tier.id === donation.rewardTierId)?.title ?? null : undefined}
         onChange={handleStatusChange}
         onStartOver={startOver}
@@ -350,9 +275,9 @@ export function DonationPanel({
   if (donation && donation.status !== "completed") {
     const pending = donation.status === "pending";
     const outcomes: Partial<Record<ApiDonationStatus, { title: string; text: string }>> = {
-      pending: { title: "Giao dịch đang chờ thanh toán", text: "Bạn có thể thanh toán lại hoặc hủy giao dịch. Giao dịch chưa thanh toán sẽ tự hết hạn sau 30 phút." },
-      cancelled: { title: "Đã hủy giao dịch", text: "Không có khoản tiền nào được ghi nhận." },
-      expired: { title: "Giao dịch đã hết hạn", text: "Giao dịch quá thời gian chờ thanh toán. Không có khoản tiền nào được ghi nhận." },
+      pending: { title: "Giao dịch đang chờ thanh toán", text: "Giao dịch chưa thanh toán sẽ tự hết hạn sau 30 phút." },
+      cancelled: { title: "Đã hủy cam kết", text: "Không có khoản tiền nào được ghi nhận." },
+      expired: { title: "Cam kết đã hết hạn", text: `Khoản này không được thanh toán trong ${PAYMENT_WINDOW_DAYS} ngày sau khi dự án đạt mục tiêu nên đã tự hủy. Bạn không bị trừ tiền.` },
       failed: { title: "Thanh toán không thành công", text: "Không có khoản tiền nào được ghi nhận. Bạn có thể thử lại." },
       refunded: { title: "Khoản ủng hộ đã được hoàn tiền", text: "" },
     };
@@ -368,14 +293,9 @@ export function DonationPanel({
         {error && <p className="form-error" role="alert">{error}</p>}
         <div className="donate-result-actions">
           {pending ? (
-            <>
-              <button className="button button-primary button-lg" type="button" disabled={loading || cancelling} onClick={retryPayment}>
-                {loading ? "Đang xử lý…" : "Thanh toán lại"}
-              </button>
-              <button className="button button-outline button-lg" type="button" disabled={cancelling} onClick={cancelPending}>
-                {cancelling ? "Đang hủy…" : "Hủy giao dịch"}
-              </button>
-            </>
+            <button className="button button-outline button-lg" type="button" disabled={cancelling} onClick={cancelPending}>
+              {cancelling ? "Đang hủy…" : "Hủy giao dịch"}
+            </button>
           ) : (
             <button className="button button-primary button-lg" type="button" onClick={startOver}>Tạo giao dịch mới</button>
           )}
@@ -521,40 +441,24 @@ export function DonationPanel({
         </fieldset>
       )}
 
-      <fieldset className="donate-section donate-methods">
-        <legend>Phương thức thanh toán</legend>
-        {methods.map((method) => (
-          <label key={method.value}>
-            <input type="radio" name="payment" value={method.value} checked={payment === method.value} onChange={() => setPayment(method.value)} />
-            <span>
-              <b>
-                {method.label}
-                {method.balance != null && (
-                  <span className="donate-balance">
-                    · số dư
-                    <MaskedAmount value={method.balance} shown={balanceShown} />
-                    <BalanceToggle className="balance-toggle-sm" shown={balanceShown} onToggle={() => setBalanceShown((value) => !value)} />
-                  </span>
-                )}
-              </b>
-              <small>{method.note}</small>
-            </span>
-          </label>
-        ))}
-        {/* Cách giữ/trừ tiền phụ thuộc kênh: giải thích ngay khi người dùng chọn ví hay thẻ. */}
-        {payment && (
-          <p className="donate-aon" aria-live="polite">
-            <Icon name="shield" size={15} />
-            <span>
-              {payByWallet
-                ? `${amount > 0 ? `Khoản ${formatVnd(amount)}` : "Số tiền ủng hộ"} được tạm giữ trong ví của bạn đến khi dự án kết thúc${endDate ? ` (${endDate})` : ""}. Nếu dự án đạt mục tiêu, tiền mới được chuyển cho dự án; nếu không đạt hoặc bạn rút lại trước hạn, tiền tự hoàn về ví.`
-                : pledging
-                  ? `Bạn chỉ bị trừ tiền nếu dự án đạt mục tiêu khi kết thúc${endDate ? ` (${endDate})` : ""}. Nếu không đạt, bạn không mất đồng nào và có thể rút lại trước hạn.`
-                  : "Nếu dự án không đạt mục tiêu, khoản ủng hộ được hoàn lại cho bạn."}
-            </span>
-          </p>
-        )}
-      </fieldset>
+      <section className="donate-section donate-methods" aria-labelledby={`${amountId}-how`}>
+        <h2 className="donate-section-title" id={`${amountId}-how`}>Cách thanh toán</h2>
+        <ol className="pledge-steps">
+          <li><b>Hôm nay:</b> bạn chỉ cam kết, không phải trả đồng nào.</li>
+          <li>
+            <b>Dự án đạt mục tiêu khi kết thúc{endDate ? ` (${endDate})` : ""}:</b> bạn nhận thông báo và email mời thanh toán,
+            quét QR SePay trong {PAYMENT_WINDOW_DAYS} ngày.
+          </li>
+          <li><b>Không đạt mục tiêu:</b> cam kết tự hủy, không phát sinh thanh toán.</li>
+        </ol>
+        <p className="donate-aon">
+          <Icon name="shield" size={15} />
+          <span>
+            Góp Mầm không giữ tiền của bạn trong ví. Tiền chỉ chuyển khi dự án thành công, sau đó được gom và chuyển cho chủ dự án
+            một lần. Bạn có thể rút cam kết bất cứ lúc nào trước khi dự án kết thúc.
+          </span>
+        </p>
+      </section>
 
       <div className="donate-section donate-message">
         <label className="donate-message-label" htmlFor={`${amountId}-message`}>
@@ -583,23 +487,12 @@ export function DonationPanel({
       <section className="donate-summary" aria-labelledby={`${amountId}-summary`}>
         <h2 id={`${amountId}-summary`}>Khoản ủng hộ của bạn</h2>
         <dl>
-          <div><dt>{pledging ? "Số tiền cam kết" : "Số tiền ủng hộ"}</dt><dd className="num">{formatVnd(amount)}</dd></div>
+          <div><dt>Số tiền cam kết</dt><dd className="num">{formatVnd(amount)}</dd></div>
           {selectedTier && <div><dt>Phần quà</dt><dd>{selectedTier.title} · từ {formatVnd(selectedTier.minAmount)}</dd></div>}
           {selectedTier && bonus > 0 && <div><dt>Ủng hộ thêm</dt><dd className="num">{formatVnd(bonus)}</dd></div>}
-          {payByWallet ? (
-            <div className="donate-summary-total"><dt>Giữ trong ví hôm nay</dt><dd className="num">{formatVnd(amount)}</dd></div>
-          ) : (
-            <div className="donate-summary-total"><dt>Trừ tiền hôm nay</dt><dd className="num">{formatVnd(pledging ? 0 : amount)}</dd></div>
-          )}
+          <div className="donate-summary-total"><dt>Thanh toán hôm nay</dt><dd className="num">{formatVnd(0)}</dd></div>
         </dl>
       </section>
-
-      {payByWallet && shortfall > 0 && (
-        <p className="donate-wallet-short" role="status">
-          <Icon name="wallet" size={16} /> Số dư ví còn thiếu <b className="num">{formatVnd(shortfall)}</b>.{" "}
-          <Link href={topupHref}>Nạp thêm vào ví</Link> rồi quay lại ủng hộ.
-        </p>
-      )}
 
       {error === "login" ? (
         <p className="form-error" role="alert">
@@ -609,18 +502,14 @@ export function DonationPanel({
         <p className="form-error" role="alert">{error}</p>
       ) : null}
 
-      <button className="button button-primary button-block button-lg" type="submit" disabled={loading || !enabled || !payment}>
-        {loading ? "Đang xử lý…" : pledging ? "Cam kết ủng hộ" : "Ủng hộ ngay"}
+      <button className="button button-primary button-block button-lg" type="submit" disabled={loading || !enabled}>
+        {loading ? "Đang xử lý…" : "Cam kết ủng hộ"}
       </button>
       <p className="fineprint">
         {enabled ? (
           <>
-            Khi bấm “{pledging ? "Cam kết ủng hộ" : "Ủng hộ ngay"}”, bạn đồng ý với <Link href="/chinh-sach-bao-mat">chính sách quyền riêng tư</Link> của Góp Mầm.{" "}
-            {payment === "balance"
-                ? "Số tiền được giữ trong ví Góp Mầm của bạn; không cần chuyển khoản thêm. Nạp ví bằng chuyển khoản QR SePay ở trang Ví."
-              : payment === "stripe"
-                ? "Bạn sẽ được chuyển sang trang bảo mật của Stripe để lưu thẻ. Góp Mầm không lưu số thẻ; Stripe chỉ trừ tiền khi dự án đạt mục tiêu."
-                : "Ví demo dùng cho môi trường thử nghiệm, không trừ tiền thật và không lưu dữ liệu thẻ."}
+            Khi bấm “Cam kết ủng hộ”, bạn đồng ý với <Link href="/chinh-sach-bao-mat">chính sách quyền riêng tư</Link> của Góp Mầm
+            và cam kết thanh toán {amount > 0 ? formatVnd(amount) : "số tiền trên"} qua QR SePay nếu dự án đạt mục tiêu.
           </>
         ) : (
           "Dự án hiện không nhận ủng hộ."

@@ -192,3 +192,44 @@ export async function downloadReconciliationCsv(range: { from?: string; to?: str
   const { blob, filename } = await apiDownload(`/admin/reconciliation/export${rangeQuery(range)}`);
   saveBlob(blob, filename ?? "doi-soat.csv");
 }
+
+/* ---------- Giải ngân tiền gây quỹ cho chủ dự án ---------- */
+
+/** `collecting`: còn cam kết chưa thu xong; `ready`: thu xong, chờ chuyển; `disbursed`: đã chuyển. */
+export type DisbursementState = "collecting" | "ready" | "disbursed";
+
+export type Disbursement = {
+  amount: number;
+  donationCount: number;
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
+  transferReference: string;
+  proofUrl: string | null;
+  adminNotes?: string | null;
+  disbursedAt: string;
+};
+
+export type DisbursementRow = {
+  campaign: { id: string; title: string; status: string; goalAmount: number; endDate: string };
+  owner: { id: string; name: string; email: string };
+  state: DisbursementState;
+  collected: number;
+  paidCount: number;
+  outstanding: number;
+  outstandingCount: number;
+  payoutAccount: { bankName: string; bankAccountNumber: string; bankAccountName: string; updatedAt: string } | null;
+  disbursement: Disbursement | null;
+};
+
+export function fetchDisbursements(state?: DisbursementState): Promise<DisbursementRow[]> {
+  return api.get<DisbursementRow[]>(`/admin/disbursements${state ? `?state=${state}` : ""}`);
+}
+
+/** Cần mã OTP; hộp nhập mã tự mở rồi gửi lại. */
+export function disburseCampaign(
+  campaignId: string,
+  input: { transferReference: string; proofMediaId?: string; adminNotes?: string },
+): Promise<Disbursement> {
+  return api.post<Disbursement>(`/admin/disbursements/${encodeURIComponent(campaignId)}`, input);
+}

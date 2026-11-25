@@ -20,6 +20,7 @@ import type { PaymentGateway } from "../../integrations/payment/payment.gateway"
 import type { CardPledgeGateway } from "../../integrations/payment/stripe";
 import { WalletService } from "../wallet/wallet.service";
 import { closedWithoutReachingGoal } from "../campaigns/campaign-outcome";
+import { CampaignDisbursement } from "../campaigns/entities/campaign-disbursement.entity";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { COUNTED_DONATION_STATUSES, Donation, DonationStatus, RefundMethod } from "../donations/entities/donation.entity";
 import { MediaFile, MediaPurpose } from "../media/entities/media-file.entity";
@@ -144,6 +145,9 @@ export class FinanceService {
     // Kiểu `X | null` làm metadata thành Object: phải chỉ rõ token, nếu không Nest âm thầm inject null.
     @Inject(WalletService)
     private readonly wallet: WalletService | null = null,
+    @Optional()
+    @InjectRepository(CampaignDisbursement)
+    private readonly disbursementRepo: Repository<CampaignDisbursement> | null = null,
   ) {}
 
   // ---------- Yêu cầu hoàn tiền ----------
@@ -483,6 +487,10 @@ export class FinanceService {
     }
     if (donation.status !== DonationStatus.COMPLETED) {
       throw new ConflictException("Chỉ hoàn được khoản ủng hộ đã xác nhận và chưa hoàn.");
+    }
+    // Đã gom tiền chuyển cho chủ dự án: Góp Mầm không còn giữ khoản này để hoàn.
+    if (this.disbursementRepo && (await this.disbursementRepo.count({ where: { campaignId: donation.campaignId } })) > 0) {
+      throw new ConflictException("Chiến dịch đã được giải ngân cho chủ dự án nên không hoàn tiền qua hệ thống được.");
     }
     const amount = Number(donation.amount);
     const refundedAt = new Date();

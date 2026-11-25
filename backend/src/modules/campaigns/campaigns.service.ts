@@ -27,6 +27,7 @@ import {
   ModerateCampaignDto,
   UpdateCampaignDto,
 } from "./dto/campaign.dto";
+import { CampaignPayoutAccount } from "./entities/campaign-payout-account.entity";
 import { Campaign, CampaignStatus } from "./entities/campaign.entity";
 
 const PUBLIC_STATUSES = [
@@ -137,6 +138,9 @@ export class CampaignsService {
     @Optional()
     @Inject(AutomationSettingsService)
     private readonly automationSettings: AutomationSettingsService | null = null,
+    @Optional()
+    @InjectRepository(CampaignPayoutAccount)
+    private readonly payoutRepo: Repository<CampaignPayoutAccount> | null = null,
   ) {}
 
   async findAll(
@@ -441,6 +445,11 @@ export class CampaignsService {
       throw new BadRequestException(
         `Thời gian gây quỹ tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày — hãy sửa ngày kết thúc trước khi gửi duyệt`,
       );
+    }
+
+    // Như Kickstarter: phải khai báo nơi nhận tiền trước khi gửi duyệt, để khi thành công admin giải ngân được ngay.
+    if (this.payoutRepo && (await this.payoutRepo.count({ where: { campaignId: campaign.id } })) === 0) {
+      throw new BadRequestException("Vui lòng khai báo tài khoản ngân hàng nhận tiền trước khi gửi duyệt.");
     }
 
     const previousStatus = campaign.status;

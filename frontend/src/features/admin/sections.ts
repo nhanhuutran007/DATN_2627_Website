@@ -31,7 +31,7 @@ export const ADMIN_SECTION_GROUPS: AdminSectionGroup[] = [
     label: "Tài chính",
     sections: [
       { slug: "giao-dich", label: "Giao dịch", title: "Giao dịch", icon: "receipt" },
-      { slug: "hoan-rut-tien", label: "Hoàn & rút tiền", title: "Hoàn tiền & rút tiền ví", icon: "wallet" },
+      { slug: "hoan-rut-tien", label: "Hoàn tiền & giải ngân", title: "Hoàn tiền & giải ngân", icon: "wallet" },
       { slug: "doi-soat", label: "Đối soát", title: "Đối soát giao dịch", icon: "scale" },
     ],
   },
@@ -58,7 +58,8 @@ export const SECTION_TABS: Record<string, AdminTab[]> = {
   ],
   "hoan-rut-tien": [
     { slug: "hoan-tien", label: "Hoàn tiền", icon: "wallet" },
-    { slug: "rut-tien", label: "Rút tiền ví", icon: "send" },
+    // Ví Góp Mầm đã ngừng hoạt động (không giữ tiền người dùng): tab "Rút tiền ví" được ẩn, code vẫn giữ.
+    { slug: "giai-ngan", label: "Giải ngân cho chủ dự án", icon: "send" },
   ],
   "cai-dat": [
     { slug: "linh-vuc", label: "Lĩnh vực", icon: "tag" },

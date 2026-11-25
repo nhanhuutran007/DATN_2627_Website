@@ -35,6 +35,8 @@ const ACTION_LABELS: Record<StepUpPurpose, string> = {
   [StepUpPurpose.ADMIN_USERS]: "đổi vai trò hoặc xóa tài khoản",
   [StepUpPurpose.WALLET_WITHDRAW]: "rút tiền từ ví về tài khoản ngân hàng",
   [StepUpPurpose.ADMIN_WITHDRAW]: "duyệt chi tiền rút ví",
+  [StepUpPurpose.CAMPAIGN_PAYOUT]: "khai báo tài khoản nhận tiền của chiến dịch",
+  [StepUpPurpose.ADMIN_DISBURSE]: "giải ngân tiền gây quỹ cho chủ dự án",
 };
 
 type StepUpClaims = { sub: string; typ: "step_up"; purpose: StepUpPurpose };

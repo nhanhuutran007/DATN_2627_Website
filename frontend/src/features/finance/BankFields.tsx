@@ -35,11 +35,21 @@ export function bankPayload(bank: BankDraft) {
   };
 }
 
-export function BankFields({ value, onChange, hint }: { value: BankDraft; onChange: (next: BankDraft) => void; hint: string }) {
+export function BankFields({
+  value,
+  onChange,
+  hint,
+  legend = "Tài khoản nhận hoàn tiền",
+}: {
+  value: BankDraft;
+  onChange: (next: BankDraft) => void;
+  hint: string;
+  legend?: string;
+}) {
   const banksId = useId();
   return (
     <fieldset className="refund-bank">
-      <legend>Tài khoản nhận hoàn tiền</legend>
+      <legend>{legend}</legend>
       <p className="hint">{hint}</p>
       <label className="field">
         <span>Ngân hàng</span>

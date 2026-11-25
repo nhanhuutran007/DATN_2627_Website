@@ -56,8 +56,8 @@ export default function PrivacyPolicyPage() {
               và báo cáo vi phạm bạn gửi.
             </li>
             <li>
-              <strong>Giao dịch ủng hộ:</strong> số tiền, thời gian, trạng thái và lời nhắn. Ủng hộ bằng số dư ví Góp Mầm,
-              ví được nạp bằng chuyển khoản qua cổng SePay; Góp Mầm không lưu thông tin thẻ hay tài khoản dùng để thanh toán. Khi bạn yêu cầu hoàn tiền
+              <strong>Giao dịch ủng hộ:</strong> số tiền, thời gian, trạng thái và lời nhắn. Ủng hộ là cam kết trả sau: chỉ khi dự án
+              đạt mục tiêu bạn mới thanh toán bằng chuyển khoản qua cổng SePay; Góp Mầm không lưu thông tin thẻ hay tài khoản dùng để thanh toán. Khi bạn yêu cầu hoàn tiền
               một khoản chuyển khoản, chúng tôi lưu ngân hàng, số tài khoản và tên chủ tài khoản bạn cung cấp để chuyển
               trả, và chỉ quản trị viên xem được.
             </li>

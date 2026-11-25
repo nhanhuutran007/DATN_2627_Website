@@ -47,6 +47,9 @@ function safeNext(value: string | null): string | null {
  * dư dùng được, số đang giữ cho cam kết và lịch sử. Ủng hộ bằng ví theo "tất cả hoặc không":
  * đạt mục tiêu mới trừ, không đạt thì hoàn về ví.
  */
+/** Nạp ví đã tắt (Góp Mầm không giữ tiền người dùng); phần nạp giữ lại trong code nhưng không hiển thị. */
+const TOPUP_ENABLED = false;
+
 export function WalletPage() {
   const user = useAuthUser();
   const redirecting = useRedirectAdmin();
@@ -177,8 +180,8 @@ export function WalletPage() {
         <div className="wallet-head">
           <h1>Ví Góp Mầm</h1>
           <p className="org-lead">
-            Nạp tiền qua chuyển khoản SePay, rồi ủng hộ dự án bằng số dư. Tiền được <b>giữ lại</b> đến khi dự án kết thúc:
-            đạt mục tiêu mới bị trừ, không đạt thì tự <b>hoàn về ví</b>.
+            Ví Góp Mầm đã <b>ngừng nhận nạp tiền</b>: giờ bạn chỉ cần cam kết ủng hộ, và chỉ thanh toán bằng QR SePay khi dự án
+            đạt mục tiêu. Nếu còn số dư cũ, bạn có thể rút về tài khoản ngân hàng bên dưới.
           </p>
         </div>
 
@@ -210,6 +213,7 @@ export function WalletPage() {
           )}
         </section>
 
+        {TOPUP_ENABLED && (
         <section className="panel wallet-topup" aria-labelledby={`${amountId}-title`}>
           <h2 id={`${amountId}-title`}>Nạp tiền vào ví</h2>
           {pending ? (
@@ -253,6 +257,7 @@ export function WalletPage() {
             </form>
           )}
         </section>
+        )}
 
         <WithdrawPanel balance={wallet ? wallet.balance : null} onChanged={() => setReloadKey((key) => key + 1)} />
 

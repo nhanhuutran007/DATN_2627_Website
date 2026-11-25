@@ -12,6 +12,7 @@ import { PROVINCES } from "@/lib/provinces";
 import { escapeHtml, htmlToText } from "@/lib/rich-text";
 import { isUploadedVideo, videoSource } from "@/lib/video";
 import { ImageUploader } from "@/features/media/ImageUploader";
+import { BankFields, bankDraftError, bankPayload, EMPTY_BANK, maskAccount, type BankDraft } from "@/features/finance/BankFields";
 import { DurationEstimatePanel } from "@/features/campaign-create/DurationEstimatePanel";
 import { VideoInput } from "@/features/campaign-create/VideoInput";
 import { OrganizationPicker } from "@/features/organizations/OrganizationPicker";
@@ -27,6 +28,9 @@ import { ApiError } from "@/lib/api";
 import {
   createCampaign,
   fetchCampaign,
+  fetchMyPayoutAccounts,
+  fetchPayoutAccount,
+  savePayoutAccount,
   submitCampaign,
   updateCampaign,
   type ApiCampaign,
@@ -53,6 +57,10 @@ const STEPS = [
   { title: "Minh bạch ngân sách và rủi ro", intro: "Người ủng hộ muốn biết tiền được dùng vào đâu và bạn đã lường trước những khó khăn gì." },
   { title: "Lập kế hoạch theo mốc", intro: "Mỗi mốc là một đầu ra kiểm chứng được. Sau khi được duyệt, bạn báo cáo tiến độ và chi tiêu theo từng mốc." },
   { title: "Quà tri ân người ủng hộ", intro: "Không bắt buộc. Bạn có thể tặng quà theo mức ủng hộ để cảm ơn cộng đồng." },
+  {
+    title: "Tài khoản nhận tiền",
+    intro: "Khi dự án thành công, Góp Mầm gom tiền người ủng hộ đã thanh toán và chuyển vào tài khoản này một lần.",
+  },
   { title: "Kiểm tra và gửi duyệt", intro: "Rà soát lần cuối. Hồ sơ chỉ được công khai sau khi quản trị viên duyệt." },
 ];
 
@@ -63,7 +71,12 @@ const STEP_STORY = 3;
 const STEP_BUDGET = 4;
 const STEP_MILESTONES = 5;
 const STEP_REWARDS = 6;
+const STEP_PAYOUT = 7;
 const LAST_STEP = STEPS.length - 1;
+
+type SavedBank = { bankName: string; bankAccountNumber: string; bankAccountName: string };
+
+const bankKey = (bank: SavedBank) => `${bank.bankName}|${bank.bankAccountNumber}|${bank.bankAccountName}`.toLowerCase();
 
 
 type DraftMilestone = { title: string; deadline: string; budget: string; output: string };
@@ -270,6 +283,10 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [savedMilestoneIds, setSavedMilestoneIds] = useState<string[]>([]);
   const [tiers, setTiers] = useState<DraftTier[]>([{ ...emptyTier }]);
+  // Tài khoản nhận tiền: lưu riêng cho từng chiến dịch (cần mã OTP), gợi ý dùng lại tài khoản đã khai báo trước đó.
+  const [bank, setBank] = useState<BankDraft>(EMPTY_BANK);
+  const [savedBankKey, setSavedBankKey] = useState("");
+  const [knownBanks, setKnownBanks] = useState<SavedBank[]>([]);
   const [savedTierIds, setSavedTierIds] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [beneficiary, setBeneficiary] = useState<Beneficiary>(initialOrganization ? "organization" : "self");
@@ -293,6 +310,27 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
       active = false;
     };
   }, [userId]);
+  // Tài khoản đã khai báo ở chiến dịch trước: đổ sẵn tài khoản gần nhất cho chiến dịch mới.
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+    fetchMyPayoutAccounts()
+      .then((list) => {
+        if (!active) return;
+        setKnownBanks(list);
+        if (!editId && list[0]) {
+          setBank((current) =>
+            current.bankName || current.accountNumber || current.accountName
+              ? current
+              : { bankName: list[0].bankName, accountNumber: list[0].bankAccountNumber, accountName: list[0].bankAccountName },
+          );
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [userId, editId]);
   const COLLAB_BLOCKED =
     "Bạn là cộng tác viên của tổ chức này nên không tự tạo chiến dịch cho tổ chức được. Hãy nhờ người đại diện tạo; bạn sẽ quản lý chiến dịch theo quyền được giao.";
   const collabBlocked = !!pickedOrganization && collabOrgIds.includes(pickedOrganization.id);
@@ -302,8 +340,8 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
   useEffect(() => {
     if (!editId || !userId) return;
     let cancelled = false;
-    Promise.all([fetchCampaign(editId), fetchManagedRewardTiers(editId)])
-      .then(([campaign, rewardTiers]) => {
+    Promise.all([fetchCampaign(editId), fetchManagedRewardTiers(editId), fetchPayoutAccount(editId).catch(() => null)])
+      .then(([campaign, rewardTiers, payout]) => {
         if (cancelled) return;
         if (campaign.ownerId !== userId || !EDITABLE_STATUSES.includes(campaign.status)) {
           setError("Hồ sơ này không sửa được: chỉ sửa bản nháp, hồ sơ cần bổ sung hoặc bị từ chối của chính bạn.");
@@ -338,6 +376,10 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
         } else {
           setBeneficiary("self");
         }
+        if (payout) {
+          setBank({ bankName: payout.bankName, accountNumber: payout.bankAccountNumber, accountName: payout.bankAccountName });
+          setSavedBankKey(bankKey(payout));
+        }
         setCampaignId(campaign.id);
         setReviewNote(campaign.status === "draft" ? "" : campaign.rejectionReason ?? "");
         setEditState("ready");
@@ -371,8 +413,9 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
         label: "Tổng ngân sách các mốc khớp mục tiêu (lệch không quá 10%)",
       },
       { ok: isImageValue(draft.imageUrl), label: "Có ảnh đại diện cho dự án" },
+      { ok: !bankDraftError(bank), label: "Đã khai báo tài khoản nhận tiền" },
     ],
-    [draft, milestones, plannedBudget, storyLength, target],
+    [draft, milestones, plannedBudget, storyLength, target, bank],
   );
   const passed = checks.filter((check) => check.ok).length;
 
@@ -413,6 +456,12 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
     }
     if (index === STEP_MILESTONES) return validateMilestones(milestones);
     if (index === STEP_REWARDS) return validateTiers(tiers);
+    if (index === STEP_PAYOUT) {
+      const blank = !bank.bankName.trim() && !bank.accountNumber.trim() && !bank.accountName.trim();
+      // Lưu nháp được khi chưa nhập; gửi duyệt thì bắt buộc (như Kickstarter).
+      if (forDraft && blank) return "";
+      return bankDraftError(bank);
+    }
     return "";
   };
 
@@ -489,6 +538,15 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
     await Promise.all(savedTierIds.map((tierId) => deleteRewardTier(tierId)));
     const createdTiers = await Promise.all(tiersToPayloads(tiers).map((payloadItem) => createRewardTier(id, payloadItem)));
     setSavedTierIds(createdTiers.map((tier) => tier.id));
+
+    // Tài khoản nhận tiền: chỉ lưu khi đã nhập đủ và có thay đổi (máy chủ hỏi mã OTP gửi email).
+    if (!bankDraftError(bank)) {
+      const payload = bankPayload(bank);
+      if (bankKey(payload) !== savedBankKey) {
+        await savePayoutAccount(id, payload);
+        setSavedBankKey(bankKey(payload));
+      }
+    }
     return id;
   };
 
@@ -810,6 +868,52 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                 <RewardTiersEditor tiers={tiers} onChange={(next) => { setTiers(next); setNotice(""); }} />
               )}
 
+              {step === STEP_PAYOUT && (
+                <div className="form">
+                  {knownBanks.length > 0 && (
+                    <div className="payout-reuse">
+                      <p className="hint">Dùng lại tài khoản đã khai báo ở chiến dịch trước:</p>
+                      <div className="payout-reuse-list">
+                        {knownBanks.map((known) => {
+                          const selected = bankKey(known) === bankKey(bankPayload(bank));
+                          return (
+                            <button
+                              key={bankKey(known)}
+                              className={`button button-sm ${selected ? "button-dark" : "button-outline"}`}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => {
+                                setBank({ bankName: known.bankName, accountNumber: known.bankAccountNumber, accountName: known.bankAccountName });
+                                setNotice("");
+                              }}
+                            >
+                              {known.bankName} {maskAccount(known.bankAccountNumber)} · {known.bankAccountName}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <BankFields
+                    legend="Tài khoản nhận tiền gây quỹ"
+                    value={bank}
+                    onChange={(next) => {
+                      setBank(next);
+                      setNotice("");
+                    }}
+                    hint={
+                      pickedOrganization
+                        ? "Gây quỹ cho tổ chức: nên dùng tài khoản đứng tên tổ chức thụ hưởng. Chỉ bạn và quản trị viên xem được."
+                        : "Tài khoản nên đứng tên bạn. Chỉ bạn và quản trị viên xem được."
+                    }
+                  />
+                  <p className="hint">
+                    Lưu tài khoản cần nhập mã xác nhận gửi qua email. Người ủng hộ chỉ thanh toán khi dự án đạt mục tiêu; hết hạn
+                    thanh toán (7 ngày), Góp Mầm chuyển toàn bộ tiền đã thu vào tài khoản này một lần.
+                  </p>
+                </div>
+              )}
+
               {step === LAST_STEP && (
                 <div className="form">
                   <dl className="review-grid">
@@ -822,6 +926,10 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                     <div><dt>Ngày kết thúc</dt><dd>{draft.deadline ? new Date(draft.deadline).toLocaleDateString("vi-VN") : "—"}</dd></div>
                     <div><dt>Số mốc</dt><dd>{milestones.filter((m) => m.title.trim()).length}</dd></div>
                     <div><dt>Mức quà</dt><dd>{tiersToPayloads(tiers).length || "Không có"}</dd></div>
+                    <div>
+                      <dt>Nhận tiền vào</dt>
+                      <dd>{bankDraftError(bank) ? "Chưa khai báo" : `${bank.bankName.trim()} ${maskAccount(bankPayload(bank).bankAccountNumber)}`}</dd>
+                    </div>
                   </dl>
                   <div className="checklist-box">
                     <h3>Tiêu chí hồ sơ ({passed}/{checks.length})</h3>

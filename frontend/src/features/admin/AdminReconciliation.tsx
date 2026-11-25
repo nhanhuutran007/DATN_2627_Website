@@ -40,10 +40,13 @@ export function AdminReconciliation({
     window.history.replaceState(null, "", url.toString());
   };
 
+  // Ví đã ngừng hoạt động: chỉ giữ tab ví để xử lý dữ liệu cũ khi còn ví lệch sổ.
+  const tabs = TABS.filter((item) => item.id !== "wallets" || walletMismatches > 0 || tab === "wallets");
+
   return (
     <>
       <div className="recon-presets recon-tabs" role="tablist" aria-label="Loại đối soát">
-        {TABS.map((item) => (
+        {tabs.map((item) => (
           <button
             key={item.id}
             type="button"

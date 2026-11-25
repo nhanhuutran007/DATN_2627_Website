@@ -5,12 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Icon } from "@/components/ui/Icon";
-import { BalanceToggle, MaskedAmount } from "@/components/ui/MaskedAmount";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { logoutRequest } from "@/lib/api";
 import { useAuthUser } from "@/lib/auth";
-import { useWalletSummary } from "@/lib/wallet-store";
 
 type MenuKey = "ung-ho" | "gay-quy" | "gioi-thieu" | "tai-khoan";
 
@@ -52,8 +50,6 @@ export function SiteHeader() {
       : `/dang-nhap?next=${encodeURIComponent(pathname)}`;
   const router = useRouter();
   const user = useAuthUser();
-  // Số dư ví (khách/admin: null → không hiện).
-  const wallet = useWalletSummary();
   const [menu, setMenu] = useState<MenuKey | null>(null);
   const [drawer, setDrawer] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -126,7 +122,6 @@ export function SiteHeader() {
   const accountLinks: MenuLink[] = user
     ? [
         isAdmin ? { href: "/admin", label: "Trang quản trị" } : { href: "/dashboard", label: "Hoạt động của bạn" },
-        ...(isAdmin ? [] : [{ href: "/vi", label: "Ví Góp Mầm" }]),
         // Như "Recommended for you" trong menu tài khoản Kickstarter: dự án AI gợi ý kèm lý do.
         ...(isAdmin ? [] : [{ href: "/goi-y-cho-ban", label: "Gợi ý cho bạn" }]),
         { href: "/thong-bao", label: "Thông báo" },
@@ -182,7 +177,6 @@ export function SiteHeader() {
                       <small>{user.email}</small>
                       <span className={`tag ${user.role === "admin" ? "tag-blue" : "tag-green"}`}>{ROLE_LABEL[user.role]}</span>
                     </div>
-                    {wallet && <WalletBalance balance={wallet.balance} held={wallet.held} onNavigate={closeAll} />}
                     <MenuList links={accountLinks} onNavigate={closeAll} />
                     <button className="gh-menu-item gh-menu-logout" type="button" onClick={logout}>Đăng xuất</button>
                   </div>
@@ -223,7 +217,6 @@ export function SiteHeader() {
             {user ? (
               <section className="gh-drawer-section">
                 <h2>{user.name}</h2>
-                {wallet && <WalletBalance balance={wallet.balance} held={wallet.held} onNavigate={closeAll} />}
                 <MenuList links={accountLinks} onNavigate={closeAll} />
                 <button className="gh-menu-item gh-menu-logout" type="button" onClick={logout}>Đăng xuất</button>
               </section>
@@ -288,23 +281,3 @@ function DrawerSection({ title, links, onNavigate }: { title: string; links: Men
   );
 }
 
-/**
- * Số dư ví trong menu tài khoản: mặc định ẩn (••••••), bấm biểu tượng con mắt mới hiện số tiền.
- * Menu đóng là component bị gỡ nên lần mở sau số dư lại ẩn.
- */
-function WalletBalance({ balance, held, onNavigate }: { balance: number; held: number; onNavigate: () => void }) {
-  const [shown, setShown] = useState(false);
-  return (
-    <div className="gh-account-wallet">
-      <Link className="gh-account-wallet-link" href="/vi" onClick={onNavigate}>
-        <Icon name="wallet" size={16} />
-        <span>Ví Góp Mầm</span>
-      </Link>
-      <span className="gh-account-wallet-amount" aria-live="polite">
-        <b className="num"><MaskedAmount value={balance} shown={shown} /></b>
-        {held > 0 && <small>Đang giữ <MaskedAmount value={held} shown={shown} /></small>}
-      </span>
-      <BalanceToggle className="gh-account-wallet-toggle" shown={shown} onToggle={() => setShown((value) => !value)} />
-    </div>
-  );
-}

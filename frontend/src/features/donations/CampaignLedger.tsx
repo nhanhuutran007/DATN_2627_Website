@@ -62,7 +62,7 @@ export function CampaignLedger({ campaignId, sort = "recent" }: CampaignLedgerPr
                 <td>{paymentMethodLabel(entry.paymentMethod)}</td>
                 <td className="num">
                   {formatVnd(entry.amount)}
-                  {entry.status === "pledged" && <small className="ledger-pledged">cam kết · chưa trừ tiền</small>}
+                  {entry.status === "pledged" && <small className="ledger-pledged">cam kết · chưa thanh toán</small>}
                 </td>
                 <td className="mono">{entry.reference}</td>
               </tr>

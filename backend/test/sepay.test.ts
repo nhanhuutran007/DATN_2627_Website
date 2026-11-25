@@ -149,21 +149,37 @@ describe("SePay gateway", () => {
 });
 
 describe("DonationsService – SePay", () => {
-  it("SePay chỉ dùng để nạp ví: không tạo khoản ủng hộ SePay mới", async () => {
+  it("ủng hộ chỉ tạo cam kết (chưa thu tiền), có mã đơn để trả qua SePay sau", async () => {
     const { service, saved } = setup();
+    const created = await service.create({ campaignId: CAMPAIGN_ID, amount: 200000, paymentMethod: "sepay", idempotencyKey: "k-1" }, donor);
+    equal(created.status, DonationStatus.PLEDGED);
+    equal(saved.length, 1);
+    match(saved[0].transferCode ?? "", /^GM/);
+  });
+
+  it("checkout cam kết: chỉ khi đang chờ thanh toán và còn hạn", async () => {
+    const recent = new Date(Date.now() - 86400000);
+    const form = await setup({ donation: { status: DonationStatus.AWAITING_PAYMENT, paymentRequestedAt: recent } }).service.createSepayCheckout(DONATION_ID, donor);
+    equal(form.fields.order_invoice_number, "GM7K2QX9AB");
     await rejects(
-      service.create({ campaignId: CAMPAIGN_ID, amount: 200000, paymentMethod: "sepay", idempotencyKey: "k-1" }, donor),
-      (err: { status?: number }) => err.status === 400,
+      setup({ donation: { status: DonationStatus.PLEDGED } }).service.createSepayCheckout(DONATION_ID, donor),
+      (err: { status?: number }) => err.status === 409,
     );
-    equal(saved.length, 0);
     await rejects(
-      setup({ sepay: null }).service.create({ campaignId: CAMPAIGN_ID, amount: 200000, paymentMethod: "sepay", idempotencyKey: "k-2" }, donor),
-      (err: { status?: number }) => err.status === 400,
+      setup({ donation: { status: DonationStatus.AWAITING_PAYMENT, paymentRequestedAt: new Date(Date.now() - 8 * 86400000) } }).service.createSepayCheckout(DONATION_ID, donor),
+      (err: { status?: number }) => err.status === 409,
     );
   });
 
+  it("IPN trả cam kết đang chờ: hoàn tất, không cộng tiến độ lần nữa", async () => {
+    const { service, updates } = setup({ donation: { status: DonationStatus.AWAITING_PAYMENT, paymentRequestedAt: new Date() } });
+    const result = await service.handleSepayIpn(ipnBody(), SECRET);
+    equal(result.applied, true);
+    equal(updates[0].status, DonationStatus.COMPLETED);
+  });
+
   it("paymentOptions không lộ thông tin merchant", () => {
-    deepEqual(setup().service.paymentOptions(), { sepay: { env: "sandbox" }, demoWallet: true, stripe: null, balance: null });
+    deepEqual(setup().service.paymentOptions(), { sepay: { env: "sandbox" }, demoWallet: false, stripe: null, balance: null });
     deepEqual(setup({ sepay: null }).service.paymentOptions(), { sepay: null, demoWallet: true, stripe: null, balance: null });
   });
 

@@ -15913,3 +15913,49 @@ html:has(dialog:modal) .admin-sidebar {
 .section-tabs button {
   flex-shrink: 0;
 }
+
+/* ---------- Tài khoản nhận tiền của chiến dịch (chủ dự án) ---------- */
+.payout-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.payout-panel .hint {
+  margin: 0;
+}
+
+/* ---------- Cam kết trả sau: các bước thanh toán ở form ủng hộ ---------- */
+.donate-section-title {
+  margin: 0 0 10px;
+  color: var(--navy);
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.pledge-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding-left: 1.3em;
+  color: var(--ink, inherit);
+  line-height: 1.55;
+}
+
+/* ---------- Tạo chiến dịch: gợi ý dùng lại tài khoản nhận tiền ---------- */
+.payout-reuse {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.payout-reuse .hint {
+  margin: 0;
+}
+
+.payout-reuse-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

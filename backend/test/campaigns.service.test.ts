@@ -374,6 +374,20 @@ describe("CampaignsService", () => {
       equal(campaign.status, CampaignStatus.PENDING);
     });
 
+    it("chưa khai báo tài khoản nhận tiền thì không gửi duyệt được; có rồi thì gửi được", async () => {
+      repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.DRAFT });
+      let accounts = 0;
+      const payoutRepo: any = { count: async () => accounts };
+      const service = new CampaignsService(repo as any, audit.service, makeNotifierRecorder().service, null, null, payoutRepo);
+      await service.submitForReview("123e4567-e89b-12d3-a456-426614174000", makeUser()).then(
+        () => ok(false, "phải từ chối"),
+        (err: { status?: number }) => equal(err.status, 400),
+      );
+      accounts = 1;
+      const campaign = await service.submitForReview("123e4567-e89b-12d3-a456-426614174000", makeUser());
+      equal(campaign.status, CampaignStatus.PENDING);
+    });
+
     it("should reject an active campaign for resubmission", async () => {
       repo.findOne = async () => ({
         ...createMockRepo().mockCampaign,

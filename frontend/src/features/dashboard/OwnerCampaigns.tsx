@@ -5,6 +5,7 @@ import { ProgressBar } from "@/components/campaign/ProgressBar";
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { CampaignStatsPanel } from "@/features/campaign-stats/CampaignStatsPanel";
+import { PayoutAccountPanel } from "@/features/dashboard/PayoutAccountPanel";
 import { PostManager } from "@/features/posts/PostManager";
 import { ProgressManager } from "@/features/progress/ProgressManager";
 import { RewardManager } from "@/features/rewards/RewardManager";
@@ -65,7 +66,7 @@ type OwnerCampaignsProps = {
   reload: () => Promise<void>;
 };
 
-type PanelKind = "stats" | "posts" | "progress" | "rewards";
+type PanelKind = "stats" | "posts" | "progress" | "rewards" | "payout";
 type OpenPanel = { id: string; kind: PanelKind };
 
 /** Khu vực chủ dự án: số liệu tổng, danh sách chiến dịch và việc cần làm. */
@@ -226,6 +227,14 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
                 >
                   Mức quà
                 </button>
+                <button
+                  className="button button-ghost button-sm"
+                  type="button"
+                  aria-expanded={isOpen(c.id, "payout")}
+                  onClick={() => toggle(c.id, "payout")}
+                >
+                  Tài khoản nhận tiền
+                </button>
               </div>
               {isOpen(c.id, "stats") && <CampaignStatsPanel campaignId={c.id} />}
               {isOpen(c.id, "posts") && <PostManager campaignId={c.id} />}
@@ -233,6 +242,7 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
               {isOpen(c.id, "rewards") && (
                 <RewardManager campaignId={c.id} closed={["success", "failed", "cancelled", "ended"].includes(c.status)} />
               )}
+              {isOpen(c.id, "payout") && <PayoutAccountPanel campaignId={c.id} />}
             </li>
           );
         })}

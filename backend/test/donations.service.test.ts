@@ -128,17 +128,29 @@ describe("DonationsService", () => {
   });
 
   describe("create", () => {
-    it("should create a pending donation with idempotency key", async () => {
+    it("tạo cam kết trả sau: ghi nhận `pledged` ngay, chưa thu tiền", async () => {
       const dto = {
         campaignId: "33333333-3333-3333-3333-333333333333",
         amount: 500000,
-        paymentMethod: "wallet",
+        paymentMethod: "sepay",
         idempotencyKey: "unique-key-1",
       };
       const donation = await service.create(dto as any, makeUser());
-      equal(donation.status, DonationStatus.PENDING);
+      equal(donation.status, DonationStatus.PLEDGED);
       equal(donation.amount, 500000);
-      ok(donation.transactionId?.startsWith("DEMO-"));
+      equal(donation.completedAt, undefined);
+    });
+
+    it("ví/thẻ/ví demo không còn nhận khoản mới", async () => {
+      for (const paymentMethod of ["wallet", "balance", "stripe"]) {
+        await service.create(
+          { campaignId: "33333333-3333-3333-3333-333333333333", amount: 500000, paymentMethod, idempotencyKey: `k-${paymentMethod}` } as any,
+          makeUser(),
+        ).then(
+          () => ok(false, `${paymentMethod} không được nhận`),
+          (err: { status?: number }) => equal(err.status, 400),
+        );
+      }
     });
 
     it("should return existing donation for duplicate idempotency key", async () => {

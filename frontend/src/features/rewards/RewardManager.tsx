@@ -18,7 +18,8 @@ type LoadState = "loading" | "ready" | "error";
 
 const CLAIM_STATUS: Record<string, { label: string; tone: string }> = {
   completed: { label: "Đã thanh toán", tone: "tag-green" },
-  pledged: { label: "Cam kết · chưa trừ tiền", tone: "tag-amber" },
+  pledged: { label: "Cam kết · chưa trả tiền", tone: "tag-amber" },
+  awaiting_payment: { label: "Chờ thanh toán", tone: "tag-amber" },
   charge_failed: { label: "Trừ tiền thất bại", tone: "tag-red" },
 };
 

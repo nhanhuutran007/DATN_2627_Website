@@ -257,7 +257,7 @@ describe("DonationsService + mức quà", () => {
   const createDto = (overrides: any = {}) => ({
     campaignId: CAMPAIGN_ID,
     amount: 300000,
-    paymentMethod: "wallet",
+    paymentMethod: "sepay",
     idempotencyKey: "k-" + Math.random(),
     rewardTierId: TIER_ID,
     rewardRecipient: { name: "Nguyễn Văn A", phone: "0901 234 567", address: " 12 Lê Lợi, phường Thuận Hóa, Huế " },
@@ -268,7 +268,9 @@ describe("DonationsService + mức quà", () => {
     const donation = await service.create(createDto(), DONOR);
     equal(donation.rewardTierId, TIER_ID);
     equal(recipients.length, 1);
-    equal(recipients[0].donationId, donation.id);
+    // Người nhận quà gắn với khoản vừa lưu (mock `save` trả id "new").
+    equal(recipients[0].donationId, "new");
+    equal(donation.status, DonationStatus.PLEDGED);
     equal(recipients[0].address, "12 Lê Lợi, phường Thuận Hóa, Huế");
   });
 

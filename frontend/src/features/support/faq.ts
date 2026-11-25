@@ -67,7 +67,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: "thanh-toan",
     question: "Có những phương thức thanh toán nào?",
     answer:
-      "Bạn nạp tiền vào ví Góp Mầm bằng chuyển khoản qua cổng SePay (quét mã QR bằng ứng dụng ngân hàng bất kỳ) ở trang Ví, rồi ủng hộ dự án bằng số dư ví. Tiền ủng hộ được giữ trong ví và chỉ bị trừ khi dự án đạt mục tiêu; không đạt thì tự hoàn về ví. Hiện Góp Mầm chưa tích hợp riêng ví MoMo hay ZaloPay. Góp Mầm không lưu thông tin thẻ hay tài khoản ngân hàng dùng để thanh toán.",
+      "Khi ủng hộ, bạn chỉ tạo cam kết và chưa phải trả đồng nào. Nếu dự án đạt mục tiêu khi kết thúc, bạn nhận thông báo và email mời thanh toán, rồi quét mã QR SePay bằng ứng dụng ngân hàng bất kỳ trong 7 ngày (quá hạn thì cam kết tự hủy). Dự án không đạt thì không phát sinh thanh toán. Góp Mầm không giữ tiền của bạn trong ví: tiền thu được gom lại và chuyển cho chủ dự án một lần. Hiện Góp Mầm chưa tích hợp riêng ví MoMo hay ZaloPay. Góp Mầm không lưu thông tin thẻ hay tài khoản ngân hàng dùng để thanh toán.",
     keywords: [
       "thanh toan", "phuong thuc", "chuyen khoan", "tra tien", "sepay", "vi demo", "the tin dung", "nap tien", "nap vi", "vi gop mam", "so du",
       "ngan hang", "ma qr", "momo", "zalopay", "vnpay", "bang momo", "bang zalopay", "bang vnpay", "bang the",

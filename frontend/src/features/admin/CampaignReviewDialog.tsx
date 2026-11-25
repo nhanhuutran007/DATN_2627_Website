@@ -8,7 +8,7 @@ import { CampaignScreeningPanel } from "@/features/admin/CampaignScreeningPanel"
 import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredictionCard";
 import { resolveMediaUrl } from "@/lib/api";
 import type { AdminCampaign } from "@/lib/api/admin";
-import { fetchCampaign, type ApiCampaign } from "@/lib/api/campaigns";
+import { fetchCampaign, fetchPayoutAccount, type ApiCampaign, type PayoutAccount } from "@/lib/api/campaigns";
 import { fetchManagedRewardTiers, type RewardTier } from "@/lib/api/rewards";
 import { looksLikeHtml } from "@/lib/rich-text";
 
@@ -68,6 +68,18 @@ export function CampaignReviewDialog({ campaign, statusLabel, actions, onClose }
   const [detail, setDetail] = useState<ApiCampaign | null>(null);
   const [tiers, setTiers] = useState<RewardTier[]>([]);
   const [error, setError] = useState("");
+  // undefined = đang tải; null = chưa khai báo (hoặc không tải được).
+  const [payout, setPayout] = useState<PayoutAccount | null | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPayoutAccount(campaign.id)
+      .then((loaded) => !cancelled && setPayout(loaded))
+      .catch(() => !cancelled && setPayout(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign.id]);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -213,6 +225,22 @@ export function CampaignReviewDialog({ campaign, statusLabel, actions, onClose }
                     </li>
                   ))}
                 </ul>
+              )}
+            </section>
+
+            <section>
+              <h3>Tài khoản nhận tiền</h3>
+              {payout === undefined ? (
+                <p className="table-muted">Đang tải…</p>
+              ) : payout === null ? (
+                <p className="table-muted">Chủ dự án chưa khai báo tài khoản nhận tiền.</p>
+              ) : (
+                <dl className="manual-refund-bank">
+                  <div><dt>Ngân hàng</dt><dd>{payout.bankName}</dd></div>
+                  <div><dt>Số tài khoản</dt><dd className="mono">{payout.bankAccountNumber}</dd></div>
+                  <div><dt>Chủ tài khoản</dt><dd>{payout.bankAccountName}</dd></div>
+                  <div><dt>Cập nhật</dt><dd>{new Date(payout.updatedAt).toLocaleString("vi-VN")}</dd></div>
+                </dl>
               )}
             </section>
 
