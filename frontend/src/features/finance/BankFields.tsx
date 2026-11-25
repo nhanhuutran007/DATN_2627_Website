@@ -1,6 +1,8 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId } from "react";
+
+import { fetchMyBankAccount } from "@/lib/api/users";
 
 /** Tài khoản ngân hàng nhận tiền (hoàn tiền SePay, rút tiền ví): ô nhập + kiểm tra giống máy chủ. */
 
@@ -33,6 +35,26 @@ export function bankPayload(bank: BankDraft) {
     bankAccountNumber: accountDigits(bank.accountNumber),
     bankAccountName: bank.accountName.trim().toUpperCase(),
   };
+}
+
+/** Điền sẵn tài khoản ngân hàng trong hồ sơ (Cài đặt › Tài khoản) nếu ô nhập còn trống. */
+export function usePrefillBankFromProfile(setBank: (update: (current: BankDraft) => BankDraft) => void) {
+  useEffect(() => {
+    let active = true;
+    fetchMyBankAccount()
+      .then((account) => {
+        if (!active || !account) return;
+        setBank((current) =>
+          current.bankName || current.accountNumber || current.accountName
+            ? current
+            : { bankName: account.bankName, accountNumber: account.bankAccountNumber, accountName: account.bankAccountName },
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [setBank]);
 }
 
 export function BankFields({

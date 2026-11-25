@@ -3,6 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { AiModule } from "../ai/ai.module";
 import { Campaign } from "../campaigns/entities/campaign.entity";
+import { DonationsModule } from "../donations/donations.module";
 import { Donation } from "../donations/entities/donation.entity";
 import { MilestoneUpdate } from "../progress/entities/milestone-update.entity";
 import { Milestone } from "../progress/entities/milestone.entity";
@@ -14,6 +15,7 @@ import { BackupService } from "./backup.service";
 import { ContentService } from "./content.service";
 import { ExportService } from "./export.service";
 import { RiskAlert } from "./entities/risk-alert.entity";
+import { PledgeIntegrityService } from "./pledge-integrity.service";
 import { RiskAlertService } from "./risk-alert.service";
 
 @Module({
@@ -21,9 +23,10 @@ import { RiskAlertService } from "./risk-alert.service";
     TypeOrmModule.forFeature([User, Campaign, Donation, RiskAlert, Milestone, MilestoneUpdate]),
     AiModule,
     WalletModule,
+    DonationsModule,
   ],
   controllers: [AdminController],
-  providers: [AdminService, RiskAlertService, ContentService, ExportService, BackupService],
+  providers: [AdminService, RiskAlertService, PledgeIntegrityService, ContentService, ExportService, BackupService],
   exports: [AdminService, RiskAlertService],
 })
 export class AdminModule {}

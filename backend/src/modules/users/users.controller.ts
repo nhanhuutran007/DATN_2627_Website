@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Put,
   SerializeOptions,
   UseGuards,
 } from "@nestjs/common";
@@ -17,8 +18,11 @@ import { RequireStepUp, StepUpGuard } from "../auth/guards/step-up.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
+import { NonAdminGuard } from "../auth/guards/non-admin.guard";
+import { RefundBankInfoDto } from "../finance/dto/finance.dto";
 import { USER_PRIVATE_GROUP, User, UserRole } from "./entities/user.entity";
 import { UpdateAiConsentDto, UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
+import { UserBankAccountService } from "./user-bank-account.service";
 import { UsersService } from "./users.service";
 
 @Controller("users")
@@ -26,7 +30,10 @@ import { UsersService } from "./users.service";
 // Mọi route ở đây chỉ dành cho chính chủ hoặc admin → được thấy email/phone
 @SerializeOptions({ groups: [USER_PRIVATE_GROUP] })
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly bankAccountService: UserBankAccountService,
+  ) {}
 
   @Get()
   @Roles(UserRole.ADMIN)
@@ -43,6 +50,28 @@ export class UsersController {
   @Patch("me/ai-consent")
   updateAiConsent(@Body() dto: UpdateAiConsentDto, @GetCurrentUser() user: User) {
     return this.usersService.updateAiConsent(user, dto.consent);
+  }
+
+  /** Tài khoản ngân hàng mặc định của chính mình (`null` = chưa lưu). */
+  @Get("me/bank-account")
+  async getBankAccount(@GetCurrentUser() user: User) {
+    return { account: await this.bankAccountService.get(user) };
+  }
+
+  /** Lưu/đổi cần mã OTP gửi email (đổi nơi nhận tiền). */
+  @Put("me/bank-account")
+  @UseGuards(NonAdminGuard, StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ACCOUNT_BANK)
+  setBankAccount(@Body() dto: RefundBankInfoDto, @GetCurrentUser() user: User) {
+    return this.bankAccountService.set(user, dto);
+  }
+
+  @Delete("me/bank-account")
+  @UseGuards(NonAdminGuard, StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ACCOUNT_BANK)
+  async removeBankAccount(@GetCurrentUser() user: User) {
+    await this.bankAccountService.remove(user);
+    return { ok: true };
   }
 
   @Get(":id")

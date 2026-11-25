@@ -135,8 +135,68 @@ export type AdminUserDetail = {
     }>;
   };
   donations: { count: number; amount: number };
+  /** Quyền cam kết trả sau (số lần bỏ cam kết, giới hạn đang áp dụng). */
+  pledgeStanding?: AdminPledgeStanding;
+  pledgeResetAt?: string | null;
   openRisks: Array<{ id: string; entityType: "campaign" | "user"; entityName: string; level: RiskLevel; score: number }>;
 };
+
+export type AdminPledgeStanding = {
+  abandoned: number;
+  expiredCount: number;
+  paidCount: number;
+  tier: "good" | "warned" | "limited" | "blocked";
+  maxOpenCampaigns: number;
+  openCampaigns: number;
+  canPledge: boolean;
+  newAccount: boolean;
+};
+
+/** Mở lại quyền cam kết trả sau (cần mã OTP). */
+export function resetPledgeStanding(id: string, reason?: string): Promise<AdminPledgeStanding> {
+  return api.post<AdminPledgeStanding>(`/admin/users/${encodeURIComponent(id)}/pledge-reset`, reason ? { reason } : {});
+}
+
+export type PledgeSuspectSignal =
+  | "shared_ip_owner"
+  | "same_bank_owner"
+  | "shared_ip_group"
+  | "new_account"
+  | "single_campaign"
+  | "burst"
+  | "unpaid";
+
+export type PledgeSuspect = {
+  userId: string;
+  name: string;
+  email: string;
+  accountCreatedAt: string;
+  firstPledgeAt: string;
+  amount: number;
+  openPledges: number;
+  status: "open" | "expired" | "paid";
+  signals: PledgeSuspectSignal[];
+};
+
+export type PledgeIntegrity = {
+  features: Record<string, number>;
+  reasons: RiskReason[];
+  score: number;
+  suspects: PledgeSuspect[];
+};
+
+/** Tài khoản nghi là clone cam kết thổi phồng một chiến dịch (tính lại lúc xem). */
+export function fetchPledgeSuspects(campaignId: string): Promise<PledgeIntegrity> {
+  return api.get<PledgeIntegrity>(`/admin/campaigns/${encodeURIComponent(campaignId)}/pledge-suspects`);
+}
+
+/** Hủy cam kết chưa trả của các tài khoản đã chọn (tùy chọn khóa luôn); cần OTP. */
+export function voidSuspectPledges(
+  campaignId: string,
+  input: { userIds: string[]; lockAccounts: boolean; reason: string },
+): Promise<{ cancelled: number; amount: number; locked: number }> {
+  return api.post(`/admin/campaigns/${encodeURIComponent(campaignId)}/pledge-suspects/void`, input);
+}
 
 export async function fetchAdminUserDetail(id: string): Promise<AdminUserDetail> {
   return api.get<AdminUserDetail>(`/admin/users/${encodeURIComponent(id)}`);

@@ -42,3 +42,26 @@ export async function updateMyProfile(id: string, update: ProfileUpdate): Promis
   }
   return saved;
 }
+
+/** Tài khoản ngân hàng mặc định của chính mình (Cài đặt › Tài khoản). */
+export type MyBankAccount = {
+  bankName: string;
+  bankAccountNumber: string;
+  bankAccountName: string;
+  updatedAt: string;
+};
+
+export type BankAccountInput = Omit<MyBankAccount, "updatedAt">;
+
+export async function fetchMyBankAccount(): Promise<MyBankAccount | null> {
+  return (await api.get<{ account: MyBankAccount | null }>("/users/me/bank-account")).account;
+}
+
+/** Lưu/đổi cần mã OTP gửi email (hộp nhập mã tự mở). */
+export function saveMyBankAccount(input: BankAccountInput): Promise<MyBankAccount> {
+  return api.put<MyBankAccount>("/users/me/bank-account", input);
+}
+
+export async function deleteMyBankAccount(): Promise<void> {
+  await api.del("/users/me/bank-account");
+}

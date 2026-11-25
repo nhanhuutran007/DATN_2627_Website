@@ -25,7 +25,8 @@ import { StepUpPurpose } from "../auth/entities/step-up-code.entity";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { RequireStepUp, StepUpGuard } from "../auth/guards/step-up.guard";
-import { USER_PRIVATE_GROUP, User, UserRole } from "../users/entities/user.entity";
+import { DonationsService } from "../donations/donations.service";
+import { USER_PRIVATE_GROUP, User, UserRole, UserStatus } from "../users/entities/user.entity";
 import { AdminService } from "./admin.service";
 import { BackupService, MAX_BACKUP_BYTES } from "./backup.service";
 import { ContentService } from "./content.service";
@@ -34,6 +35,8 @@ import {
   AdminDonationQueryDto,
   AdminUserQueryDto,
   ExportRangeQueryDto,
+  PledgeResetDto,
+  VoidSuspectPledgesDto,
   RiskQueryDto,
   SetFeaturedDto,
   UpdateRiskStatusDto,
@@ -63,6 +66,7 @@ export class AdminController {
     private readonly contentService: ContentService,
     private readonly exportService: ExportService,
     private readonly backupService: BackupService,
+    private readonly donationsService: DonationsService,
   ) {}
 
   /** Lần sao lưu gần nhất và phiên bản cấu trúc CSDL hiện tại (để kiểm tra file trước khi khôi phục). */
@@ -144,7 +148,37 @@ export class AdminController {
 
   @Post("risks/generate")
   generateRisks(@GetCurrentUser() currentUser: User) {
-    return this.riskAlertService.generateWarnings(currentUser);
+    return this.riskAlertService.generateWarnings(currentUser, 50);
+  }
+
+  /** Tài khoản nghi là clone cam kết thổi phồng chiến dịch, kèm dấu hiệu của từng tài khoản. */
+  @Get("campaigns/:id/pledge-suspects")
+  pledgeSuspects(@Param("id", ParseUUIDPipe) id: string) {
+    return this.riskAlertService.pledgeSuspects(id);
+  }
+
+  /** Hủy cam kết chưa trả của các tài khoản đã chọn (tùy chọn khóa luôn): cần OTP. */
+  @Post("campaigns/:id/pledge-suspects/void")
+  @UseGuards(StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ADMIN_USERS)
+  async voidSuspectPledges(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: VoidSuspectPledgesDto,
+    @GetCurrentUser() currentUser: User,
+  ) {
+    const reason = dto.reason.trim();
+    const result = await this.donationsService.voidSuspectPledges(id, dto.userIds, currentUser, reason);
+    let locked = 0;
+    if (dto.lockAccounts) {
+      for (const userId of dto.userIds) {
+        // Bỏ qua tài khoản không khóa được (admin, chính mình, không tồn tại).
+        const done = await this.adminService
+          .updateUserStatus(userId, { status: UserStatus.BANNED, reason: `Nghi tài khoản clone: ${reason}` }, currentUser)
+          .then(() => true, () => false);
+        if (done) locked += 1;
+      }
+    }
+    return { ...result, locked };
   }
 
   @Patch("risks/:id/status")
@@ -180,6 +214,18 @@ export class AdminController {
     @Res() res: Response,
   ): Promise<void> {
     sendCsv(res, await this.exportService.exportDailyDonations(query, currentUser));
+  }
+
+  /** Mở lại quyền cam kết trả sau cho tài khoản đã bị giới hạn/chặn vì bỏ cam kết. */
+  @Post("users/:id/pledge-reset")
+  @UseGuards(StepUpGuard)
+  @RequireStepUp(StepUpPurpose.ADMIN_USERS)
+  resetPledgeStanding(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: PledgeResetDto,
+    @GetCurrentUser() currentUser: User,
+  ) {
+    return this.adminService.resetPledgeStanding(id, dto.reason, currentUser);
   }
 
   @Patch("users/:id/status")

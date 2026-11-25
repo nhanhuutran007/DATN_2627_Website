@@ -20,11 +20,12 @@ import { CampaignPayoutAccount } from "./entities/campaign-payout-account.entity
 import { CampaignScreening } from "./entities/campaign-screening.entity";
 import { CampaignViewDaily } from "./entities/campaign-view-daily.entity";
 import { Campaign } from "./entities/campaign.entity";
+import { UserBankAccount } from "../users/entities/user-bank-account.entity";
 import { Milestone } from "./../progress/entities/milestone.entity";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Campaign, Milestone, CampaignViewDaily, Donation, CampaignFollow, CampaignScreening, CampaignPayoutAccount, CampaignDisbursement]),
+    TypeOrmModule.forFeature([Campaign, Milestone, CampaignViewDaily, Donation, CampaignFollow, CampaignScreening, CampaignPayoutAccount, CampaignDisbursement, UserBankAccount]),
     CategoriesModule,
     OrganizationsModule,
     SupportModule,

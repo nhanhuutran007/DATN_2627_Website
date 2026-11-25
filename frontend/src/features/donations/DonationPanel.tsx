@@ -17,12 +17,14 @@ import {
   fetchCampaignLedger,
   fetchDonation,
   fetchPaymentOptions,
+  fetchPledgeStanding,
   generateIdempotencyKey,
   PAYMENT_WINDOW_DAYS,
   type ApiDonation,
   type ApiDonationStatus,
   type LedgerEntry,
   type PaymentOptions,
+  type PledgeStanding,
   syncSepayDonation,
 } from "@/lib/api/donations";
 import { formatVnd, paymentMethodLabel } from "@/lib/format";
@@ -99,6 +101,7 @@ export function DonationPanel({
   const [recipient, setRecipient] = useState({ name: "", phone: "", address: "" });
   const [recent, setRecent] = useState<LedgerEntry | null>(null);
   const [options, setOptions] = useState<PaymentOptions | null>(null);
+  const [standing, setStanding] = useState<PledgeStanding | null>(null);
   const amountId = useId();
   const selectedTier = rewardTiers.find((tier) => tier.id === rewardTierId) ?? null;
   // Quà số/ghi danh không cần địa chỉ; mức quà cũ (API chưa có trường) coi như gửi tận nơi.
@@ -132,6 +135,22 @@ export function DonationPanel({
       active = false;
     };
   }, []);
+
+  // Quyền cam kết: đủ giới hạn thì khóa nút cam kết và giải thích lý do.
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId || !enabled) return;
+    let active = true;
+    fetchPledgeStanding()
+      .then((data) => {
+        if (active) setStanding(data);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [userId, enabled]);
+  const pledgeFull = !!standing && !standing.canPledge;
 
   // Mở từ thông báo hoặc quay về từ SePay: tải lại khoản đó (trạng thái thật do IPN quyết định, không theo URL).
   const returnDonationId = sepayReturn?.donationId;
@@ -494,6 +513,8 @@ export function DonationPanel({
         </dl>
       </section>
 
+      {standing && <PledgeStandingNotice standing={standing} />}
+
       {error === "login" ? (
         <p className="form-error" role="alert">
           Bạn cần <Link href={`/dang-nhap?next=/du-an/${encodeURIComponent(campaignId)}/ung-ho`}>đăng nhập</Link> để ủng hộ.
@@ -502,7 +523,7 @@ export function DonationPanel({
         <p className="form-error" role="alert">{error}</p>
       ) : null}
 
-      <button className="button button-primary button-block button-lg" type="submit" disabled={loading || !enabled}>
+      <button className="button button-primary button-block button-lg" type="submit" disabled={loading || !enabled || pledgeFull}>
         {loading ? "Đang xử lý…" : "Cam kết ủng hộ"}
       </button>
       <p className="fineprint">
@@ -517,4 +538,33 @@ export function DonationPanel({
       </p>
     </form>
   );
+}
+
+/** Nhắc về quyền cam kết trả sau: đã bỏ cam kết, đang bị giới hạn, hoặc phải thanh toán ngay. */
+function PledgeStandingNotice({ standing }: { standing: PledgeStanding }) {
+  if (standing.tier === "blocked") {
+    return (
+      <p className="form-error" role="alert">
+        Bạn đã bỏ {standing.abandoned} cam kết không thanh toán nên không thể cam kết thêm. Vui lòng liên hệ quản trị viên Góp Mầm.
+      </p>
+    );
+  }
+  if (!standing.canPledge) {
+    return (
+      <p className="form-notice" role="status">
+        Bạn đang có {standing.openCampaigns}/{standing.maxOpenCampaigns} cam kết chưa thanh toán
+        {standing.tier === "limited" ? " (bị giới hạn vì đã bỏ cam kết)" : standing.newAccount ? " (mức của tài khoản mới)" : ""}. Hãy
+        thanh toán hoặc chờ các dự án đó kết thúc rồi cam kết tiếp.
+      </p>
+    );
+  }
+  if (standing.tier === "limited" || standing.tier === "warned") {
+    return (
+      <p className="form-notice" role="status">
+        Bạn từng bỏ {standing.abandoned} cam kết không thanh toán. Bỏ nhiều lần sẽ bị giới hạn rồi khóa tài khoản; mỗi cam kết thanh
+        toán đủ sẽ xóa bớt một lần bỏ.
+      </p>
+    );
+  }
+  return null;
 }

@@ -383,14 +383,15 @@ export class AiService {
     };
   }
 
-  async getFraudScore(dto: FraudAiDto): Promise<FraudResult> {
+  /** `extraFeatures`: đặc trưng tính sẵn ở nơi khác (vd. dấu hiệu tài khoản clone của chiến dịch). */
+  async getFraudScore(dto: FraudAiDto, extraFeatures: Record<string, number> = {}): Promise<FraudResult> {
     if (!dto.campaignId && !dto.userId) {
       throw new BadRequestException("Provide at least campaignId or userId");
     }
 
     if (dto.campaignId) {
       const entityId = dto.campaignId;
-      const features = await this.buildCampaignFraudFeatures(entityId);
+      const features = { ...(await this.buildCampaignFraudFeatures(entityId)), ...extraFeatures };
       try {
         const data = await this.aiGateway.getFraudScore({
           entityType: "CAMPAIGN",

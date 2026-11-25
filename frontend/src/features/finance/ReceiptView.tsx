@@ -19,7 +19,7 @@ import {
 import { useAuthUser } from "@/lib/auth";
 import { formatVnd, paymentMethodLabel } from "@/lib/format";
 
-import { BankFields, bankDraftError, bankPayload, EMPTY_BANK, maskAccount, type BankDraft } from "./BankFields";
+import { BankFields, bankDraftError, bankPayload, EMPTY_BANK, maskAccount, usePrefillBankFromProfile, type BankDraft } from "./BankFields";
 
 type LoadState = "loading" | "ready" | "notfound" | "error";
 
@@ -32,6 +32,7 @@ const dateTime = (iso: string | null) =>
  */
 function RefundBankForm({ request, onSaved }: { request: RefundRequest; onSaved: (r: RefundRequest) => void }) {
   const [bank, setBank] = useState<BankDraft>(EMPTY_BANK);
+  usePrefillBankFromProfile(setBank);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -74,6 +75,7 @@ function RefundSection({ receipt, request, onRequested }: { receipt: DonationRec
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [bank, setBank] = useState<BankDraft>(EMPTY_BANK);
+  usePrefillBankFromProfile(setBank);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   // Khoản qua SePay hoàn bằng chuyển khoản tay → cần tài khoản nhận.

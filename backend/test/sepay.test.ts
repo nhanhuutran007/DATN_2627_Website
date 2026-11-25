@@ -58,6 +58,8 @@ function setup(options: { sepay?: SepayGateway | null; donation?: Partial<Donati
   const updates: Record<string, unknown>[] = [];
   const saved: Partial<Donation>[] = [];
   const donationRepo = {
+    count: async () => 0,
+    find: async () => [],
     create: (d: Partial<Donation>) => d,
     save: async (d: Partial<Donation>) => {
       saved.push(d);
@@ -94,7 +96,7 @@ function setup(options: { sepay?: SepayGateway | null; donation?: Partial<Donati
   return { service, updates, saved, audit, notifier };
 }
 
-const donor = { id: DONOR_ID } as User;
+const donor = { id: DONOR_ID, emailVerified: true } as User;
 
 describe("SePay gateway", () => {
   it("chỉ bật khi có merchant + secret; mặc định sandbox", () => {

@@ -5,6 +5,7 @@ import { Repository } from "typeorm";
 import { AuditService } from "../../common/audit/audit.service";
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { NotificationsService } from "../notifications/notifications.service";
+import { UserBankAccount } from "../users/entities/user-bank-account.entity";
 import { User, UserRole } from "../users/entities/user.entity";
 import { CampaignDisbursement } from "./entities/campaign-disbursement.entity";
 import { CampaignPayoutAccount } from "./entities/campaign-payout-account.entity";
@@ -50,6 +51,9 @@ export class CampaignPayoutService {
     @Optional()
     @InjectRepository(CampaignDisbursement)
     private readonly disbursementRepo: Repository<CampaignDisbursement> | null = null,
+    @Optional()
+    @InjectRepository(UserBankAccount)
+    private readonly userBankRepo: Repository<UserBankAccount> | null = null,
   ) {}
 
   /** Chủ dự án hoặc admin; `null` = chưa khai báo. */
@@ -65,6 +69,7 @@ export class CampaignPayoutService {
   /**
    * Các tài khoản (khác nhau) chủ dự án đã khai báo ở những chiến dịch trước, mới nhất trước —
    * để form tạo chiến dịch gợi ý dùng lại (như Kickstarter), mỗi chiến dịch vẫn lưu riêng.
+   * Tài khoản ngân hàng trong hồ sơ (Cài đặt → Ngân hàng) luôn đứng đầu để được điền sẵn.
    */
   async listMine(owner: Pick<User, "id">): Promise<Array<Omit<PayoutAccountView, "updatedAt">>> {
     const rows = await this.payoutRepo
@@ -74,9 +79,10 @@ export class CampaignPayoutService {
       .orderBy("p.updated_at", "DESC")
       .take(50)
       .getMany();
+    const profile = await this.userBankRepo?.findOne({ where: { userId: owner.id } });
     const seen = new Set<string>();
     const result: Array<Omit<PayoutAccountView, "updatedAt">> = [];
-    for (const row of rows) {
+    for (const row of profile ? [profile, ...rows] : rows) {
       const key = `${row.bankName}|${row.bankAccountNumber}|${row.bankAccountName}`.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);

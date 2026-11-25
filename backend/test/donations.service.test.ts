@@ -73,6 +73,7 @@ function createMockRepos() {
   };
 
   const donationRepo: any = {
+    count: async () => 0,
     create: (dto: any) => ({ ...mockDonation, ...dto }),
     save: async (d: any) => ({ ...mockDonation, ...d }),
     findOne: async (opts: any) => {

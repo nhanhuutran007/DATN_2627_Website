@@ -8083,12 +8083,57 @@ html:has(dialog:modal) .admin-sidebar {
   gap: 24px;
 }
 
+/* Nút "Ủng hộ" hiện khi thẻ gây quỹ đã khuất: viên thuốc gọn, không thừa hưởng style của tab. */
 .detail-tabs-action {
+  display: flex;
   flex: none;
+  align-items: center;
+  animation: detail-tabs-action-in 0.22s ease-out;
 }
 
 .detail-tabs-action[hidden] {
   display: none;
+}
+
+.detail-tabs-action .button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgb(224 64 43 / 24%);
+}
+
+/* Nút đang hiện: mép phải danh sách tab mờ dần thay vì bị cắt cụt dưới nút. */
+.detail-tabs-bar:has(.detail-tabs-action:not([hidden])) ul {
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+}
+
+.detail-tabs-action .button:hover {
+  box-shadow: 0 8px 20px rgb(224 64 43 / 32%);
+}
+
+@keyframes detail-tabs-action-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-tabs-action {
+    animation: none;
+  }
 }
 
 .detail-tabs ul {
@@ -8111,7 +8156,7 @@ html:has(dialog:modal) .admin-sidebar {
   flex: none;
 }
 
-.detail-tabs a {
+.detail-tabs li > a {
   display: block;
   padding: 16px 0 14px;
   border-bottom: 3px solid transparent;
@@ -8123,17 +8168,17 @@ html:has(dialog:modal) .admin-sidebar {
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 
-.detail-tabs a:hover {
+.detail-tabs li > a:hover {
   color: var(--primary-dark);
 }
 
-.detail-tabs a[aria-current="location"] {
+.detail-tabs li > a[aria-current="location"] {
   border-bottom-color: var(--text);
   color: var(--primary);
   font-weight: 700;
 }
 
-.detail-tabs a:focus-visible {
+.detail-tabs li > a:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
@@ -8147,7 +8192,17 @@ html:has(dialog:modal) .admin-sidebar {
     gap: 24px;
   }
 
-  .detail-tabs a {
+  .detail-tabs-bar {
+    gap: 12px;
+  }
+
+  .detail-tabs-action .button {
+    height: 34px;
+    padding: 0 14px;
+    font-size: 0.85rem;
+  }
+
+  .detail-tabs li > a {
     padding: 13px 0 11px;
     font-size: 0.9rem;
   }
@@ -8178,6 +8233,32 @@ html:has(dialog:modal) .admin-sidebar {
 }
 
 /* Đã vượt mục tiêu nhưng còn hạn: vẫn nhận ủng hộ (như Kickstarter) */
+.fund-quality {
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.fund-quality p {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0;
+}
+
+.fund-quality svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--primary);
+}
+
+.fund-quality b {
+  color: var(--text, inherit);
+}
+
 .fund-overfunded {
   display: flex;
   gap: 8px;
@@ -15435,7 +15516,7 @@ html:has(dialog:modal) .admin-sidebar {
 }
 
 .signin-alt a {
-  color: var(--ink, inherit);
+  color: var(--text, inherit);
   font-weight: 700;
   text-decoration: underline;
 }
@@ -15939,7 +16020,7 @@ html:has(dialog:modal) .admin-sidebar {
   gap: 6px;
   margin: 0 0 12px;
   padding-left: 1.3em;
-  color: var(--ink, inherit);
+  color: var(--text, inherit);
   line-height: 1.55;
 }
 

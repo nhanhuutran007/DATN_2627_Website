@@ -109,6 +109,11 @@ export class User extends BaseEntity {
   @Column({ name: "ai_consent_updated_at", type: "datetime", nullable: true })
   aiConsentUpdatedAt?: Date | null;
 
+  /** Admin mở lại quyền cam kết trả sau: các lần bỏ cam kết trước mốc này không còn tính. */
+  @Exclude({ toPlainOnly: true })
+  @Column({ name: "pledge_reset_at", type: "datetime", nullable: true })
+  pledgeResetAt?: Date | null;
+
   @OneToMany("Campaign", "owner")
   campaigns!: Campaign[];
 

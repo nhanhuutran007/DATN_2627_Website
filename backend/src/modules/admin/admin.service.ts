@@ -19,6 +19,7 @@ import { rangeFilter } from "../../common/query/range";
 import { CampaignScreening } from "../campaigns/entities/campaign-screening.entity";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
 import { Donation, DonationStatus } from "../donations/entities/donation.entity";
+import { computePledgeStanding, type PledgeStanding } from "../donations/pledge-policy";
 import { User, UserRole, UserStatus } from "../users/entities/user.entity";
 import { WalletReconciliationService } from "../wallet/wallet-reconciliation.service";
 import {
@@ -532,6 +533,8 @@ export class AdminService {
         count: donations.length,
         amount: donations.reduce((sum, donation) => sum + toMoney(donation.amount), 0),
       },
+      pledgeStanding: await computePledgeStanding(this.donationRepo, user),
+      pledgeResetAt: user.pledgeResetAt ?? null,
       openRisks: openAlerts.map((alert) => ({
         id: alert.id,
         entityType: alert.entityType,
@@ -565,6 +568,15 @@ export class AdminService {
       // Thu hồi mọi phiên đang có: kể cả khi mở khóa sau này, token cũ không dùng lại được.
       user.sessionsRevokedAt = new Date();
     }
+    // Mở khóa tài khoản bị khóa vì bỏ cam kết: tính lại số lần bỏ từ đầu, không thì lần hết hạn kế tiếp khóa lại ngay.
+    let pledgeReset = false;
+    if (previousStatus === UserStatus.BANNED && dto.status !== UserStatus.BANNED) {
+      const standing = await computePledgeStanding(this.donationRepo, user).catch(() => null);
+      if (standing?.tier === "blocked") {
+        user.pledgeResetAt = new Date();
+        pledgeReset = true;
+      }
+    }
     const saved = await this.userRepo.save(user);
     await this.auditService.record({
       userId: currentUser.id,
@@ -572,9 +584,32 @@ export class AdminService {
       entity: "user",
       entityId: saved.id,
       oldValues: { status: previousStatus },
-      newValues: { status: saved.status, reason: dto.reason?.trim() || null },
+      newValues: { status: saved.status, reason: dto.reason?.trim() || null, ...(pledgeReset ? { pledgeReset: true } : {}) },
     });
     return saved;
+  }
+
+  /**
+   * Mở lại quyền cam kết trả sau: các lần bỏ cam kết trước thời điểm này không còn tính.
+   * Cam kết đã hết hạn vẫn giữ nguyên trong lịch sử.
+   */
+  async resetPledgeStanding(id: string, reason: string | undefined, currentUser: User): Promise<PledgeStanding> {
+    const user = await this.userRepo.findOneBy({ id });
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+    const before = await computePledgeStanding(this.donationRepo, user);
+    user.pledgeResetAt = new Date();
+    await this.userRepo.save(user);
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "user.pledge.reset",
+      entity: "user",
+      entityId: user.id,
+      oldValues: { abandoned: before.abandoned, tier: before.tier },
+      newValues: { abandoned: 0, reason: reason?.trim() || null },
+    });
+    return computePledgeStanding(this.donationRepo, user);
   }
 
   private campaignOrder(

@@ -15,6 +15,7 @@ import { resolveMediaUrl } from "@/lib/api";
 import {
   deleteUser,
   fetchAdminUserDetail,
+  resetPledgeStanding,
   setUserRole,
   type AdminUserDetail,
   type AdminUserRole,
@@ -33,6 +34,13 @@ type UserDetailDialogProps = {
   currentUserId?: string;
   /** Gọi sau khi đổi vai trò hoặc xóa để trang tải lại danh sách. */
   onChanged?: (change: "role" | "deleted") => void;
+};
+
+const PLEDGE_TIER_LABEL: Record<NonNullable<AdminUserDetail["pledgeStanding"]>["tier"], string> = {
+  good: "Bình thường",
+  warned: "Đã nhắc nhở",
+  limited: "Bị giới hạn (1 cam kết)",
+  blocked: "Bị khóa vì bỏ cam kết",
 };
 
 /** Thông tin một tài khoản (vd. chủ dự án) để admin đánh giá trước khi duyệt. */
@@ -101,6 +109,32 @@ export function UserDetailDialog({ userId, onClose, currentUserId, onChanged }: 
     } catch (err) {
       setRole(user.role);
       setActionMessage({ tone: "error", text: err instanceof Error ? err.message : "Không đổi được vai trò." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handlePledgeReset() {
+    if (!user || !detail?.pledgeStanding) return;
+    const confirmed = await dialog.confirm({
+      title: "Mở lại quyền cam kết trả sau",
+      message: (
+        <>
+          Bỏ qua {detail.pledgeStanding.abandoned} lần bỏ cam kết của <b>{user.name}</b>. Lịch sử cam kết vẫn giữ nguyên; thao
+          tác được ghi nhật ký và cần nhập mã xác minh gửi qua email.
+        </>
+      ),
+      confirmLabel: "Mở lại",
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    setActionMessage(null);
+    try {
+      const standing = await resetPledgeStanding(user.id);
+      setDetail({ ...detail, pledgeStanding: standing, pledgeResetAt: new Date().toISOString() });
+      setActionMessage({ tone: "success", text: "Đã mở lại quyền cam kết trả sau." });
+    } catch (err) {
+      setActionMessage({ tone: "error", text: err instanceof Error ? err.message : "Không mở lại được." });
     } finally {
       setBusy(false);
     }
@@ -203,6 +237,23 @@ export function UserDetailDialog({ userId, onClose, currentUserId, onChanged }: 
                 <dd>{money(detail.donations.amount)}<small>{detail.donations.count} giao dịch thành công</small></dd>
               </div>
             </dl>
+
+            {detail.pledgeStanding && detail.user.role !== "admin" && (
+              <section>
+                <h3>Cam kết trả sau</h3>
+                <p>
+                  {PLEDGE_TIER_LABEL[detail.pledgeStanding.tier]} · bỏ {detail.pledgeStanding.expiredCount} lần, đã trả{" "}
+                  {detail.pledgeStanding.paidCount} lần (tính {detail.pledgeStanding.abandoned}) · đang cam kết{" "}
+                  {detail.pledgeStanding.openCampaigns}/{detail.pledgeStanding.maxOpenCampaigns} dự án
+                  {detail.pledgeStanding.newAccount ? " (tài khoản mới)" : ""}
+                </p>
+                {detail.pledgeStanding.abandoned > 0 && (
+                  <button className="button button-outline button-sm" type="button" disabled={busy} onClick={() => void handlePledgeReset()}>
+                    Mở lại quyền cam kết
+                  </button>
+                )}
+              </section>
+            )}
 
             {detail.openRisks.length > 0 && (
               <section>

@@ -25,6 +25,12 @@ export class CampaignLedgerController {
     return this.donationsService.listPublicLedger(id, limit, sort);
   }
 
+  /** Chỉ số người ủng hộ (đã từng thanh toán / đã cam kết / đã thanh toán), không lộ danh tính. */
+  @Get(":id/backer-quality")
+  backerQuality(@Param("id", ParseUUIDPipe) id: string) {
+    return this.donationsService.backerQuality(id);
+  }
+
   /** Lời động viên công khai (lời nhắn kèm khoản ủng hộ đã xác nhận), mới nhất trước. */
   @Get(":id/support-messages")
   supportMessages(

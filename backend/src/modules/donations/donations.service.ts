@@ -11,7 +11,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, EntityManager, In, IsNull, Raw, Repository } from "typeorm";
+import { DataSource, EntityManager, In, IsNull, Not, Raw, Repository } from "typeorm";
 
 import {
   PaymentGateway,
@@ -32,10 +32,11 @@ import { NotificationType } from "../notifications/entities/notification.entity"
 import { donationGroupText, NotificationsService } from "../notifications/notifications.service";
 import { RewardTier } from "../rewards/entities/reward-tier.entity";
 import { RewardRecipient } from "./entities/reward-recipient.entity";
-import { User, UserRole } from "../users/entities/user.entity";
+import { User, UserRole, UserStatus } from "../users/entities/user.entity";
 import { WalletService } from "../wallet/wallet.service";
 import { CreateDonationDto, WebhookDonationDto, type WebhookStatus } from "./dto/donation.dto";
 import { COUNTED_DONATION_STATUSES, Donation, DonationStatus } from "./entities/donation.entity";
+import { computePledgeStanding, OPEN_PLEDGE_STATUSES, standingNotice, type PledgeStanding } from "./pledge-policy";
 
 /** Kênh ví Góp Mầm: nạp qua SePay rồi ủng hộ bằng số dư (cam kết, tiền được giữ trong ví). */
 export const WALLET_BALANCE_METHOD = "balance";
@@ -48,6 +49,18 @@ function isDeadlock(error: unknown): boolean {
   const code = (error as { code?: string; driverError?: { code?: string } })?.code ?? (error as { driverError?: { code?: string } })?.driverError?.code;
   return code === "ER_LOCK_DEADLOCK" || code === "ER_LOCK_WAIT_TIMEOUT";
 }
+
+export type BackerQuality = {
+  backers: number;
+  /** Người ủng hộ đã từng thanh toán thật ít nhất một lần trên Góp Mầm. */
+  verifiedBackers: number;
+  verifiedRatio: number | null;
+  committedAmount: number;
+  paidAmount: number;
+  /** Chiến dịch đã tới bước mời thanh toán (đạt mục tiêu). */
+  paymentPhase: boolean;
+};
+export const BACKER_QUALITY_MIN = 3;
 
 /** Hạn đổi thẻ sau khi trừ tiền cam kết thất bại (như Kickstarter: 7 ngày). */
 export const CHARGE_RETRY_DAYS = 7;
@@ -553,19 +566,51 @@ export class DonationsService {
       oldValues: { status: DonationStatus.AWAITING_PAYMENT },
       newValues: { status: DonationStatus.EXPIRED, amount: Number(donation.amount), campaignId: donation.campaignId, windowDays: PAYMENT_WINDOW_DAYS },
     });
+    // Báo luôn hậu quả của lần bỏ này (nhắc / giới hạn / khóa tài khoản).
+    const { owner, standing } = await this.standingAfterAbandon(donation.userId);
+    const notice = standing ? standingNotice(standing) : "";
     await this.notificationsService
       .notify({
         userId: donation.userId,
         type: NotificationType.SYSTEM,
         title: "Khoản cam kết đã bị hủy",
-        message: `Khoản cam kết ${money(donation.amount)} cho "${campaignTitle}" chưa được thanh toán sau ${PAYMENT_WINDOW_DAYS} ngày nên đã tự hủy. Bạn không bị trừ tiền.`,
+        message: `Khoản cam kết ${money(donation.amount)} cho "${campaignTitle}" chưa được thanh toán sau ${PAYMENT_WINDOW_DAYS} ngày nên đã tự hủy. Bạn không bị trừ tiền.${notice}`,
         link: `/du-an/${donation.campaignId}`,
         relatedId: donation.id,
         email: true,
         emailCategory: "pledge_settlement",
       })
       .catch(() => undefined);
+    // Gửi email trước rồi mới khóa (để người dùng biết lý do).
+    if (owner && standing?.tier === "blocked") {
+      await this.lockForAbandonedPledges(owner, standing.abandoned).catch(() => undefined);
+    }
     return true;
+  }
+
+  /**
+   * Bỏ cam kết tới ngưỡng: khóa tài khoản (thu hồi mọi phiên) và hủy các cam kết còn mở để
+   * tiến độ các dự án không còn bị phồng bởi những khoản sẽ không được trả.
+   * Admin mở khóa thì số lần bỏ được tính lại từ đầu.
+   */
+  private async lockForAbandonedPledges(owner: User, abandoned: number): Promise<void> {
+    if (owner.role === UserRole.ADMIN || owner.status === UserStatus.BANNED) return;
+    const locked = await this.dataSource
+      .getRepository(User)
+      .update({ id: owner.id, status: Not(UserStatus.BANNED) }, { status: UserStatus.BANNED, sessionsRevokedAt: new Date() });
+    if (!locked.affected) return;
+    const open = await this.donationRepo.find({ where: { userId: owner.id, status: In(OPEN_PLEDGE_STATUSES) } });
+    let cancelled = 0;
+    for (const pledge of open) {
+      if (await this.uncountPledge(pledge, pledge.status, DonationStatus.CANCELLED)) cancelled += 1;
+    }
+    await this.auditService.record({
+      action: "user.pledge.banned",
+      entity: "user",
+      entityId: owner.id,
+      oldValues: { status: owner.status },
+      newValues: { status: UserStatus.BANNED, abandoned, cancelledPledges: cancelled },
+    });
   }
 
   /** Chiến dịch đạt mục tiêu: trừ hẳn tiền đang giữ trong ví và hoàn tất khoản ủng hộ. */
@@ -906,6 +951,7 @@ export class DonationsService {
     if (paymentMethod !== "sepay") {
       throw new BadRequestException("Chỉ hỗ trợ cam kết ủng hộ, thanh toán qua SePay khi dự án đạt mục tiêu.");
     }
+    await this.assertCanPledge(user, campaign.id);
     const donation = this.donationRepo.create({
       userId: user.id,
       campaignId: dto.campaignId,
@@ -938,6 +984,125 @@ export class DonationsService {
       "pledge",
       user.id,
     );
+  }
+
+  /**
+   * Admin hủy cam kết chưa trả của các tài khoản nghi là clone ở một chiến dịch: trừ khỏi tiến độ,
+   * trả suất quà. Khoản đã thanh toán không đụng tới (hoàn tiền đi theo luồng hoàn tiền).
+   */
+  async voidSuspectPledges(campaignId: string, userIds: string[], admin: Pick<User, "id">, reason: string): Promise<{ cancelled: number; amount: number }> {
+    if (userIds.length === 0) return { cancelled: 0, amount: 0 };
+    const open = await this.donationRepo.find({
+      where: { campaignId, userId: In(userIds), status: In([DonationStatus.PLEDGED, DonationStatus.AWAITING_PAYMENT, DonationStatus.CHARGE_FAILED]) },
+    });
+    let cancelled = 0;
+    let amount = 0;
+    for (const pledge of open) {
+      if (!(await this.uncountPledge(pledge, pledge.status, DonationStatus.CANCELLED))) continue;
+      cancelled += 1;
+      amount += Number(pledge.amount);
+      await this.auditService.record({
+        userId: admin.id,
+        action: "donation.pledge.voided",
+        entity: "donation",
+        entityId: pledge.id,
+        oldValues: { status: pledge.status },
+        newValues: { status: DonationStatus.CANCELLED, amount: Number(pledge.amount), campaignId, reason },
+      });
+      await this.notificationsService
+        .notify({
+          userId: pledge.userId,
+          type: NotificationType.SYSTEM,
+          title: "Khoản cam kết đã bị hủy",
+          message: `Khoản cam kết ${money(pledge.amount)} của bạn đã bị quản trị viên hủy do có dấu hiệu bất thường. Bạn không bị trừ tiền.`,
+          link: `/du-an/${campaignId}`,
+          relatedId: pledge.id,
+        })
+        .catch(() => undefined);
+    }
+    return { cancelled, amount };
+  }
+
+  /**
+   * Chỉ số công khai về người ủng hộ của một chiến dịch: bao nhiêu người từng thanh toán thật
+   * trên Góp Mầm (tài khoản clone chỉ cam kết, không bao giờ trả), và — khi đã tới bước thanh
+   * toán — số đã thanh toán so với số đã cam kết. Không lộ danh tính ai.
+   */
+  async backerQuality(campaignId: string): Promise<BackerQuality> {
+    const counted = [...COUNTED_DONATION_STATUSES];
+    const [row] = await this.dataSource.query(
+      `SELECT COUNT(*) AS backers, COALESCE(SUM(p.paid_before), 0) AS verified
+         FROM (SELECT d.user_id,
+                      EXISTS(SELECT 1 FROM donations x WHERE x.user_id = d.user_id AND x.status = ?) AS paid_before
+                 FROM donations d WHERE d.campaign_id = ? AND d.status IN (?) GROUP BY d.user_id) p`,
+      [DonationStatus.COMPLETED, campaignId, counted],
+    );
+    const [totals] = await this.dataSource.query(
+      `SELECT COALESCE(SUM(CASE WHEN status IN (?) THEN amount ELSE 0 END), 0) AS committed,
+              COALESCE(SUM(CASE WHEN status = ? THEN amount ELSE 0 END), 0) AS paid,
+              SUM(payment_requested_at IS NOT NULL) AS requested
+         FROM donations WHERE campaign_id = ?`,
+      [counted, DonationStatus.COMPLETED, campaignId],
+    );
+    const backers = Number(row?.backers ?? 0);
+    const verified = Number(row?.verified ?? 0);
+    return {
+      backers,
+      verifiedBackers: verified,
+      // Quá ít người thì tỷ lệ không có ý nghĩa (và dễ đoán ra từng người).
+      verifiedRatio: backers >= BACKER_QUALITY_MIN ? Math.round((verified / backers) * 100) / 100 : null,
+      committedAmount: Number(totals?.committed ?? 0),
+      paidAmount: Number(totals?.paid ?? 0),
+      paymentPhase: Number(totals?.requested ?? 0) > 0,
+    };
+  }
+
+  /** Quyền cam kết trả sau của chính người dùng (số lần bỏ, giới hạn đang áp dụng). */
+  pledgeStanding(user: User): Promise<PledgeStanding> {
+    return computePledgeStanding(this.donationRepo, user);
+  }
+
+  /** Bậc của người dùng ngay sau một lần bỏ cam kết; lỗi khi đếm thì bỏ qua (không chặn việc hủy). */
+  private async standingAfterAbandon(userId: string): Promise<{ owner: User | null; standing: PledgeStanding | null }> {
+    try {
+      const owner = await this.dataSource.getRepository(User).findOne({ where: { id: userId } });
+      return { owner, standing: owner ? await computePledgeStanding(this.donationRepo, owner) : null };
+    } catch {
+      return { owner: null, standing: null };
+    }
+  }
+
+  /**
+   * Trước khi nhận cam kết trả sau: đã xác minh email, mỗi dự án chỉ 1 cam kết chưa trả,
+   * và chưa vượt số dự án được cam kết cùng lúc (giảm dần theo số lần bỏ cam kết).
+   */
+  private async assertCanPledge(user: User, campaignId: string): Promise<void> {
+    if (!user.emailVerified) {
+      throw new ForbiddenException("Vui lòng xác minh email trước khi cam kết ủng hộ.");
+    }
+    const sameCampaign = await this.donationRepo.count({
+      where: { userId: user.id, campaignId, status: In(OPEN_PLEDGE_STATUSES) },
+    });
+    if (sameCampaign > 0) {
+      throw new ConflictException(
+        "Bạn đã có một cam kết chưa thanh toán cho dự án này. Muốn đổi số tiền, hãy hủy cam kết cũ rồi cam kết lại.",
+      );
+    }
+    const standing = await computePledgeStanding(this.donationRepo, user);
+    if (standing.tier === "blocked") {
+      throw new ForbiddenException(
+        `Bạn đã bỏ ${standing.abandoned} cam kết không thanh toán nên không thể cam kết thêm. Vui lòng liên hệ quản trị viên Góp Mầm.`,
+      );
+    }
+    if (!standing.canPledge) {
+      const reason =
+        standing.tier === "limited"
+          ? `Vì đã bỏ ${standing.abandoned} cam kết, bạn chỉ giữ được 1 cam kết chưa thanh toán cùng lúc.`
+          : standing.newAccount
+            ? `Tài khoản mới chỉ giữ được ${standing.maxOpenCampaigns} cam kết chưa thanh toán cùng lúc.`
+            : `Bạn chỉ giữ được tối đa ${standing.maxOpenCampaigns} cam kết chưa thanh toán cùng lúc.`;
+      throw new ConflictException(`${reason} Hãy thanh toán hoặc chờ các dự án đó kết thúc rồi cam kết tiếp.`);
+    }
   }
 
   /**

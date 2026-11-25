@@ -22,6 +22,7 @@ import { CampaignReviewDialog } from "@/features/admin/CampaignReviewDialog";
 import { ScreeningBadge } from "@/features/admin/CampaignScreeningPanel";
 import { CopyableCode, DonationDetailDialog } from "@/features/admin/DonationDetailDialog";
 import { AuditLogViewer } from "@/features/admin/AuditLogViewer";
+import { PledgeSuspectsDialog } from "@/features/admin/PledgeSuspectsDialog";
 import { UserDetailDialog } from "@/features/admin/UserDetailDialog";
 import {
   CAMPAIGN_STATUS_LABEL,
@@ -297,6 +298,19 @@ function evidenceSummary(evidences: Record<string, number>): string {
   if (evidences.near_duplicate_receipts) {
     parts.push(`${evidences.near_duplicate_receipts} ảnh chứng từ gần giống ảnh đã dùng`);
   }
+  // Dấu hiệu tài khoản clone cam kết thổi phồng (pledge-integrity).
+  const pct = (value: number) => `${Math.round(value * 100)}%`;
+  if (evidences.backers_shared_ip_owner) parts.push(`${evidences.backers_shared_ip_owner} người cam kết chung IP với chủ dự án`);
+  if (evidences.backers_same_bank_owner) parts.push(`${evidences.backers_same_bank_owner} người cam kết trùng tài khoản ngân hàng với chủ dự án`);
+  if ((evidences.backers_shared_ip_max_group ?? 0) >= 3) parts.push(`${evidences.backers_shared_ip_max_group} người cam kết dùng chung một IP`);
+  if (evidences.integrity_backer_count) {
+    if ((evidences.new_account_backer_ratio ?? 0) >= 0.5) parts.push(`${pct(evidences.new_account_backer_ratio)} người cam kết là tài khoản mới`);
+    if ((evidences.single_campaign_backer_ratio ?? 0) >= 0.8) parts.push(`${pct(evidences.single_campaign_backer_ratio)} chưa ủng hộ dự án nào khác`);
+    if ((evidences.pledge_burst_ratio ?? 0) >= 0.6) parts.push(`${pct(evidences.pledge_burst_ratio)} cam kết dồn trong 1 giờ`);
+  }
+  if ((evidences.payment_requested_count ?? 0) >= 3 && evidences.unpaid_pledge_ratio) {
+    parts.push(`${pct(evidences.unpaid_pledge_ratio)} cam kết không được thanh toán`);
+  }
   return parts.length > 0 ? parts.join(" · ") : "chưa có dữ liệu chi tiết";
 }
 
@@ -408,6 +422,7 @@ export function AdminDashboard() {
   // Hồ sơ đang mở: các nút quyết định chỉ nằm trong hồ sơ, buộc admin xem đủ trước khi duyệt.
   const [reviewing, setReviewing] = useState<AdminCampaign | null>(null);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
+  const [suspectCampaign, setSuspectCampaign] = useState<{ id: string; title: string } | null>(null);
   const [viewingDonation, setViewingDonation] = useState<AdminDonation | null>(null);
   // Desktop: dải icon, rê chuột (hoặc focus bàn phím) thì mở rộng đè lên nội dung; màn hẹp: nút trình đơn mở rộng.
   const [sidebarHovered, setSidebarHovered] = useState(false);
@@ -1145,6 +1160,11 @@ export function AdminDashboard() {
     const disabled = busy === alert.id;
     return (
       <div className="risk-actions">
+        {alert.entityType === "campaign" && (
+          <button type="button" onClick={() => setSuspectCampaign({ id: alert.entityId, title: alert.entityName })}>
+            Tài khoản nghi vấn
+          </button>
+        )}
         <button className="resolve" type="button" disabled={disabled} onClick={() => handleRiskDecision(alert, "resolved")}>
           Xác nhận đã xử lý
         </button>
@@ -1633,6 +1653,15 @@ export function AdminDashboard() {
           </section>
           )}
 
+          {suspectCampaign && (
+            <PledgeSuspectsDialog
+              campaignId={suspectCampaign.id}
+              campaignTitle={suspectCampaign.title}
+              onClose={() => setSuspectCampaign(null)}
+              onViewUser={(id) => setViewingUserId(id)}
+              onChanged={() => void Promise.all([loadRisks(riskFilter, riskPaging.page), reloadOverview()])}
+            />
+          )}
           {viewingUserId && (
             <UserDetailDialog
               userId={viewingUserId}

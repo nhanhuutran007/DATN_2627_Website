@@ -74,6 +74,16 @@ export const FAQ_ITEMS: FaqItem[] = [
     ],
   },
   {
+    id: "bo-cam-ket",
+    question: "Nếu tôi không thanh toán cam kết thì sao?",
+    answer:
+      "Quá 7 ngày không thanh toán, cam kết tự hủy và bạn không bị trừ tiền. Tuy vậy, mỗi lần bỏ cam kết được tính lại (trong 12 tháng): bỏ 2 lần thì bạn chỉ giữ được 1 cam kết chưa thanh toán cùng lúc, bỏ 3 lần thì tài khoản bị khóa và các cam kết còn lại bị hủy (liên hệ quản trị viên để mở lại). Mỗi cam kết bạn thanh toán đủ sẽ xóa bớt một lần bỏ. Ngoài ra, mỗi dự án bạn chỉ có 1 cam kết chưa thanh toán, và tối đa 5 dự án cùng lúc (tài khoản mới dưới 30 ngày: 2 dự án).",
+    keywords: [
+      "khong thanh toan", "khong tra", "bo cam ket", "khong chuyen tien", "qua han", "het han thanh toan", "bi chan", "gioi han cam ket",
+      "bao nhieu cam ket", "huy cam ket",
+    ],
+  },
+  {
     id: "cho-xac-nhan",
     question: "Đã thanh toán nhưng giao dịch vẫn chờ xác nhận?",
     answer:

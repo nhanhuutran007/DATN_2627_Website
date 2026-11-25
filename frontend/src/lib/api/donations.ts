@@ -76,6 +76,20 @@ export type ConfirmDonationPayload = {
   status: "completed" | "failed";
 };
 
+/** Quyền cam kết trả sau của chính mình (`GET /donations/pledge-standing`). */
+export type PledgeStanding = {
+  abandoned: number;
+  tier: "good" | "warned" | "limited" | "blocked";
+  maxOpenCampaigns: number;
+  openCampaigns: number;
+  canPledge: boolean;
+  newAccount: boolean;
+};
+
+export function fetchPledgeStanding(): Promise<PledgeStanding> {
+  return api.get<PledgeStanding>("/donations/pledge-standing");
+}
+
 export async function createDonation(payload: CreateDonationPayload): Promise<ApiDonation> {
   return api.post<ApiDonation>("/donations", payload);
 }
@@ -233,4 +247,19 @@ export async function fetchSupportMessages(campaignId: string, offset = 0, limit
   return api.get<SupportMessagePage>(
     `/campaigns/${encodeURIComponent(campaignId)}/support-messages?offset=${offset}&limit=${limit}`,
   );
+}
+
+/** Chỉ số người ủng hộ công khai của chiến dịch (không lộ danh tính). */
+export type BackerQuality = {
+  backers: number;
+  verifiedBackers: number;
+  /** null khi quá ít người để tính. */
+  verifiedRatio: number | null;
+  committedAmount: number;
+  paidAmount: number;
+  paymentPhase: boolean;
+};
+
+export function fetchBackerQuality(campaignId: string): Promise<BackerQuality> {
+  return api.get<BackerQuality>(`/campaigns/${encodeURIComponent(campaignId)}/backer-quality`);
 }

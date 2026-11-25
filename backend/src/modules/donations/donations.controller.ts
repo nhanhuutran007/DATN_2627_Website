@@ -67,6 +67,13 @@ export class DonationsController {
     return this.donationsService.cancel(id, user);
   }
 
+  /** Quyền cam kết trả sau của chính mình (để form ủng hộ cảnh báo / chuyển sang trả ngay). */
+  @Get("pledge-standing")
+  @UseGuards(JwtAuthGuard)
+  pledgeStanding(@GetCurrentUser() user: User) {
+    return this.donationsService.pledgeStanding(user);
+  }
+
   @Get("mine")
   @UseGuards(JwtAuthGuard)
   findMine(@GetCurrentUser() user: User) {

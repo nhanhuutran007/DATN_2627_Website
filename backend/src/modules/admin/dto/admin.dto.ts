@@ -1,5 +1,8 @@
 import { Transform, Type } from "class-transformer";
 import {
+  ArrayMaxSize,
+  ArrayNotEmpty,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
@@ -8,9 +11,11 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from "class-validator";
 
 import { CampaignStatus } from "../../campaigns/entities/campaign.entity";
@@ -144,6 +149,32 @@ export class UpdateUserStatusDto {
   status!: UserStatus;
 
   /** Lý do khóa/mở khóa, lưu vào nhật ký kiểm toán. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+/** Hủy cam kết của các tài khoản nghi là clone ở một chiến dịch (tùy chọn khóa luôn tài khoản). */
+export class VoidSuspectPledgesDto {
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(200)
+  @IsUUID("all", { each: true })
+  userIds!: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  lockAccounts?: boolean;
+
+  @IsString()
+  @MinLength(5, { message: "Cần ghi lý do (ít nhất 5 ký tự)." })
+  @MaxLength(500)
+  reason!: string;
+}
+
+/** Mở lại quyền cam kết trả sau; lý do lưu vào nhật ký kiểm toán. */
+export class PledgeResetDto {
   @IsOptional()
   @IsString()
   @MaxLength(500)

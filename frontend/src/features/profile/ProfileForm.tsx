@@ -7,6 +7,7 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
 import { AiConsentSettings } from "@/features/ai-consent/AiConsentSettings";
+import { BankAccountSettings } from "@/features/profile/BankAccountSettings";
 import { ApiError, logoutAllRequest, resolveMediaUrl } from "@/lib/api";
 import { ACCEPTED_IMAGE_TYPES, uploadImage, validateImageFile } from "@/lib/api/media";
 import { fetchMyProfile, updateMyProfile, type MyProfile, type ProfileUpdate } from "@/lib/api/users";
@@ -403,6 +404,8 @@ function ProfileView({ profile, onSaved, aiUser }: ProfileViewProps) {
             <Link className="account-pill" href="/admin">Mở trang quản trị</Link>
           </section>
         )}
+
+        {!isAdmin && <BankAccountSettings />}
 
         <section className="account-row" aria-labelledby="account-password-label">
           <div className="account-row-main">

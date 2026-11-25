@@ -17,7 +17,7 @@ import { makeNotifierRecorder } from "./helpers/notifications";
 const CAMPAIGN_ID = "33333333-3333-4333-8333-333333333333";
 const TIER_ID = "44444444-4444-4444-8444-444444444444";
 const OWNER = { id: "11111111-1111-4111-8111-111111111111", role: UserRole.CAMPAIGN_OWNER } as any;
-const DONOR = { id: "22222222-2222-4222-8222-222222222222", role: UserRole.USER, name: "Donor" } as any;
+const DONOR = { id: "22222222-2222-4222-8222-222222222222", role: UserRole.USER, name: "Donor", emailVerified: true } as any;
 const ADMIN = { id: "99999999-9999-4999-8999-999999999999", role: UserRole.ADMIN } as any;
 
 function makeTier(overrides: Partial<RewardTier> = {}): RewardTier {
@@ -220,6 +220,8 @@ describe("DonationsService + mức quà", () => {
     const campaign = { id: CAMPAIGN_ID, title: "Thư viện", ownerId: OWNER.id, status: CampaignStatus.ACTIVE, endDate: new Date(Date.now() + 86400000) };
     const donationRepo: any = {
       findOne: async ({ where }: any) => (where.idempotencyKey ? null : pending),
+      count: async () => 0,
+      find: async () => [],
       create: (dto: any) => dto,
       save: async (d: any) => ({ id: "new", ...d }),
     };

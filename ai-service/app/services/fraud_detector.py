@@ -147,6 +147,105 @@ def _apply_rules(features: dict[str, float]) -> list[RuleResult]:
             )
         )
 
+    results.extend(_apply_pledge_integrity_rules(features))
+    return results
+
+
+# Chiến dịch cần đủ chừng này người cam kết thì các tỷ lệ mới có ý nghĩa.
+INTEGRITY_MIN_BACKERS = 5
+
+
+def _apply_pledge_integrity_rules(features: dict[str, float]) -> list[RuleResult]:
+    """Dấu hiệu chủ dự án dùng tài khoản clone cam kết để thổi phồng tiến độ (cấp chiến dịch).
+
+    Đặc trưng do backend tính (``pledge-integrity.ts``, luật giống hệt bản dự phòng ở đó).
+    """
+    results: list[RuleResult] = []
+    backers = _as_finite(features.get("integrity_backer_count")) or 0.0
+
+    owner_ip = _as_finite(features.get("backers_shared_ip_owner"))
+    if owner_ip is not None and owner_ip >= 1:
+        results.append(
+            RuleResult(
+                group="RULE_SHARED_IP_WITH_OWNER",
+                label="Người cam kết dùng chung địa chỉ IP với chủ dự án",
+                score=min(1.0, 0.5 + 0.25 * (owner_ip - 1)),
+            )
+        )
+
+    same_bank = _as_finite(features.get("backers_same_bank_owner"))
+    if same_bank is not None and same_bank >= 1:
+        results.append(
+            RuleResult(
+                group="RULE_SAME_BANK_AS_OWNER",
+                label="Người cam kết trùng tài khoản ngân hàng với chủ dự án",
+                score=1.0,
+            )
+        )
+
+    ip_group = _as_finite(features.get("backers_shared_ip_max_group"))
+    if ip_group is not None and ip_group >= 3:
+        results.append(
+            RuleResult(
+                group="RULE_SHARED_IP_BACKERS",
+                label="Nhiều người cam kết dùng chung một địa chỉ IP",
+                score=min(1.0, 0.2 * ip_group),
+            )
+        )
+
+    new_ratio = _as_finite(features.get("new_account_backer_ratio"))
+    single_ratio = _as_finite(features.get("single_campaign_backer_ratio"))
+    burst_ratio = _as_finite(features.get("pledge_burst_ratio"))
+    if backers >= INTEGRITY_MIN_BACKERS:
+        if new_ratio is not None and new_ratio >= 0.5:
+            results.append(
+                RuleResult(
+                    group="RULE_NEW_ACCOUNT_BACKERS",
+                    label="Phần lớn người cam kết là tài khoản mới tạo",
+                    # Riêng dấu hiệu này không đủ mức cao (chiến dịch mới hay kéo người quen mới đăng ký).
+                    score=min(1.0, new_ratio * 0.6),
+                )
+            )
+        if single_ratio is not None and single_ratio >= 0.8:
+            results.append(
+                RuleResult(
+                    group="RULE_SINGLE_CAMPAIGN_BACKERS",
+                    label="Phần lớn người cam kết chưa từng ủng hộ dự án nào khác",
+                    score=min(1.0, single_ratio * 0.5),
+                )
+            )
+        if burst_ratio is not None and burst_ratio >= 0.6:
+            results.append(
+                RuleResult(
+                    group="RULE_PLEDGE_BURST",
+                    label="Cam kết dồn dập trong một khoảng thời gian ngắn",
+                    score=min(1.0, burst_ratio * 0.7),
+                )
+            )
+        if (
+            new_ratio is not None
+            and single_ratio is not None
+            and new_ratio >= 0.5
+            and single_ratio >= 0.8
+        ):
+            results.append(
+                RuleResult(
+                    group="RULE_CLONE_PATTERN",
+                    label="Nhiều tài khoản mới chỉ cam kết cho riêng dự án này",
+                    score=0.8,
+                )
+            )
+
+    unpaid = _as_finite(features.get("unpaid_pledge_ratio"))
+    requested = _as_finite(features.get("payment_requested_count")) or 0.0
+    if unpaid is not None and requested >= 3 and unpaid >= 0.5:
+        results.append(
+            RuleResult(
+                group="RULE_UNPAID_PLEDGES",
+                label="Phần lớn cam kết không được thanh toán sau khi dự án đạt mục tiêu",
+                score=min(1.0, unpaid),
+            )
+        )
     return results
 
 

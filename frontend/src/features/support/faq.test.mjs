@@ -17,6 +17,7 @@ const CASES = [
   ["trả tiền kiểu gì", "thanh-toan"],
   ["ủng hộ bằng momo được không", "thanh-toan"],
   ["tôi đã chuyển tiền rồi mà chưa thấy", "cho-xac-nhan"],
+  ["nếu tôi không chuyển tiền cam kết thì sao", "bo-cam-ket"],
   ["lấy lại tiền", "hoan-tien"],
   ["chiến dịch không đạt mục tiêu thì sao", "hoan-tien"],
   ["bao lâu thì được duyệt", "xet-duyet"],

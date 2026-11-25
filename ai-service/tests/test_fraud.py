@@ -132,3 +132,42 @@ def test_classifier_is_named_as_reason_when_it_ranks_risk_top(tmp_path) -> None:
 
     groups = {reason.group for reason in response.reasons}
     assert "ML_CLASSIFIER" in groups
+
+
+def test_clone_pledges_sharing_owner_ip_or_bank_are_high_risk() -> None:
+    service = FraudDetectorService()
+    response = service.score(
+        "CAMPAIGN", "c-1", {"integrity_backer_count": 6, "backers_shared_ip_owner": 2, "backers_same_bank_owner": 1}
+    )
+    groups = {reason.group for reason in response.reasons}
+    assert {"RULE_SHARED_IP_WITH_OWNER", "RULE_SAME_BANK_AS_OWNER"} <= groups
+    assert response.level == "HIGH"
+
+
+def test_new_single_campaign_backers_form_clone_pattern() -> None:
+    service = FraudDetectorService()
+    response = service.score(
+        "CAMPAIGN",
+        "c-2",
+        {"integrity_backer_count": 8, "new_account_backer_ratio": 0.75, "single_campaign_backer_ratio": 1.0},
+    )
+    groups = {reason.group for reason in response.reasons}
+    assert "RULE_CLONE_PATTERN" in groups
+    assert response.level == "HIGH"
+
+
+def test_ratio_rules_need_enough_backers() -> None:
+    service = FraudDetectorService()
+    response = service.score(
+        "CAMPAIGN",
+        "c-3",
+        {"integrity_backer_count": 2, "new_account_backer_ratio": 1.0, "single_campaign_backer_ratio": 1.0, "pledge_burst_ratio": 1.0},
+    )
+    assert response.level == "LOW"
+    assert response.reasons == []
+
+
+def test_new_accounts_alone_are_not_high_risk() -> None:
+    service = FraudDetectorService()
+    response = service.score("CAMPAIGN", "c-4", {"integrity_backer_count": 8, "new_account_backer_ratio": 1.0})
+    assert response.level == "MEDIUM"
