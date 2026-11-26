@@ -57,7 +57,7 @@ export function DonorHighlights({ campaignId }: DonorHighlightsProps) {
         <b>{data.total.toLocaleString("vi-VN")}</b> lượt ủng hộ đã xác nhận
       </p>
       <ul>
-        {data.recent && <DonorRow entry={data.recent} note={`Gần nhất · ${timeAgo(data.recent.completedAt)}`} />}
+        {data.recent && <DonorRow entry={data.recent} note={timeAgo(data.recent.completedAt)} />}
         {data.top && data.top.id !== data.recent?.id && <DonorRow entry={data.top} note="Ủng hộ lớn nhất" />}
       </ul>
       <div className="donor-highlights-actions">

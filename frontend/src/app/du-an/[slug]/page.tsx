@@ -24,7 +24,6 @@ import { DetailToc, type DetailTocItem } from "@/features/campaigns/DetailToc";
 import { UnpublishedCampaignPreview } from "@/features/campaigns/UnpublishedCampaignPreview";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ShareSpread } from "@/features/follows/ShareSpread";
-import { BackerQualityNote } from "@/features/donations/BackerQualityNote";
 import { CampaignViewTracker } from "@/features/campaign-stats/CampaignViewTracker";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
 import { FAQ_ITEMS } from "@/features/support/faq";
@@ -271,7 +270,6 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                   )}
                 </div>
               </div>
-              {published && <BackerQualityNote campaignId={campaign.slug} />}
               {open && percent >= 100 && (
                 <p className="fund-overfunded" role="status">
                   <Icon name="check" size={16} /> Đã đạt mục tiêu! Dự án vẫn tiếp tục nhận ủng hộ đến hết
