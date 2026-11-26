@@ -220,6 +220,13 @@ export class CampaignQueryDto {
   limit?: number = 9;
 }
 
+export class PublishCampaignDto {
+  /** Ngày kết thúc mới (tùy chọn) khi ngày đã chọn không còn trong 7–60 ngày kể từ lúc phát hành. */
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+}
+
 export class ModerateCampaignDto {
   @IsIn([
     CampaignStatus.APPROVED,

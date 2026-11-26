@@ -120,7 +120,7 @@ const FINISHED_STATUSES = [CampaignStatus.SUCCESS, CampaignStatus.FAILED, Campai
 const PLATFORM_HISTORY_LIMIT = 1000;
 /** Dự án kết thúc ít khi thay đổi: lưu tạm danh sách 5 phút thay vì truy vấn mỗi lần dự đoán. */
 const PLATFORM_HISTORY_TTL_MS = 5 * 60 * 1000;
-/** Thời hạn gây quỹ ngắn nhất form tạo chiến dịch cho phép (≥ 1 tháng). */
+/** Thời hạn ngắn nhất AI gợi ý (form cho phép từ 7 ngày, nhưng mô hình học chủ yếu dự án 30–60 ngày). */
 const MIN_CAMPAIGN_DAYS = 30;
 /** "Ban đầu" trong đặc trưng dự đoán = 7 ngày đầu gây quỹ (tổng hiện tại sẽ làm mô hình tự trả lời). */
 const EARLY_WINDOW_DAYS = 7;

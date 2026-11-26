@@ -143,15 +143,18 @@ describe("CampaignsService", () => {
       equal(campaign.currentAmount, 0);
     });
 
-    it("should reject an end date less than one month away", async () => {
-      const dto = {
+    it("should reject an end date shorter than 7 days or further than 60 + 3 days", async () => {
+      const dto = (days: number) => ({
         title: "Short campaign",
         description: "Long description",
         category: "Giáo dục",
         goalAmount: 10000000,
-        endDate: new Date(Date.now() + 10 * 86400000).toISOString(),
-      };
-      await rejects(campaignsService.create(dto as any, makeUser()), BadRequestException);
+        endDate: new Date(Date.now() + days * 86400000).toISOString(),
+      });
+      await rejects(campaignsService.create(dto(5) as any, makeUser()), BadRequestException);
+      await rejects(campaignsService.create(dto(65) as any, makeUser()), BadRequestException);
+      equal((await campaignsService.create(dto(10) as any, makeUser())).status, CampaignStatus.DRAFT);
+      equal((await campaignsService.create(dto(63) as any, makeUser())).status, CampaignStatus.DRAFT);
     });
   });
 
@@ -187,7 +190,6 @@ describe("CampaignsService", () => {
     it("mặc định chỉ lấy trạng thái công khai và phân trang ở bước lấy id", async () => {
       await campaignsService.findAll({ limit: 12, offset: 24 });
       deepEqual(listQuery.params().statuses, [
-        CampaignStatus.APPROVED,
         CampaignStatus.ACTIVE,
         CampaignStatus.SUCCESS,
         CampaignStatus.ENDED,
@@ -318,7 +320,7 @@ describe("CampaignsService", () => {
         (err) => equal(err.status, 404),
       );
 
-    for (const status of [CampaignStatus.DRAFT, CampaignStatus.PENDING, CampaignStatus.NEEDS_INFO, CampaignStatus.REJECTED]) {
+    for (const status of [CampaignStatus.DRAFT, CampaignStatus.PENDING, CampaignStatus.NEEDS_INFO, CampaignStatus.REJECTED, CampaignStatus.APPROVED]) {
       it(`should hide a ${status} campaign from guests and other users`, async () => {
         const campaign = await repo.findOne();
         repo.findOne = async () => ({ ...campaign, status });
@@ -386,6 +388,18 @@ describe("CampaignsService", () => {
       accounts = 1;
       const campaign = await service.submitForReview("123e4567-e89b-12d3-a456-426614174000", makeUser());
       equal(campaign.status, CampaignStatus.PENDING);
+    });
+
+    it("gửi duyệt khi ngày kết thúc không còn đủ 7 ngày gây quỹ + 3 ngày chờ duyệt thì bị từ chối", async () => {
+      repo.findOne = async () => ({
+        ...createMockRepo().mockCampaign,
+        status: CampaignStatus.DRAFT,
+        endDate: new Date(Date.now() + 8 * 86400000),
+      });
+      await rejects(
+        campaignsService.submitForReview("123e4567-e89b-12d3-a456-426614174000", makeUser()),
+        (err: { status: number; message: string }) => err.status === 400 && err.message.includes("chờ duyệt"),
+      );
     });
 
     it("should reject an active campaign for resubmission", async () => {
@@ -584,6 +598,14 @@ describe("CampaignsService", () => {
         });
     });
 
+    it("admin không kích hoạt thay chủ dự án (approved -> active bị chặn)", async () => {
+      repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.APPROVED });
+      await rejects(
+        campaignsService.moderate("123e4567-e89b-12d3-a456-426614174000", { status: CampaignStatus.ACTIVE } as any, makeUser(UserRole.ADMIN, ADMIN_ID)),
+        (err: { status: number }) => err.status === 409,
+      );
+    });
+
     it("should allow resuming a paused campaign without a reason", async () => {
       repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.PAUSED });
       const campaign = await campaignsService.moderate(
@@ -592,6 +614,62 @@ describe("CampaignsService", () => {
         makeUser(UserRole.ADMIN, ADMIN_ID),
       );
       equal(campaign.status, CampaignStatus.ACTIVE);
+    });
+  });
+
+  describe("publish (chủ dự án tự phát hành)", () => {
+    const ID = "123e4567-e89b-12d3-a456-426614174000";
+    const DAY = 86400000;
+    function approved(endInDays: number) {
+      const updates: any[] = [];
+      const campaign = {
+        ...createMockRepo().mockCampaign,
+        status: CampaignStatus.APPROVED,
+        startDate: new Date(Date.now() - 5 * DAY),
+        endDate: new Date(Date.now() + endInDays * DAY),
+      };
+      repo.findOne = async () => campaign;
+      repo.update = async (where: any, patch: any) => {
+        updates.push({ where, patch });
+        return { affected: where.status === campaign.status ? 1 : 0 };
+      };
+      return updates;
+    }
+
+    it("phát hành: approved -> active, thời gian gây quỹ tính từ lúc phát hành, ghi audit", async () => {
+      const updates = approved(30);
+      const before = Date.now();
+      const saved = await campaignsService.publish(ID, makeUser());
+      equal(saved.status, CampaignStatus.ACTIVE);
+      equal(updates[0].where.status, CampaignStatus.APPROVED);
+      ok(updates[0].patch.startDate.getTime() >= before);
+      equal(audit.entries.at(-1)?.action, "campaign.publish");
+    });
+
+    it("chỉ chủ dự án được phát hành — admin và người khác bị chặn", async () => {
+      approved(30);
+      await rejects(campaignsService.publish(ID, makeUser(UserRole.ADMIN, ADMIN_ID)), (err: { status: number }) => err.status === 403);
+      await rejects(
+        campaignsService.publish(ID, makeUser(UserRole.USER, "123e4567-e89b-12d3-a456-426614174777")),
+        (err: { status: number }) => err.status === 403,
+      );
+    });
+
+    it("chưa được duyệt thì không phát hành được", async () => {
+      repo.findOne = async () => ({ ...createMockRepo().mockCampaign, status: CampaignStatus.PENDING });
+      await rejects(campaignsService.publish(ID, makeUser()), (err: { status: number }) => err.status === 409);
+    });
+
+    it("ngày kết thúc cũ còn dưới 7 ngày hoặc ngày mới quá 60 ngày → từ chối; ngày mới trong 7–60 ngày → phát hành", async () => {
+      approved(3);
+      await rejects(campaignsService.publish(ID, makeUser()), (err: { status: number }) => err.status === 400);
+      await rejects(
+        campaignsService.publish(ID, makeUser(), new Date(Date.now() + 62 * DAY).toISOString()),
+        (err: { status: number }) => err.status === 400,
+      );
+      const newEnd = new Date(Date.now() + 45 * DAY);
+      const saved = await campaignsService.publish(ID, makeUser(), newEnd.toISOString());
+      equal(saved.endDate.getTime(), newEnd.getTime());
     });
   });
 

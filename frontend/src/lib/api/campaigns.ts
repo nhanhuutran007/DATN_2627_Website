@@ -19,7 +19,7 @@ export type ApiCampaignStatus =
  * Trạng thái đã công khai: backend chỉ mở theo dõi, lượt xem, sổ cái, bình luận
  * và báo cáo cho các trạng thái này (các trạng thái khác trả 404).
  */
-const PUBLISHED_STATUSES: readonly ApiCampaignStatus[] = ["approved", "active", "paused", "success", "failed", "ended"];
+const PUBLISHED_STATUSES: readonly ApiCampaignStatus[] = ["active", "paused", "success", "failed", "ended"];
 
 /** Dữ liệu mẫu (không có `apiStatus`) coi như đã công khai. */
 export function isPublishedStatus(status: ApiCampaignStatus | undefined): boolean {
@@ -35,6 +35,8 @@ export function reviewStatusLabel(status: ApiCampaignStatus | undefined): string
       return "Đang chờ quản trị viên duyệt";
     case "needs_info":
       return "Quản trị viên yêu cầu bổ sung";
+    case "approved":
+      return "Đã duyệt — chờ chủ dự án phát hành";
     case "rejected":
       return "Bị từ chối";
     case "cancelled":
@@ -185,6 +187,11 @@ export async function submitCampaign(id: string): Promise<ApiCampaign> {
   return api.post<ApiCampaign>(`/campaigns/${encodeURIComponent(id)}/submit`);
 }
 
+/** Chủ dự án phát hành chiến dịch đã duyệt; `endDate` (ISO) khi chọn lại ngày kết thúc. */
+export async function publishCampaign(id: string, endDate?: string): Promise<ApiCampaign> {
+  return api.post<ApiCampaign>(`/campaigns/${encodeURIComponent(id)}/publish`, endDate ? { endDate } : {});
+}
+
 export async function deleteCampaign(id: string): Promise<void> {
   return api.del<void>(`/campaigns/${encodeURIComponent(id)}`);
 }
@@ -275,9 +282,9 @@ function statusToDisplay(status: ApiCampaignStatus): CampaignStatus {
       return "Chờ duyệt";
     case "needs_info":
       return "Cần bổ sung";
-    // Đã duyệt nhưng admin chưa kích hoạt: máy chủ chưa nhận tiền ủng hộ (chỉ nhận khi `active`)
+    // Đã duyệt nhưng chủ dự án chưa bấm "Phát hành": chưa công khai, chưa nhận ủng hộ.
     case "approved":
-      return "Sắp mở gây quỹ";
+      return "Chờ phát hành";
     case "active":
       return "Đang gây quỹ";
     case "rejected":

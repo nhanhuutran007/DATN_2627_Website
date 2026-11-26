@@ -1745,7 +1745,6 @@ export const LEDGER_SORTS = ["recent", "top"] as const;
 export type LedgerSort = (typeof LEDGER_SORTS)[number];
 
 const LEDGER_VISIBLE_STATUSES = [
-  CampaignStatus.APPROVED,
   CampaignStatus.ACTIVE,
   CampaignStatus.PAUSED,
   CampaignStatus.SUCCESS,

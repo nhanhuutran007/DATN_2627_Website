@@ -18,7 +18,14 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { Organization, OrganizationStatus } from "../organizations/entities/organization.entity";
 import { AutomationSettingsService } from "../support/automation-settings.service";
 import { User, UserRole } from "../users/entities/user.entity";
-import { exceedsMaxDuration, MAX_CAMPAIGN_DURATION_DAYS } from "./campaign-duration";
+import {
+  draftDurationProblem,
+  type DurationProblem,
+  MAX_CAMPAIGN_DURATION_DAYS,
+  MIN_CAMPAIGN_DURATION_DAYS,
+  publishDurationProblem,
+  REVIEW_BUFFER_DAYS,
+} from "./campaign-duration";
 import { campaignStatusNotifications } from "./campaign-notifications";
 import { CampaignScreeningService, type ScreeningView } from "./campaign-screening.service";
 import {
@@ -30,19 +37,20 @@ import {
 import { CampaignPayoutAccount } from "./entities/campaign-payout-account.entity";
 import { Campaign, CampaignStatus } from "./entities/campaign.entity";
 
+/** Đã phát hành (chủ dự án bấm "Phát hành" sau khi được duyệt). `approved` chưa công khai. */
 const PUBLIC_STATUSES = [
-  CampaignStatus.APPROVED,
   CampaignStatus.ACTIVE,
   CampaignStatus.SUCCESS,
   CampaignStatus.ENDED,
 ];
 
-/** Hồ sơ chưa qua xét duyệt: không công khai chi tiết cho người ngoài. */
+/** Hồ sơ chưa phát hành (kể cả đã duyệt nhưng chủ dự án chưa bấm phát hành): chỉ chủ dự án/admin xem. */
 const UNPUBLISHED_STATUSES = [
   CampaignStatus.DRAFT,
   CampaignStatus.PENDING,
   CampaignStatus.NEEDS_INFO,
   CampaignStatus.REJECTED,
+  CampaignStatus.APPROVED,
 ];
 
 /** Thông tin liên hệ của một chiến dịch công khai (nút "Liên hệ"); trường rỗng = chưa công khai. */
@@ -68,6 +76,7 @@ const SUBMITTABLE_STATUSES = [
  * README: draft → pending ⇄ needs_info → approved → active → (paused ⇄ active)
  * → success | failed → ended; từ pending có thể rejected. Chuyển ngoài bảng này
  * bị từ chối, kể cả khi status đích hợp lệ theo DTO.
+ * approved → active KHÔNG thuộc admin: chủ dự án tự bấm phát hành (`publish`).
  */
 const MODERATE_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
   [CampaignStatus.DRAFT]: [],
@@ -76,7 +85,7 @@ const MODERATE_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
     CampaignStatus.REJECTED,
     CampaignStatus.NEEDS_INFO,
   ],
-  [CampaignStatus.APPROVED]: [CampaignStatus.ACTIVE],
+  [CampaignStatus.APPROVED]: [],
   [CampaignStatus.REJECTED]: [],
   [CampaignStatus.NEEDS_INFO]: [],
   [CampaignStatus.ACTIVE]: [CampaignStatus.PAUSED, CampaignStatus.ENDED],
@@ -89,7 +98,6 @@ const MODERATE_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
 
 /** Chiến dịch đã công khai (người dùng nhìn thấy được), dùng cho thống kê. */
 const STATS_STATUSES = [
-  CampaignStatus.APPROVED,
   CampaignStatus.ACTIVE,
   CampaignStatus.PAUSED,
   CampaignStatus.SUCCESS,
@@ -344,29 +352,34 @@ export class CampaignsService {
     };
   }
 
-  /** Ngày kết thúc phải cách hiện tại ít nhất 1 tháng (cho phép lệch 1 ngày do múi giờ). */
-  private assertMinDuration(endDate: string): void {
-    const min = new Date();
-    min.setMonth(min.getMonth() + 1);
-    min.setDate(min.getDate() - 1);
-    if (new Date(endDate).getTime() < min.getTime()) {
+  /**
+   * Ngày kết thúc của hồ sơ chưa phát hành: thời gian gây quỹ tính từ lúc chủ dự án phát hành,
+   * nên được chọn xa tối đa 60 + 3 ngày (dự trù chờ duyệt). Gửi duyệt thì phải còn ít nhất 7 + 3 ngày.
+   */
+  private assertDraftDuration(endDate: string | Date, requireReviewBuffer = false): void {
+    const problem = draftDurationProblem(new Date(endDate), new Date(), { requireReviewBuffer });
+    if (problem === "too_short") {
       throw new BadRequestException(
-        "Ngày kết thúc phải cách hôm nay ít nhất 1 tháng",
+        requireReviewBuffer
+          ? `Ngày kết thúc phải cách hôm nay ít nhất ${MIN_CAMPAIGN_DURATION_DAYS + REVIEW_BUFFER_DAYS} ngày (${MIN_CAMPAIGN_DURATION_DAYS} ngày gây quỹ + ${REVIEW_BUFFER_DAYS} ngày chờ duyệt) — hãy sửa ngày kết thúc trước khi gửi duyệt`
+          : `Thời gian gây quỹ tối thiểu ${MIN_CAMPAIGN_DURATION_DAYS} ngày`,
+      );
+    }
+    if (problem === "too_long") {
+      throw new BadRequestException(
+        `Thời gian gây quỹ tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày (ngày kết thúc cách hôm nay tối đa ${MAX_CAMPAIGN_DURATION_DAYS + REVIEW_BUFFER_DAYS} ngày, đã gồm ${REVIEW_BUFFER_DAYS} ngày chờ duyệt)`,
       );
     }
   }
 
-  /** Tối đa 60 ngày kể từ ngày bắt đầu (hoặc từ hôm nay nếu ngày bắt đầu đã qua). */
-  private assertMaxDuration(endDate: string, startDate?: string | Date | null): void {
-    const start = startDate ? new Date(startDate) : null;
-    if (exceedsMaxDuration(new Date(endDate), start)) {
-      throw new BadRequestException(`Thời gian gây quỹ tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày`);
-    }
+  private static publishDurationMessage(problem: DurationProblem): string {
+    return problem === "too_short"
+      ? `Còn chưa tới ${MIN_CAMPAIGN_DURATION_DAYS} ngày gây quỹ — hãy chọn ngày kết thúc mới (${MIN_CAMPAIGN_DURATION_DAYS}–${MAX_CAMPAIGN_DURATION_DAYS} ngày kể từ hôm nay)`
+      : `Thời gian gây quỹ tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày kể từ lúc phát hành — hãy chọn ngày kết thúc sớm hơn`;
   }
 
   async create(dto: CreateCampaignDto, owner: User): Promise<Campaign> {
-    this.assertMinDuration(dto.endDate);
-    this.assertMaxDuration(dto.endDate, dto.startDate);
+    this.assertDraftDuration(dto.endDate);
     const campaign = this.campaignRepo.create({
       title: dto.title,
       description: sanitizeRichText(dto.description),
@@ -401,10 +414,7 @@ export class CampaignsService {
       );
     }
 
-    if (dto.endDate) {
-      this.assertMinDuration(dto.endDate);
-      this.assertMaxDuration(dto.endDate, dto.startDate ?? campaign.startDate);
-    }
+    if (dto.endDate) this.assertDraftDuration(dto.endDate);
     if (dto.description !== undefined) dto.description = sanitizeRichText(dto.description);
 
     const current = campaign as unknown as Record<string, unknown>;
@@ -440,12 +450,8 @@ export class CampaignsService {
       );
     }
 
-    // Hồ sơ tạo trước khi có giới hạn 60 ngày phải sửa ngày kết thúc trước khi gửi duyệt.
-    if (exceedsMaxDuration(new Date(campaign.endDate), campaign.startDate ? new Date(campaign.startDate) : null)) {
-      throw new BadRequestException(
-        `Thời gian gây quỹ tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày — hãy sửa ngày kết thúc trước khi gửi duyệt`,
-      );
-    }
+    // Phải còn đủ thời gian sau khi duyệt (7 ngày gây quỹ + 3 ngày chờ duyệt), và không quá 60 + 3 ngày.
+    this.assertDraftDuration(campaign.endDate, true);
 
     // Như Kickstarter: phải khai báo nơi nhận tiền trước khi gửi duyệt, để khi thành công admin giải ngân được ngay.
     if (this.payoutRepo && (await this.payoutRepo.count({ where: { campaignId: campaign.id } })) === 0) {
@@ -470,7 +476,8 @@ export class CampaignsService {
 
   /**
    * Duyệt tự động sau khi gửi: chấm điểm hồ sơ cho hàng đợi admin. Chỉ khi admin bật chế độ
-   * `auto_low_risk` và hồ sơ qua đủ các bước, rủi ro thấp thì hệ thống tự phát hành (pending → active).
+   * `auto_low_risk` và hồ sơ qua đủ các bước, rủi ro thấp thì hệ thống tự duyệt (pending → approved);
+   * chủ dự án vẫn tự bấm "Phát hành" như khi admin duyệt tay.
    * Không bao giờ tự từ chối hay yêu cầu bổ sung — các trường hợp đó luôn để admin quyết định.
    * Lỗi khi chấm điểm không chặn việc gửi duyệt.
    */
@@ -487,22 +494,63 @@ export class CampaignsService {
     if (settings?.campaignReviewMode !== "auto_low_risk" || screening.recommendation !== "auto_approve") {
       return campaign;
     }
-    const published = await this.campaignRepo.update(
+    const approved = await this.campaignRepo.update(
       { id: campaign.id, status: CampaignStatus.PENDING },
-      { status: CampaignStatus.ACTIVE },
+      { status: CampaignStatus.APPROVED },
     );
-    if (!published.affected) return campaign;
+    if (!approved.affected) return campaign;
     await this.screeningService.markAutoApproved(campaign.id);
-    const saved = { ...campaign, status: CampaignStatus.ACTIVE } as Campaign;
+    const saved = { ...campaign, status: CampaignStatus.APPROVED } as Campaign;
     await this.auditService.record({
       action: "campaign.auto_approve",
       entity: "campaign",
       entityId: campaign.id,
       oldValues: { status: CampaignStatus.PENDING },
-      newValues: { status: CampaignStatus.ACTIVE, score: screening.score, rulesVersion: screening.rulesVersion },
+      newValues: { status: CampaignStatus.APPROVED, score: screening.score, rulesVersion: screening.rulesVersion },
     });
-    const notices = campaignStatusNotifications(saved, CampaignStatus.PENDING, CampaignStatus.ACTIVE);
+    const notices = campaignStatusNotifications(saved, CampaignStatus.PENDING, CampaignStatus.APPROVED);
     if (notices.owner) await this.notificationsService.notify(notices.owner).catch(() => undefined);
+    return saved;
+  }
+
+  /**
+   * Chủ dự án phát hành chiến dịch đã được duyệt (approved → active). Thời gian gây quỹ tính từ lúc
+   * này: `startDate` = bây giờ, ngày kết thúc phải còn 7–60 ngày. Nếu duyệt lâu làm ngày đã chọn
+   * không còn hợp lệ, chủ dự án gửi kèm `endDate` mới (chỉ được đổi ngày kết thúc ở bước này).
+   * Chỉ chủ dự án — admin duyệt nhưng không phát hành thay.
+   */
+  async publish(id: string, currentUser: User, endDate?: string): Promise<Campaign> {
+    const campaign = await this.findById(id);
+    if (campaign.ownerId !== currentUser.id) {
+      throw new ForbiddenException("Chỉ chủ dự án mới được phát hành chiến dịch");
+    }
+    if (campaign.status !== CampaignStatus.APPROVED) {
+      throw new ConflictException("Chỉ phát hành được chiến dịch đã được duyệt và chưa phát hành");
+    }
+
+    const now = new Date();
+    const nextEnd = endDate ? new Date(endDate) : new Date(campaign.endDate);
+    const problem = publishDurationProblem(nextEnd, now);
+    if (problem) throw new BadRequestException(CampaignsService.publishDurationMessage(problem));
+
+    const previous = { status: campaign.status, startDate: campaign.startDate, endDate: campaign.endDate };
+    // Cập nhật có điều kiện: hai lần bấm đồng thời chỉ một lần thành công.
+    const result = await this.campaignRepo.update(
+      { id: campaign.id, status: CampaignStatus.APPROVED },
+      { status: CampaignStatus.ACTIVE, startDate: now, endDate: nextEnd },
+    );
+    if (!result.affected) {
+      throw new ConflictException("Chiến dịch vừa được phát hành hoặc đổi trạng thái");
+    }
+    const saved = Object.assign(campaign, { status: CampaignStatus.ACTIVE, startDate: now, endDate: nextEnd });
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "campaign.publish",
+      entity: "campaign",
+      entityId: saved.id,
+      oldValues: previous,
+      newValues: { status: saved.status, startDate: now, endDate: nextEnd },
+    });
     return saved;
   }
 

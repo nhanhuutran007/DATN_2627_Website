@@ -15,7 +15,7 @@ import type { User } from "../users/entities/user.entity";
 export const MAX_FEATURED = 6;
 
 /** Chỉ chiến dịch đang hiển thị công khai mới được chọn nổi bật. */
-const FEATURABLE_STATUSES = [CampaignStatus.APPROVED, CampaignStatus.ACTIVE, CampaignStatus.SUCCESS];
+const FEATURABLE_STATUSES = [CampaignStatus.ACTIVE, CampaignStatus.SUCCESS];
 
 /** Quản trị nội dung trang chủ: chọn/bỏ dự án nổi bật (có audit). */
 @Injectable()

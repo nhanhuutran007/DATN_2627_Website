@@ -786,7 +786,9 @@ paths:
       summary: Gửi chiến dịch để admin xét duyệt
       description: >-
         Chỉ khi đang ở `draft`, `rejected` hoặc `needs_info` → chuyển sang
-        `pending`. Ghi audit `campaign.submit`.
+        `pending`. Ngày kết thúc phải cách hôm nay 10–63 ngày (7–60 ngày gây
+        quỹ + 3 ngày dự trù chờ duyệt 24–48 giờ). Ghi audit `campaign.submit`.
+        Chế độ `auto_low_risk` chỉ tự duyệt (→ `approved`), không tự phát hành.
       security:
         - bearerAuth: []
       parameters:
@@ -798,10 +800,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Campaign"
+        "400":
+          description: Ngày kết thúc không còn đủ thời gian gây quỹ sau khi duyệt, hoặc quá xa
         "403":
           description: Không có quyền, hoặc chiến dịch không ở trạng thái gửi duyệt được
         "404":
           $ref: "#/components/responses/NotFound"
+  /campaigns/{id}/publish:
+    post:
+      operationId: publishCampaign
+      summary: Chủ dự án phát hành chiến dịch đã được duyệt
+      description: >-
+        `approved` → `active`, chỉ chủ dự án (admin duyệt nhưng không phát hành
+        thay). `startDate` = thời điểm phát hành; ngày kết thúc phải còn 7–60
+        ngày, có thể gửi `endDate` mới khi ngày cũ không còn hợp lệ. Trước khi
+        phát hành chiến dịch không công khai. Ghi audit `campaign.publish`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                endDate:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: Đã phát hành
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "400":
+          description: Thời gian gây quỹ ngoài khoảng 7–60 ngày kể từ lúc phát hành
+        "403":
+          description: Không phải chủ dự án
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Chiến dịch chưa được duyệt hoặc đã phát hành
   /campaigns/{id}/moderate:
     patch:
       operationId: moderateCampaign

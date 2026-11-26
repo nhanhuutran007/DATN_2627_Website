@@ -20,6 +20,8 @@ type DurationEstimatePanelProps = {
   deadline: string;
   title: string;
   onUseDuration: (days: number) => void;
+  /** Số ngày từ hôm nay tới lúc dự kiến phát hành (dự trù chờ duyệt). */
+  startOffsetDays?: number;
 };
 
 type State =
@@ -32,7 +34,7 @@ type State =
  * số tiền. Học từ các dự án Góp Mầm đã kết thúc (kết hợp mô hình học từ dữ liệu Kickstarter khi
  * Góp Mầm còn ít dữ liệu). Chỉ tham khảo.
  */
-export function DurationEstimatePanel({ category, goalAmount, minGoal, deadline, title, onUseDuration }: DurationEstimatePanelProps) {
+export function DurationEstimatePanel({ category, goalAmount, minGoal, deadline, title, onUseDuration, startOffsetDays = 0 }: DurationEstimatePanelProps) {
   const [state, setState] = useState<State>({ status: "loading", previous: null });
   const ready = Boolean(category) && goalAmount >= minGoal;
 
@@ -41,7 +43,8 @@ export function DurationEstimatePanel({ category, goalAmount, minGoal, deadline,
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setState((current) => ({ status: "loading", previous: current.status === "ready" ? current.data : null }));
-      const endDate = deadline ? new Date(`${deadline}T23:59:59`) : null;
+      // Thời hạn tính từ lúc phát hành: bỏ số ngày chờ duyệt để ước lượng đúng số ngày gây quỹ thật.
+      const endDate = deadline ? new Date(new Date(`${deadline}T23:59:59`).getTime() - startOffsetDays * 86_400_000) : null;
       fetchDurationEstimate(
         {
           category,
@@ -60,7 +63,7 @@ export function DurationEstimatePanel({ category, goalAmount, minGoal, deadline,
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [ready, category, goalAmount, deadline, title]);
+  }, [ready, category, goalAmount, deadline, title, startOffsetDays]);
 
   const data = !ready ? null : state.status === "ready" ? state.data : state.status === "loading" ? state.previous : null;
 

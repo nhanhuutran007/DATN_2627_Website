@@ -24,7 +24,6 @@ import { Report, ReportStatus } from "./entities/report.entity";
 
 /** Chỉ báo cáo được chiến dịch đã công khai (người dùng có thể nhìn thấy). */
 const REPORTABLE_CAMPAIGN_STATUSES = [
-  CampaignStatus.APPROVED,
   CampaignStatus.ACTIVE,
   CampaignStatus.PAUSED,
   CampaignStatus.SUCCESS,

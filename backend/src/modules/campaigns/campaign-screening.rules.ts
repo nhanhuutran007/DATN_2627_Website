@@ -5,12 +5,17 @@
  * chỉ có thể tự phát hành hồ sơ rủi ro thấp khi admin bật chế độ đó.
  */
 
-import { campaignDurationDays, exceedsMaxDuration, MAX_CAMPAIGN_DURATION_DAYS } from "./campaign-duration";
+import {
+  campaignDurationDays,
+  draftDurationProblem,
+  MAX_CAMPAIGN_DURATION_DAYS,
+  REVIEW_BUFFER_DAYS,
+} from "./campaign-duration";
 
-export const SCREENING_RULES_VERSION = "2026.11-r2";
+export const SCREENING_RULES_VERSION = "2026.11-r3";
 
 export type ScreeningLevel = "low" | "medium" | "high";
-/** `auto_approve`: đủ điều kiện tự phát hành; `manual_review`: admin xét; `needs_info`: nên yêu cầu bổ sung. */
+/** `auto_approve`: đủ điều kiện tự duyệt (chủ dự án vẫn tự bấm phát hành); `manual_review`: admin xét; `needs_info`: nên yêu cầu bổ sung. */
 export type ScreeningRecommendation = "auto_approve" | "manual_review" | "needs_info";
 export type ScreeningCheckKey = "completeness" | "verification" | "content" | "risk";
 export type ScreeningStatus = "pass" | "warn" | "fail";
@@ -166,9 +171,14 @@ function checkCompleteness(input: ScreeningInput): ScreeningCheck {
   if (campaign.endDate.getTime() <= now.getTime()) {
     findings.push({ status: "fail", message: "Ngày kết thúc gây quỹ đã qua.", points: 10 });
   } else {
-    const days = Math.round(campaignDurationDays(campaign.endDate, campaign.startDate, now));
-    if (exceedsMaxDuration(campaign.endDate, campaign.startDate, now)) {
-      findings.push({ status: "fail", message: `Thời gian gây quỹ ${days} ngày, vượt tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày.`, points: 10 });
+    // Chưa phát hành: thời hạn tính tới lúc phát hành, nên cho phép thêm số ngày dự trù chờ duyệt.
+    const days = Math.round(campaignDurationDays(campaign.endDate, null, now));
+    if (draftDurationProblem(campaign.endDate, now) === "too_long") {
+      findings.push({
+        status: "fail",
+        message: `Ngày kết thúc cách hôm nay ${days} ngày, vượt tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày gây quỹ (+${REVIEW_BUFFER_DAYS} ngày chờ duyệt).`,
+        points: 10,
+      });
     }
   }
   return makeCheck("completeness", "Đủ thông tin bắt buộc", findings);

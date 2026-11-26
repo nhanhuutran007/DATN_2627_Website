@@ -242,9 +242,19 @@ function waitingLabel(value: string): string {
   return days <= 0 ? "hôm nay" : `${days} ngày trước`;
 }
 
+/** Cam kết với chủ dự án: hồ sơ được phản hồi trong 24–48 giờ (khớp `REVIEW_SLA_HOURS` ở backend). */
+const REVIEW_SLA_HOURS = 48;
+
+/** Hồ sơ chờ duyệt quá thời hạn cam kết. */
+function reviewOverdue(campaign: AdminCampaign): boolean {
+  if (campaign.status !== "pending") return false;
+  const since = campaign.submittedAt ?? campaign.createdAt;
+  return Boolean(since) && Date.now() - new Date(since as string).getTime() > REVIEW_SLA_HOURS * 3_600_000;
+}
+
 /** Chiến dịch chưa gây quỹ mà sắp tới (≤ 7 ngày) hoặc đã qua ngày kết thúc: cần duyệt gấp. */
 function endDateWarning(campaign: AdminCampaign): string | null {
-  if (!["pending", "needs_info", "approved"].includes(campaign.status)) return null;
+  if (!["pending", "needs_info"].includes(campaign.status)) return null;
   const days = Math.ceil((new Date(campaign.endDate).getTime() - Date.now()) / DAY_MS);
   if (days <= 0) return "Đã quá ngày kết thúc";
   return days <= 7 ? `Còn ${days} ngày` : null;
@@ -734,19 +744,18 @@ export function AdminDashboard() {
       if (!result) return;
       reason = result.value;
     } else {
-      // Duyệt = hiện công khai; kích hoạt/cho tiếp tục = bắt đầu nhận tiền: hỏi lại trước khi áp dụng.
-      const resuming = status === "active" && campaign.status === "paused";
+      // Duyệt = cho phép chủ dự án phát hành; cho tiếp tục = nhận tiền trở lại: hỏi lại trước khi áp dụng.
       const confirmed = await dialog.confirm(
         status === "approved"
           ? {
             title: campaign.status === "needs_info" ? "Duyệt lại chiến dịch" : "Duyệt chiến dịch",
-            message: <>Chiến dịch <b>{campaign.title}</b> sẽ hiển thị công khai trên trang khám phá. Chiến dịch chỉ nhận ủng hộ sau khi được kích hoạt.</>,
+            message: <>Chủ dự án sẽ được báo và tự bấm <b>Phát hành</b> để đưa <b>{campaign.title}</b> lên trang khám phá. Thời gian gây quỹ tính từ lúc phát hành.</>,
             confirmLabel: "Duyệt",
           }
           : {
-            title: resuming ? "Cho chiến dịch tiếp tục" : "Kích hoạt chiến dịch",
-            message: <>Chiến dịch <b>{campaign.title}</b> sẽ {resuming ? "nhận ủng hộ trở lại" : "bắt đầu nhận ủng hộ"} ngay sau khi xác nhận.</>,
-            confirmLabel: resuming ? "Cho tiếp tục" : "Kích hoạt",
+            title: "Cho chiến dịch tiếp tục",
+            message: <>Chiến dịch <b>{campaign.title}</b> sẽ nhận ủng hộ trở lại ngay sau khi xác nhận.</>,
+            confirmLabel: "Cho tiếp tục",
           },
       );
       if (!confirmed) return;
@@ -1217,14 +1226,9 @@ export function AdminDashboard() {
         </div>
       );
     }
+    // Phát hành là quyền của chủ dự án (POST /campaigns/:id/publish); admin chỉ duyệt.
     if (campaign.status === "approved") {
-      return (
-        <div className="admin-actions">
-          <button className="approve" type="button" disabled={disabled} onClick={() => handleModerate(campaign, "active")}>
-            Kích hoạt
-          </button>
-        </div>
-      );
+      return <span className="table-muted">Chờ chủ dự án phát hành</span>;
     }
     // Server chỉ cho needs_info quay lại pending khi chủ dự án sửa và gửi duyệt lại
     // (MODERATE_TRANSITIONS), nên admin không có thao tác ở trạng thái này.
@@ -1574,7 +1578,7 @@ export function AdminDashboard() {
                       <td>
                         <b>{campaign.title}</b>
                         {campaign.isFeatured && <span className="tag tag-amber featured-tag">Nổi bật</span>}
-                        {(campaign.isFeatured || ["approved", "active", "success"].includes(campaign.status)) && (
+                        {(campaign.isFeatured || ["active", "success"].includes(campaign.status)) && (
                           <button
                             className="link-inline table-sub-action"
                             type="button"
@@ -1614,7 +1618,9 @@ export function AdminDashboard() {
                         {awaitingReview ? (
                           <>
                             {formatDate(campaign.submittedAt ?? campaign.createdAt ?? campaign.startDate)}
-                            <small className="table-cell-note">{waitingLabel(campaign.submittedAt ?? campaign.createdAt ?? campaign.startDate)}</small>
+                            <small className={`table-cell-note${reviewOverdue(campaign) ? " is-urgent" : ""}`}>
+                              {reviewOverdue(campaign) ? `Quá ${REVIEW_SLA_HOURS} giờ` : waitingLabel(campaign.submittedAt ?? campaign.createdAt ?? campaign.startDate)}
+                            </small>
                           </>
                         ) : (
                           money(campaign.currentAmount)

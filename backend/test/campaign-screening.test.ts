@@ -125,7 +125,7 @@ describe("campaign screening rules", () => {
 
 describe("CampaignsService — duyệt tự động khi gửi hồ sơ", () => {
   function setup(mode: "manual_all" | "auto_low_risk", recommendation: "auto_approve" | "manual_review") {
-    const campaign: any = { id: "c1", ownerId: "owner-1", title: "Sửa thư viện", status: CampaignStatus.DRAFT };
+    const campaign: any = { id: "c1", ownerId: "owner-1", title: "Sửa thư viện", status: CampaignStatus.DRAFT, endDate: new Date(Date.now() + 30 * 86_400_000) };
     const updates: any[] = [];
     const repo: any = {
       findOne: async () => campaign,
@@ -156,10 +156,11 @@ describe("CampaignsService — duyệt tự động khi gửi hồ sơ", () => {
     equal(marked.length, 0);
   });
 
-  it("chế độ tự duyệt rủi ro thấp: hồ sơ đủ điều kiện được phát hành, ghi audit hệ thống và báo chủ dự án", async () => {
-    const { service, owner, marked, audit, notifier } = setup("auto_low_risk", "auto_approve");
+  it("chế độ tự duyệt rủi ro thấp: hồ sơ đủ điều kiện được duyệt (chưa phát hành), ghi audit hệ thống và báo chủ dự án", async () => {
+    const { service, owner, marked, audit, notifier, updates } = setup("auto_low_risk", "auto_approve");
     const saved = await service.submitForReview("c1", owner);
-    equal(saved.status, CampaignStatus.ACTIVE);
+    equal(saved.status, CampaignStatus.APPROVED);
+    deepEqual(updates[0].patch, { status: CampaignStatus.APPROVED });
     deepEqual(marked, ["c1"]);
     const entry = audit.entries.find((e) => e.action === "campaign.auto_approve");
     ok(entry);

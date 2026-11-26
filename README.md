@@ -149,6 +149,8 @@ Vai trò trong hệ thống: `user` (người tài trợ), `campaign_owner` (ch�
 
 Mọi chuyển trạng thái được kiểm tra ở server theo ma trận cho phép. Mỗi thay đổi đều ghi nhật ký kiểm toán (thời điểm, người thực hiện, giá trị trước/sau).
 
+Quản trị viên chỉ **duyệt** (cam kết phản hồi trong 24–48 giờ); **chủ dự án tự bấm "Phát hành"** khi sẵn sàng (`POST /campaigns/:id/publish`). Chiến dịch "Đã duyệt" chưa công khai. Thời gian gây quỹ 7–60 ngày **tính từ lúc phát hành**; khi chọn ngày kết thúc lúc tạo hồ sơ, chủ dự án dự trù thêm 2–3 ngày chờ duyệt (gửi duyệt cần ngày kết thúc cách hôm nay 10–63 ngày) và được chọn lại ngày kết thúc khi phát hành nếu duyệt lâu.
+
 ```mermaid
 stateDiagram-v2
     [*] --> BanNhap
@@ -162,7 +164,7 @@ stateDiagram-v2
     ChoDuyet --> TuChoi: Từ chối kèm lý do
     TuChoi: Bị từ chối
     DaDuyet: Đã duyệt
-    DaDuyet --> DangGayQuy: Phát hành
+    DaDuyet --> DangGayQuy: Chủ dự án phát hành
     DangGayQuy: Đang gây quỹ
     DangGayQuy --> TamDung: Có căn cứ tạm dừng
     TamDung: Tạm dừng
@@ -429,7 +431,7 @@ cd backend
 cd backend; ..\scripts\npm-local.cmd run test:coverage   # unit test backend kèm độ phủ mã
 ```
 
-Lần chạy ngày 25/11/2026 (sau khi thêm cài đặt email, giới hạn 60 ngày và phần AI học nội dung): backend 678 test, frontend 36 test, AI service 49 test đều đạt; typecheck, ESLint, Ruff và build không báo lỗi. Lần chạy trước (23/11/2026): backend 621 test; AI service 34 test (17/11/2026, Ruff không báo lỗi). Độ phủ của unit test backend (đo ngày 14/11/2026) là 89,1% dòng lệnh, 79,3% nhánh và 83,3% hàm, tính trên các file được test nạp vào (service, guard, DTO); phần lớn controller được kiểm tra qua smoke test và kiểm thử thủ công nên không nằm trong phép đo này.
+Lần chạy ngày 26/11/2026 (sau khi đổi luồng duyệt/phát hành): backend 721 test, frontend 37 test đều đạt; typecheck và ESLint không báo lỗi (chưa build lại, AI service không đổi). Lần chạy 25/11/2026: backend 678 test, frontend 36 test, AI service 49 test đều đạt; typecheck, ESLint, Ruff và build không báo lỗi. Lần chạy trước (23/11/2026): backend 621 test; AI service 34 test (17/11/2026, Ruff không báo lỗi). Độ phủ của unit test backend (đo ngày 14/11/2026) là 89,1% dòng lệnh, 79,3% nhánh và 83,3% hàm, tính trên các file được test nạp vào (service, guard, DTO); phần lớn controller được kiểm tra qua smoke test và kiểm thử thủ công nên không nằm trong phép đo này.
 
 **Kết quả kiểm thử thủ công (đợt 14–16/11/2026):**
 
@@ -579,12 +581,23 @@ DATN_2627_Website/
   - Notebook huấn luyện thêm **mô hình riêng cho Giáo dục** trên DonorsChoose (dự án đủ tiền / hết hạn), so với mô hình Kickstarter trên cùng tập kiểm tra; chưa đưa vào ai-service, chờ kết quả chạy Colab.
   - Dữ liệu mẫu đủ trường hợp (`npm run seed:coverage`): đủ 25/25 lĩnh vực, đủ trạng thái chiến dịch (kể cả bị từ chối, bị hủy), yêu cầu hoàn tiền và báo cáo vi phạm đang chờ, ví có đủ kiểu yêu cầu rút. Tài liệu báo cáo gom về `Document/` (đề cương, bộ test case, wireframe, sơ đồ kiến trúc, kịch bản thuyết trình).
 
-_Cập nhật lần cuối: 25/11/2026._
+- Cam kết trả sau và giải ngân (25/11/2026, migration `1790000000032`–`1790000000036` cần chạy khi deploy):
+  - **Ủng hộ chỉ tạo cam kết, chưa thu tiền** (như Kickstarter): khi dự án đạt mục tiêu, cam kết chuyển sang chờ thanh toán, người ủng hộ được báo qua thông báo/email để trả bằng QR SePay trong 7 ngày (nhắc 1 lần trước 2 ngày); quá hạn thì cam kết hết hiệu lực và bị trừ khỏi tổng; dự án thất bại thì cam kết được nhả. Ví Góp Mầm, Stripe và ví demo không nhận khoản ủng hộ mới (ví ẩn nhưng giữ lại, bật nạp bằng `WALLET_TOPUP_ENABLED`).
+  - **Tài khoản nhận tiền theo chiến dịch**: bước riêng trong form tạo chiến dịch, bắt buộc trước khi gửi duyệt, lưu/đổi cần OTP. Mỗi tài khoản người dùng có thêm tài khoản ngân hàng mặc định (Cài đặt › Tài khoản), tự điền vào bước nhận tiền và form hoàn tiền.
+  - **Giải ngân một lần**: tab "Giải ngân" của admin liệt kê dự án thành công (đã thu / còn thiếu, tài khoản nhận); ghi mã chuyển khoản + chứng từ (cần OTP), báo chủ dự án; sau giải ngân không hoàn tiền được nữa.
+  - **Luật cam kết**: mỗi chiến dịch 1 cam kết mở, tối đa 5 chiến dịch cùng lúc (2 với tài khoản dưới 30 ngày), phải xác minh email; bỏ cam kết nhiều lần trong 12 tháng thì cảnh báo → giới hạn → khóa tài khoản. Trang dự án hiện tỷ lệ người ủng hộ từng trả tiền đúng hạn.
+  - **Dò tài khoản clone** cho admin: trùng IP/tài khoản ngân hàng với chủ dự án, nhiều người ủng hộ chung IP, tài khoản mới chỉ ủng hộ một chiến dịch, cam kết dồn dập, tỷ lệ bỏ cam kết cao (luật ở ai-service, có dự phòng ở backend, quét 6 giờ/lần); hộp "Tài khoản nghi vấn" để hủy cam kết và khóa tài khoản.
+- Duyệt và phát hành theo kiểu Kickstarter (26/11/2026, không cần migration):
+  - Quản trị viên chỉ duyệt, không kích hoạt thay; hàng đợi gắn nhãn "Quá 48 giờ" cho hồ sơ chờ quá hạn cam kết. Chế độ tự duyệt rủi ro thấp chỉ chuyển sang "Đã duyệt", không tự phát hành.
+  - Chủ dự án bấm **Phát hành** ở Trang của tôi (chọn lại ngày kết thúc được); chiến dịch "Đã duyệt" không hiện ở trang công khai, lượt xem, bình luận, sổ cái, theo dõi, báo cáo, trang tổ chức và mục nổi bật. Bài cập nhật và kế hoạch mốc soạn được ngay từ khi được duyệt.
+  - Thời gian gây quỹ 7–60 ngày tính từ lúc phát hành (trước là từ 1 tháng tính từ lúc tạo); ô ngày kết thúc nhắc dự trù thêm 2–3 ngày chờ duyệt và ước tính số ngày gây quỹ; gợi ý thời hạn của AI trừ đi thời gian chờ duyệt.
+
+_Cập nhật lần cuối: 26/11/2026._
 
 ### 15.2. Hạn chế
 
 - Mô hình AI được huấn luyện trên dữ liệu công khai của nền tảng nước ngoài (Kickstarter, DonorsChoose, IEEE-CIS); hiệu năng trên người dùng Việt Nam cần đánh giá lại khi nền tảng có dữ liệu thật.
-- Hoàn tiền khoản SePay phải chuyển khoản thủ công (SePay không có API hoàn tiền); chưa có giải ngân thực tế cho chủ dự án hay chuyển tiền trực tiếp tới tổ chức thụ hưởng.
+- Hoàn tiền khoản SePay phải chuyển khoản thủ công (SePay không có API hoàn tiền); giải ngân cho chủ dự án là admin chuyển khoản thủ công rồi ghi mã chuyển khoản, chưa chuyển tiền tự động hay trực tiếp tới tổ chức thụ hưởng.
 - Xác minh tổ chức dựa trên ảnh giấy phép do quản trị viên đối chiếu thủ công; chưa tra cứu được nguồn dữ liệu đăng ký chính thức.
 - Chưa có kiểm thử đầu-cuối tự động; 23 test case thủ công của nhóm tương tác cộng đồng và kiểm duyệt chưa chạy.
 - Chống trùng ảnh giấy phép tổ chức chỉ so khớp từng byte (SHA-256): ảnh chụp lại hay cắt/nén khác đi vẫn qua được, quản trị viên vẫn phải đối chiếu bằng mắt. Ảnh tải lên trước ngày 17/11/2026 chưa có dấu vân nên chỉ so được theo đường dẫn.

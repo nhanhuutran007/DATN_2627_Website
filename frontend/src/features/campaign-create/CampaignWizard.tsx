@@ -61,7 +61,7 @@ const STEPS = [
     title: "Tài khoản nhận tiền",
     intro: "Khi dự án thành công, Góp Mầm gom tiền người ủng hộ đã thanh toán và chuyển vào tài khoản này một lần.",
   },
-  { title: "Kiểm tra và gửi duyệt", intro: "Rà soát lần cuối. Hồ sơ chỉ được công khai sau khi quản trị viên duyệt." },
+  { title: "Kiểm tra và gửi duyệt", intro: "Rà soát lần cuối. Quản trị viên duyệt trong 24–48 giờ; sau đó bạn tự bấm Phát hành để công khai dự án." },
 ];
 
 const STEP_BASICS = 0;
@@ -126,28 +126,49 @@ function toDateInput(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Ngày kết thúc sớm nhất cho phép: hôm nay + 1 tháng. */
-function minDeadline() {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 1);
-  return toDateInput(d);
-}
-
-/** Thời gian gây quỹ tối đa (như Kickstarter); khớp `MAX_CAMPAIGN_DURATION_DAYS` ở backend. */
+/**
+ * Thời gian gây quỹ 7–60 ngày (như Kickstarter), tính từ lúc chủ dự án bấm "Phát hành" sau khi được
+ * duyệt; khớp `MIN/MAX_CAMPAIGN_DURATION_DAYS` + `REVIEW_BUFFER_DAYS` ở backend `campaign-duration.ts`.
+ */
+const MIN_DURATION_DAYS = 7;
 const MAX_DURATION_DAYS = 60;
+/** Dự trù thời gian chờ duyệt (admin phản hồi trong 24–48 giờ). */
+const REVIEW_BUFFER_DAYS = 3;
 
-/** Ngày kết thúc muộn nhất cho phép: hôm nay + 60 ngày. */
-function maxDeadline() {
-  const d = new Date();
-  d.setDate(d.getDate() + MAX_DURATION_DAYS);
-  return toDateInput(d);
-}
-
-/** Ngày kết thúc sau `days` ngày kể từ hôm nay, nằm trong khoảng cho phép (1 tháng – 60 ngày). */
-function deadlineAfter(days: number) {
+function dateAfter(days: number) {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  const value = toDateInput(d);
+  return toDateInput(d);
+}
+
+/** Ngày kết thúc sớm nhất: còn đủ 7 ngày gây quỹ sau 3 ngày chờ duyệt. */
+function minDeadline() {
+  return dateAfter(MIN_DURATION_DAYS + REVIEW_BUFFER_DAYS);
+}
+
+/** Ngày kết thúc muộn nhất: 60 ngày gây quỹ + 3 ngày chờ duyệt. */
+function maxDeadline() {
+  return dateAfter(MAX_DURATION_DAYS + REVIEW_BUFFER_DAYS);
+}
+
+/** Số ngày gây quỹ ước tính nếu phát hành sau `REVIEW_BUFFER_DAYS` ngày. */
+function estimatedDuration(deadline: string): number | null {
+  if (!deadline) return null;
+  const end = new Date(`${deadline}T23:59:59`).getTime();
+  if (Number.isNaN(end)) return null;
+  const publishAt = new Date();
+  publishAt.setDate(publishAt.getDate() + REVIEW_BUFFER_DAYS);
+  return Math.floor((end - publishAt.getTime()) / 86_400_000);
+}
+
+function formatDay(value: string) {
+  const [y, m, d] = value.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/** Ngày kết thúc để gây quỹ `days` ngày sau khi phát hành (đã cộng thời gian chờ duyệt), trong khoảng cho phép. */
+function deadlineAfter(days: number) {
+  const value = dateAfter(days + REVIEW_BUFFER_DAYS);
   if (value < minDeadline()) return minDeadline();
   return value > maxDeadline() ? maxDeadline() : value;
 }
@@ -440,8 +461,12 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
     if (index === STEP_GOAL) {
       if (target < MIN_TARGET) return "Mục tiêu tối thiểu là 1.000.000 ₫.";
       if (!draft.deadline) return "Vui lòng chọn ngày kết thúc gây quỹ.";
-      if (draft.deadline < minDeadline()) return "Ngày kết thúc phải cách hôm nay ít nhất 1 tháng.";
-      if (draft.deadline > maxDeadline()) return `Thời gian gây quỹ tối đa ${MAX_DURATION_DAYS} ngày.`;
+      if (draft.deadline < minDeadline()) {
+        return `Ngày kết thúc phải từ ${formatDay(minDeadline())} trở đi (tối thiểu ${MIN_DURATION_DAYS} ngày gây quỹ + ${REVIEW_BUFFER_DAYS} ngày chờ duyệt).`;
+      }
+      if (draft.deadline > maxDeadline()) {
+        return `Ngày kết thúc muộn nhất là ${formatDay(maxDeadline())} (tối đa ${MAX_DURATION_DAYS} ngày gây quỹ + ${REVIEW_BUFFER_DAYS} ngày chờ duyệt).`;
+      }
     }
     if (index === STEP_IMAGE) {
       if (draft.imageUrl.trim() && !isImageValue(draft.imageUrl.trim())) return "Link ảnh phải bắt đầu bằng http:// hoặc https://";
@@ -646,7 +671,10 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
           <div className="create-body create-done" aria-live="polite">
             <span className="done-icon"><Icon name="check" size={30} /></span>
             <h2>Đã gửi hồ sơ, đang chờ kiểm duyệt</h2>
-            <p>Quản trị viên sẽ duyệt, yêu cầu bổ sung hoặc từ chối kèm lý do. Bạn theo dõi trạng thái trong trang quản lý.</p>
+            <p>
+              Quản trị viên sẽ phản hồi trong 24–48 giờ: duyệt, yêu cầu bổ sung hoặc từ chối kèm lý do. Khi được duyệt,
+              bạn tự bấm <b>Phát hành</b> trong trang quản lý để dự án hiện công khai — thời gian gây quỹ bắt đầu tính từ lúc đó.
+            </p>
             <div className="wizard-done-actions">
               <Link className="button button-primary" href="/dashboard">Về trang quản lý</Link>
               <Link className="button button-outline" href={`/du-an/${campaignId}`}>Xem hồ sơ</Link>
@@ -760,8 +788,31 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                   </div>
                   <div className="create-q">
                     <label htmlFor="create-deadline">Khi nào kết thúc gây quỹ?</label>
-                    <p>Từ 1 tháng đến {MAX_DURATION_DAYS} ngày kể từ hôm nay.</p>
-                    <input id="create-deadline" type="date" min={minDeadline()} max={maxDeadline()} value={draft.deadline} onChange={(e) => update("deadline", e.target.value)} />
+                    <p>
+                      Gây quỹ từ {MIN_DURATION_DAYS} đến {MAX_DURATION_DAYS} ngày, tính từ lúc bạn bấm <b>Phát hành</b> sau khi hồ sơ được duyệt.
+                      Chọn ngày từ {formatDay(minDeadline())} đến {formatDay(maxDeadline())}.
+                    </p>
+                    <input
+                      id="create-deadline"
+                      type="date"
+                      min={minDeadline()}
+                      max={maxDeadline()}
+                      value={draft.deadline}
+                      aria-describedby="create-deadline-note"
+                      onChange={(e) => update("deadline", e.target.value)}
+                    />
+                    <p className="create-deadline-note" id="create-deadline-note">
+                      <Icon name="clock" size={15} />
+                      <span>
+                        Quản trị viên duyệt hồ sơ trong 24–48 giờ, vì vậy hãy <b>dự trù thêm 2–3 ngày</b> chờ duyệt khi chọn ngày kết thúc.
+                        {(() => {
+                          const days = estimatedDuration(draft.deadline);
+                          return days !== null && days > 0
+                            ? ` Nếu phát hành sau ${REVIEW_BUFFER_DAYS} ngày, dự án sẽ gây quỹ khoảng ${days} ngày.`
+                            : "";
+                        })()}
+                      </span>
+                    </p>
                   </div>
                   {user && (
                     <DurationEstimatePanel
@@ -771,6 +822,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                       deadline={draft.deadline}
                       title={draft.title}
                       onUseDuration={(days) => update("deadline", deadlineAfter(days))}
+                      startOffsetDays={REVIEW_BUFFER_DAYS}
                     />
                   )}
                 </>

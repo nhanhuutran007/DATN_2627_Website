@@ -49,7 +49,6 @@ const ACTIVE_STATUSES = [
  * và tổng đã huy động trên trang tổ chức phải khớp đúng các chiến dịch người xem thấy.
  */
 const PUBLISHED_CAMPAIGN_STATUSES = [
-  CampaignStatus.APPROVED,
   CampaignStatus.ACTIVE,
   CampaignStatus.SUCCESS,
   CampaignStatus.ENDED,

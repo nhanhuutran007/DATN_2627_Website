@@ -21,7 +21,6 @@ const DAY_MS = 86_400_000;
 
 /** Chiến dịch công khai mới được đếm lượt xem. */
 const VIEWABLE_STATUSES = [
-  CampaignStatus.APPROVED,
   CampaignStatus.ACTIVE,
   CampaignStatus.PAUSED,
   CampaignStatus.SUCCESS,

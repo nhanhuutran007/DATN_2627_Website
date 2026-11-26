@@ -16006,6 +16006,70 @@ html:has(dialog:modal) .admin-sidebar {
   margin: 0;
 }
 
+/* ---------- Chủ dự án tự phát hành chiến dịch đã duyệt ---------- */
+.publish-panel {
+  display: grid;
+  gap: 8px;
+  max-width: 520px;
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid var(--line, #e5e5e5);
+  border-radius: 16px;
+  background: #f7fbf8;
+}
+
+.publish-panel p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.publish-panel label {
+  font-weight: 700;
+}
+
+.publish-panel input[type="date"] {
+  width: 100%;
+  max-width: 260px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line, #d0d0d0);
+  border-radius: 10px;
+  font: inherit;
+}
+
+.publish-panel small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.publish-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Ghi chú dự trù thời gian chờ duyệt dưới ô ngày kết thúc (wizard tạo chiến dịch). */
+.create-q > .create-deadline-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7e8;
+  color: #6b4a00;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.create-deadline-note svg {
+  flex: none;
+  margin-top: 2px;
+}
+
 /* ---------- Cam kết trả sau: các bước thanh toán ở form ủng hộ ---------- */
 .donate-section-title {
   margin: 0 0 10px;

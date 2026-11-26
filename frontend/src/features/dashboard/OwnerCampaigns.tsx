@@ -6,6 +6,7 @@ import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { CampaignStatsPanel } from "@/features/campaign-stats/CampaignStatsPanel";
 import { PayoutAccountPanel } from "@/features/dashboard/PayoutAccountPanel";
+import { PublishCampaignPanel } from "@/features/dashboard/PublishCampaignPanel";
 import { PostManager } from "@/features/posts/PostManager";
 import { ProgressManager } from "@/features/progress/ProgressManager";
 import { RewardManager } from "@/features/rewards/RewardManager";
@@ -18,7 +19,7 @@ const STATUS: Record<ApiCampaignStatus, { label: string; tone: string }> = {
   pending: { label: "Chờ duyệt", tone: "tag-amber" },
   needs_info: { label: "Cần bổ sung", tone: "tag-amber" },
   rejected: { label: "Bị từ chối", tone: "tag-red" },
-  approved: { label: "Đã duyệt", tone: "tag-blue" },
+  approved: { label: "Đã duyệt · chờ phát hành", tone: "tag-blue" },
   active: { label: "Đang gây quỹ", tone: "tag-green" },
   paused: { label: "Tạm dừng", tone: "tag-red" },
   success: { label: "Đạt mục tiêu", tone: "tag-green" },
@@ -29,7 +30,9 @@ const STATUS: Record<ApiCampaignStatus, { label: string; tone: string }> = {
 
 const EDITABLE: ApiCampaignStatus[] = ["draft", "rejected", "needs_info"];
 /** Đã phát hành → có lượt xem/giao dịch để thống kê. */
-const PUBLISHED: ApiCampaignStatus[] = ["approved", "active", "paused", "success", "failed", "ended"];
+const PUBLISHED: ApiCampaignStatus[] = ["active", "paused", "success", "failed", "ended"];
+/** Chuẩn bị được bài cập nhật và kế hoạch mốc từ khi được duyệt (trước khi phát hành). */
+const PREPARABLE: ApiCampaignStatus[] = ["approved", ...PUBLISHED];
 const DAY_MS = 86_400_000;
 
 type Task = { key: string; icon: IconName; text: string; href: string };
@@ -43,6 +46,12 @@ function buildTasks(campaigns: ApiCampaign[]): Task[] {
     }
     if (c.status === "needs_info") {
       tasks.push({ key: `${c.id}-info`, icon: "message", text: `Quản trị viên yêu cầu bổ sung cho “${c.title}”.`, href: "#chien-dich" });
+    }
+    if (c.status === "approved") {
+      tasks.push({ key: `${c.id}-publish`, icon: "check", text: `“${c.title}” đã được duyệt — bấm Phát hành khi bạn sẵn sàng mở gây quỹ.`, href: "#chien-dich" });
+    }
+    if (c.status === "pending") {
+      tasks.push({ key: `${c.id}-pending`, icon: "clock", text: `“${c.title}” đang chờ duyệt (thường trong 24–48 giờ).`, href: "#chien-dich" });
     }
     if (c.status === "paused") {
       tasks.push({ key: `${c.id}-paused`, icon: "shield", text: `“${c.title}” đang bị tạm dừng, xem lý do để giải trình.`, href: "#chien-dich" });
@@ -66,7 +75,7 @@ type OwnerCampaignsProps = {
   reload: () => Promise<void>;
 };
 
-type PanelKind = "stats" | "posts" | "progress" | "rewards" | "payout";
+type PanelKind = "stats" | "posts" | "progress" | "rewards" | "payout" | "publish";
 type OpenPanel = { id: string; kind: PanelKind };
 
 /** Khu vực chủ dự án: số liệu tổng, danh sách chiến dịch và việc cần làm. */
@@ -107,7 +116,7 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
       if (action === "submit") await submitCampaign(campaign.id);
       else await deleteCampaign(campaign.id);
       await reload();
-      setMessage({ tone: "ok", text: action === "submit" ? `Đã gửi “${campaign.title}” để xét duyệt.` : `Đã xóa “${campaign.title}”.` });
+      setMessage({ tone: "ok", text: action === "submit" ? `Đã gửi “${campaign.title}” để xét duyệt. Quản trị viên sẽ phản hồi trong 24–48 giờ.` : `Đã xóa “${campaign.title}”.` });
     } catch (err) {
       setMessage({ tone: "error", text: err instanceof ApiError ? err.message : "Không thực hiện được, vui lòng thử lại." });
     } finally {
@@ -189,6 +198,16 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
                     Xóa
                   </button>
                 )}
+                {c.status === "approved" && (
+                  <button
+                    className="button button-primary button-sm"
+                    type="button"
+                    aria-expanded={isOpen(c.id, "publish")}
+                    onClick={() => toggle(c.id, "publish")}
+                  >
+                    Phát hành
+                  </button>
+                )}
                 {PUBLISHED.includes(c.status) && (
                   <button
                     className="button button-ghost button-sm"
@@ -199,7 +218,7 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
                     Số liệu
                   </button>
                 )}
-                {PUBLISHED.includes(c.status) && (
+                {PREPARABLE.includes(c.status) && (
                   <button
                     className="button button-ghost button-sm"
                     type="button"
@@ -209,7 +228,7 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
                     Bài cập nhật
                   </button>
                 )}
-                {PUBLISHED.includes(c.status) && (
+                {PREPARABLE.includes(c.status) && (
                   <button
                     className="button button-ghost button-sm"
                     type="button"
@@ -236,6 +255,17 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
                   Tài khoản nhận tiền
                 </button>
               </div>
+              {isOpen(c.id, "publish") && (
+                <PublishCampaignPanel
+                  campaign={c}
+                  onCancel={() => setPanel(null)}
+                  onPublished={async () => {
+                    setPanel(null);
+                    await reload();
+                    setMessage({ tone: "ok", text: `Đã phát hành “${c.title}”. Dự án đã hiện công khai và bắt đầu nhận ủng hộ.` });
+                  }}
+                />
+              )}
               {isOpen(c.id, "stats") && <CampaignStatsPanel campaignId={c.id} />}
               {isOpen(c.id, "posts") && <PostManager campaignId={c.id} />}
               {isOpen(c.id, "progress") && <ProgressManager campaignId={c.id} readOnly={c.status === "failed"} />}

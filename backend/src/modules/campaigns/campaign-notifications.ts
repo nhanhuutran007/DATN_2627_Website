@@ -32,7 +32,7 @@ export function campaignStatusNotifications(
 
   switch (next) {
     case CampaignStatus.APPROVED:
-      return { owner: owner(NotificationType.CAMPAIGN_APPROVED, "Chiến dịch đã được duyệt", `Chiến dịch ${name} đã được quản trị viên duyệt và sẽ sớm được phát hành.`) };
+      return { owner: owner(NotificationType.CAMPAIGN_APPROVED, "Chiến dịch đã được duyệt", `Chiến dịch ${name} đã được duyệt. Vào Bảng điều khiển và bấm "Phát hành" khi bạn sẵn sàng mở gây quỹ — thời gian gây quỹ tính từ lúc phát hành.`) };
     case CampaignStatus.ACTIVE:
       if (previous === CampaignStatus.PAUSED) {
         return {

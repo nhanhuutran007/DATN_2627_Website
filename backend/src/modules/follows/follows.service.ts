@@ -13,7 +13,6 @@ import { CampaignFollow } from "./entities/campaign-follow.entity";
 
 /** Chiến dịch người dùng nhìn thấy được (xem số người theo dõi). */
 const VISIBLE_STATUSES = [
-  CampaignStatus.APPROVED,
   CampaignStatus.ACTIVE,
   CampaignStatus.PAUSED,
   CampaignStatus.SUCCESS,
@@ -27,7 +26,7 @@ const HOUR_MS = 3_600_000;
 const REMINDER_BATCH = 200;
 
 /** Chỉ theo dõi mới được khi chiến dịch còn đang diễn ra. */
-const FOLLOWABLE_STATUSES = [CampaignStatus.APPROVED, CampaignStatus.ACTIVE, CampaignStatus.PAUSED];
+const FOLLOWABLE_STATUSES = [CampaignStatus.ACTIVE, CampaignStatus.PAUSED];
 
 export type FollowStatus = { following: boolean; followerCount: number };
 

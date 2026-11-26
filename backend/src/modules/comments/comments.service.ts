@@ -27,7 +27,6 @@ import { Report, ReportStatus } from "../moderation/entities/report.entity";
 
 /** Bình luận được trên chiến dịch đã công khai (người dùng nhìn thấy được). */
 export const COMMENTABLE_STATUSES = [
-  CampaignStatus.APPROVED,
   CampaignStatus.ACTIVE,
   CampaignStatus.PAUSED,
   CampaignStatus.SUCCESS,

@@ -30,7 +30,6 @@ export const MAX_TIERS_PER_CAMPAIGN = 10;
 
 /** Chiến dịch đã công khai: ai cũng xem được mức quà. */
 const PUBLIC_STATUSES = [
-  CampaignStatus.APPROVED,
   CampaignStatus.ACTIVE,
   CampaignStatus.PAUSED,
   CampaignStatus.SUCCESS,

@@ -2,7 +2,7 @@ import type { ApiCampaignStatus } from "@/lib/api/campaigns";
 
 export type CampaignStatus =
   | "Đang gây quỹ"
-  | "Sắp mở gây quỹ"
+  | "Chờ phát hành"
   | "Sắp kết thúc"
   | "Mới phát hành"
   | "Đã đạt mục tiêu"
@@ -387,7 +387,7 @@ export function campaignTimeLabel(campaign: Campaign): string {
     if (campaign.daysLeft > 1) return `Còn ${campaign.daysLeft.toLocaleString("vi-VN")} ngày`;
     return campaign.daysLeft === 1 ? "Còn 1 ngày" : "Ngày cuối";
   }
-  if (campaign.status === "Sắp mở gây quỹ") return "Sắp mở";
+  if (campaign.status === "Chờ phát hành") return "Chờ phát hành";
   if (campaign.status === "Tạm dừng") return "Tạm dừng";
   return "Đã kết thúc";
 }

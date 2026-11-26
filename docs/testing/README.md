@@ -83,7 +83,7 @@ Sau đó kiểm tra qua Nginx tại `http://localhost:8080`:
 Dùng dữ liệu seed (`npm run seed`, mật khẩu chung `Test@123`):
 
 1. Chủ dự án (`owner2@gopmam.com`) tạo chiến dịch qua trình hướng dẫn và gửi duyệt.
-2. Quản trị viên (`admin@gopmam.com`) duyệt hồ sơ rồi kích hoạt.
+2. Quản trị viên (`admin@gopmam.com`) duyệt hồ sơ; chủ dự án bấm "Phát hành" ở Trang của tôi.
 3. Người ủng hộ (`user1@gopmam.com`) ủng hộ bằng ví demo, xem biên nhận.
 4. Gửi webhook thanh toán có chữ ký đúng và chữ ký sai bằng `npm run sign-webhook` (backend) để kiểm tra xác minh HMAC và chống gửi lặp.
 5. Chủ dự án đăng cập nhật tiến độ kèm khoản chi và chứng từ; người ủng hộ nhận thông báo.

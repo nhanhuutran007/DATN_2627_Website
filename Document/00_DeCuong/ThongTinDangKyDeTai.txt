@@ -1,0 +1,87 @@
+TÊN ĐỀ TÀI
+Xây dựng nền tảng gây quỹ cộng đồng cho các dự án xã hội và khởi nghiệp – tích hợp trí tuệ nhân tạo trong gợi ý dự án, dự đoán khả năng thành công và phát hiện gian lận (Góp Mầm)
+
+
+==================================================
+1. NỘI DUNG ĐỀ TÀI
+==================================================
+
+Gây quỹ cộng đồng (crowdfunding) giúp các nhóm khởi nghiệp, tổ chức xã hội, câu lạc bộ sinh viên và cá nhân có sáng kiến tiếp cận nguồn vốn từ nhiều người ủng hộ thay vì phụ thuộc vào một nhà đầu tư. Tuy nhiên, các nền tảng hiện nay còn tồn tại một số vấn đề: người ủng hộ khó tìm được dự án phù hợp giữa số lượng chiến dịch lớn; chủ dự án thiếu công cụ đánh giá khả năng đạt mục tiêu trước khi phát hành; quản trị viên phải xử lý rủi ro từ thông tin sai lệch và giao dịch bất thường; việc sử dụng tiền sau khi gây quỹ thường thiếu minh bạch.
+
+Đề tài xây dựng một website gây quỹ cộng đồng hỗ trợ toàn bộ vòng đời chiến dịch: khởi tạo – xét duyệt – kêu gọi ủng hộ – thanh toán – giải ngân – cập nhật tiến độ và minh bạch nguồn quỹ – báo cáo, đồng thời tích hợp ba mô-đun trí tuệ nhân tạo hỗ trợ ra quyết định. Các nội dung chính gồm:
+
+1) Quản lý tài khoản và phân quyền: đăng ký/đăng nhập bằng email hoặc Google, xác minh email, quên/đổi mật khẩu; phân quyền theo vai trò (khách, người ủng hộ, chủ dự án, quản trị viên) và theo quyền sở hữu; xác thực bổ sung bằng mã OTP qua email cho thao tác nhạy cảm; quản lý phiên đăng nhập bằng JWT có xoay vòng refresh token; ghi nhật ký kiểm toán.
+
+2) Quản lý chiến dịch gây quỹ: tạo chiến dịch theo từng bước (thông tin cơ bản, lĩnh vực, hình ảnh/video, câu chuyện, mục tiêu tài chính, thời hạn tối đa 60 ngày, kế hoạch và các mốc chi tiêu, mức quà tặng, tài khoản nhận giải ngân); vòng đời trạng thái nháp → chờ duyệt ⇄ cần bổ sung → đã duyệt → đang gây quỹ → (tạm dừng) → thành công/không đạt → kết thúc; bảng điều khiển số liệu cho chủ dự án (tiền đã nhận, lượt xem, tỷ lệ chuyển đổi, người theo dõi).
+
+3) Gây quỹ cho tổ chức: tổ chức xã hội đăng ký hồ sơ pháp lý để quản trị viên xác minh; chiến dịch có thể gây quỹ cho tổ chức đã xác minh; tổ chức mời cộng tác viên với quyền hạn riêng.
+
+4) Khám phá và tương tác: trang chủ có dự án nổi bật, tìm kiếm và lọc theo lĩnh vực/trạng thái; trang chi tiết dự án; theo dõi, chia sẻ, bình luận – hỏi đáp, lời động viên, bài cập nhật; báo cáo vi phạm; thông báo trong hệ thống và qua email; hộp hỏi đáp hỗ trợ người dùng.
+
+5) Ủng hộ và quản lý giao dịch theo mô hình "tất cả hoặc không": người ủng hộ cam kết số tiền (có thể chọn mức quà); khi chiến dịch đạt mục tiêu, người ủng hộ thanh toán qua mã QR chuyển khoản của cổng SePay; chiến dịch không đạt thì cam kết được giải phóng. Giao dịch dùng khóa chống trùng (idempotency), xác minh chữ ký/khóa bí mật của thông báo từ cổng thanh toán, đối soát giao dịch, biên nhận điện tử, yêu cầu hoàn tiền và giải ngân một lần cho chủ dự án sau khi chiến dịch thành công.
+
+6) Theo dõi tiến độ và minh bạch nguồn quỹ: các mốc công việc có thời hạn và ngân sách; chủ dự án báo cáo chi tiêu kèm chứng từ; tổng chi không vượt số tiền đã huy động; nhắc chủ dự án khi mốc quá hạn; lịch sử thay đổi kế hoạch công khai; điểm minh bạch hiển thị cho cộng đồng.
+
+7) Quản trị hệ thống: tổng quan thống kê; xét duyệt chiến dịch và tổ chức (có sàng lọc tự động theo luật, chấm điểm rủi ro); quản lý người dùng, lĩnh vực, dự án nổi bật; xử lý báo cáo vi phạm, bình luận, hoàn tiền, giải ngân; xem cảnh báo rủi ro; xuất dữ liệu thống kê đã ẩn danh; cấu hình email và thông tin liên hệ hỗ trợ.
+
+8) Các mô-đun trí tuệ nhân tạo (dịch vụ AI độc lập):
+   - Gợi ý dự án phù hợp cho người ủng hộ dựa trên lĩnh vực quan tâm và hành vi (chỉ khi người dùng đồng ý), có phương án dự phòng là danh sách phổ biến.
+   - Dự đoán xác suất chiến dịch đạt mục tiêu từ mục tiêu vốn, thời hạn, lĩnh vực, độ dài tên, thời điểm phát hành và nội dung (video, hình ảnh, độ dài câu chuyện), kèm giải thích các yếu tố ảnh hưởng và gợi ý cải thiện cho chủ dự án.
+   - Phát hiện giao dịch bất thường bằng cách kết hợp luật nghiệp vụ với mô hình học máy, sinh cảnh báo có điểm rủi ro và lý do để quản trị viên xem xét.
+   AI chỉ đóng vai trò hỗ trợ; mọi quyết định khóa, từ chối hay xử lý đều do con người xác nhận.
+
+
+==================================================
+2. PHƯƠNG PHÁP THỰC HIỆN
+==================================================
+
+1) Phương pháp nghiên cứu lý thuyết và khảo sát
+   - Nghiên cứu mô hình gây quỹ cộng đồng, các nền tảng tiêu biểu (GoFundMe, Kickstarter) để xác định quy trình nghiệp vụ, mô hình "tất cả hoặc không" và các yêu cầu về minh bạch.
+   - Xác định tác nhân, yêu cầu chức năng và phi chức năng; xây dựng use case, đặc tả và tiêu chí nghiệm thu.
+   - Nghiên cứu các phương pháp học máy cho bài toán gợi ý, phân loại nhị phân (dự đoán thành công) và phát hiện bất thường.
+
+2) Phương pháp phát triển phần mềm
+   - Áp dụng mô hình lặp và tăng trưởng (Agile/Scrum): chia công việc thành các sprint, mỗi sprint hoàn thành trọn vẹn một nhóm chức năng (cơ sở dữ liệu → API → giao diện → kiểm thử) và có sản phẩm kiểm chứng.
+   - Phân tích thiết kế hướng đối tượng với UML (use case, hoạt động, tuần tự, lớp), thiết kế cơ sở dữ liệu quan hệ (ERD), thiết kế giao diện bằng wireframe, đặc tả API theo chuẩn OpenAPI.
+   - Kiến trúc nhiều lớp gồm ba thành phần giao tiếp qua REST API:
+       + Frontend: Next.js, React, TypeScript – giao diện responsive, render phía máy chủ.
+       + Backend: NestJS, TypeScript, TypeORM – nghiệp vụ, xác thực JWT, phân quyền, giao dịch, thông báo, quản trị.
+       + AI service: Python, FastAPI, scikit-learn, pandas – huấn luyện và cung cấp mô hình.
+     Lưu trữ bằng MySQL 8, bộ nhớ đệm và giới hạn tần suất bằng Redis 7; tích hợp cổng thanh toán SePay, dịch vụ email và lưu trữ tệp qua lớp giao diện (interface) để dễ thay thế nhà cung cấp.
+   - Quản lý cơ sở dữ liệu bằng migration có thứ tự và có rollback; khóa chính UUID; nhật ký kiểm toán cho thay đổi quan trọng.
+   - Quản lý mã nguồn bằng Git/GitHub; đóng gói và triển khai bằng Docker Compose, Nginx; hạ tầng đám mây AWS mô tả bằng Terraform.
+
+3) Phương pháp xây dựng và đánh giá mô hình AI
+   - Thu thập và tiền xử lý dữ liệu công khai: Kickstarter (khoảng 331.000 dự án) cho dự đoán thành công, IEEE-CIS Fraud Detection (khoảng 590.000 giao dịch) cho phát hiện gian lận, DonorsChoose (khoảng 3,5 triệu lượt ủng hộ) cho gợi ý; kết hợp dữ liệu phát sinh trên chính nền tảng.
+   - So sánh mô hình nền (Logistic Regression) với các mô hình Gradient Boosting; chia tập huấn luyện/kiểm thử và kiểm định chéo để hạn chế rò rỉ thông tin.
+   - Đánh giá bằng các chỉ số ROC-AUC, PR-AUC, Brier score, precision/recall theo ngưỡng (dự đoán, gian lận) và Hit@K (gợi ý); so sánh với phương án đơn giản (baseline) và công bố rõ giới hạn của mô hình.
+   - Mô hình kèm giải thích yếu tố ảnh hưởng, phiên bản mô hình và phương án dự phòng khi dịch vụ AI gián đoạn.
+
+4) Phương pháp kiểm thử và đánh giá hệ thống
+   - Kiểm thử đơn vị và tích hợp tự động cho backend và AI service; đo độ phủ mã.
+   - Kiểm thử chức năng thủ công theo bộ test case cho từng mô-đun; kiểm thử phân quyền theo ma trận endpoint × vai trò.
+   - Kiểm thử bảo mật (kiểm tra dữ liệu đầu vào, chống XSS/SQL injection, giới hạn tần suất, xác minh webhook) và kiểm tra giao diện trên nhiều kích thước màn hình.
+   - Triển khai bản demo trực tuyến, chạy kịch bản trọn vòng đời: đăng ký → tạo chiến dịch → xét duyệt → ủng hộ → thanh toán → giải ngân → cập nhật tiến độ → báo cáo.
+
+
+==================================================
+3. PHẠM VI NGHIÊN CỨU
+==================================================
+
+1) Đối tượng nghiên cứu
+   - Quy trình gây quỹ cộng đồng trực tuyến cho dự án xã hội và khởi nghiệp, từ khởi tạo, xét duyệt, tài trợ đến minh bạch sử dụng quỹ.
+   - Dữ liệu chiến dịch, dữ liệu giao dịch và dữ liệu hành vi người dùng.
+   - Các phương pháp học máy cho bài toán gợi ý, phân loại/ước lượng xác suất thành công và phát hiện bất thường.
+   - Các công nghệ xây dựng ứng dụng web nhiều thành phần: Next.js, NestJS, FastAPI, MySQL, Redis, Docker, AWS.
+
+2) Phạm vi chức năng
+   - Sản phẩm là một website responsive, sử dụng được trên máy tính và thiết bị di động qua trình duyệt; giao diện tiếng Việt, đơn vị tiền tệ VND.
+   - Bốn nhóm người dùng: khách truy cập, người ủng hộ, chủ dự án (cá nhân hoặc đại diện tổ chức) và quản trị viên.
+   - Bao gồm các chức năng đã nêu ở phần Nội dung đề tài: tài khoản – phân quyền, chiến dịch, tổ chức, khám phá – tương tác, ủng hộ – thanh toán – hoàn tiền – giải ngân, tiến độ – minh bạch, quản trị và ba mô-đun AI.
+
+3) Giới hạn của đề tài
+   - Thanh toán tích hợp cổng SePay (chuyển khoản ngân hàng qua mã QR) và môi trường thử nghiệm; hệ thống không lưu thông tin thẻ. Việc hoàn tiền và giải ngân được ghi nhận trên hệ thống, còn thao tác chuyển tiền thực hiện thủ công qua ngân hàng do cổng thanh toán không hỗ trợ hoàn tiền tự động. Chưa giải quyết đầy đủ các yêu cầu pháp lý của hoạt động huy động vốn và ký quỹ thực tế.
+   - Xác minh danh tính chỉ ở mức thu thập và kiểm tra hồ sơ, giấy tờ minh chứng do quản trị viên duyệt; không tích hợp eKYC chuyên sâu của bên thứ ba.
+   - Mô hình AI huấn luyện chủ yếu trên bộ dữ liệu công khai nước ngoài và dữ liệu thử nghiệm của nền tảng nên độ chính xác ở mức tham khảo; AI chỉ hỗ trợ, không tự động quyết định duyệt, từ chối hay khóa tài khoản (cơ chế con người trong vòng kiểm soát).
+   - Chưa phát triển ứng dụng di động riêng, chưa hỗ trợ đa ngôn ngữ, đa tiền tệ và gây quỹ định kỳ.
+   - Hệ thống được triển khai và kiểm thử ở quy mô đồ án (môi trường Docker cục bộ và bản demo trên AWS), chưa đánh giá với tải người dùng thực tế quy mô lớn.

@@ -128,7 +128,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: "xet-duyet",
     question: "Chiến dịch được xét duyệt như thế nào?",
     answer:
-      "Quản trị viên kiểm tra nội dung, mục tiêu và kế hoạch sử dụng quỹ, sau đó duyệt, từ chối kèm lý do hoặc yêu cầu bổ sung thông tin. Bạn nhận thông báo trong ứng dụng và qua email. Sau khi phát hành, mục tiêu và thời hạn không thể tự ý thay đổi.",
+      "Quản trị viên kiểm tra nội dung, mục tiêu và kế hoạch sử dụng quỹ trong 24–48 giờ, sau đó duyệt, từ chối kèm lý do hoặc yêu cầu bổ sung thông tin. Bạn nhận thông báo trong ứng dụng và qua email. Khi được duyệt, bạn tự bấm “Phát hành” trong Trang của tôi để dự án hiện công khai; thời gian gây quỹ (7–60 ngày) tính từ lúc phát hành, nên khi chọn ngày kết thúc hãy dự trù thêm 2–3 ngày chờ duyệt. Sau khi phát hành, mục tiêu và thời hạn không thể tự ý thay đổi.",
     link: { href: "/dashboard", label: "Theo dõi chiến dịch của tôi" },
     keywords: [
       "xet duyet", "duyet", "kiem duyet", "tu choi", "bo sung", "phe duyet", "gia han",

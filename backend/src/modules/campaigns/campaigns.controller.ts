@@ -26,6 +26,7 @@ import {
   CampaignQueryDto,
   CreateCampaignDto,
   ModerateCampaignDto,
+  PublishCampaignDto,
   UpdateCampaignDto,
 } from "./dto/campaign.dto";
 
@@ -95,6 +96,17 @@ export class CampaignsController {
   @UseGuards(JwtAuthGuard, NonAdminGuard)
   submit(@Param("id", ParseUUIDPipe) id: string, @GetCurrentUser() user: User) {
     return this.campaignsService.submitForReview(id, user);
+  }
+
+  /** Chủ dự án tự phát hành sau khi được duyệt (approved → active); có thể chọn lại ngày kết thúc. */
+  @Post(":id/publish")
+  @UseGuards(JwtAuthGuard, NonAdminGuard)
+  publish(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: PublishCampaignDto,
+    @GetCurrentUser() user: User,
+  ) {
+    return this.campaignsService.publish(id, user, dto.endDate);
   }
 
   @Patch(":id/moderate")
