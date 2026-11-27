@@ -5,7 +5,6 @@ import { CampaignDisbursement } from "../campaigns/entities/campaign-disbursemen
 import { CampaignPayoutAccount } from "../campaigns/entities/campaign-payout-account.entity";
 import { Campaign } from "../campaigns/entities/campaign.entity";
 import { DonationsModule } from "../donations/donations.module";
-import { WalletModule } from "../wallet/wallet.module";
 import { Donation } from "../donations/entities/donation.entity";
 import { MediaFile } from "../media/entities/media-file.entity";
 import { AutoRefundService } from "./auto-refund.service";
@@ -20,7 +19,6 @@ import { FinanceService } from "./finance.service";
   imports: [
     TypeOrmModule.forFeature([RefundRequest, Donation, Campaign, MediaFile, CampaignDisbursement, CampaignPayoutAccount]),
     DonationsModule,
-    WalletModule,
   ],
   controllers: [FinanceController, AdminFinanceController, AdminDisbursementsController],
   providers: [FinanceService, AutoRefundService, DisbursementsService],

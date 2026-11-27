@@ -361,7 +361,7 @@ async function main() {
               status: DonationStatus.REFUNDED,
               refundedAt: at(endedDaysAgo - 1, 10),
               refundReason: "Tự động: chiến dịch kết thúc không đạt mục tiêu hoặc bị hủy.",
-              refundMethod: RefundMethod.WALLET,
+              refundMethod: RefundMethod.GATEWAY,
               refundReference: `DEMO-RF-AIHIST-${seq}`,
             }),
       });

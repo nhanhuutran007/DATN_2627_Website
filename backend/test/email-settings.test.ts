@@ -87,7 +87,7 @@ describe("EmailSettingsService", () => {
     deepEqual(parseEmailSettings("{bad json").enabled, true);
     const parsed = parseEmailSettings(JSON.stringify({ enabled: true, categories: { comments: false } }));
     equal(parsed.categories.comments, false);
-    equal(parsed.categories.wallet, true);
+    equal(parsed.categories.refunds, true);
   });
 });
 

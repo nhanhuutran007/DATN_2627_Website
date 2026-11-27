@@ -7,7 +7,6 @@ import { StripeGateway, stripeConfigFromEnv } from "../../integrations/payment/s
 import { Campaign } from "../campaigns/entities/campaign.entity";
 import { RefundRequest } from "../finance/entities/refund-request.entity";
 import { RewardTier } from "../rewards/entities/reward-tier.entity";
-import { WalletModule } from "../wallet/wallet.module";
 import { CampaignLedgerController } from "./campaign-ledger.controller";
 import { DonationsController } from "./donations.controller";
 import { SepayIpnController } from "./sepay-ipn.controller";
@@ -19,7 +18,7 @@ import { RewardRecipient } from "./entities/reward-recipient.entity";
 import { PledgeSettlementService } from "./pledge-settlement.service";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Donation, Campaign, RewardTier, RewardRecipient, RefundRequest]), WalletModule],
+  imports: [TypeOrmModule.forFeature([Donation, Campaign, RewardTier, RewardRecipient, RefundRequest])],
   controllers: [DonationsController, CampaignLedgerController, SepayIpnController, StripeWebhookController],
   providers: [
     DonationsService,

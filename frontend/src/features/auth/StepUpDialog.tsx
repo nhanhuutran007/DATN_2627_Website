@@ -24,8 +24,6 @@ const ACTION_LABELS: Record<string, string> = {
   change_password: "đổi mật khẩu",
   refund_request: "gửi yêu cầu hoàn tiền",
   admin_refund: "xử lý hoàn tiền",
-  wallet_withdraw: "rút tiền từ ví về tài khoản ngân hàng",
-  admin_withdraw: "duyệt chi tiền rút ví",
   campaign_payout: "khai báo tài khoản nhận tiền của chiến dịch",
   admin_disburse: "giải ngân tiền gây quỹ cho chủ dự án",
   account_bank: "lưu hoặc đổi tài khoản ngân hàng của bạn",

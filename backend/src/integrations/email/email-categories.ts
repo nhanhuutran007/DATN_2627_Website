@@ -16,7 +16,7 @@ export type EmailCategoryInfo = {
 export const EMAIL_CATEGORY_GROUPS: Array<{ key: EmailCategoryGroup; label: string }> = [
   { key: "account", label: "Tài khoản & bảo mật" },
   { key: "campaign", label: "Chiến dịch" },
-  { key: "donation", label: "Ủng hộ, hoàn tiền & ví" },
+  { key: "donation", label: "Ủng hộ & hoàn tiền" },
   { key: "other", label: "Khác" },
 ];
 
@@ -97,7 +97,7 @@ export const EMAIL_CATEGORIES = [
     group: "donation",
     label: "Quyết toán cam kết khi dự án kết thúc",
     description:
-      "Đã trừ tiền, trừ tiền thất bại, không bị trừ tiền / hoàn về ví, cam kết bị hủy, bổ sung tài khoản nhận hoàn — gửi từng người ủng hộ khi dự án chốt.",
+      "Đã trừ tiền, trừ tiền thất bại, không bị trừ tiền, cam kết bị hủy, bổ sung tài khoản nhận hoàn — gửi từng người ủng hộ khi dự án chốt.",
     bulk: true,
   },
   {
@@ -105,13 +105,6 @@ export const EMAIL_CATEGORIES = [
     group: "donation",
     label: "Kết quả yêu cầu hoàn tiền",
     description: "Yêu cầu hoàn tiền được duyệt (đã hoàn) hoặc bị từ chối.",
-    bulk: false,
-  },
-  {
-    key: "wallet",
-    group: "donation",
-    label: "Rút tiền ví",
-    description: "Đã chuyển tiền rút về tài khoản hoặc yêu cầu rút bị từ chối.",
     bulk: false,
   },
   {

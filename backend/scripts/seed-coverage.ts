@@ -13,15 +13,6 @@ import {
 } from "../src/modules/organizations/entities/organization.entity";
 import { CampaignPost, PostVisibility } from "../src/modules/posts/entities/campaign-post.entity";
 import { User, UserRole, UserStatus } from "../src/modules/users/entities/user.entity";
-import {
-  TopupStatus,
-  Wallet,
-  WalletTopup,
-  WalletTransaction,
-  WalletTxType,
-  WalletWithdrawal,
-  WithdrawalStatus,
-} from "../src/modules/wallet/entities/wallet.entity";
 
 /**
  * Dữ liệu mẫu "đủ trường hợp" bổ sung cho seed chính, để demo/kiểm thử không thiếu tình huống:
@@ -29,9 +20,7 @@ import {
  *   sắp hết hạn, đã vượt mục tiêu, đã kết thúc), kèm các trạng thái còn thiếu (bị từ chối, bị hủy);
  * - yêu cầu hoàn tiền đang chờ, báo cáo vi phạm đang chờ, bình luận bị ẩn, hỏi đáp có trả lời,
  *   bài cập nhật chỉ dành cho người ủng hộ;
- * - tổ chức bị từ chối và bị tạm ngưng; một tài khoản bị khóa;
- * - ví Góp Mầm có nạp tiền và đủ 3 kiểu yêu cầu rút (chờ duyệt / đã chuyển / bị từ chối), sổ ví
- *   khớp số dư để không bị khóa khi đối soát.
+ * - tổ chức bị từ chối và bị tạm ngưng; một tài khoản bị khóa.
  *
  * Chạy lặp lại an toàn: phần nào đã có (theo tiêu đề / slug / email / mã) thì bỏ qua.
  *   npm run seed:coverage
@@ -420,107 +409,11 @@ async function main() {
       log.push("Tài khoản bị khóa: user9@gopmam.com");
     }
 
-    // --- 7. Ví Góp Mầm: nạp tiền + 3 kiểu yêu cầu rút, sổ ví khớp số dư -------------------------
-    log.push(await seedWallet(manager, user("user3"), admin, at));
-
     log.push(`Lĩnh vực có dự án mới: ${new Set(coverage.map((c) => c.category)).size}`);
   });
 
   for (const line of log) console.log(line);
   await dataSource.destroy();
-}
-
-async function seedWallet(
-  manager: EntityManager,
-  owner: User,
-  admin: User,
-  at: (daysAgo: number, hour?: number) => Date,
-): Promise<string> {
-  const walletRepo = manager.getRepository(Wallet);
-  if (await walletRepo.findOne({ where: { userId: owner.id } })) return `Ví ${owner.email}: đã có, bỏ qua`;
-
-  const txRepo = manager.getRepository(WalletTransaction);
-  const buckets = { balance: 0, held: 0, withdrawing: 0 };
-  const effect: Record<string, [number, number, number]> = {
-    [WalletTxType.TOPUP]: [1, 0, 0],
-    [WalletTxType.WITHDRAW_REQUEST]: [-1, 0, 1],
-    [WalletTxType.WITHDRAW_PAID]: [0, 0, -1],
-    [WalletTxType.WITHDRAW_CANCEL]: [1, 0, -1],
-  };
-  const tx = async (type: WalletTxType, amount: number, when: Date, refs: Partial<WalletTransaction>, note: string) => {
-    const [b, h, w] = effect[type];
-    buckets.balance += b * amount;
-    buckets.held += h * amount;
-    buckets.withdrawing += w * amount;
-    await txRepo.save(
-      txRepo.create({
-        userId: owner.id,
-        type,
-        amount,
-        balanceAfter: buckets.balance,
-        heldAfter: buckets.held,
-        withdrawingAfter: buckets.withdrawing,
-        note,
-        createdAt: when,
-        ...refs,
-      }),
-    );
-  };
-
-  const topupRepo = manager.getRepository(WalletTopup);
-  const topup = await topupRepo.save(
-    topupRepo.create({
-      userId: owner.id,
-      amount: 3_000_000,
-      status: TopupStatus.COMPLETED,
-      transferCode: "GMCOV0000001",
-      transactionId: "COV-TOPUP-0001",
-      completedAt: at(20, 10),
-      createdAt: at(20, 9),
-    }),
-  );
-  await tx(WalletTxType.TOPUP, 3_000_000, at(20, 10), { topupId: topup.id }, "Nạp tiền vào ví");
-
-  const withdrawalRepo = manager.getRepository(WalletWithdrawal);
-  const bank = { bankName: "Vietcombank", bankAccountNumber: "0071000123456", bankAccountName: owner.name.toUpperCase() };
-  const paid = await withdrawalRepo.save(
-    withdrawalRepo.create({
-      userId: owner.id,
-      amount: 1_000_000,
-      ...bank,
-      status: WithdrawalStatus.COMPLETED,
-      transferReference: "FT26310COV0001",
-      reviewedBy: admin.id,
-      reviewedAt: at(13, 15),
-      createdAt: at(15, 9),
-    }),
-  );
-  await tx(WalletTxType.WITHDRAW_REQUEST, 1_000_000, at(15, 9), { withdrawalId: paid.id }, "Yêu cầu rút tiền");
-  await tx(WalletTxType.WITHDRAW_PAID, 1_000_000, at(13, 15), { withdrawalId: paid.id }, "Đã chuyển tiền rút");
-
-  const rejected = await withdrawalRepo.save(
-    withdrawalRepo.create({
-      userId: owner.id,
-      amount: 500_000,
-      ...bank,
-      bankAccountName: "TEN KHONG KHOP",
-      status: WithdrawalStatus.REJECTED,
-      adminNotes: "Tên chủ tài khoản không khớp với tên tài khoản Góp Mầm.",
-      reviewedBy: admin.id,
-      reviewedAt: at(7, 11),
-      createdAt: at(8, 20),
-    }),
-  );
-  await tx(WalletTxType.WITHDRAW_REQUEST, 500_000, at(8, 20), { withdrawalId: rejected.id }, "Yêu cầu rút tiền");
-  await tx(WalletTxType.WITHDRAW_CANCEL, 500_000, at(7, 11), { withdrawalId: rejected.id }, "Từ chối yêu cầu rút");
-
-  const pending = await withdrawalRepo.save(
-    withdrawalRepo.create({ userId: owner.id, amount: 700_000, ...bank, status: WithdrawalStatus.PENDING, createdAt: at(1, 16) }),
-  );
-  await tx(WalletTxType.WITHDRAW_REQUEST, 700_000, at(1, 16), { withdrawalId: pending.id }, "Yêu cầu rút tiền");
-
-  await walletRepo.save(walletRepo.create({ userId: owner.id, ...buckets }));
-  return `Ví ${owner.email}: số dư ${buckets.balance.toLocaleString("vi-VN")} ₫, chờ rút ${buckets.withdrawing.toLocaleString("vi-VN")} ₫ (1 chờ duyệt, 1 đã chuyển, 1 bị từ chối)`;
 }
 
 main().catch((error) => {

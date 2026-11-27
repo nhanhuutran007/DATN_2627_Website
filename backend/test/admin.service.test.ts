@@ -355,7 +355,6 @@ describe("AdminService", () => {
         pendingRefunds: 4,
         pendingOrganizations: 7,
         ledgerMismatches: 1,
-        walletMismatches: 0,
         daysSinceBackup: 6,
       });
       // SePay "chờ" chỉ tính khi tạo trước mốc 30 phút

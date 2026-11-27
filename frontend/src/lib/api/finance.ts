@@ -17,7 +17,7 @@ export function needsManualRefund(paymentMethod?: string | null): boolean {
 export const REFUND_METHOD_LABEL: Record<string, string> = {
   gateway: "Hoàn qua cổng thanh toán",
   manual_transfer: "Hoàn thủ công qua chuyển khoản",
-  wallet: "Hoàn về ví Góp Mầm",
+  wallet: "Hoàn về ví Góp Mầm (cũ)",
 };
 
 /** Tài khoản nhận hoàn do người ủng hộ khai. */

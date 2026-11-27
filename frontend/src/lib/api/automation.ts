@@ -14,7 +14,7 @@ export type AutoRefundEvent = {
   campaignTitle: string;
   donorName: string;
   amount: number;
-  destination: "wallet" | "pledge_cancelled" | "gateway";
+  destination: "pledge_cancelled" | "gateway";
   at: string;
 };
 

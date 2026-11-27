@@ -113,24 +113,19 @@ export function ReviewAutomationPanel() {
   );
 }
 
-/**
- * Một nhãn duy nhất cho mỗi cách hoàn (không thêm dòng phụ): chỉ "về ví" mới cần phân biệt
- * nhả cam kết (chưa trừ tiền) với hoàn khoản đã thu.
- */
+/** Một nhãn duy nhất cho mỗi cách hoàn (không thêm dòng phụ). */
 function refundLabel(event: AutoRefundEvent): { text: string; tone: string } {
-  if (event.destination === "gateway") return { text: "Hoàn qua cổng thanh toán", tone: "is-gateway" };
-  if (event.destination === "pledge_cancelled") return { text: "Hủy cam kết thẻ (chưa trừ tiền)", tone: "is-pledge_cancelled" };
-  return event.kind === "pledge_released"
-    ? { text: "Trả cam kết về ví", tone: "is-wallet" }
-    : { text: "Hoàn tiền đã thu về ví", tone: "is-wallet" };
+  return event.destination === "gateway"
+    ? { text: "Hoàn qua cổng thanh toán", tone: "is-gateway" }
+    : { text: "Hủy cam kết (chưa trừ tiền)", tone: "is-pledge_cancelled" };
 }
 
 const money = (value: number) => `${Math.round(value).toLocaleString("vi-VN")}\u00A0₫`;
 
 /**
  * Theo dõi hoàn tiền tự động (đặt ở mục "Hoàn tiền"): khi dự án hết hạn mà không đạt mục tiêu hoặc bị hủy,
- * hệ thống tự trả khoản cam kết/ủng hộ về ví Góp Mầm của người ủng hộ. Không có nút bật/tắt — các yêu cầu
- * hoàn hay rút tiền khác đều do admin kiểm tra và duyệt thủ công ở danh sách bên dưới.
+ * hệ thống tự hủy khoản cam kết (không trừ tiền) hoặc hoàn khoản đã thu. Không có nút bật/tắt — các yêu cầu
+ * hoàn tiền khác đều do admin kiểm tra và duyệt thủ công ở danh sách bên dưới.
  */
 export function RefundAutoMonitor({ refreshKey = 0 }: { refreshKey?: number }) {
   const [summary, setSummary] = useState<AutoRefundSummary | null>(null);
@@ -164,7 +159,7 @@ export function RefundAutoMonitor({ refreshKey = 0 }: { refreshKey?: number }) {
         <>
           <dl className="refund-monitor-stats">
             <div>
-              <dt>Cam kết đã trả về ví</dt>
+              <dt>Cam kết đã hủy (không trừ tiền)</dt>
               <dd><b>{money(summary.releasedPledges.amount)}</b></dd>
               <dd className="stat-meta">{summary.releasedPledges.count.toLocaleString("vi-VN")} khoản</dd>
             </div>

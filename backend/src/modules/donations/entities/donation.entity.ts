@@ -51,7 +51,7 @@ export const OUTSTANDING_DONATION_STATUSES: readonly DonationStatus[] = [
 export enum RefundMethod {
   GATEWAY = "gateway",
   MANUAL_TRANSFER = "manual_transfer",
-  /** Hoàn về ví Góp Mầm (khoản ủng hộ bằng ví). */
+  /** Hoàn về ví (chỉ còn ở dữ liệu cũ; Ví Góp Mầm đã gỡ bỏ, không tạo mới). */
   WALLET = "wallet",
 }
 

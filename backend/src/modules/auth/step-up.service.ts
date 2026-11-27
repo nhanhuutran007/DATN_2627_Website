@@ -33,8 +33,6 @@ const ACTION_LABELS: Record<StepUpPurpose, string> = {
   [StepUpPurpose.ADMIN_REFUND]: "xử lý hoàn tiền",
   [StepUpPurpose.ADMIN_BACKUP]: "sao lưu hoặc khôi phục dữ liệu",
   [StepUpPurpose.ADMIN_USERS]: "đổi vai trò hoặc xóa tài khoản",
-  [StepUpPurpose.WALLET_WITHDRAW]: "rút tiền từ ví về tài khoản ngân hàng",
-  [StepUpPurpose.ADMIN_WITHDRAW]: "duyệt chi tiền rút ví",
   [StepUpPurpose.CAMPAIGN_PAYOUT]: "khai báo tài khoản nhận tiền của chiến dịch",
   [StepUpPurpose.ADMIN_DISBURSE]: "giải ngân tiền gây quỹ cho chủ dự án",
   [StepUpPurpose.ACCOUNT_BANK]: "lưu hoặc đổi tài khoản ngân hàng của bạn",

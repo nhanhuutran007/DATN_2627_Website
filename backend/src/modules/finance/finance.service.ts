@@ -18,7 +18,6 @@ import { AuditService, truncateForAudit } from "../../common/audit/audit.service
 import { rangeFilter, vnDateRange, vnDayEnd, vnDayStart } from "../../common/query/range";
 import type { PaymentGateway } from "../../integrations/payment/payment.gateway";
 import type { CardPledgeGateway } from "../../integrations/payment/stripe";
-import { WalletService } from "../wallet/wallet.service";
 import { closedWithoutReachingGoal } from "../campaigns/campaign-outcome";
 import { CampaignDisbursement } from "../campaigns/entities/campaign-disbursement.entity";
 import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity";
@@ -45,14 +44,14 @@ export const REFUND_WINDOW_DAYS = 7;
 export type AutoRefundOutcome = { refunded: boolean; reason: string };
 
 export type AutoRefundEvent = {
-  /** `pledge_released`: cam kết trả về ví/hủy khi dự án không đạt; `auto_refund`: khoản đã thu được tự hoàn. */
+  /** `pledge_released`: cam kết bị hủy khi dự án không đạt; `auto_refund`: khoản đã thu được tự hoàn. */
   kind: "pledge_released" | "auto_refund";
   donationId: string;
   campaignTitle: string;
   donorName: string;
   amount: number;
-  /** `wallet`: về ví Góp Mầm; `pledge_cancelled`: cam kết thẻ không bị trừ; `gateway`: hoàn qua cổng. */
-  destination: "wallet" | "pledge_cancelled" | "gateway";
+  /** `pledge_cancelled`: cam kết không bị trừ tiền; `gateway`: hoàn qua cổng. */
+  destination: "pledge_cancelled" | "gateway";
   at: string;
 };
 
@@ -141,10 +140,6 @@ export class FinanceService {
     @Optional()
     @Inject("StripeGateway")
     private readonly stripe: CardPledgeGateway | null = null,
-    @Optional()
-    // Kiểu `X | null` làm metadata thành Object: phải chỉ rõ token, nếu không Nest âm thầm inject null.
-    @Inject(WalletService)
-    private readonly wallet: WalletService | null = null,
     @Optional()
     @InjectRepository(CampaignDisbursement)
     private readonly disbursementRepo: Repository<CampaignDisbursement> | null = null,
@@ -310,7 +305,7 @@ export class FinanceService {
       campaignTitle: d.campaign?.title ?? "",
       donorName: d.user?.name ?? "",
       amount: Number(d.amount),
-      destination: d.paymentMethod === "balance" ? "wallet" : "pledge_cancelled",
+      destination: "pledge_cancelled",
       at: new Date(d.updatedAt).toISOString(),
     }));
     const refundEvents: AutoRefundEvent[] = autoRefunds.slice(0, limit).map((r) => ({
@@ -319,7 +314,7 @@ export class FinanceService {
       campaignTitle: r.donation?.campaign?.title ?? "",
       donorName: r.donation?.user?.name ?? "",
       amount: Number(r.donation?.amount ?? 0),
-      destination: r.donation?.paymentMethod === "balance" ? "wallet" : "gateway",
+      destination: "gateway",
       at: new Date(r.reviewedAt ?? r.updatedAt).toISOString(),
     }));
 
@@ -501,12 +496,7 @@ export class FinanceService {
         "Khoản ủng hộ qua SePay phải chuyển khoản hoàn thủ công: nhập mã giao dịch chuyển khoản đã thực hiện.",
       );
     }
-    const toWallet = donation.paymentMethod === "balance";
-    const refundMethod = manualTransfer
-      ? RefundMethod.MANUAL_TRANSFER
-      : toWallet
-        ? RefundMethod.WALLET
-        : RefundMethod.GATEWAY;
+    const refundMethod = manualTransfer ? RefundMethod.MANUAL_TRANSFER : RefundMethod.GATEWAY;
     const refundProofUrl =
       manualTransfer && options.manual?.proofMediaId && actor
         ? await this.resolveRefundProof(options.manual.proofMediaId, actor)
@@ -524,12 +514,6 @@ export class FinanceService {
       let refundId: string;
       if (manualTransfer && transferReference) {
         refundId = transferReference;
-      } else if (toWallet) {
-        // Ủng hộ bằng ví: hoàn thẳng về ví Góp Mầm trong cùng transaction.
-        if (!this.wallet) {
-          throw new BadGatewayException("Ví Góp Mầm chưa sẵn sàng nên chưa hoàn được khoản này.");
-        }
-        refundId = await this.wallet.refund(manager, donation, reason);
       } else if (donation.paymentMethod === "stripe") {
         // Khoản cam kết đã trừ tiền thẻ: hoàn qua Stripe theo mã PaymentIntent (`pi_…`).
         if (!this.stripe || !donation.transactionId) {

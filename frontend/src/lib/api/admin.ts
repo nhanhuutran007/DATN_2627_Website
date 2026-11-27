@@ -325,8 +325,6 @@ export type AdminNavCounts = {
   pendingRefunds: number;
   pendingOrganizations: number;
   ledgerMismatches: number;
-  /** Ví lệch sổ giao dịch hoặc không khớp chứng từ gốc. */
-  walletMismatches: number;
   daysSinceBackup: number | null;
 };
 

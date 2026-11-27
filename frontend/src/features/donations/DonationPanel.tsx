@@ -473,7 +473,7 @@ export function DonationPanel({
         <p className="donate-aon">
           <Icon name="shield" size={15} />
           <span>
-            Góp Mầm không giữ tiền của bạn trong ví. Tiền chỉ chuyển khi dự án thành công, sau đó được gom và chuyển cho chủ dự án
+            Góp Mầm không giữ tiền của bạn. Tiền chỉ chuyển khi dự án thành công, sau đó được gom và chuyển cho chủ dự án
             một lần. Bạn có thể rút cam kết bất cứ lúc nào trước khi dự án kết thúc.
           </span>
         </p>

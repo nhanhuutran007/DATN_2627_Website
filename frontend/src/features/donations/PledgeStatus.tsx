@@ -21,7 +21,6 @@ import {
   type PaymentOptions,
 } from "@/lib/api/donations";
 import { formatVnd, paymentMethodLabel } from "@/lib/format";
-import { refreshWallet } from "@/lib/wallet-store";
 
 type PledgeStatusProps = {
   donation: ApiDonation;
@@ -57,7 +56,6 @@ export function PledgeStatus({ donation, campaignId, campaignTitle, endDate, rew
   const [openedAt] = useState(() => Date.now());
   const amount = formatVnd(Number(donation.amount));
   const isCard = donation.paymentMethod === "stripe";
-  const fromWallet = donation.paymentMethod === "balance";
   /** Cam kết trả sau: không lưu thẻ/giữ tiền, đạt mục tiêu mới quét QR SePay. */
   const payLater = donation.paymentMethod === "sepay";
 
@@ -98,7 +96,6 @@ export function PledgeStatus({ donation, campaignId, campaignTitle, endDate, rew
   const withdraw = () =>
     run("cancel", async () => {
       onChange(await cancelDonation(donation.id));
-      if (fromWallet) void refreshWallet();
     }, "Không rút được cam kết. Vui lòng thử lại.");
 
   const details = (
@@ -145,7 +142,7 @@ export function PledgeStatus({ donation, campaignId, campaignTitle, endDate, rew
         <h2>Bạn đã cam kết ủng hộ!</h2>
         <p>
           Cam kết {amount} cho “{campaignTitle}” đã được ghi nhận và tính vào tiến độ dự án.{" "}
-          <b>{fromWallet ? "Số tiền đang được giữ trong ví của bạn." : "Bạn chưa phải trả tiền."}</b>{" "}
+          <b>Bạn chưa phải trả tiền.</b>{" "}
           Bạn đã được tự động theo dõi dự án để nhận cập nhật.
         </p>
         {payLater ? (
@@ -161,13 +158,10 @@ export function PledgeStatus({ donation, campaignId, campaignTitle, endDate, rew
         <ul className="pledge-rules">
           <li>
             <Icon name="check" size={16} /> Nếu dự án đạt mục tiêu khi kết thúc{endDate ? ` (${endDate})` : ""}, hệ thống mới trừ {amount}
-            {isCard ? " từ thẻ bạn đã lưu" : fromWallet ? " từ khoản đang giữ trong ví" : " từ ví demo"}.
+            {isCard ? " từ thẻ bạn đã lưu" : " từ ví demo"}.
           </li>
           <li>
-            <Icon name="check" size={16} />{" "}
-            {fromWallet
-              ? "Nếu không đạt mục tiêu, toàn bộ số tiền tự hoàn về ví Góp Mầm của bạn."
-              : "Nếu không đạt mục tiêu, cam kết tự hủy và bạn không mất đồng nào."}
+            <Icon name="check" size={16} /> Nếu không đạt mục tiêu, cam kết tự hủy và bạn không mất đồng nào.
           </li>
           <li><Icon name="check" size={16} /> Bạn có thể rút cam kết bất cứ lúc nào trước khi dự án kết thúc.</li>
         </ul>
@@ -253,12 +247,10 @@ export function PledgeStatus({ donation, campaignId, campaignTitle, endDate, rew
   // released (không đạt mục tiêu) hoặc trạng thái kết thúc khác của khoản cam kết.
   return (
     <div className="donate-result" aria-live="polite">
-      <h2>{donation.status === "released" ? (fromWallet ? "Tiền đã hoàn về ví" : "Bạn không bị trừ tiền") : "Cam kết đã kết thúc"}</h2>
+      <h2>{donation.status === "released" ? "Bạn không bị trừ tiền" : "Cam kết đã kết thúc"}</h2>
       <p>
         {donation.status === "released"
-          ? fromWallet
-            ? `“${campaignTitle}” không đạt mục tiêu nên ${amount} đã được hoàn về ví Góp Mầm của bạn.`
-            : `“${campaignTitle}” không đạt mục tiêu nên cam kết ${amount} của bạn đã được hủy. Không có khoản tiền nào bị trừ.`
+          ? `“${campaignTitle}” không đạt mục tiêu nên cam kết ${amount} của bạn đã được hủy. Không có khoản tiền nào bị trừ.`
           : "Khoản cam kết này không còn hiệu lực và bạn không bị trừ tiền."}
       </p>
       {details}

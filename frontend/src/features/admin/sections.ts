@@ -58,7 +58,6 @@ export const SECTION_TABS: Record<string, AdminTab[]> = {
   ],
   "hoan-rut-tien": [
     { slug: "hoan-tien", label: "Hoàn tiền", icon: "wallet" },
-    // Ví Góp Mầm đã ngừng hoạt động (không giữ tiền người dùng): tab "Rút tiền ví" được ẩn, code vẫn giữ.
     { slug: "giai-ngan", label: "Giải ngân cho chủ dự án", icon: "send" },
   ],
   "cai-dat": [

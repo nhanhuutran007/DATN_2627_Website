@@ -8,7 +8,6 @@ import { Donation } from "../donations/entities/donation.entity";
 import { MilestoneUpdate } from "../progress/entities/milestone-update.entity";
 import { Milestone } from "../progress/entities/milestone.entity";
 import { User } from "../users/entities/user.entity";
-import { WalletModule } from "../wallet/wallet.module";
 import { AdminController } from "./admin.controller";
 import { AdminService } from "./admin.service";
 import { BackupService } from "./backup.service";
@@ -22,7 +21,6 @@ import { RiskAlertService } from "./risk-alert.service";
   imports: [
     TypeOrmModule.forFeature([User, Campaign, Donation, RiskAlert, Milestone, MilestoneUpdate]),
     AiModule,
-    WalletModule,
     DonationsModule,
   ],
   controllers: [AdminController],

@@ -435,10 +435,10 @@ describe("DonationsService — biên nhận & quyền xem", () => {
 });
 
 describe("FinanceService — theo dõi hoàn tiền tự động", () => {
-  it("tổng hợp cam kết trả về ví, khoản tự hoàn và số yêu cầu chờ admin", async () => {
+  it("tổng hợp cam kết bị hủy, khoản tự hoàn và số yêu cầu chờ admin", async () => {
     const at = new Date("2026-11-20T03:00:00Z");
     const released = [
-      { id: "d1", amount: "200000", paymentMethod: "balance", updatedAt: at, campaign: { title: "Thư viện" }, user: { name: "An" } },
+      { id: "d1", amount: "200000", paymentMethod: "sepay", updatedAt: at, campaign: { title: "Thư viện" }, user: { name: "An" } },
     ];
     const donationRepo: any = {
       find: async () => released,
@@ -452,7 +452,7 @@ describe("FinanceService — theo dõi hoàn tiền tự động", () => {
         {
           donationId: "d2",
           reviewedAt: new Date("2026-11-21T03:00:00Z"),
-          donation: { amount: "150000", paymentMethod: "balance", campaign: { title: "Giếng nước" }, user: { name: "Bình" } },
+          donation: { amount: "150000", paymentMethod: "sepay", campaign: { title: "Giếng nước" }, user: { name: "Bình" } },
         },
       ],
       count: async () => 2,
@@ -463,8 +463,8 @@ describe("FinanceService — theo dõi hoàn tiền tự động", () => {
     deepEqual(summary.autoRefunds, { count: 1, amount: 150000 });
     equal(summary.pendingManual, 2);
     deepEqual(summary.recent.map((e) => [e.kind, e.destination, e.campaignTitle]), [
-      ["auto_refund", "wallet", "Giếng nước"],
-      ["pledge_released", "wallet", "Thư viện"],
+      ["auto_refund", "gateway", "Giếng nước"],
+      ["pledge_released", "pledge_cancelled", "Thư viện"],
     ]);
   });
 });

@@ -25,7 +25,7 @@ function errorText(err: unknown, fallback: string): string {
 }
 
 /**
- * Giải ngân: Góp Mầm không giữ tiền trong ví nữa. Người ủng hộ trả cam kết (QR SePay) về tài khoản
+ * Giải ngân: Góp Mầm không giữ tiền của người dùng. Người ủng hộ trả cam kết (QR SePay) về tài khoản
  * Góp Mầm sau khi dự án đạt mục tiêu; hết hạn thanh toán thì admin gom tổng đã thu và chuyển khoản
  * tay MỘT lần cho chủ dự án, rồi ghi nhận mã giao dịch + chứng từ.
  */

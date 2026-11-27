@@ -8,9 +8,6 @@ import { vnDateRange } from "../src/common/query/range";
 import { FinanceService } from "../src/modules/finance/finance.service";
 import type { RefundRequest } from "../src/modules/finance/entities/refund-request.entity";
 import type { Donation } from "../src/modules/donations/entities/donation.entity";
-import { WithdrawalStatus, type WalletWithdrawal } from "../src/modules/wallet/entities/wallet.entity";
-import { WithdrawalsService } from "../src/modules/wallet/withdrawals.service";
-import type { WalletService } from "../src/modules/wallet/wallet.service";
 import type { MediaFile } from "../src/modules/media/entities/media-file.entity";
 import { makeAuditRecorder } from "./helpers/audit";
 import { makeNotifierRecorder } from "./helpers/notifications";
@@ -104,35 +101,5 @@ describe("refund lists filtered by date", () => {
     ok(approved);
     equal(operator(approved.reviewedAt).type, "between");
     deepEqual(calls.andWhere.map(([sql]) => sql), ["d.updated_at >= :from", "d.updated_at <= :to"]);
-  });
-});
-
-describe("wallet withdrawals filtered by date and keyword", () => {
-  it("passes status, date range and keyword branches to the query", async () => {
-    let where: Where | Where[] = {};
-    const withdrawalRepo = {
-      findAndCount: async (options: { where: Where | Where[] }) => {
-        where = options.where;
-        return [[], 0];
-      },
-    } as unknown as Repository<WalletWithdrawal>;
-    const service = new WithdrawalsService(
-      withdrawalRepo,
-      {} as Repository<MediaFile>,
-      {} as DataSource,
-      {} as WalletService,
-      makeAuditRecorder().service,
-      makeNotifierRecorder().service,
-    );
-    await service.adminList(WithdrawalStatus.PENDING, 0, 20, { q: "Bích", from: "2026-11-01", to: "2026-11-23" });
-    ok(Array.isArray(where));
-    equal(where.length, 3);
-    for (const branch of where) {
-      equal(branch.status, WithdrawalStatus.PENDING);
-      equal(operator(branch.createdAt).type, "between");
-    }
-
-    await service.adminList(undefined, 0, 20);
-    deepEqual(where, {});
   });
 });

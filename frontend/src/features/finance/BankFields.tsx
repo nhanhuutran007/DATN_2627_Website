@@ -4,7 +4,7 @@ import { useEffect, useId } from "react";
 
 import { fetchMyBankAccount } from "@/lib/api/users";
 
-/** Tài khoản ngân hàng nhận tiền (hoàn tiền SePay, rút tiền ví): ô nhập + kiểm tra giống máy chủ. */
+/** Tài khoản ngân hàng nhận tiền (hoàn tiền SePay): ô nhập + kiểm tra giống máy chủ. */
 
 /** Gợi ý tên ngân hàng phổ biến cho ô nhập (vẫn gõ tự do được). */
 export const COMMON_BANKS = [

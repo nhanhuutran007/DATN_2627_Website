@@ -32,7 +32,6 @@ import {
   USER_STATUS_LABEL,
 } from "@/features/admin/labels";
 import { ADMIN_SECTION_GROUPS, ADMIN_SECTIONS, adminHref, findAdminSection } from "@/features/admin/sections";
-import { AdminReconciliation } from "@/features/admin/AdminReconciliation";
 import { AdminDisbursements } from "@/features/admin/AdminDisbursements";
 import { CampaignPredictionCard } from "@/features/campaign-stats/CampaignPredictionCard";
 import {
@@ -148,16 +147,6 @@ function navBadge(slug: string, counts: AdminNavCounts | null): NavBadge | null 
     case "hoan-rut-tien":
       return numeric(counts.pendingRefunds, "yêu cầu hoàn tiền chờ xử lý");
     case "doi-soat":
-      // Ví lệch là tiền có thể bị chi sai: ưu tiên báo nổi bật hơn chiến dịch lệch sổ.
-      if (counts.walletMismatches > 0) {
-        const total = counts.walletMismatches + counts.ledgerMismatches;
-        return {
-          text: String(total),
-          title: `${counts.walletMismatches} ví lệch sổ giao dịch, cần xử lý ngay` +
-            (counts.ledgerMismatches ? ` · ${counts.ledgerMismatches} chiến dịch lệch sổ (lũy kế)` : ""),
-          tone: "warn",
-        };
-      }
       return numeric(counts.ledgerMismatches, "chiến dịch lệch sổ (lũy kế)");
     case "cai-dat": {
       // Mục Cài đặt chứa phần Sao lưu: nhắc khi lâu chưa sao lưu.
@@ -2171,8 +2160,8 @@ export function AdminDashboard() {
           {showing("hoan-rut-tien", "hoan-tien") && <AdminFinance view="refunds" onChanged={() => { void loadDonations(donationFilter, donationPaging.page); void reloadOverview(); }} />}
           {showing("hoan-rut-tien", "giai-ngan") && <AdminDisbursements />}
           {view === "doi-soat" && (
-            <AdminReconciliation
-              walletMismatches={navCounts?.walletMismatches ?? 0}
+            <AdminFinance
+              view="reconciliation"
               onChanged={() => {
                 void refreshNavCounts();
                 void loadDonations(donationFilter, donationPaging.page);
