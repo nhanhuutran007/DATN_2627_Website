@@ -19,6 +19,10 @@ resource "aws_lb_target_group" "frontend" {
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
+  # Có nhiều task: ALB chọn task ít request đang xử lý nhất thay vì xoay vòng đều.
+  load_balancing_algorithm_type = "least_outstanding_requests"
+  # Task bị gỡ (deploy/co lại) chỉ chờ request dở dang 30 giây thay vì mặc định 300 giây.
+  deregistration_delay = 30
 
   health_check {
     path                = "/api/health"
@@ -36,6 +40,9 @@ resource "aws_lb_target_group" "backend" {
   protocol    = "HTTP"
   vpc_id      = aws_vpc.main.id
   target_type = "ip"
+  # API không giữ phiên trên task (JWT, rate limit ở Redis, ảnh ở S3) nên không cần sticky session.
+  load_balancing_algorithm_type = "least_outstanding_requests"
+  deregistration_delay          = 30
 
   health_check {
     path                = "/api/v1/health"

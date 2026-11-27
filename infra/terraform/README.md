@@ -106,11 +106,12 @@ Mở `http://<alb_dns_name>` trên trình duyệt.
 ```
 
 ### Kiến trúc triển khai
-- **ALB (HTTP :80)**: `/api/v1/*` → backend, còn lại → frontend. AI service **không** mở ra ALB.
+- **ALB (:80, hoặc :443 khi `enable_https`)**: `/api/v1/*` → backend, còn lại → frontend. AI service **không** mở ra ALB.
 - **Cloud Map (`gopmam.local`)**: backend gọi `ai.gopmam.local:8000` (kèm header `X-AI-Key`) và `redis.gopmam.local:6379`; SSR của frontend gọi `backend.gopmam.local:4000`.
 - **RDS MySQL 8.4** private, bắt buộc TLS; backend xác minh chứng chỉ bằng CA bundle của RDS đóng sẵn trong image (`DB_SSL=true`).
 - **Log**: CloudWatch `/ecs/gopmam/<service>`, giữ 7 ngày. Xem nhanh: `aws logs tail /ecs/gopmam/backend --follow`.
 - **Email**: backend gửi qua SMTP khi khai báo `smtp_*` + `mail_from` trong `terraform.tfvars`; để trống thì email chỉ ghi log. Link trong email dùng `public_url` (tên miền riêng nếu đã bật HTTPS).
+- **Cân bằng tải** (`autoscaling.tf`): frontend và backend mỗi service chạy `web_min_count` (mặc định 2) task trải trên 2 AZ, tự co giãn tới `web_max_count` (mặc định 4) theo CPU trung bình (`autoscaling_cpu_target` = 60%) và số request/phút mỗi task (`autoscaling_requests_per_target` = 1000), tăng sau 60 giây, giảm sau 300 giây. ALB chọn task ít request đang xử lý nhất (`least_outstanding_requests`), task bị gỡ chỉ chờ 30 giây. Deploy cuốn chiếu (giữ 100% task cũ tới khi task mới khỏe, task mới hỏng thì tự quay lại bản cũ). Không cần sticky session: JWT, rate limit ở Redis, ảnh ở S3. Job định kỳ của backend chỉ chạy ở 1 task mỗi lượt nhờ bảng `scheduler_locks` (migration `1790000000039`) → **phải push image backend mới + chạy migrate trước khi apply lên ≥2 task**. Redis và AI service vẫn 1 task (gọi nội bộ, không qua ALB). Muốn tiết kiệm khi demo: `web_min_count = 1`.
 - Giới hạn cho bản demo: secret truyền qua biến môi trường của task definition (chưa dùng Secrets Manager); Redis không có volume bền vững.
 
 ### Dùng tên miền riêng (vd. gopmam.com, DNS quản lý trên Cloudflare)

@@ -250,9 +250,18 @@ resource "aws_ecs_service" "backend" {
   name                              = "${var.project_name}-backend-svc"
   cluster                           = aws_ecs_cluster.main.id
   task_definition                   = aws_ecs_task_definition.backend.arn
-  desired_count                     = 1
+  desired_count                     = var.web_min_count
   launch_type                       = "FARGATE"
   health_check_grace_period_seconds = 60
+  # Deploy cuốn chiếu: giữ đủ task cũ tới khi task mới khỏe; task mới hỏng thì tự quay lại bản cũ.
+  # Job định kỳ chỉ chạy ở 1 task mỗi lượt nhờ bảng scheduler_locks (migration 039).
+  deployment_minimum_healthy_percent = 100
+  deployment_maximum_percent         = 200
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   network_configuration {
     subnets          = [aws_subnet.public_1.id, aws_subnet.public_2.id]
@@ -268,6 +277,11 @@ resource "aws_ecs_service" "backend" {
 
   service_registries {
     registry_arn = aws_service_discovery_service.internal["backend"].arn
+  }
+
+  # Số task do tự co giãn (autoscaling.tf) điều khiển; apply lại không kéo về desired_count.
+  lifecycle {
+    ignore_changes = [desired_count]
   }
 
   # Backend gọi Redis/AI lúc khởi động (có fallback, nhưng khởi động sau thì log sạch hơn)
@@ -310,12 +324,19 @@ resource "aws_ecs_task_definition" "frontend" {
 }
 
 resource "aws_ecs_service" "frontend" {
-  name                              = "${var.project_name}-frontend-svc"
-  cluster                           = aws_ecs_cluster.main.id
-  task_definition                   = aws_ecs_task_definition.frontend.arn
-  desired_count                     = 1
-  launch_type                       = "FARGATE"
-  health_check_grace_period_seconds = 60
+  name                               = "${var.project_name}-frontend-svc"
+  cluster                            = aws_ecs_cluster.main.id
+  task_definition                    = aws_ecs_task_definition.frontend.arn
+  desired_count                      = var.web_min_count
+  launch_type                        = "FARGATE"
+  health_check_grace_period_seconds  = 60
+  deployment_minimum_healthy_percent = 100
+  deployment_maximum_percent         = 200
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
 
   network_configuration {
     subnets          = [aws_subnet.public_1.id, aws_subnet.public_2.id]
@@ -327,6 +348,10 @@ resource "aws_ecs_service" "frontend" {
     target_group_arn = aws_lb_target_group.frontend.arn
     container_name   = "frontend"
     container_port   = 3000
+  }
+
+  lifecycle {
+    ignore_changes = [desired_count]
   }
 
   depends_on = [aws_ecs_service.backend]

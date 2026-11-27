@@ -169,6 +169,38 @@ variable "stripe_secret_key" {
   sensitive   = true
 }
 
+variable "web_min_count" {
+  description = "Số task tối thiểu cho mỗi service sau ALB (frontend, backend); ≥2 để ALB thật sự chia tải và chịu được 1 AZ/task hỏng"
+  type        = number
+  default     = 2
+  validation {
+    condition     = var.web_min_count >= 1
+    error_message = "web_min_count phải ≥ 1."
+  }
+}
+
+variable "web_max_count" {
+  description = "Số task tối đa khi tự co giãn (frontend, backend)"
+  type        = number
+  default     = 4
+  validation {
+    condition     = var.web_max_count >= var.web_min_count
+    error_message = "web_max_count phải ≥ web_min_count."
+  }
+}
+
+variable "autoscaling_cpu_target" {
+  description = "Mức CPU trung bình (%) mà tự co giãn cố giữ"
+  type        = number
+  default     = 60
+}
+
+variable "autoscaling_requests_per_target" {
+  description = "Số request/phút trên mỗi task mà tự co giãn cố giữ (chỉ số ALBRequestCountPerTarget)"
+  type        = number
+  default     = 1000
+}
+
 variable "stripe_webhook_secret" {
   description = "Khóa ký webhook Stripe (whsec_…) để xác thực sự kiện checkout.session.completed"
   type        = string
