@@ -17,6 +17,8 @@ type ImageUploaderProps = {
   onChange: (url: string) => void;
   purpose?: MediaPurpose;
   hint?: string;
+  /** Hiện `hint` bên trong khung chọn ảnh (dưới dòng định dạng) thay vì dưới ô. */
+  hintInside?: boolean;
   disabled?: boolean;
 };
 
@@ -31,7 +33,7 @@ function uploadErrorMessage(error: unknown): string {
 }
 
 /** Chọn ảnh từ máy (tải lên kho của hệ thống) hoặc dán link ảnh có sẵn. */
-export function ImageUploader({ label, value, onChange, purpose = "campaign_image", hint, disabled }: ImageUploaderProps) {
+export function ImageUploader({ label, value, onChange, purpose = "campaign_image", hint, hintInside = false, disabled }: ImageUploaderProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -97,6 +99,7 @@ export function ImageUploader({ label, value, onChange, purpose = "campaign_imag
           <Icon name="image" size={26} />
           <b>{uploading ? "Đang tải ảnh lên…" : "Chọn ảnh từ máy"}</b>
           <small>JPEG, PNG hoặc WebP, tối đa 5 MB</small>
+          {hint && hintInside && <small id={`${inputId}-hint`}>{hint}</small>}
         </button>
       )}
 
@@ -118,7 +121,7 @@ export function ImageUploader({ label, value, onChange, purpose = "campaign_imag
           {useLink ? "Tải ảnh từ máy thay vì dán link" : "Hoặc dán link ảnh có sẵn"}
         </button>
       )}
-      {hint && <small id={`${inputId}-hint`}>{hint}</small>}
+      {hint && !hintInside && <small id={`${inputId}-hint`}>{hint}</small>}
     </div>
   );
 }

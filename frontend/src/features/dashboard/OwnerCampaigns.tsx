@@ -270,7 +270,7 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
               {isOpen(c.id, "posts") && <PostManager campaignId={c.id} />}
               {isOpen(c.id, "progress") && <ProgressManager campaignId={c.id} readOnly={c.status === "failed"} />}
               {isOpen(c.id, "rewards") && (
-                <RewardManager campaignId={c.id} closed={["success", "failed", "cancelled", "ended"].includes(c.status)} />
+                <RewardManager campaignId={c.id} endDate={c.endDate} closed={["success", "failed", "cancelled", "ended"].includes(c.status)} />
               )}
               {isOpen(c.id, "payout") && <PayoutAccountPanel campaignId={c.id} />}
             </li>

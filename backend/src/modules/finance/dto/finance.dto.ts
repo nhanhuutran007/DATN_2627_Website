@@ -44,9 +44,9 @@ export class CreateRefundRequestDto {
     typeof value === "string" ? value.trim().replace(/\s+/g, " ").toUpperCase() : value,
   )
   @IsString()
-  @MinLength(2, { message: "Tên chủ tài khoản cần ít nhất 2 ký tự." })
-  @MaxLength(100)
-  @Matches(/^[\p{L} ]+$/u, { message: "Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng." })
+  @MinLength(3, { message: "Tên chủ tài khoản cần từ 3 đến 70 ký tự." })
+  @MaxLength(70, { message: "Tên chủ tài khoản cần từ 3 đến 70 ký tự." })
+  @Matches(/^[\p{L} ]+$/u, { message: "Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng, không chứa chữ số." })
   bankAccountName?: string;
 }
 
@@ -67,9 +67,9 @@ export class RefundBankInfoDto {
     typeof value === "string" ? value.trim().replace(/\s+/g, " ").toUpperCase() : value,
   )
   @IsString()
-  @MinLength(2, { message: "Tên chủ tài khoản cần ít nhất 2 ký tự." })
-  @MaxLength(100)
-  @Matches(/^[\p{L} ]+$/u, { message: "Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng." })
+  @MinLength(3, { message: "Tên chủ tài khoản cần từ 3 đến 70 ký tự." })
+  @MaxLength(70, { message: "Tên chủ tài khoản cần từ 3 đến 70 ký tự." })
+  @Matches(/^[\p{L} ]+$/u, { message: "Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng, không chứa chữ số." })
   bankAccountName!: string;
 }
 

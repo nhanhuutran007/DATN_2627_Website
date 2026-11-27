@@ -8,7 +8,6 @@ import {
   MAX_CAMPAIGN_DURATION_DAYS,
   MIN_CAMPAIGN_DURATION_DAYS,
   publishDurationProblem,
-  REVIEW_BUFFER_DAYS,
 } from "../src/modules/campaigns/campaign-duration";
 
 const DAY = 86_400_000;
@@ -33,20 +32,14 @@ describe("Giới hạn thời gian gây quỹ 60 ngày", () => {
   });
 });
 
-describe("Thời hạn tính từ lúc phát hành, dự trù 3 ngày chờ duyệt", () => {
-  it("hồ sơ nháp: 7 đến 60 + 3 ngày kể từ hôm nay", () => {
+describe("Thời hạn tính từ lúc phát hành, không tự cộng ngày chờ duyệt", () => {
+  it("hồ sơ nháp và gửi duyệt: 7 đến 60 ngày kể từ hôm nay", () => {
     equal(MIN_CAMPAIGN_DURATION_DAYS, 7);
-    equal(REVIEW_BUFFER_DAYS, 3);
     equal(draftDurationProblem(after(5), NOW), "too_short");
     equal(draftDurationProblem(after(7), NOW), null);
-    equal(draftDurationProblem(after(63), NOW), null);
-    equal(draftDurationProblem(after(65), NOW), "too_long");
-  });
-
-  it("gửi duyệt: phải còn ít nhất 7 + 3 ngày", () => {
-    const submit = { requireReviewBuffer: true };
-    equal(draftDurationProblem(after(8), NOW, submit), "too_short");
-    equal(draftDurationProblem(after(10), NOW, submit), null);
+    equal(draftDurationProblem(after(60), NOW), null);
+    equal(draftDurationProblem(after(61), NOW), null);
+    equal(draftDurationProblem(after(63), NOW), "too_long");
   });
 
   it("phát hành: thời gian gây quỹ thật 7–60 ngày kể từ lúc bấm", () => {

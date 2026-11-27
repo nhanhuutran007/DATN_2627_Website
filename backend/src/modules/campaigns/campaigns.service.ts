@@ -24,7 +24,6 @@ import {
   MAX_CAMPAIGN_DURATION_DAYS,
   MIN_CAMPAIGN_DURATION_DAYS,
   publishDurationProblem,
-  REVIEW_BUFFER_DAYS,
 } from "./campaign-duration";
 import { campaignStatusNotifications } from "./campaign-notifications";
 import { CampaignScreeningService, type ScreeningView } from "./campaign-screening.service";
@@ -353,21 +352,19 @@ export class CampaignsService {
   }
 
   /**
-   * Ngày kết thúc của hồ sơ chưa phát hành: thời gian gây quỹ tính từ lúc chủ dự án phát hành,
-   * nên được chọn xa tối đa 60 + 3 ngày (dự trù chờ duyệt). Gửi duyệt thì phải còn ít nhất 7 + 3 ngày.
+   * Ngày kết thúc của hồ sơ chưa phát hành: cách hôm nay 7–60 ngày. Thời gian gây quỹ thật tính từ lúc
+   * chủ dự án phát hành nên được kiểm tra lại lúc đó.
    */
-  private assertDraftDuration(endDate: string | Date, requireReviewBuffer = false): void {
-    const problem = draftDurationProblem(new Date(endDate), new Date(), { requireReviewBuffer });
+  private assertDraftDuration(endDate: string | Date): void {
+    const problem = draftDurationProblem(new Date(endDate), new Date());
     if (problem === "too_short") {
       throw new BadRequestException(
-        requireReviewBuffer
-          ? `Ngày kết thúc phải cách hôm nay ít nhất ${MIN_CAMPAIGN_DURATION_DAYS + REVIEW_BUFFER_DAYS} ngày (${MIN_CAMPAIGN_DURATION_DAYS} ngày gây quỹ + ${REVIEW_BUFFER_DAYS} ngày chờ duyệt) — hãy sửa ngày kết thúc trước khi gửi duyệt`
-          : `Thời gian gây quỹ tối thiểu ${MIN_CAMPAIGN_DURATION_DAYS} ngày`,
+        `Ngày kết thúc phải cách hôm nay ít nhất ${MIN_CAMPAIGN_DURATION_DAYS} ngày — hãy sửa ngày kết thúc (nhớ dự trù 2–3 ngày chờ duyệt)`,
       );
     }
     if (problem === "too_long") {
       throw new BadRequestException(
-        `Thời gian gây quỹ tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày (ngày kết thúc cách hôm nay tối đa ${MAX_CAMPAIGN_DURATION_DAYS + REVIEW_BUFFER_DAYS} ngày, đã gồm ${REVIEW_BUFFER_DAYS} ngày chờ duyệt)`,
+        `Thời gian gây quỹ tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày (ngày kết thúc cách hôm nay tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày)`,
       );
     }
   }
@@ -450,8 +447,8 @@ export class CampaignsService {
       );
     }
 
-    // Phải còn đủ thời gian sau khi duyệt (7 ngày gây quỹ + 3 ngày chờ duyệt), và không quá 60 + 3 ngày.
-    this.assertDraftDuration(campaign.endDate, true);
+    // Ngày kết thúc phải cách hôm nay 7–60 ngày (chủ dự án tự dự trù thời gian chờ duyệt).
+    this.assertDraftDuration(campaign.endDate);
 
     // Như Kickstarter: phải khai báo nơi nhận tiền trước khi gửi duyệt, để khi thành công admin giải ngân được ngay.
     if (this.payoutRepo && (await this.payoutRepo.count({ where: { campaignId: campaign.id } })) === 0) {

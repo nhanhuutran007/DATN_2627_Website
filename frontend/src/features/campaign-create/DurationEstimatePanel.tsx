@@ -20,8 +20,8 @@ type DurationEstimatePanelProps = {
   deadline: string;
   title: string;
   onUseDuration: (days: number) => void;
-  /** Số ngày từ hôm nay tới lúc dự kiến phát hành (dự trù chờ duyệt). */
-  startOffsetDays?: number;
+  /** Thời hạn dài nhất được chọn (ngày, tính từ hôm nay). */
+  maxDays: number;
 };
 
 type State =
@@ -34,7 +34,7 @@ type State =
  * số tiền. Học từ các dự án Góp Mầm đã kết thúc (kết hợp mô hình học từ dữ liệu Kickstarter khi
  * Góp Mầm còn ít dữ liệu). Chỉ tham khảo.
  */
-export function DurationEstimatePanel({ category, goalAmount, minGoal, deadline, title, onUseDuration, startOffsetDays = 0 }: DurationEstimatePanelProps) {
+export function DurationEstimatePanel({ category, goalAmount, minGoal, deadline, title, onUseDuration, maxDays }: DurationEstimatePanelProps) {
   const [state, setState] = useState<State>({ status: "loading", previous: null });
   const ready = Boolean(category) && goalAmount >= minGoal;
 
@@ -43,8 +43,8 @@ export function DurationEstimatePanel({ category, goalAmount, minGoal, deadline,
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setState((current) => ({ status: "loading", previous: current.status === "ready" ? current.data : null }));
-      // Thời hạn tính từ lúc phát hành: bỏ số ngày chờ duyệt để ước lượng đúng số ngày gây quỹ thật.
-      const endDate = deadline ? new Date(new Date(`${deadline}T23:59:59`).getTime() - startOffsetDays * 86_400_000) : null;
+      // Số ngày gây quỹ tính từ hôm nay tới ngày kết thúc đã chọn (không tự cộng thời gian chờ duyệt).
+      const endDate = deadline ? new Date(`${deadline}T23:59:59`) : null;
       fetchDurationEstimate(
         {
           category,
@@ -63,7 +63,7 @@ export function DurationEstimatePanel({ category, goalAmount, minGoal, deadline,
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [ready, category, goalAmount, deadline, title, startOffsetDays]);
+  }, [ready, category, goalAmount, deadline, title]);
 
   const data = !ready ? null : state.status === "ready" ? state.data : state.status === "loading" ? state.previous : null;
 
@@ -77,24 +77,35 @@ export function DurationEstimatePanel({ category, goalAmount, minGoal, deadline,
 
       {!ready && <p className="hint">Nhập số tiền bạn cần huy động, AI sẽ gợi ý nên gây quỹ trong bao lâu.</p>}
       {ready && state.status === "unavailable" && (
-        <p className="hint">Dịch vụ gợi ý tạm thời gián đoạn. Bạn vẫn tạo chiến dịch bình thường.</p>
+        <p className="hint">Dịch vụ gợi ý tạm thời gián đoạn. Bạn vẫn tạo dự án bình thường.</p>
       )}
       {ready && !data && state.status === "loading" && <p className="hint">Đang phân tích các dự án tương tự…</p>}
-      {data && <EstimateBody data={data} goalAmount={goalAmount} onUseDuration={onUseDuration} />}
+      {data && <EstimateBody data={data} goalAmount={goalAmount} onUseDuration={onUseDuration} maxDays={maxDays} />}
     </section>
   );
+}
+
+/** Ngày kết thúc (dd/mm/yyyy) nếu gây quỹ `days` ngày kể từ hôm nay. */
+function endDateLabel(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString("vi-VN");
 }
 
 function EstimateBody({
   data,
   goalAmount,
   onUseDuration,
+  maxDays,
 }: {
   data: AiDurationEstimate;
   goalAmount: number;
   onUseDuration: (days: number) => void;
+  maxDays: number;
 }) {
-  const { duration, current, chosenDays, options } = data;
+  const { duration, current, chosenDays } = data;
+  // Chỉ hiện thời hạn chọn được (ngày kết thúc cách hôm nay tối đa `maxDays` ngày); ngày đang chọn luôn giữ để so sánh.
+  const options = data.options.filter((option) => option.days <= maxDays || option.days === chosenDays);
   const base = baseSuccessRate(current?.metrics ?? null);
   const level = current ? relativeLevel(current.probability, base) : null;
   const maxOption = Math.max(...options.map((option) => option.probability), 0.01);
@@ -124,10 +135,14 @@ function EstimateBody({
         {chosenInRange ? (
           <p className="goal-estimate-ok">Ngày kết thúc bạn chọn ({chosenDays} ngày) nằm trong khoảng gợi ý.</p>
         ) : (
-          <button className="button button-outline button-sm" type="button" onClick={() => onUseDuration(duration.days)}>
-            Đặt ngày kết thúc sau {duration.days} ngày
+          <button className="button button-outline button-sm" type="button" onClick={() => onUseDuration(Math.min(duration.days, maxDays))}>
+            Đặt ngày kết thúc sau {Math.min(duration.days, maxDays)} ngày ({endDateLabel(Math.min(duration.days, maxDays))})
           </button>
         )}
+        <p className="hint">
+          Số ngày tính từ hôm nay đến ngày kết thúc. Thời gian gây quỹ thật bắt đầu khi bạn bấm Phát hành, nên sẽ ngắn hơn
+          khoảng 2–3 ngày chờ duyệt — hãy cộng thêm nếu muốn gây quỹ đủ số ngày gợi ý.
+        </p>
       </div>
 
       {options.length > 1 && (
@@ -136,7 +151,7 @@ function EstimateBody({
           <ul className="goal-estimate-options">
             {options.map((option) => (
               <li key={option.days} className={option.days === chosenDays ? "is-current" : undefined}>
-                <button type="button" onClick={() => onUseDuration(option.days)} title={`Đặt ngày kết thúc sau ${option.days} ngày`}>
+                <button type="button" onClick={() => onUseDuration(option.days)} title={`Đặt ngày kết thúc sau ${option.days} ngày (${endDateLabel(option.days)})`}>
                   <span className="goal-estimate-amount">
                     {option.days} ngày
                     {option.days === chosenDays && <span className="goal-estimate-chosen">đang chọn</span>}

@@ -143,7 +143,7 @@ describe("CampaignsService", () => {
       equal(campaign.currentAmount, 0);
     });
 
-    it("should reject an end date shorter than 7 days or further than 60 + 3 days", async () => {
+    it("should reject an end date shorter than 7 days or further than 60 days", async () => {
       const dto = (days: number) => ({
         title: "Short campaign",
         description: "Long description",
@@ -152,9 +152,9 @@ describe("CampaignsService", () => {
         endDate: new Date(Date.now() + days * 86400000).toISOString(),
       });
       await rejects(campaignsService.create(dto(5) as any, makeUser()), BadRequestException);
-      await rejects(campaignsService.create(dto(65) as any, makeUser()), BadRequestException);
+      await rejects(campaignsService.create(dto(63) as any, makeUser()), BadRequestException);
       equal((await campaignsService.create(dto(10) as any, makeUser())).status, CampaignStatus.DRAFT);
-      equal((await campaignsService.create(dto(63) as any, makeUser())).status, CampaignStatus.DRAFT);
+      equal((await campaignsService.create(dto(60) as any, makeUser())).status, CampaignStatus.DRAFT);
     });
   });
 
@@ -390,15 +390,15 @@ describe("CampaignsService", () => {
       equal(campaign.status, CampaignStatus.PENDING);
     });
 
-    it("gửi duyệt khi ngày kết thúc không còn đủ 7 ngày gây quỹ + 3 ngày chờ duyệt thì bị từ chối", async () => {
+    it("gửi duyệt khi ngày kết thúc không còn đủ 7 ngày gây quỹ thì bị từ chối", async () => {
       repo.findOne = async () => ({
         ...createMockRepo().mockCampaign,
         status: CampaignStatus.DRAFT,
-        endDate: new Date(Date.now() + 8 * 86400000),
+        endDate: new Date(Date.now() + 5 * 86400000),
       });
       await rejects(
         campaignsService.submitForReview("123e4567-e89b-12d3-a456-426614174000", makeUser()),
-        (err: { status: number; message: string }) => err.status === 400 && err.message.includes("chờ duyệt"),
+        (err: { status: number; message: string }) => err.status === 400 && err.message.includes("ít nhất 7 ngày"),
       );
     });
 

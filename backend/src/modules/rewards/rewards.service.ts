@@ -48,6 +48,39 @@ const CLOSED_STATUSES = [
   CampaignStatus.ENDED,
 ];
 
+const DAY_MS = 86_400_000;
+const VIETNAM_OFFSET_MS = 7 * 60 * 60 * 1000;
+/** Ngày (yyyy-mm-dd) theo giờ Việt Nam. */
+const vnDay = (date: Date) => new Date(date.getTime() + VIETNAM_OFFSET_MS).toISOString().slice(0, 10);
+
+/**
+ * Hạn chọn quà và ngày dự kiến giao phải khớp thời gian gây quỹ (như Kickstarter): chỉ chọn quà
+ * trong lúc đang gây quỹ (hạn chọn không muộn hơn ngày kết thúc), và quà chỉ giao được sau khi
+ * chiến dịch kết thúc (ngày giao không sớm hơn ngày kết thúc).
+ */
+export function tierDateProblem(
+  campaign: Pick<Campaign, "endDate">,
+  dates: { availableUntil?: string | Date | null; estimatedDelivery?: string | null },
+  now = new Date(),
+): string | null {
+  const end = new Date(campaign.endDate);
+  if (Number.isNaN(end.getTime())) return null;
+  if (dates.availableUntil) {
+    const until = new Date(dates.availableUntil);
+    if (until.getTime() <= now.getTime()) return "Hạn chọn quà phải ở tương lai.";
+    // Lệch 1 ngày cho chọn ngày theo giờ địa phương.
+    if (until.getTime() > end.getTime() + DAY_MS) return "Hạn chọn quà không được muộn hơn ngày kết thúc gây quỹ.";
+  }
+  if (dates.estimatedDelivery) {
+    const delivery = String(dates.estimatedDelivery).slice(0, 10);
+    if (delivery < vnDay(end)) return "Ngày dự kiến giao quà phải sau ngày kết thúc gây quỹ.";
+    if (delivery > vnDay(new Date(end.getTime() + 730 * DAY_MS))) {
+      return "Ngày dự kiến giao quà không quá 2 năm sau ngày kết thúc gây quỹ.";
+    }
+  }
+  return null;
+}
+
 /** Mức quà còn chọn được: đang mở, còn suất, chưa quá hạn chọn. */
 export function isTierAvailable(tier: RewardTier, now = new Date()): boolean {
   const soldOut = tier.quantityLimit != null && tier.claimedCount >= tier.quantityLimit;
@@ -146,6 +179,8 @@ export class RewardsService {
     if (CLOSED_STATUSES.includes(campaign.status)) {
       throw new ConflictException("Chiến dịch đã kết thúc, không thêm mức quà được.");
     }
+    const dateProblem = tierDateProblem(campaign, dto);
+    if (dateProblem) throw new BadRequestException(dateProblem);
     const count = await this.tierRepo.count({ where: { campaignId } });
     if (count >= MAX_TIERS_PER_CAMPAIGN) {
       throw new BadRequestException(`Tối đa ${MAX_TIERS_PER_CAMPAIGN} mức quà mỗi chiến dịch.`);
@@ -195,6 +230,20 @@ export class RewardsService {
     if (dto.requiresShipping === false && tier.requiresShipping && tier.claimedCount > 0) {
       throw new ConflictException("Đã có người nhận quà này nên không đổi sang quà không cần giao được.");
     }
+
+    // Chỉ kiểm tra ngày được đổi (không chặn sửa tên/mô tả của mức quà cũ).
+    const changedDates = {
+      ...(dto.availableUntil !== undefined &&
+      (dto.availableUntil ? new Date(dto.availableUntil).getTime() : null) !==
+        (tier.availableUntil ? new Date(tier.availableUntil).getTime() : null)
+        ? { availableUntil: dto.availableUntil }
+        : {}),
+      ...(dto.estimatedDelivery !== undefined && dto.estimatedDelivery !== tier.estimatedDelivery
+        ? { estimatedDelivery: dto.estimatedDelivery }
+        : {}),
+    };
+    const dateProblem = tierDateProblem(campaign, changedDates);
+    if (dateProblem) throw new BadRequestException(dateProblem);
 
     const before = toTierView(tier);
     if (dto.title !== undefined) tier.title = dto.title;

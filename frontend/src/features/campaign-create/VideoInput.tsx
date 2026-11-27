@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { VideoPlayer } from "@/components/campaign/VideoPlayer";
 import { ApiError } from "@/lib/api";
-import { ACCEPTED_VIDEO_TYPES, uploadVideo, validateVideoFile } from "@/lib/api/media";
+import { ACCEPTED_VIDEO_TYPES, MAX_VIDEO_SECONDS, uploadVideo, validateVideoDuration, validateVideoFile } from "@/lib/api/media";
 import { isUploadedVideo, videoSource } from "@/lib/video";
 
 type Mode = "youtube" | "upload";
@@ -18,7 +18,7 @@ type VideoInputProps = {
 };
 
 /**
- * Video giới thiệu dự án (không bắt buộc): dán link YouTube hoặc tải file MP4/MOV/WebM ≤ 100 MB.
+ * Video giới thiệu dự án (không bắt buộc): dán link YouTube hoặc tải file MP4/MOV/WebM dài tối đa 2 phút.
  * Cả hai đều phát ngay trên trang dự án; ở đây có xem trước.
  */
 export function VideoInput({ value, onChange, disabled }: VideoInputProps) {
@@ -55,9 +55,10 @@ export function VideoInput({ value, onChange, disabled }: VideoInputProps) {
 
   const pickFile = async (file: File | undefined) => {
     if (!file) return;
-    const problem = validateVideoFile(file);
+    const problem = validateVideoFile(file) ?? (await validateVideoDuration(file));
     if (problem) {
       setError(problem);
+      if (inputRef.current) inputRef.current.value = "";
       return;
     }
     setError("");
@@ -95,7 +96,8 @@ export function VideoInput({ value, onChange, disabled }: VideoInputProps) {
     <div className="field video-input">
       <span className="create-q-label">Video giới thiệu <small>(không bắt buộc)</small></span>
       <p className="hint">
-        Nên dài 1–3 phút. 30 giây đầu hãy nói rõ ai cần giúp và số tiền dùng vào việc gì. Video phát ngay trên trang dự án.
+        Video tải lên dài tối đa {MAX_VIDEO_SECONDS / 60} phút. 30 giây đầu hãy nói rõ ai cần giúp và số tiền dùng vào việc gì.
+        Video phát ngay trên trang dự án.
       </p>
 
       <div className="video-input-modes" role="tablist" aria-label="Cách thêm video">
@@ -125,7 +127,7 @@ export function VideoInput({ value, onChange, disabled }: VideoInputProps) {
         <button className="video-input-drop" type="button" disabled={disabled} onClick={() => inputRef.current?.click()}>
           <Icon name="video" size={26} />
           <b>Chọn file video</b>
-          <span>MP4, MOV hoặc WebM · tối đa 100 MB</span>
+          <span>MP4, MOV hoặc WebM · dài tối đa {MAX_VIDEO_SECONDS / 60} phút</span>
         </button>
       )}
       <input

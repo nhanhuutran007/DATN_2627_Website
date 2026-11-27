@@ -18,7 +18,7 @@ import type { UploadedImageResponse } from "./dto/media.dto";
 import { MediaFile, MediaPurpose } from "./entities/media-file.entity";
 import { fingerprintImage } from "./image-fingerprint";
 import { MAX_IMAGE_BYTES, detectImageType, sanitizeOriginalName } from "./image-type";
-import { MAX_VIDEO_BYTES, detectVideoType } from "./video-type";
+import { MAX_VIDEO_BYTES, MAX_VIDEO_SECONDS, detectVideoType, exceedsMaxVideoDuration } from "./video-type";
 
 /** Tiền tố URL công khai của file; khớp `GET /media/:folder/:file`. */
 export const MEDIA_URL_PREFIX = "/api/v1/media/";
@@ -87,17 +87,20 @@ export class MediaService {
     return this.saveRecord(file, user, purpose, storageKey, type.mimeType, fingerprint);
   }
 
-  /** Video giới thiệu dự án: MP4/WebM (nhận diện theo nội dung file), tối đa 100 MB. */
+  /** Video giới thiệu dự án: MP4/WebM (nhận diện theo nội dung file), tối đa 2 phút. */
   async uploadVideo(file: IncomingFile | undefined, user: User): Promise<UploadedImageResponse> {
     if (!file || !file.buffer || file.size === 0) {
       throw new BadRequestException("Vui lòng chọn một file video.");
     }
     if (file.size > MAX_VIDEO_BYTES) {
-      throw new PayloadTooLargeException("Video tối đa 100 MB.");
+      throw new PayloadTooLargeException(`Video quá lớn (tối đa ${MAX_VIDEO_BYTES / 1024 / 1024} MB). Hãy xuất lại ở 1080p hoặc thấp hơn.`);
     }
     const type = detectVideoType(file.buffer);
     if (!type) {
       throw new BadRequestException("Chỉ chấp nhận video MP4, MOV hoặc WebM.");
+    }
+    if (exceedsMaxVideoDuration(file.buffer)) {
+      throw new BadRequestException(`Video dài tối đa ${MAX_VIDEO_SECONDS / 60} phút. Hãy cắt ngắn rồi tải lên lại.`);
     }
     const purpose = MediaPurpose.CAMPAIGN_VIDEO;
     const storageKey = `${FOLDER_BY_PURPOSE[purpose]}/${randomUUID()}.${type.extension}`;

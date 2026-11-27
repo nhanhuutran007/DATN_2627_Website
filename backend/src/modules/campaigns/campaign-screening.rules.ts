@@ -9,7 +9,6 @@ import {
   campaignDurationDays,
   draftDurationProblem,
   MAX_CAMPAIGN_DURATION_DAYS,
-  REVIEW_BUFFER_DAYS,
 } from "./campaign-duration";
 
 export const SCREENING_RULES_VERSION = "2026.11-r3";
@@ -171,12 +170,12 @@ function checkCompleteness(input: ScreeningInput): ScreeningCheck {
   if (campaign.endDate.getTime() <= now.getTime()) {
     findings.push({ status: "fail", message: "Ngày kết thúc gây quỹ đã qua.", points: 10 });
   } else {
-    // Chưa phát hành: thời hạn tính tới lúc phát hành, nên cho phép thêm số ngày dự trù chờ duyệt.
+    // Chưa phát hành: ngày kết thúc cách hôm nay tối đa 60 ngày.
     const days = Math.round(campaignDurationDays(campaign.endDate, null, now));
     if (draftDurationProblem(campaign.endDate, now) === "too_long") {
       findings.push({
         status: "fail",
-        message: `Ngày kết thúc cách hôm nay ${days} ngày, vượt tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày gây quỹ (+${REVIEW_BUFFER_DAYS} ngày chờ duyệt).`,
+        message: `Ngày kết thúc cách hôm nay ${days} ngày, vượt tối đa ${MAX_CAMPAIGN_DURATION_DAYS} ngày gây quỹ.`,
         points: 10,
       });
     }

@@ -16104,3 +16104,248 @@ html:has(dialog:modal) .admin-sidebar {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* ===== Wizard tạo dự án: ô bắt buộc, lỗi từng ô, tiêu chí, xem trước ===== */
+.create-form .required-mark {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.create-alert {
+  margin: 0 0 18px;
+  scroll-margin-top: 24px;
+}
+
+.rich-field.is-invalid .ck.ck-editor__top .ck-toolbar,
+.rich-field.is-invalid .ck.ck-editor__main > .ck-editor__editable,
+.rich-field.is-invalid .ck.ck-editor__main > .ck-editor__editable:not(.ck-focused) {
+  border-color: #b42318;
+}
+
+.rich-field.is-invalid .ck.ck-editor__main > .ck-editor__editable.ck-focused {
+  box-shadow: 0 0 0 2px rgba(180, 35, 24, 0.18);
+}
+
+.create-q > .field-error {
+  margin: 6px 0 0;
+}
+
+.refund-bank input[aria-invalid="true"] {
+  border-color: #b42318;
+}
+
+.image-uploader-drop small + small {
+  color: var(--muted);
+}
+
+/* Bảng tóm tắt: tên và nội dung dài xuống dòng trong khung, không tràn ra ngoài. */
+.review-grid > div {
+  min-width: 0;
+}
+
+.review-grid dd {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.review-grid-wide {
+  grid-column: 1 / -1;
+}
+
+.checklist-box li > span:not(.sr-only) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.checklist-box li svg {
+  flex: none;
+}
+
+.checklist-box li.is-missing svg {
+  color: #b42318;
+}
+
+.check-row.is-invalid {
+  padding: 10px 12px;
+  border: 1px solid #f7c1ba;
+  border-radius: 8px;
+  background: #fdecea;
+}
+
+.review-preview-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+}
+
+.review-preview-cta p {
+  margin: 4px 0 0;
+}
+
+.review-preview-cta .button,
+.create-bar-actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Hộp xem trước trang dự án (toàn màn hình) */
+.campaign-preview {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--white);
+  color: var(--text);
+  overflow-y: auto;
+}
+
+.campaign-preview::backdrop {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.campaign-preview-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line);
+  background: #fff8e6;
+}
+
+.campaign-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #8a5a00;
+  font-weight: 600;
+}
+
+.campaign-preview-bar .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.campaign-preview-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.campaign-preview-page .detail-title {
+  overflow-wrap: anywhere;
+}
+
+.campaign-preview-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.campaign-preview-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
+  gap: 28px;
+  align-items: start;
+  margin-top: 18px;
+}
+
+.campaign-preview-cover-icon {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--muted);
+}
+
+.campaign-preview-organizer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.campaign-preview-fund {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+}
+
+.campaign-preview-fund p {
+  margin: 0;
+}
+
+.campaign-preview-body {
+  max-width: 760px;
+  margin-top: 28px;
+}
+
+.campaign-preview-summary {
+  overflow-wrap: anywhere;
+}
+
+.campaign-preview-body .rich-text,
+.campaign-preview-body .detail-story {
+  overflow-wrap: anywhere;
+}
+
+.campaign-preview-missing {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #b42318;
+}
+
+.campaign-preview-milestones {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.campaign-preview-milestones li {
+  overflow-wrap: anywhere;
+}
+
+.campaign-preview-milestones li > span {
+  display: block;
+}
+
+.campaign-preview-milestones p {
+  margin: 4px 0 0;
+  white-space: pre-line;
+}
+
+.campaign-preview-rewards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 860px) {
+  .campaign-preview-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .review-preview-cta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

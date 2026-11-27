@@ -18,10 +18,23 @@ import { CreateCampaignDto, UpdateCampaignDto } from "../src/modules/campaigns/d
 import { MediaPurpose } from "../src/modules/media/entities/media-file.entity";
 import { parseByteRange } from "../src/modules/media/media.controller";
 import { MEDIA_URL_PREFIX, MediaService } from "../src/modules/media/media.service";
-import { MAX_VIDEO_BYTES, detectVideoType } from "../src/modules/media/video-type";
+import { MAX_VIDEO_BYTES, detectVideoType, mp4DurationSeconds } from "../src/modules/media/video-type";
 import { makeAuditRecorder } from "./helpers/audit";
 
 const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from("ftypisom"), Buffer.alloc(8)]);
+
+/** MP4 tối giản: hộp `ftyp` + `moov/mvhd` (version 0) với thời lượng `seconds`. */
+function mp4WithDuration(seconds: number): Buffer {
+  const ftyp = Buffer.concat([Buffer.from([0, 0, 0, 16]), Buffer.from("ftypisom"), Buffer.alloc(4)]);
+  const mvhdBody = Buffer.alloc(100);
+  mvhdBody.writeUInt32BE(1000, 12); // timescale
+  mvhdBody.writeUInt32BE(seconds * 1000, 16); // duration
+  const mvhd = Buffer.concat([Buffer.alloc(4), Buffer.from("mvhd"), mvhdBody]);
+  mvhd.writeUInt32BE(mvhd.length, 0);
+  const moov = Buffer.concat([Buffer.alloc(4), Buffer.from("moov"), mvhd]);
+  moov.writeUInt32BE(moov.length, 0);
+  return Buffer.concat([ftyp, moov]);
+}
 const MOV = Buffer.concat([Buffer.from([0, 0, 0, 0x14]), Buffer.from("ftypqt  "), Buffer.alloc(8)]);
 const WEBM = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(8)]);
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
@@ -157,7 +170,16 @@ describe("MediaService.uploadVideo", () => {
     equal(repo.rows[0].purpose, MediaPurpose.CAMPAIGN_VIDEO);
   });
 
-  it("từ chối thiếu file, file quá 100 MB hoặc không phải video", async () => {
+  it("đọc thời lượng MP4 và từ chối video dài hơn 2 phút", async () => {
+    equal(mp4DurationSeconds(mp4WithDuration(90)), 90);
+    equal(mp4DurationSeconds(MP4), null);
+    const short = mp4WithDuration(110);
+    ok((await service.uploadVideo({ buffer: short, size: short.length }, user)).url);
+    const long = mp4WithDuration(180);
+    await rejects(service.uploadVideo({ buffer: long, size: long.length }, user), BadRequestException);
+  });
+
+  it("từ chối thiếu file, file quá lớn hoặc không phải video", async () => {
     await rejects(service.uploadVideo(undefined, user), BadRequestException);
     await rejects(service.uploadVideo({ buffer: MP4, size: MAX_VIDEO_BYTES + 1 }, user), PayloadTooLargeException);
     await rejects(service.uploadVideo({ buffer: PNG, size: PNG.length }, user), BadRequestException);

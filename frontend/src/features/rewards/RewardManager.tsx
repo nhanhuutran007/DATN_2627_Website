@@ -23,6 +23,13 @@ const CLAIM_STATUS: Record<string, { label: string; tone: string }> = {
   charge_failed: { label: "Trừ tiền thất bại", tone: "tag-red" },
 };
 
+/** Ngày (yyyy-mm-dd) theo giờ địa phương của mốc thời gian ISO. */
+function localDay(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function message(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
 }
@@ -31,7 +38,10 @@ function message(err: unknown, fallback: string): string {
  * Quản lý mức quà của một chiến dịch đã có: xem trước thẻ quà như người ủng hộ thấy,
  * sửa/ngừng nhận từng mức, thêm mức mới, và danh sách người nhận quà (backer report).
  */
-export function RewardManager({ campaignId, closed }: { campaignId: string; closed: boolean }) {
+export function RewardManager({ campaignId, closed, endDate }: { campaignId: string; closed: boolean; endDate?: string }) {
+  // Mức quà mới: hạn chọn không muộn hơn ngày kết thúc, quà giao sau khi kết thúc.
+  const deadline = endDate ? localDay(endDate) : "";
+  const newTierRules = { deadline, requireDelivery: true };
   const [tiers, setTiers] = useState<RewardTier[]>([]);
   const [claims, setClaims] = useState<RewardClaim[]>([]);
   const [state, setState] = useState<LoadState>("loading");
@@ -104,7 +114,7 @@ export function RewardManager({ campaignId, closed }: { campaignId: string; clos
 
   const add = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const invalid = validateTiers([draft]);
+    const invalid = validateTiers([draft], newTierRules);
     if (invalid || !draft.title.trim()) {
       setError(invalid || "Vui lòng nhập thông tin mức quà.");
       return;
@@ -184,7 +194,7 @@ export function RewardManager({ campaignId, closed }: { campaignId: string; clos
         adding ? (
           <form className="reward-add" onSubmit={add}>
             <p className="reward-add-title">Thêm mức quà</p>
-            <RewardTierFields tier={draft} onChange={setDraft} />
+            <RewardTierFields tier={draft} dateRules={newTierRules} onChange={setDraft} />
             <div className="own-actions">
               <button className="button button-primary button-sm" type="submit" disabled={busy === "new"}>
                 {busy === "new" ? "Đang thêm…" : "Thêm mức"}

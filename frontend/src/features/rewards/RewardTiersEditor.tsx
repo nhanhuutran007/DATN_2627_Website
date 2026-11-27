@@ -50,8 +50,49 @@ export function tierToDraft(t: RewardTier): DraftTier {
   };
 }
 
+/** yyyy-mm-dd theo giờ địa phương (như ô `<input type="date">`). */
+function toDateInput(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Ngày `value` (yyyy-mm-dd) cộng `days` ngày. */
+function addDays(value: string, days: number) {
+  const d = new Date(`${value}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return toDateInput(d);
+}
+
+const formatDay = (value: string) => value.split("-").reverse().join("/");
+
+/** Quà giao muộn nhất 2 năm sau khi kết thúc gây quỹ. */
+const MAX_DELIVERY_DAYS = 730;
+
+/**
+ * Ràng buộc ngày theo thời gian gây quỹ (như Kickstarter): chỉ chọn quà trong lúc gây quỹ
+ * (hạn chọn từ hôm nay tới ngày kết thúc), quà giao sau khi kết thúc (dự kiến giao từ ngày hôm sau).
+ */
+export type TierDateRules = {
+  /** Ngày kết thúc gây quỹ (yyyy-mm-dd); rỗng = chưa chọn. */
+  deadline?: string;
+  /** Bắt buộc nhập ngày dự kiến giao (wizard tạo dự án, thêm mức mới). */
+  requireDelivery?: boolean;
+};
+
+/** Khoảng ngày cho ô "Hạn chọn quà" và "Dự kiến giao". */
+export function tierDateBounds(tier: Pick<DraftTier, "until">, rules: TierDateRules = {}) {
+  const today = toDateInput(new Date());
+  const deadline = rules.deadline || "";
+  const deliveryFrom = deadline ? addDays(deadline, 1) : today;
+  return {
+    untilMin: today,
+    untilMax: deadline || undefined,
+    deliveryMin: tier.until && tier.until > deliveryFrom ? tier.until : deliveryFrom,
+    deliveryMax: deadline ? addDays(deadline, MAX_DELIVERY_DAYS) : undefined,
+  };
+}
+
 /** Kiểm tra các mức đã nhập (bỏ qua mức để trống hoàn toàn). Trả thông báo lỗi đầu tiên hoặc "". */
-export function validateTiers(tiers: DraftTier[]): string {
+export function validateTiers(tiers: DraftTier[], rules: TierDateRules = {}): string {
   for (const [i, t] of tiers.entries()) {
     if (isBlank(t)) continue;
     const label = tiers.length > 1 ? `Mức quà ${i + 1}` : "Mức quà";
@@ -64,6 +105,23 @@ export function validateTiers(tiers: DraftTier[]): string {
       if (item.name.trim().length < 2) return `${label}: tên món quà cần ít nhất 2 ký tự.`;
       const qty = Number(item.quantity || "1");
       if (!(Number.isInteger(qty) && qty >= 1 && qty <= 1000)) return `${label}: số lượng mỗi món từ 1 đến 1000.`;
+    }
+    const bounds = tierDateBounds(t, rules);
+    if (t.until) {
+      if (t.until < bounds.untilMin) return `${label}: hạn chọn quà không được ở quá khứ.`;
+      if (bounds.untilMax && t.until > bounds.untilMax) {
+        return `${label}: hạn chọn quà không được muộn hơn ngày kết thúc gây quỹ (${formatDay(bounds.untilMax)}).`;
+      }
+    }
+    if (!t.delivery) {
+      if (rules.requireDelivery) return `${label}: vui lòng chọn thời gian dự kiến giao quà.`;
+    } else if (rules.deadline) {
+      if (t.delivery < bounds.deliveryMin) {
+        return `${label}: dự kiến giao phải sau ngày kết thúc gây quỹ, từ ${formatDay(bounds.deliveryMin)} trở đi.`;
+      }
+      if (bounds.deliveryMax && t.delivery > bounds.deliveryMax) {
+        return `${label}: dự kiến giao không quá 2 năm sau khi kết thúc gây quỹ (muộn nhất ${formatDay(bounds.deliveryMax)}).`;
+      }
     }
   }
   return "";
@@ -96,10 +154,13 @@ type FieldsProps = {
   onChange: (tier: DraftTier) => void;
   /** Sau khi phát hành: số tiền tối thiểu không đổi được. */
   lockAmount?: boolean;
+  /** Ràng buộc ngày theo thời gian gây quỹ. */
+  dateRules?: TierDateRules;
 };
 
 /** Các trường của một mức quà kiểu Kickstarter (dùng trong wizard và trang quản lý). */
-export function RewardTierFields({ tier, onChange, lockAmount = false }: FieldsProps) {
+export function RewardTierFields({ tier, onChange, lockAmount = false, dateRules = {} }: FieldsProps) {
+  const bounds = tierDateBounds(tier, dateRules);
   const set = <K extends keyof DraftTier>(key: K, value: DraftTier[K]) => onChange({ ...tier, [key]: value });
   const setItem = (index: number, patch: Partial<DraftItem>) =>
     set("items", tier.items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -127,7 +188,7 @@ export function RewardTierFields({ tier, onChange, lockAmount = false }: FieldsP
       </div>
 
       <fieldset className="reward-items-field">
-        <legend>Bao gồm <small>(mỗi món một dòng, như Kickstarter)</small></legend>
+        <legend>Bao gồm <small>(mỗi món một dòng)</small></legend>
         {tier.items.map((item, index) => (
           <div className="reward-item-row" key={index}>
             <input
@@ -160,13 +221,24 @@ export function RewardTierFields({ tier, onChange, lockAmount = false }: FieldsP
 
       <div className="field-row">
         <label className="field">
-          <span>Dự kiến giao</span>
-          <input type="date" value={tier.delivery} onChange={(e) => set("delivery", e.target.value)} />
+          <span>Hạn chọn quà</span>
+          <input type="date" min={bounds.untilMin} max={bounds.untilMax} value={tier.until} onChange={(e) => set("until", e.target.value)} />
+          <small className="hint">
+            {bounds.untilMax ? `Bỏ trống = đến hết ngày kết thúc (${formatDay(bounds.untilMax)})` : "Bỏ trống = đến hết thời gian gây quỹ"}
+          </small>
         </label>
         <label className="field">
-          <span>Hạn chọn quà</span>
-          <input type="date" value={tier.until} onChange={(e) => set("until", e.target.value)} />
-          <small className="hint">Bỏ trống = đến hết chiến dịch</small>
+          <span>Dự kiến giao{dateRules.requireDelivery && <span className="required-mark" aria-hidden="true"> *</span>}</span>
+          <input
+            type="date"
+            min={dateRules.deadline ? bounds.deliveryMin : undefined}
+            max={bounds.deliveryMax}
+            value={tier.delivery}
+            onChange={(e) => set("delivery", e.target.value)}
+          />
+          <small className="hint">
+            {dateRules.deadline ? `Sau khi kết thúc gây quỹ, từ ${formatDay(bounds.deliveryMin)}` : "Sau khi kết thúc gây quỹ"}
+          </small>
         </label>
         <fieldset className="field field-span-2 reward-shipping">
           <legend>Hình thức nhận quà</legend>
@@ -189,21 +261,22 @@ export function RewardTierFields({ tier, onChange, lockAmount = false }: FieldsP
 type Props = {
   tiers: DraftTier[];
   onChange: (tiers: DraftTier[]) => void;
+  dateRules?: TierDateRules;
 };
 
-/** Soạn danh sách mức ủng hộ & phần quà (dùng trong wizard tạo chiến dịch). */
-export function RewardTiersEditor({ tiers, onChange }: Props) {
+/** Soạn danh sách mức ủng hộ & phần quà (dùng trong wizard tạo dự án). */
+export function RewardTiersEditor({ tiers, onChange, dateRules }: Props) {
   return (
     <div className="reward-editor">
       <h3>Mức ủng hộ &amp; phần quà <small>(tùy chọn)</small></h3>
       <p className="hint">
-        Như Kickstarter: mỗi mức nêu rõ số tiền, các món bao gồm, thời gian dự kiến giao và hình thức nhận quà. Sau khi chiến dịch
-        phát hành, số tiền tối thiểu của mỗi mức không thay đổi được để giữ đúng cam kết với người đã ủng hộ.
+        Mỗi mức nêu rõ số tiền, các món bao gồm, thời gian dự kiến giao và hình thức nhận quà. Sau khi dự án phát hành, số
+        tiền tối thiểu của mỗi mức không thay đổi được để giữ đúng cam kết với người đã ủng hộ.
       </p>
       {tiers.map((tier, index) => (
         <fieldset className="milestone" key={index}>
           <legend>Mức quà {index + 1}</legend>
-          <RewardTierFields tier={tier} onChange={(next) => onChange(tiers.map((t, i) => (i === index ? next : t)))} />
+          <RewardTierFields tier={tier} dateRules={dateRules} onChange={(next) => onChange(tiers.map((t, i) => (i === index ? next : t)))} />
           <button className="link-danger" type="button" onClick={() => onChange(tiers.filter((_, i) => i !== index))}>
             Xóa mức này
           </button>

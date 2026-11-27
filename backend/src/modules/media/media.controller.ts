@@ -22,7 +22,7 @@ import { MAX_IMAGE_BYTES } from "./image-type";
 import { type IncomingFile, MediaService } from "./media.service";
 import { MAX_VIDEO_BYTES } from "./video-type";
 
-/** Mỗi phản hồi `206 Partial Content` tối đa 4 MB, không đọc cả video 100 MB vào bộ nhớ. */
+/** Mỗi phản hồi `206 Partial Content` tối đa 4 MB, không đọc cả video vào bộ nhớ. */
 const MAX_RANGE_BYTES = 4 * 1024 * 1024;
 
 /**
@@ -66,7 +66,7 @@ export class MediaController {
     return this.mediaService.uploadImage(file, user, dto.purpose);
   }
 
-  /** Video giới thiệu dự án (MP4/MOV/WebM ≤ 100 MB). */
+  /** Video giới thiệu dự án (MP4/MOV/WebM, tối đa 2 phút). */
   @Post("videos")
   @UseGuards(JwtAuthGuard, RateLimitGuard)
   @RateLimit({ limit: 10, windowMs: 60 * 60_000, keyPrefix: "media-video-upload" })

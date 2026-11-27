@@ -115,6 +115,11 @@ const initialDraft: Draft = {
 const MIN_STORY = 80;
 const MIN_TARGET = 1_000_000;
 
+// Xem trước dùng bộ lọc HTML (nặng): chỉ tải khi mở.
+const CampaignPreview = dynamic(() => import("@/features/campaign-create/CampaignPreview").then((m) => m.CampaignPreview), {
+  ssr: false,
+});
+
 // CKEditor dùng `window`, chỉ tải ở trình duyệt.
 const RichTextEditor = dynamic(() => import("@/components/ui/RichTextEditor"), {
   ssr: false,
@@ -128,12 +133,11 @@ function toDateInput(d: Date) {
 
 /**
  * Thời gian gây quỹ 7–60 ngày (như Kickstarter), tính từ lúc chủ dự án bấm "Phát hành" sau khi được
- * duyệt; khớp `MIN/MAX_CAMPAIGN_DURATION_DAYS` + `REVIEW_BUFFER_DAYS` ở backend `campaign-duration.ts`.
+ * duyệt. Ngày kết thúc chọn trong 7–60 ngày kể từ hôm nay (không tự cộng ngày chờ duyệt, chủ dự án tự
+ * dự trù); khớp `MIN/MAX_CAMPAIGN_DURATION_DAYS` ở backend `campaign-duration.ts`.
  */
 const MIN_DURATION_DAYS = 7;
 const MAX_DURATION_DAYS = 60;
-/** Dự trù thời gian chờ duyệt (admin phản hồi trong 24–48 giờ). */
-const REVIEW_BUFFER_DAYS = 3;
 
 function dateAfter(days: number) {
   const d = new Date();
@@ -141,24 +145,14 @@ function dateAfter(days: number) {
   return toDateInput(d);
 }
 
-/** Ngày kết thúc sớm nhất: còn đủ 7 ngày gây quỹ sau 3 ngày chờ duyệt. */
+/** Ngày kết thúc sớm nhất: 7 ngày kể từ hôm nay. */
 function minDeadline() {
-  return dateAfter(MIN_DURATION_DAYS + REVIEW_BUFFER_DAYS);
+  return dateAfter(MIN_DURATION_DAYS);
 }
 
-/** Ngày kết thúc muộn nhất: 60 ngày gây quỹ + 3 ngày chờ duyệt. */
+/** Ngày kết thúc muộn nhất: 60 ngày kể từ hôm nay. */
 function maxDeadline() {
-  return dateAfter(MAX_DURATION_DAYS + REVIEW_BUFFER_DAYS);
-}
-
-/** Số ngày gây quỹ ước tính nếu phát hành sau `REVIEW_BUFFER_DAYS` ngày. */
-function estimatedDuration(deadline: string): number | null {
-  if (!deadline) return null;
-  const end = new Date(`${deadline}T23:59:59`).getTime();
-  if (Number.isNaN(end)) return null;
-  const publishAt = new Date();
-  publishAt.setDate(publishAt.getDate() + REVIEW_BUFFER_DAYS);
-  return Math.floor((end - publishAt.getTime()) / 86_400_000);
+  return dateAfter(MAX_DURATION_DAYS);
 }
 
 function formatDay(value: string) {
@@ -166,9 +160,9 @@ function formatDay(value: string) {
   return `${d}/${m}/${y}`;
 }
 
-/** Ngày kết thúc để gây quỹ `days` ngày sau khi phát hành (đã cộng thời gian chờ duyệt), trong khoảng cho phép. */
+/** Ngày kết thúc sau `days` ngày kể từ hôm nay, trong khoảng cho phép. */
 function deadlineAfter(days: number) {
-  const value = dateAfter(days + REVIEW_BUFFER_DAYS);
+  const value = dateAfter(days);
   if (value < minDeadline()) return minDeadline();
   return value > maxDeadline() ? maxDeadline() : value;
 }
@@ -180,10 +174,19 @@ function minMilestoneDate(milestones: DraftMilestone[], index: number) {
   return previous && previous > today ? previous : today;
 }
 
+/** Gợi ý tên cho các mốc mặc định (chỉ là chữ mờ, không tính là đã nhập). */
+const MILESTONE_PLACEHOLDERS = ["Ví dụ: Chuẩn bị và khảo sát", "Ví dụ: Triển khai hoạt động chính", "Ví dụ: Tổng kết và công bố báo cáo"];
+
+const milestoneHasContent = (m: DraftMilestone) => Boolean(m.title.trim() || m.deadline || m.budget || m.output.trim());
+
+/** Mốc đã đặt tên: chỉ những mốc này được lưu và tính vào "Số mốc". */
+const namedMilestones = (milestones: DraftMilestone[]) => milestones.filter((m) => m.title.trim());
+
 function validateMilestones(milestones: DraftMilestone[]): string {
   const today = toDateInput(new Date());
   let previous: { label: string; deadline: string } | null = null;
   for (const [index, m] of milestones.entries()) {
+    if (!m.title.trim() && milestoneHasContent(m)) return `Mốc ${index + 1}: vui lòng nhập tên mốc (hoặc xóa mốc này).`;
     if (!m.deadline) continue;
     const label = `Mốc ${index + 1}`;
     if (m.deadline < today) return `Hạn hoàn thành của ${label} không được ở quá khứ.`;
@@ -291,12 +294,17 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
   }, [step]);
   const [draft, setDraft] = useState<Draft>({ ...initialDraft, category: initialCategory ?? "" });
   const categories = useCategories();
-  const [milestones, setMilestones] = useState<DraftMilestone[]>([
-    { ...emptyMilestone, title: "Chuẩn bị và khảo sát" },
-    { ...emptyMilestone, title: "Triển khai hoạt động chính" },
-    { ...emptyMilestone, title: "Tổng kết và công bố báo cáo" },
-  ]);
+  const [milestones, setMilestones] = useState<DraftMilestone[]>([{ ...emptyMilestone }, { ...emptyMilestone }, { ...emptyMilestone }]);
   const [error, setError] = useState("");
+  // Lỗi của từng ô (hiện ngay dưới ô và tô đỏ khung).
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<"budget" | "risks", string>>>({});
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  /** Báo lỗi ở đầu form và cuộn tới đó để người dùng thấy ngay (vd. chưa tích cam kết ở cuối trang). */
+  const showError = (message: string) => {
+    setError(message);
+    if (message) window.requestAnimationFrame(() => errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [declared, setDeclared] = useState(false);
@@ -353,7 +361,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
     };
   }, [userId, editId]);
   const COLLAB_BLOCKED =
-    "Bạn là cộng tác viên của tổ chức này nên không tự tạo chiến dịch cho tổ chức được. Hãy nhờ người đại diện tạo; bạn sẽ quản lý chiến dịch theo quyền được giao.";
+    "Bạn là cộng tác viên của tổ chức này nên không tự tạo dự án cho tổ chức được. Hãy nhờ người đại diện tạo; bạn sẽ quản lý dự án theo quyền được giao.";
   const collabBlocked = !!pickedOrganization && collabOrgIds.includes(pickedOrganization.id);
   const loginPath = editId ? `/dang-nhap?next=${encodeURIComponent(`/tao-chien-dich?sua=${editId}`)}` : "/dang-nhap?next=/tao-chien-dich";
 
@@ -423,12 +431,12 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
 
   const checks = useMemo(
     () => [
-      { ok: draft.title.trim().length >= 10, label: "Tên chiến dịch rõ ràng (từ 10 ký tự)" },
+      { ok: draft.title.trim().length >= 10, label: "Tên dự án rõ ràng (từ 10 ký tự)" },
       { ok: draft.summary.trim().length > 0, label: "Có mô tả ngắn hiển thị ở danh sách" },
       { ok: storyLength >= MIN_STORY, label: `Câu chuyện đủ chi tiết (từ ${MIN_STORY} ký tự)` },
       { ok: htmlToText(draft.budget).length > 0, label: "Có dự toán sử dụng vốn" },
       { ok: htmlToText(draft.risks).length > 0, label: "Có nêu rủi ro và phương án ứng phó" },
-      { ok: milestones.filter((m) => m.title.trim()).length >= 2, label: "Kế hoạch có ít nhất 2 mốc" },
+      { ok: namedMilestones(milestones).length >= 2, label: "Kế hoạch có ít nhất 2 mốc" },
       {
         ok: target > 0 && plannedBudget > 0 && Math.abs(plannedBudget - target) / target <= 0.1,
         label: "Tổng ngân sách các mốc khớp mục tiêu (lệch không quá 10%)",
@@ -443,7 +451,16 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
   const update = (key: keyof Draft, value: string) => {
     setDraft((current) => ({ ...current, [key]: value }));
     setNotice("");
+    if ((key === "budget" || key === "risks") && fieldErrors[key] && htmlToText(value)) {
+      setFieldErrors((current) => ({ ...current, [key]: undefined }));
+    }
   };
+
+  /** Lỗi của riêng ô dự toán / rủi ro (bắt buộc). */
+  const budgetFieldErrors = () => ({
+    ...(htmlToText(draft.budget) ? {} : { budget: "Vui lòng nhập dự toán sử dụng vốn." }),
+    ...(htmlToText(draft.risks) ? {} : { risks: "Vui lòng nêu rủi ro và phương án ứng phó." }),
+  });
 
   const updateMilestone = (index: number, key: keyof DraftMilestone, value: string) => {
     setMilestones((current) => current.map((m, i) => (i === index ? { ...m, [key]: value } : m)));
@@ -462,10 +479,10 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
       if (target < MIN_TARGET) return "Mục tiêu tối thiểu là 1.000.000 ₫.";
       if (!draft.deadline) return "Vui lòng chọn ngày kết thúc gây quỹ.";
       if (draft.deadline < minDeadline()) {
-        return `Ngày kết thúc phải từ ${formatDay(minDeadline())} trở đi (tối thiểu ${MIN_DURATION_DAYS} ngày gây quỹ + ${REVIEW_BUFFER_DAYS} ngày chờ duyệt).`;
+        return `Ngày kết thúc phải từ ${formatDay(minDeadline())} trở đi (tối thiểu ${MIN_DURATION_DAYS} ngày gây quỹ).`;
       }
       if (draft.deadline > maxDeadline()) {
-        return `Ngày kết thúc muộn nhất là ${formatDay(maxDeadline())} (tối đa ${MAX_DURATION_DAYS} ngày gây quỹ + ${REVIEW_BUFFER_DAYS} ngày chờ duyệt).`;
+        return `Ngày kết thúc muộn nhất là ${formatDay(maxDeadline())} (tối đa ${MAX_DURATION_DAYS} ngày gây quỹ).`;
       }
     }
     if (index === STEP_IMAGE) {
@@ -473,14 +490,15 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
       if (draft.videoUrl.trim() && !videoSource(draft.videoUrl.trim())) return "Video phải là link YouTube hoặc file đã tải lên.";
     }
     if (index === STEP_STORY) {
-      if (!draft.title.trim()) return "Vui lòng đặt tên cho chiến dịch.";
+      if (!draft.title.trim()) return "Vui lòng đặt tên cho dự án.";
       if (!forDraft && storyLength < MIN_STORY) return `Câu chuyện cần ít nhất ${MIN_STORY} ký tự.`;
     }
     if (index === STEP_BUDGET && !forDraft) {
-      if (!htmlToText(draft.budget) || !htmlToText(draft.risks)) return "Vui lòng nhập dự toán sử dụng vốn và rủi ro.";
+      const missing = budgetFieldErrors();
+      if (missing.budget || missing.risks) return missing.budget ?? missing.risks ?? "";
     }
     if (index === STEP_MILESTONES) return validateMilestones(milestones);
-    if (index === STEP_REWARDS) return validateTiers(tiers);
+    if (index === STEP_REWARDS) return validateTiers(tiers, { deadline: draft.deadline, requireDelivery: true });
     if (index === STEP_PAYOUT) {
       const blank = !bank.bankName.trim() && !bank.accountNumber.trim() && !bank.accountName.trim();
       // Lưu nháp được khi chưa nhập; gửi duyệt thì bắt buộc (như Kickstarter).
@@ -504,10 +522,45 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
     setStep(Math.max(0, Math.min(LAST_STEP, index)));
   };
 
-  const goNext = () => {
+  /** Lỗi ở bước dự toán hiện ngay dưới từng ô (tô đỏ khung) thay vì một dòng chung. */
+  const flagStep = (index: number) => {
+    if (index === STEP_BUDGET) setFieldErrors(budgetFieldErrors());
+  };
+
+  /** Chuyển tới bước còn lỗi và báo lỗi. */
+  const failAt = (invalid: { index: number; message: string }) => {
+    setStep(invalid.index);
+    flagStep(invalid.index);
+    showError(invalid.index === STEP_BUDGET ? "" : invalid.message);
+  };
+
+  const goNext = async () => {
     const message = validateStep(step);
-    setError(message);
-    if (!message) setStep((current) => Math.min(LAST_STEP, current + 1));
+    flagStep(step);
+    if (message) {
+      showError(step === STEP_BUDGET ? "" : message);
+      return;
+    }
+    setError("");
+    // Rời bước tài khoản nhận tiền: lưu ngay để gửi mã xác nhận qua email (cần đăng nhập).
+    if (step === STEP_PAYOUT && user && !bankDraftError(bank) && bankKey(bankPayload(bank)) !== savedBankKey) {
+      const invalid = firstInvalid(true);
+      if (invalid) {
+        failAt(invalid);
+        return;
+      }
+      setBusy(true);
+      try {
+        await persist();
+        setNotice("Đã xác nhận và lưu tài khoản nhận tiền.");
+      } catch (err) {
+        showError(messageFor(err));
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
+    setStep((current) => Math.min(LAST_STEP, current + 1));
   };
 
   const toPayload = (): CreateCampaignPayload => {
@@ -585,8 +638,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
     if (requireLogin()) return;
     const invalid = firstInvalid(true);
     if (invalid) {
-      setError(invalid.message);
-      setStep(invalid.index);
+      failAt(invalid);
       return;
     }
     setError("");
@@ -595,7 +647,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
       await persist();
       setNotice("Đã lưu bản nháp. Bạn có thể tiếp tục chỉnh sửa và gửi duyệt ở bước cuối.");
     } catch (err) {
-      setError(messageFor(err));
+      showError(messageFor(err));
     } finally {
       setBusy(false);
     }
@@ -604,19 +656,19 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setNotice("");
+    if (busy) return;
     if (step < LAST_STEP) {
-      goNext();
+      await goNext();
       return;
     }
     if (requireLogin()) return;
     const invalid = firstInvalid(false);
     if (invalid) {
-      setError(invalid.message);
-      setStep(invalid.index);
+      failAt(invalid);
       return;
     }
     if (!declared) {
-      setError("Vui lòng xác nhận cam kết trước khi gửi duyệt.");
+      showError("Vui lòng tích ô xác nhận cam kết ở cuối trang trước khi gửi duyệt.");
       return;
     }
     setError("");
@@ -626,7 +678,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
       await submitCampaign(id);
       setSubmitted(true);
     } catch (err) {
-      setError(messageFor(err));
+      showError(messageFor(err));
     } finally {
       setBusy(false);
     }
@@ -684,7 +736,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
           <div className="create-body" aria-live="polite">
             {!user ? (
               <p className="create-login-hint">
-                Vui lòng <Link href={loginPath}>đăng nhập</Link> để sửa hồ sơ chiến dịch của bạn.
+                Vui lòng <Link href={loginPath}>đăng nhập</Link> để sửa hồ sơ dự án của bạn.
               </p>
             ) : editState === "error" ? (
               <>
@@ -698,6 +750,9 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
         ) : (
           <form ref={formRef} className="create-form" tabIndex={-1} onSubmit={submit} noValidate aria-label={STEPS[step].title}>
             <div className={`create-body${step === STEP_STORY || step === STEP_BUDGET ? " create-body-wide" : ""}`}>
+              {/* Thông báo ở đầu form để thấy ngay mà không cần cuộn xuống. */}
+              {error && <p ref={errorRef} className="form-error create-alert" role="alert">{error}</p>}
+              {notice && <p className="form-notice" role="status">{notice}</p>}
               {reviewNote && step === STEP_BASICS && (
                 <p className="form-notice" role="status">
                   <b>Quản trị viên yêu cầu:</b> {reviewNote} Sửa các mục liên quan rồi gửi duyệt lại ở bước cuối.
@@ -789,8 +844,8 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                   <div className="create-q">
                     <label htmlFor="create-deadline">Khi nào kết thúc gây quỹ?</label>
                     <p>
-                      Gây quỹ từ {MIN_DURATION_DAYS} đến {MAX_DURATION_DAYS} ngày, tính từ lúc bạn bấm <b>Phát hành</b> sau khi hồ sơ được duyệt.
-                      Chọn ngày từ {formatDay(minDeadline())} đến {formatDay(maxDeadline())}.
+                      Thời gian gây quỹ tối thiểu là {MIN_DURATION_DAYS} ngày và tối đa {MAX_DURATION_DAYS} ngày kể từ lúc bạn bấm{" "}
+                      <b>Phát hành</b> sau khi hồ sơ được duyệt. Chọn ngày từ {formatDay(minDeadline())} đến {formatDay(maxDeadline())}.
                     </p>
                     <input
                       id="create-deadline"
@@ -805,12 +860,6 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                       <Icon name="clock" size={15} />
                       <span>
                         Quản trị viên duyệt hồ sơ trong 24–48 giờ, vì vậy hãy <b>dự trù thêm 2–3 ngày</b> chờ duyệt khi chọn ngày kết thúc.
-                        {(() => {
-                          const days = estimatedDuration(draft.deadline);
-                          return days !== null && days > 0
-                            ? ` Nếu phát hành sau ${REVIEW_BUFFER_DAYS} ngày, dự án sẽ gây quỹ khoảng ${days} ngày.`
-                            : "";
-                        })()}
                       </span>
                     </p>
                   </div>
@@ -822,7 +871,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                       deadline={draft.deadline}
                       title={draft.title}
                       onUseDuration={(days) => update("deadline", deadlineAfter(days))}
-                      startOffsetDays={REVIEW_BUFFER_DAYS}
+                      maxDays={MAX_DURATION_DAYS}
                     />
                   )}
                 </>
@@ -831,11 +880,12 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
               {step === STEP_IMAGE && (
                 <div className="create-q">
                   <ImageUploader
-                    label="Ảnh đại diện"
+                    label="Ảnh đại diện dự án"
                     value={draft.imageUrl}
                     onChange={(url) => update("imageUrl", url)}
                     disabled={busy}
                     hint="Bỏ trống sẽ dùng ảnh minh họa theo lĩnh vực."
+                    hintInside
                   />
                   <VideoInput value={draft.videoUrl} onChange={(url) => update("videoUrl", url)} disabled={busy} />
                 </div>
@@ -844,7 +894,7 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
               {step === STEP_STORY && (
                 <>
                   <div className="create-q">
-                    <label htmlFor="create-title">Đặt tên cho chiến dịch</label>
+                    <label htmlFor="create-title">Đặt tên cho dự án</label>
                     <input id="create-title" value={draft.title} maxLength={200} placeholder="Ví dụ: Thư viện nhỏ cho điểm trường vùng cao" onChange={(e) => update("title", e.target.value)} />
                     <small>{draft.title.length}/200</small>
                   </div>
@@ -865,15 +915,26 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
               {step === STEP_BUDGET && (
                 <>
                   <div className="create-q">
-                    <span className="create-q-label">Dự toán sử dụng vốn</span>
+                    <span className="create-q-label" id="create-budget-label">
+                      Dự toán sử dụng vốn <span className="required-mark" aria-hidden="true">*</span>
+                    </span>
                     <p>Hạng mục, số tiền và căn cứ ước tính.</p>
-                    <RichTextEditor value={draft.budget} placeholder="Ví dụ: Mua 500 đầu sách – 25.000.000 ₫ (theo báo giá nhà sách)" disabled={busy} onChange={(html) => update("budget", html)} />
+                    <div className={`rich-field${fieldErrors.budget ? " is-invalid" : ""}`}>
+                      <RichTextEditor value={draft.budget} placeholder="Ví dụ: Mua 500 đầu sách – 25.000.000 ₫ (theo báo giá nhà sách)" disabled={busy} onChange={(html) => update("budget", html)} />
+                    </div>
+                    {fieldErrors.budget && <p className="field-error" role="alert">{fieldErrors.budget}</p>}
                   </div>
                   <div className="create-q">
-                    <span className="create-q-label">Rủi ro và phương án ứng phó</span>
+                    <span className="create-q-label" id="create-risks-label">
+                      Rủi ro và phương án ứng phó <span className="required-mark" aria-hidden="true">*</span>
+                    </span>
                     <p>Rủi ro về tiến độ, chi phí, vận hành và cách bạn xử lý.</p>
-                    <RichTextEditor value={draft.risks} placeholder="Ví dụ: Giá sách tăng – ưu tiên đầu sách thiết yếu, kêu gọi tặng sách cũ" disabled={busy} onChange={(html) => update("risks", html)} />
+                    <div className={`rich-field${fieldErrors.risks ? " is-invalid" : ""}`}>
+                      <RichTextEditor value={draft.risks} placeholder="Ví dụ: Giá sách tăng – ưu tiên đầu sách thiết yếu, kêu gọi tặng sách cũ" disabled={busy} onChange={(html) => update("risks", html)} />
+                    </div>
+                    {fieldErrors.risks && <p className="field-error" role="alert">{fieldErrors.risks}</p>}
                   </div>
+                  <p className="hint"><span className="required-mark" aria-hidden="true">*</span> Bắt buộc trước khi gửi duyệt.</p>
                 </>
               )}
 
@@ -885,7 +946,11 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                       <div className="field-row">
                         <label className="field field-span-4">
                           <span>Tên mốc</span>
-                          <input value={milestone.title} placeholder="Ví dụ: Mua sách và kệ" onChange={(e) => updateMilestone(index, "title", e.target.value)} />
+                          <input
+                            value={milestone.title}
+                            placeholder={MILESTONE_PLACEHOLDERS[index] ?? "Ví dụ: Mua sách và kệ"}
+                            onChange={(e) => updateMilestone(index, "title", e.target.value)}
+                          />
                         </label>
                         <label className="field field-span-2">
                           <span>Hạn hoàn thành</span>
@@ -917,14 +982,18 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
               )}
 
               {step === STEP_REWARDS && (
-                <RewardTiersEditor tiers={tiers} onChange={(next) => { setTiers(next); setNotice(""); }} />
+                <RewardTiersEditor
+                  tiers={tiers}
+                  dateRules={{ deadline: draft.deadline, requireDelivery: true }}
+                  onChange={(next) => { setTiers(next); setNotice(""); }}
+                />
               )}
 
               {step === STEP_PAYOUT && (
                 <div className="form">
                   {knownBanks.length > 0 && (
                     <div className="payout-reuse">
-                      <p className="hint">Dùng lại tài khoản đã khai báo ở chiến dịch trước:</p>
+                      <p className="hint">Dùng lại tài khoản đã khai báo ở dự án trước:</p>
                       <div className="payout-reuse-list">
                         {knownBanks.map((known) => {
                           const selected = bankKey(known) === bankKey(bankPayload(bank));
@@ -959,27 +1028,46 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                         : "Tài khoản nên đứng tên bạn. Chỉ bạn và quản trị viên xem được."
                     }
                   />
+                  {user && !bankDraftError(bank) && bankKey(bankPayload(bank)) === savedBankKey ? (
+                    <p className="form-notice" role="status">
+                      <Icon name="check" size={15} /> Tài khoản này đã được xác nhận và lưu cho dự án.
+                    </p>
+                  ) : (
+                    <p className="hint">
+                      Khi bấm <b>Tiếp tục</b>, Góp Mầm gửi mã xác nhận gồm 6 chữ số tới email của bạn để lưu tài khoản (hiệu lực{" "}
+                      10 phút).
+                    </p>
+                  )}
                   <p className="hint">
-                    Lưu tài khoản cần nhập mã xác nhận gửi qua email. Người ủng hộ chỉ thanh toán khi dự án đạt mục tiêu; hết hạn
-                    thanh toán (7 ngày), Góp Mầm chuyển toàn bộ tiền đã thu vào tài khoản này một lần.
+                    Người ủng hộ chỉ thanh toán khi dự án đạt mục tiêu; hết hạn thanh toán (7 ngày), Góp Mầm chuyển toàn bộ tiền
+                    đã thu vào tài khoản này một lần.
                   </p>
                 </div>
               )}
 
               {step === LAST_STEP && (
                 <div className="form">
+                  <div className="review-preview-cta">
+                    <div>
+                      <b>Xem trước trang dự án</b>
+                      <p className="hint">Xem tổng thể dự án như người ủng hộ sẽ thấy trước khi gửi duyệt.</p>
+                    </div>
+                    <button className="button button-outline" type="button" onClick={() => setPreviewOpen(true)}>
+                      <Icon name="eye" size={18} /> Xem trước
+                    </button>
+                  </div>
                   <dl className="review-grid">
-                    <div><dt>Tên chiến dịch</dt><dd>{draft.title || "—"}</dd></div>
+                    <div className="review-grid-wide"><dt>Tên dự án</dt><dd>{draft.title || "—"}</dd></div>
                     <div><dt>Gây quỹ cho</dt><dd>{pickedOrganization ? pickedOrganization.name : "Dự án của tôi"}</dd></div>
                     <div><dt>Lĩnh vực</dt><dd>{draft.category || "—"}</dd></div>
                     <div><dt>Video</dt><dd>{videoSource(draft.videoUrl) ? (isUploadedVideo(draft.videoUrl) ? "Video tải lên" : "Video YouTube") : "Không có"}</dd></div>
                     <div><dt>Địa điểm</dt><dd>{draft.location || "—"}</dd></div>
                     <div><dt>Mục tiêu</dt><dd>{target ? `${target.toLocaleString("vi-VN")}\u00A0₫` : "—"}</dd></div>
                     <div><dt>Ngày kết thúc</dt><dd>{draft.deadline ? new Date(draft.deadline).toLocaleDateString("vi-VN") : "—"}</dd></div>
-                    <div><dt>Số mốc</dt><dd>{milestones.filter((m) => m.title.trim()).length}</dd></div>
+                    <div><dt>Số mốc</dt><dd>{namedMilestones(milestones).length || "Chưa có"}</dd></div>
                     <div><dt>Mức quà</dt><dd>{tiersToPayloads(tiers).length || "Không có"}</dd></div>
                     <div>
-                      <dt>Nhận tiền vào</dt>
+                      <dt>Tài khoản nhận tiền</dt>
                       <dd>{bankDraftError(bank) ? "Chưa khai báo" : `${bank.bankName.trim()} ${maskAccount(bankPayload(bank).bankAccountNumber)}`}</dd>
                     </div>
                   </dl>
@@ -987,22 +1075,28 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                     <h3>Tiêu chí hồ sơ ({passed}/{checks.length})</h3>
                     <ul>
                       {checks.map((check) => (
-                        <li className={check.ok ? "is-ok" : ""} key={check.label}>
-                          <Icon name={check.ok ? "check" : "clock"} size={15} /> {check.label}
+                        <li className={check.ok ? "is-ok" : "is-missing"} key={check.label}>
+                          <Icon name={check.ok ? "check" : "alert"} size={15} />
+                          <span>{check.label}</span>
+                          <span className="sr-only">{check.ok ? " (đạt)" : " (chưa đạt)"}</span>
                         </li>
                       ))}
                     </ul>
                     <p className="hint">Đây là danh sách tự kiểm tra, không phải điểm chấm. Quản trị viên là người quyết định duyệt hồ sơ.</p>
                   </div>
-                  <label className="check-row">
-                    <input type="checkbox" checked={declared} onChange={(e) => setDeclared(e.target.checked)} />
+                  <label className={`check-row${error && !declared ? " is-invalid" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={declared}
+                      onChange={(e) => {
+                        setDeclared(e.target.checked);
+                        if (e.target.checked) setError("");
+                      }}
+                    />
                     <span>Tôi xác nhận thông tin là trung thực và cam kết báo cáo tiến độ, chi tiêu theo kế hoạch đã nêu.</span>
                   </label>
                 </div>
               )}
-
-              {error && <p className="form-error" role="alert">{error}</p>}
-              {notice && <p className="form-notice" role="status">{notice}</p>}
             </div>
 
             <div className="create-bar">
@@ -1025,6 +1119,9 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
                   <span />
                 )}
                 <div className="create-bar-actions">
+                  <button className="button button-ghost" type="button" onClick={() => setPreviewOpen(true)}>
+                    <Icon name="eye" size={18} /> Xem trước
+                  </button>
                   <button className="button button-ghost" type="button" disabled={busy} onClick={() => void saveDraft()}>Lưu nháp</button>
                   <button className="button button-primary create-next" type="submit" disabled={busy}>
                     {busy ? "Đang lưu…" : step === LAST_STEP ? "Gửi duyệt" : "Tiếp tục"}
@@ -1035,6 +1132,26 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
           </form>
         )}
       </section>
+      {previewOpen && (
+        <CampaignPreview
+          onClose={() => setPreviewOpen(false)}
+          title={draft.title}
+          summary={draft.summary}
+          category={draft.category}
+          location={draft.location}
+          organizationName={pickedOrganization?.name ?? null}
+          ownerName={user?.name ?? ""}
+          imageUrl={isImageValue(draft.imageUrl.trim()) ? draft.imageUrl.trim() : ""}
+          videoUrl={videoSource(draft.videoUrl.trim()) ? draft.videoUrl.trim() : ""}
+          goalAmount={target}
+          deadline={draft.deadline}
+          story={draft.story}
+          budget={draft.budget}
+          risks={draft.risks}
+          milestones={namedMilestones(milestones)}
+          tiers={tiersToPayloads(tiers)}
+        />
+      )}
     </div>
   );
 }

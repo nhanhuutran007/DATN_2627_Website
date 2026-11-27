@@ -93,7 +93,7 @@ describe("RewardsService", () => {
       ],
     };
     const campaignsService = {
-      findById: async () => ({ id: CAMPAIGN_ID, ownerId: OWNER.id, status }),
+      findById: async () => ({ id: CAMPAIGN_ID, ownerId: OWNER.id, status, endDate: new Date("2099-02-01T16:59:59.000Z") }),
     } as unknown as CampaignsService;
     const recipientRepo: any = {
       find: async () => [{ donationId: "d2", recipientName: "Bob Nguyễn", phone: "0901234567", address: "12 Lê Lợi, Huế" }],
@@ -106,6 +106,16 @@ describe("RewardsService", () => {
     equal(view.remaining, 50);
     equal(audit.entries.at(-1)?.action, "reward_tier.create");
     await rejects(service.create(CAMPAIGN_ID, { title: "Áo", description: "Áo phông in logo", minAmount: 500000 }, DONOR), ForbiddenException);
+  });
+
+  it("hạn chọn quà không muộn hơn ngày kết thúc, ngày giao không sớm hơn ngày kết thúc", async () => {
+    const base = { title: "Gói ghi danh", description: "Tên bạn trên bảng vinh danh", minAmount: 100000 };
+    await rejects(service.create(CAMPAIGN_ID, { ...base, availableUntil: "2099-03-01T00:00:00.000Z" }, OWNER), BadRequestException);
+    await rejects(service.create(CAMPAIGN_ID, { ...base, availableUntil: "2000-01-01T00:00:00.000Z" }, OWNER), BadRequestException);
+    await rejects(service.create(CAMPAIGN_ID, { ...base, estimatedDelivery: "2099-01-15" }, OWNER), BadRequestException);
+    await rejects(service.create(CAMPAIGN_ID, { ...base, estimatedDelivery: "2102-01-15" }, OWNER), BadRequestException);
+    const saved = await service.create(CAMPAIGN_ID, { ...base, availableUntil: "2099-02-01T16:59:59.000Z", estimatedDelivery: "2099-03-15" }, OWNER);
+    equal(saved.estimatedDelivery, "2099-03-15");
   });
 
   it("lưu ảnh, món bao gồm, loại giao và hạn chọn quà", async () => {

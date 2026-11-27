@@ -14,7 +14,7 @@ export enum MediaPurpose {
   ORGANIZATION_DOCUMENT = "organization_document",
   /** Ảnh đại diện lĩnh vực — chỉ admin tải lên. */
   CATEGORY_IMAGE = "category_image",
-  /** Video giới thiệu dự án (MP4/WebM ≤ 100 MB), tải qua `POST /media/videos`. */
+  /** Video giới thiệu dự án (MP4/WebM, tối đa 2 phút), tải qua `POST /media/videos`. */
   CAMPAIGN_VIDEO = "campaign_video",
 }
 

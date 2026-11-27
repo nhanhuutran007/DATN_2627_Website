@@ -16,6 +16,23 @@ export const COMMON_BANKS = [
 export const accountDigits = (value: string) => value.replace(/[\s.-]/g, "");
 export const ACCOUNT_PATTERN = /^\d{6,19}$/;
 export const maskAccount = (value: string) => `•••• ${value.slice(-4)}`;
+/** Tên chủ tài khoản: chỉ chữ cái và khoảng trắng (không chữ số), 3–70 ký tự — khớp kiểm tra ở server. */
+export const ACCOUNT_NAME_MIN = 3;
+export const ACCOUNT_NAME_MAX = 70;
+const ACCOUNT_NAME_PATTERN = /^[\p{L} ]+$/u;
+const normalizeName = (value: string) => value.trim().replace(/\s+/g, " ");
+
+/** Lỗi của riêng tên chủ tài khoản, hoặc "" (để hiện ngay dưới ô khi đang nhập). */
+export function accountNameError(value: string): string {
+  const name = normalizeName(value);
+  if (!name) return "Vui lòng nhập tên chủ tài khoản.";
+  if (/\d/.test(name)) return "Tên chủ tài khoản không được chứa chữ số.";
+  if (!ACCOUNT_NAME_PATTERN.test(name)) return "Tên chủ tài khoản chỉ gồm chữ cái và khoảng trắng.";
+  if (name.length < ACCOUNT_NAME_MIN || name.length > ACCOUNT_NAME_MAX) {
+    return `Tên chủ tài khoản cần từ ${ACCOUNT_NAME_MIN} đến ${ACCOUNT_NAME_MAX} ký tự.`;
+  }
+  return "";
+}
 
 export type BankDraft = { bankName: string; accountNumber: string; accountName: string };
 
@@ -25,15 +42,14 @@ export const EMPTY_BANK: BankDraft = { bankName: "", accountNumber: "", accountN
 export function bankDraftError(bank: BankDraft): string {
   if (bank.bankName.trim().length < 2) return "Vui lòng nhập tên ngân hàng.";
   if (!ACCOUNT_PATTERN.test(accountDigits(bank.accountNumber))) return "Số tài khoản chỉ gồm 6–19 chữ số.";
-  if (bank.accountName.trim().length < 2) return "Vui lòng nhập tên chủ tài khoản.";
-  return "";
+  return accountNameError(bank.accountName);
 }
 
 export function bankPayload(bank: BankDraft) {
   return {
     bankName: bank.bankName.trim(),
     bankAccountNumber: accountDigits(bank.accountNumber),
-    bankAccountName: bank.accountName.trim().toUpperCase(),
+    bankAccountName: normalizeName(bank.accountName).toUpperCase(),
   };
 }
 
@@ -69,6 +85,8 @@ export function BankFields({
   legend?: string;
 }) {
   const banksId = useId();
+  // Báo lỗi tên ngay khi đã nhập (ô trống thì chờ tới lúc lưu mới báo).
+  const nameError = value.accountName.trim() ? accountNameError(value.accountName) : "";
   return (
     <fieldset className="refund-bank">
       <legend>{legend}</legend>
@@ -101,12 +119,15 @@ export function BankFields({
       <label className="field">
         <span>Tên chủ tài khoản</span>
         <input
-          maxLength={100}
+          maxLength={ACCOUNT_NAME_MAX}
           autoComplete="off"
           placeholder="Vd. NGUYEN VAN A"
           value={value.accountName}
+          aria-invalid={nameError ? true : undefined}
+          aria-describedby={nameError ? `${banksId}-name-error` : undefined}
           onChange={(e) => onChange({ ...value, accountName: e.target.value.toUpperCase() })}
         />
+        {nameError && <small className="field-error" id={`${banksId}-name-error`}>{nameError}</small>}
       </label>
     </fieldset>
   );
