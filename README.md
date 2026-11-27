@@ -454,7 +454,7 @@ Kịch bản kiểm thử đầu-cuối (E2E) tự động theo luồng _đăng 
 Hạ tầng được mô tả dưới dạng mã (Infrastructure as Code) tại [`infra/terraform/`](infra/terraform):
 
 - **Amazon ECS Fargate** chạy frontend, backend, AI service và Redis.
-- **Application Load Balancer** định tuyến theo đường dẫn.
+- **Application Load Balancer** định tuyến theo đường dẫn và chia tải cho frontend/backend: mỗi service chạy 2 task trên 2 vùng sẵn sàng, tự co giãn tới 4 task theo CPU và số request (`autoscaling.tf`); job định kỳ của backend chỉ chạy ở 1 task mỗi lượt nhờ bảng khóa `scheduler_locks`.
 - **Amazon RDS** cho MySQL 8 (lớp `t4g.micro`).
 - **Amazon ECR** lưu Docker image.
 - _Tối ưu chi phí:_ task Fargate đặt trong public subnet để không cần NAT Gateway, inbound bị khóa bằng Security Group (chỉ ALB được gọi vào).
@@ -591,8 +591,12 @@ DATN_2627_Website/
   - Quản trị viên chỉ duyệt, không kích hoạt thay; hàng đợi gắn nhãn "Quá 48 giờ" cho hồ sơ chờ quá hạn cam kết. Chế độ tự duyệt rủi ro thấp chỉ chuyển sang "Đã duyệt", không tự phát hành.
   - Chủ dự án bấm **Phát hành** ở Trang của tôi (chọn lại ngày kết thúc được); chiến dịch "Đã duyệt" không hiện ở trang công khai, lượt xem, bình luận, sổ cái, theo dõi, báo cáo, trang tổ chức và mục nổi bật. Bài cập nhật và kế hoạch mốc soạn được ngay từ khi được duyệt.
   - Thời gian gây quỹ 7–60 ngày tính từ lúc phát hành (trước là từ 1 tháng tính từ lúc tạo); ô ngày kết thúc nhắc dự trù thêm 2–3 ngày chờ duyệt và ước tính số ngày gây quỹ; gợi ý thời hạn của AI trừ đi thời gian chờ duyệt.
+- Cân bằng tải trên AWS (27–28/11/2026, migration `1790000000039`):
+  - Frontend và backend mỗi service chạy tối thiểu 2 task trải trên 2 vùng sẵn sàng, tự co giãn tới 4 task theo CPU trung bình (60%) và số request mỗi task; ALB chọn task ít request đang xử lý nhất; deploy cuốn chiếu, task mới hỏng thì tự quay lại bản cũ.
+  - Job định kỳ (chốt chiến dịch hết hạn, hết hạn giao dịch, tất toán cam kết, hoàn tự động, nhắc người theo dõi, dọn thông báo, cảnh báo rủi ro, mốc quá hạn) dùng khóa trong bảng `scheduler_locks` để chỉ một instance chạy mỗi lượt; lỗi CSDL thì bỏ lượt chứ không chạy trùng.
+  - Đã deploy và thử trên AWS (2 + 2 task khỏe trên 2 vùng, `gopmam.com` hoạt động); sau đó hạ tầng được tắt (giữ ECR) để tiết kiệm chi phí.
 
-_Cập nhật lần cuối: 26/11/2026._
+_Cập nhật lần cuối: 28/11/2026._
 
 ### 15.2. Hạn chế
 
