@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Be_Vietnam_Pro, Montserrat } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Suspense } from "react";
 
 import { ChromeGate } from "@/components/layout/ChromeGate";
@@ -16,17 +16,10 @@ import { siteUrl } from "@/lib/site";
 
 import "./theme.css";
 
-const bodyFont = Be_Vietnam_Pro({
+/** Inter (variable, có dấu tiếng Việt) dùng chung cho nội dung, tiêu đề và số liệu. */
+const inter = Inter({
   subsets: ["vietnamese", "latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-body",
-  display: "swap",
-});
-
-const headingFont = Montserrat({
-  subsets: ["vietnamese", "latin"],
-  weight: ["600", "700", "800"],
-  variable: "--font-display",
+  variable: "--font-inter",
   display: "swap",
 });
 
@@ -65,7 +58,7 @@ export default function RootLayout({
 }>) {
   return (
     // data-scroll-behavior: Next tạm tắt cuộn mượt (theme.css) khi chuyển trang, tránh trang dừng lệch giữa chừng.
-    <html lang="vi" className={`${bodyFont.variable} ${headingFont.variable}`} data-scroll-behavior="smooth">
+    <html lang="vi" className={inter.variable} data-scroll-behavior="smooth">
       <body>
         <DialogProvider>
           <ChromeGate>

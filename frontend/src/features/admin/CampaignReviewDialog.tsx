@@ -24,7 +24,7 @@ const money = (value: number | string | null | undefined) => `${Number(value ?? 
 const date = (value?: string | null) => (value ? new Date(value).toLocaleDateString("vi-VN") : "—");
 
 const FRAME_STYLE = `
-  body { margin: 0; font: 15px/1.75 "Be Vietnam Pro", "Segoe UI", Arial, sans-serif; color: #4a5268; overflow-wrap: anywhere; }
+  body { margin: 0; font: 15px/1.75 "Inter", "Segoe UI", Arial, sans-serif; color: #4a5268; overflow-wrap: anywhere; }
   body > p:first-child { color: #151d36; font-weight: 500; }
   h2, h3, h4 { color: #151d36; margin: 1.2em 0 .4em; line-height: 1.35; }
   img { max-width: 100%; height: auto; border-radius: 8px; }

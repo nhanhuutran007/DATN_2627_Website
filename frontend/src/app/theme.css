@@ -1,7 +1,7 @@
 /*
  * Góp Mầm — giao diện chính
  * Phong cách website doanh nghiệp: nền trắng, thanh trên navy, màu nhấn đỏ san hô,
- * tiêu đề và số liệu Montserrat, nội dung Be Vietnam Pro, thẻ bo góc có bóng nhẹ,
+ * toàn trang dùng font Inter (tiêu đề, số liệu, nội dung), thẻ bo góc có bóng nhẹ,
  * nhãn dạng viên thuốc. Đây là file CSS duy nhất của frontend.
  */
 
@@ -21,8 +21,8 @@
   --success-soft: #e7f5ec;
   --radius: 12px;
   --shadow-card: 0 10px 30px rgba(21, 29, 54, 0.08);
-  --font-heading: var(--font-display), "Montserrat", "Segoe UI", Arial, sans-serif;
-  --font-text: var(--font-body), "Be Vietnam Pro", "Segoe UI", Arial, sans-serif;
+  --font-heading: var(--font-inter), "Inter", "Segoe UI", Arial, sans-serif;
+  --font-text: var(--font-inter), "Inter", "Segoe UI", Arial, sans-serif;
   --container: 1200px;
 }
 
@@ -33,8 +33,8 @@ body {
 }
 
 /*
- * Laptop/PC: hiển thị toàn bộ giao diện ở mức 90% (như zoom 90% của trình duyệt) — Be Vietnam Pro
- * và Montserrat rộng nét hơn font của GoFundMe nên ở 100% trang trông to. `zoom` co đều cả chữ,
+ * Laptop/PC: hiển thị toàn bộ giao diện ở mức 90% (như zoom 90% của trình duyệt) — ở 100% các
+ * khối chữ trông to so với màn hình rộng. `zoom` co đều cả chữ,
  * khoảng cách, nút, ảnh; người dùng vẫn tự phóng to/thu nhỏ bằng trình duyệt như bình thường.
  * Điện thoại/máy tính bảng giữ 100% để chữ đủ lớn.
  *
@@ -45,6 +45,42 @@ body {
   --page-zoom: 1;
   --vh-unit: calc(1vh / var(--page-zoom));
   --dvh-unit: calc(1dvh / var(--page-zoom));
+  /*
+   * Header phóng to riêng cho dễ nhìn (chỉ khi có thanh menu đầy đủ, ≥1100px): màn hình lớn 125%,
+   * nhỏ dần theo bề rộng để menu trái và nút phải không đè lên logo. Khung header rộng hơn khung
+   * nội dung (`--header-container`) để menu có chỗ. `--header-h` = chiều cao thật của header
+   * (72px + viền 1px, đã nhân zoom) cho các thanh dính bên dưới.
+   */
+  --header-zoom: 1;
+  --header-container: var(--container);
+  --header-gutter: 32px;
+  --header-h: calc(73px * var(--header-zoom));
+  /* Cỡ nội dung trang chi tiết dự án (≥1100px thu nhỏ còn 90%); `--local-zoom` = zoom của vùng
+     đang đứng, để các khoảng `top`/`scroll-margin` theo header không bị nhân sai bên trong vùng zoom. */
+  --detail-zoom: 1;
+  --detail-container: 1320px;
+  --local-zoom: 1;
+}
+
+@media screen and (min-width: 1100px) {
+  :root {
+    --header-zoom: 1.05;
+    --header-container: 1440px;
+    --detail-zoom: 1;
+    --header-gutter: 96px;
+  }
+}
+
+@media screen and (min-width: 1280px) {
+  :root {
+    --header-zoom: 1.15;
+  }
+}
+
+@media screen and (min-width: 1600px) {
+  :root {
+    --header-zoom: 1.25;
+  }
 }
 
 @media screen and (min-width: 1024px) {
@@ -70,7 +106,7 @@ h3 {
   color: var(--navy);
   font-family: var(--font-heading);
   font-weight: 700;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.015em;
 }
 
 ::selection {
@@ -486,39 +522,6 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
-/* Chi tiết ví: 3 thẻ so sánh số trong ví với sổ (số dư / đang giữ / chờ rút) */
-.wallet-compare {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.wallet-compare-card {
-  display: grid;
-  gap: 10px;
-  align-content: start;
-  padding: 14px 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--white);
-}
-
-.wallet-compare-card.is-bad {
-  border-color: #f5c2bd;
-}
-
-.wallet-compare-card h3 {
-  margin: 0;
-  color: var(--navy);
-  font-size: 0.95rem;
-}
-
-@media (max-width: 760px) {
-  .wallet-compare {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 /* Bảng có thanh cuộn ngang: email và số tiền không bị bẻ giữa chừng trên điện thoại */
 .table-scroll td.cell-email,
 .table-scroll td.num,
@@ -566,7 +569,7 @@ h3 {
   }
 }
 
-/* Hai tab trong mục Đối soát: giao dịch chiến dịch | ví người dùng */
+/* Thanh tab dạng viên thuốc (mục admin có nhiều phần) */
 .recon-tabs {
   width: fit-content;
   max-width: 100%;
@@ -590,84 +593,6 @@ h3 {
   font-weight: 700;
   line-height: 20px;
   text-align: center;
-}
-
-/* Đối soát ví: tên + email, số phụ xuống dòng; dòng đang xem/giao dịch lệch tô nền */
-#doi-soat-vi td small,
-.wallet-recon-detail td small {
-  display: block;
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-#doi-soat-vi tr.is-selected td,
-.wallet-recon-detail tr.is-selected td {
-  background: #fff4e5;
-}
-
-.wallet-recon-detail {
-  display: grid;
-  gap: 16px;
-  margin-top: 20px;
-}
-
-.wallet-recon-detail h2 small {
-  margin-left: 6px;
-  font-size: 0.85rem;
-  font-weight: 400;
-}
-
-/* Ví lệch: cột trái "vì sao bị khóa", cột phải "cách mở khóa" theo bước */
-.wallet-recon-alert {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-  padding: 16px 18px;
-  border: 1px solid #f5c2bd;
-  border-radius: 12px;
-  background: #fef3f2;
-  color: #7a271a;
-  font-size: 0.88rem;
-  line-height: 1.55;
-}
-
-.wallet-recon-alert > div + div {
-  padding-left: 20px;
-  border-left: 1px solid #f5c2bd;
-}
-
-.wallet-recon-alert h3 {
-  margin: 0 0 8px;
-  color: #7a271a;
-  font-size: 0.95rem;
-}
-
-.wallet-recon-alert ul,
-.wallet-recon-alert ol {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.wallet-recon-alert li + li {
-  margin-top: 6px;
-}
-
-@media (max-width: 860px) {
-  .wallet-recon-alert {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .wallet-recon-alert > div + div {
-    padding-top: 16px;
-    padding-left: 0;
-    border-top: 1px solid #f5c2bd;
-    border-left: 0;
-  }
-}
-
-.wallet-recon-subhead {
-  margin: 4px 0 0;
-  font-size: 1rem;
 }
 
 @media (max-width: 960px) {
@@ -1672,6 +1597,19 @@ h3 {
   border-bottom: 1px solid var(--line);
   background: var(--white);
   transition: box-shadow 0.5s cubic-bezier(0.3, 0.01, 0, 1), border-color 0.5s cubic-bezier(0.3, 0.01, 0, 1);
+  zoom: var(--header-zoom);
+}
+
+/* Header đã zoom: chia ngược độ rộng khung để mép trái/phải vẫn thẳng hàng với nội dung trang. */
+.site-top > .container {
+  width: min(calc(var(--header-container) / var(--header-zoom)), calc(100% - var(--header-gutter) / var(--header-zoom)));
+}
+
+/* Cột trái/phải không co nhỏ hơn nội dung: thiếu chỗ thì logo lệch nhẹ thay vì bị menu đè lên. */
+@media screen and (min-width: 1100px) {
+  .gh-bar {
+    grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
+  }
 }
 
 /* Đã cuộn khỏi đầu trang: đổ bóng thay đường kẻ */
@@ -1782,121 +1720,6 @@ h3 {
   .gh-cta {
     transition: none;
   }
-}
-
-/* Số dư ví trong menu tài khoản: ẩn mặc định, bấm con mắt để hiện */
-.gh-account-wallet {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 6px;
-  padding: 10px 12px;
-  border: 1px solid #cfe9d8;
-  border-radius: 12px;
-  background: var(--success-soft);
-}
-
-.gh-account-wallet-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text);
-  font-size: 0.88rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.gh-account-wallet-link:hover {
-  color: var(--success);
-}
-
-.gh-account-wallet-amount {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: flex-end;
-  min-width: 0;
-  line-height: 1.25;
-}
-
-/* Số tiền ví có che (••••••): bản che và bản thật cùng ở ô 1/1, khung theo bản lớn hơn nên không co giãn khi bấm. */
-.masked-amount {
-  display: inline-grid;
-  justify-items: end;
-  vertical-align: bottom;
-}
-
-.masked-amount > span {
-  grid-area: 1 / 1;
-  white-space: nowrap;
-}
-
-.masked-amount > .is-off {
-  visibility: hidden;
-}
-
-.masked-amount-start {
-  justify-items: start;
-}
-
-.wallet-balance-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.masked-amount > .sr-only {
-  grid-area: auto;
-}
-
-/* Nút con mắt hiện/ẩn số dư (menu tài khoản, trang ví, form ủng hộ) */
-.balance-toggle {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  color: var(--success);
-  border: 1px solid #cfe9d8;
-  border-radius: 999px;
-  background: #ffffff;
-  cursor: pointer;
-}
-
-.balance-toggle:hover {
-  border-color: var(--success);
-}
-
-.balance-toggle:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.balance-toggle-sm {
-  width: 26px;
-  height: 26px;
-  margin-left: 6px;
-  vertical-align: middle;
-}
-
-.gh-account-wallet-amount b {
-  color: var(--success);
-  font-size: 0.92rem;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
-.gh-account-wallet-amount small {
-  color: var(--muted);
-  font-size: 0.74rem;
-  white-space: nowrap;
-}
-
-.gh-account-wallet-link:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
 }
 
 .gh-right .notification-bell {
@@ -5469,11 +5292,6 @@ button {
   background: #e8efff;
 }
 
-.refund-destination.is-wallet {
-  color: #157f3d;
-  background: #e7f6ec;
-}
-
 .refund-destination.is-pledge_cancelled {
   color: #6b7385;
   background: var(--soft);
@@ -7636,6 +7454,19 @@ html:has(dialog:modal) .admin-sidebar {
   padding-top: 24px;
 }
 
+/*
+ * Trang chi tiết dự án: cỡ nội dung theo --detail-zoom, khung rộng --detail-container (hẹp hơn
+ * header, rộng hơn khung chuẩn 1200px). Chia ngược zoom để đổi cỡ chữ không đổi bề rộng khung.
+ */
+.detail-page {
+  --local-zoom: var(--detail-zoom);
+  zoom: var(--detail-zoom);
+}
+
+.detail-page .container {
+  width: min(calc(var(--detail-container) / var(--detail-zoom)), calc(100% - 32px / var(--detail-zoom)));
+}
+
 .detail-cover {
   position: relative;
   aspect-ratio: 16 / 9;
@@ -8062,15 +7893,15 @@ html:has(dialog:modal) .admin-sidebar {
   grid-template-columns: minmax(0, 820px);
 }
 
-/* Nhảy tới mục từ thanh tab/anchor: chừa chỗ cho header dính (72px) + thanh tab (~54px). */
+/* Nhảy tới mục từ thanh tab/anchor: chừa chỗ cho header dính + thanh tab (~54px). */
 .detail-page .detail-main > section[id] {
-  scroll-margin-top: 140px;
+  scroll-margin-top: calc(var(--header-h) / var(--local-zoom) + 67px);
 }
 
 /* Thanh tab ngang dính dưới header (như Kickstarter) — DetailToc */
 .detail-tabs {
   position: sticky;
-  top: 73px;
+  top: calc(var(--header-h) / var(--local-zoom));
   z-index: 40;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -11426,26 +11257,6 @@ html:has(dialog:modal) .admin-sidebar {
   line-height: 1.35;
 }
 
-/* "Ví Góp Mầm · số dư ••••••  (mắt)" nằm trên một dòng, cạnh tên phương thức */
-.donate-methods .donate-balance {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 6px;
-  color: var(--muted);
-  font-weight: 500;
-  font-size: 0.9rem;
-}
-
-.donate-methods .donate-balance .masked-amount {
-  color: var(--success);
-  font-weight: 700;
-}
-
-.donate-methods .donate-balance .balance-toggle-sm {
-  margin-left: 2px;
-}
-
 .donate-methods small {
   color: var(--muted);
   font-size: 0.8rem;
@@ -11975,7 +11786,7 @@ html:has(dialog:modal) .admin-sidebar {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--white);
-  scroll-margin-top: 96px;
+  scroll-margin-top: calc(var(--header-h) / var(--local-zoom) + 23px);
 }
 
 .post-number {
@@ -13828,204 +13639,6 @@ html:has(dialog:modal) .admin-sidebar {
   background: var(--white);
 }
 
-/* Ví Góp Mầm (/vi) */
-.wallet-page {
-  padding: 40px 16px 88px;
-  background: var(--white);
-}
-
-.wallet-inner {
-  display: grid;
-  gap: 24px;
-  width: min(820px, 100%);
-  margin-inline: auto;
-}
-
-.wallet-head h1 {
-  margin: 12px 0 8px;
-  font-size: clamp(1.6rem, 1.5vw + 1rem, 2.1rem);
-}
-
-.wallet-balances {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
-}
-
-.wallet-balance {
-  display: grid;
-  align-content: start;
-  gap: 4px;
-  padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--white);
-}
-
-/* Chỉ nhãn (con trực tiếp) — không áp vào span bên trong số tiền (MaskedAmount), nếu không số bị thu về cỡ nhãn */
-.wallet-balance > span {
-  /* Cùng chiều cao với hàng có nút con mắt để hai thẻ số dư thẳng hàng */
-  display: flex;
-  align-items: center;
-  min-height: 32px;
-  color: var(--muted);
-  font-size: 0.95rem;
-  font-weight: 600;
-}
-
-.wallet-balance > b {
-  color: var(--navy);
-  font-family: var(--font-heading);
-  font-size: clamp(2rem, 3.6vw, 2.5rem);
-  font-weight: 800;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
-}
-
-.wallet-balance small {
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.wallet-balance-held {
-  background: var(--soft);
-}
-
-.wallet-topup {
-  display: grid;
-  gap: 14px;
-}
-
-.wallet-topup h2,
-.wallet-history h2 {
-  margin: 0;
-  color: var(--navy);
-  font-size: 1.15rem;
-}
-
-.wallet-topup-form,
-.wallet-pending {
-  display: grid;
-  gap: 12px;
-}
-
-.wallet-topup-form .donate-presets {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.wallet-topup-form > .button {
-  justify-self: start;
-}
-
-.wallet-pending p {
-  margin: 0;
-}
-
-.wallet-history {
-  display: grid;
-  gap: 12px;
-}
-
-.wallet-amount-topup,
-.wallet-amount-release,
-.wallet-amount-refund {
-  color: var(--success);
-  font-weight: 700;
-}
-
-.wallet-amount-hold {
-  color: var(--primary-dark);
-  font-weight: 700;
-}
-
-.wallet-amount-capture {
-  color: var(--text-2);
-}
-
-/* Rút tiền ví về tài khoản ngân hàng */
-.wallet-withdraw {
-  display: grid;
-  gap: 12px;
-}
-
-.wallet-withdraw h2 {
-  margin: 0;
-  color: var(--navy);
-  font-size: 1.15rem;
-}
-
-.wallet-withdraw > .hint {
-  margin: 0;
-}
-
-.wallet-withdraw-form {
-  display: grid;
-  gap: 12px;
-}
-
-.wallet-withdraw-open {
-  justify-self: start;
-}
-
-.wallet-withdraw-list {
-  display: grid;
-  gap: 8px;
-  margin: 4px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.wallet-withdraw-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 14px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-
-.wallet-withdraw-list li > div:first-child {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.wallet-withdraw-list .hint {
-  overflow-wrap: anywhere;
-}
-
-.wallet-withdraw-side {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* Trang ủng hộ: số dư ví không đủ */
-.donate-wallet-short {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin: 14px 0 0;
-  padding: 12px 14px;
-  color: var(--navy);
-  border-radius: 10px;
-  background: var(--primary-soft);
-  font-size: 0.9rem;
-}
-
-@media (max-width: 640px) {
-  .wallet-balances {
-    grid-template-columns: 1fr;
-  }
-
-  .wallet-topup-form .donate-presets {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 .org-page-inner {
   width: min(760px, 100%);
   margin-inline: auto;
@@ -15000,7 +14613,7 @@ html:has(dialog:modal) .admin-sidebar {
 
 .org-profile-side {
   position: sticky;
-  top: 96px;
+  top: calc(var(--header-h) / var(--local-zoom) + 23px);
 }
 
 .org-profile-card {
@@ -15357,7 +14970,7 @@ html:has(dialog:modal) .admin-sidebar {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  scroll-margin-top: 96px;
+  scroll-margin-top: calc(var(--header-h) / var(--local-zoom) + 23px);
 }
 
 .transparency-card h3 {
@@ -16369,7 +15982,7 @@ html:has(dialog:modal) .admin-sidebar {
 }
 
 .detail-page .detail-tab-panel > section[id] {
-  scroll-margin-top: 140px;
+  scroll-margin-top: calc(var(--header-h) / var(--local-zoom) + 67px);
 }
 
 @keyframes detail-tab-in {
