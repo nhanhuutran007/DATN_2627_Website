@@ -7890,7 +7890,31 @@ html:has(dialog:modal) .admin-sidebar {
 
 /* Không có phần quà: nội dung một cột, giữ độ dài dòng dễ đọc. */
 .detail-page .detail-layout.detail-layout-single {
-  grid-template-columns: minmax(0, 820px);
+  grid-template-columns: minmax(0, 960px);
+  justify-content: center;
+}
+
+/* Nội dung các tab to hơn cho dễ đọc. */
+.detail-page .detail-main {
+  font-size: 1.15rem;
+}
+
+.detail-page .detail-story .detail-lead {
+  font-size: 1.25rem;
+}
+
+.detail-page .detail-actions .button {
+  min-height: 52px;
+  font-size: 1.05rem;
+}
+
+.detail-page .detail-meta {
+  font-size: 1.04rem;
+}
+
+.detail-page .detail-report .report-toggle,
+.detail-page .detail-report .follow-compact {
+  font-size: 1rem;
 }
 
 /* Nhảy tới mục từ thanh tab/anchor: chừa chỗ cho header dính + thanh tab (~54px). */
@@ -16003,13 +16027,18 @@ html:has(dialog:modal) .admin-sidebar {
   }
 }
 
-/* Chữ các tab to hơn một chút. */
+/* Chữ các tab to hơn, danh sách tab căn giữa (`safe`: tràn thì vẫn cuộn được từ mép trái). */
+.detail-tabs ul {
+  justify-content: safe center;
+  column-gap: 28px;
+}
+
 .detail-tabs li > a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 18px 0 15px;
-  font-size: 1.06rem;
+  padding: 20px 0 17px;
+  font-size: 1.25rem;
   font-weight: 600;
 }
 
@@ -16033,6 +16062,10 @@ html:has(dialog:modal) .admin-sidebar {
 }
 
 @media (max-width: 960px) {
+  .detail-tabs ul {
+    column-gap: 28px;
+  }
+
   .detail-tabs li > a {
     padding: 15px 0 13px;
     font-size: 1rem;
