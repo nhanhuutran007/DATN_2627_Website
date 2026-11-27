@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { useDialog } from "@/components/ui/DialogProvider";
 import { ImageUploader } from "@/features/media/ImageUploader";
+import { FaqManager } from "@/features/campaign-faqs/FaqManager";
 import { PostManager } from "@/features/posts/PostManager";
 import { ProgressManager } from "@/features/progress/ProgressManager";
 import { RewardManager } from "@/features/rewards/RewardManager";
@@ -24,7 +25,7 @@ import { fetchOrganization, updateOrganization, type Organization } from "@/lib/
 const PUBLISHED: ApiCampaignStatus[] = ["approved", "active", "paused", "success", "failed", "ended"];
 const CLOSED: ApiCampaignStatus[] = ["success", "failed", "cancelled", "ended"];
 
-type Panel = { campaignId: string; kind: "posts" | "progress" | "rewards" } | { campaignId: "profile"; kind: "profile" };
+type Panel = { campaignId: string; kind: "posts" | "progress" | "rewards" | "faq" } | { campaignId: "profile"; kind: "profile" };
 
 function errorText(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
@@ -172,6 +173,11 @@ export function MyCollaborations() {
                                       Bài cập nhật
                                     </button>
                                   )}
+                                  {permissions.postUpdates && (
+                                    <button className="button button-ghost button-sm" type="button" aria-expanded={isOpen(item.memberId, campaign.id, "faq")} onClick={() => toggle(item.memberId, campaign.id, "faq")}>
+                                      FAQ
+                                    </button>
+                                  )}
                                   {permissions.reportProgress && published && (
                                     <button className="button button-ghost button-sm" type="button" aria-expanded={isOpen(item.memberId, campaign.id, "progress")} onClick={() => toggle(item.memberId, campaign.id, "progress")}>
                                       Tiến độ
@@ -185,6 +191,9 @@ export function MyCollaborations() {
                                 </div>
                               </div>
                               {isOpen(item.memberId, campaign.id, "posts") && <PostManager campaignId={campaign.id} />}
+                              {isOpen(item.memberId, campaign.id, "faq") && (
+                                <FaqManager campaignId={campaign.id} closed={CLOSED.includes(campaign.status)} />
+                              )}
                               {isOpen(item.memberId, campaign.id, "progress") && (
                                 <ProgressManager campaignId={campaign.id} readOnly={campaign.status === "failed"} />
                               )}

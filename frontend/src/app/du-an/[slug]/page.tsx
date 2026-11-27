@@ -20,13 +20,14 @@ import { ProgressTimeline } from "@/features/progress/ProgressTimeline";
 import { TransparencyScoreCard } from "@/features/progress/TransparencyScoreCard";
 import { ContactOrganizerButton } from "@/features/campaigns/ContactOrganizerButton";
 import { CoverVideo } from "@/components/campaign/CoverVideo";
+import { DetailTabPanel, DetailTabsProvider } from "@/features/campaigns/DetailTabs";
 import { DetailToc, type DetailTocItem } from "@/features/campaigns/DetailToc";
+import { RelatedCarousel } from "@/features/campaigns/RelatedCarousel";
 import { UnpublishedCampaignPreview } from "@/features/campaigns/UnpublishedCampaignPreview";
 import { ShareCampaignButton } from "@/features/follows/ShareCampaignButton";
 import { ShareSpread } from "@/features/follows/ShareSpread";
 import { CampaignViewTracker } from "@/features/campaign-stats/CampaignViewTracker";
 import { ReportCampaignButton } from "@/features/moderation/ReportCampaignButton";
-import { FAQ_ITEMS } from "@/features/support/faq";
 import { OrganizationLogo } from "@/features/organizations/OrganizationLogo";
 import {
   apiCampaignToView,
@@ -43,6 +44,7 @@ import {
   TRANSPARENCY_LABEL,
   type CampaignProgress,
 } from "@/lib/api/progress";
+import { fetchCampaignFaqs, type CampaignFaq } from "@/lib/api/campaign-faqs";
 import { fetchRewardTiers, isRewardAvailable, type RewardTier } from "@/lib/api/rewards";
 import { coverFor } from "@/lib/covers";
 import { campaignProgress, campaigns as mockCampaigns, findCampaign, type Campaign } from "@/lib/data/campaigns";
@@ -52,9 +54,8 @@ import { timeAgo } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
-/** Câu hỏi người ủng hộ hay gặp ở trang dự án, lấy từ bộ hỏi đáp chung của hộp hỗ trợ. */
-const DETAIL_FAQ_IDS = ["cach-ung-ho", "ung-ho-chi-tiet", "thanh-toan", "cho-xac-nhan", "minh-bach", "hoan-tien", "bao-cao"];
-const DETAIL_FAQS = DETAIL_FAQ_IDS.flatMap((id) => FAQ_ITEMS.filter((item) => item.id === id));
+/** Số dự án liên quan trong băng chuyền "Có thể bạn cũng quan tâm". */
+const RELATED_LIMIT = 12;
 
 type CampaignDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -90,13 +91,23 @@ async function loadRewardTiers(id: string): Promise<RewardTier[]> {
   }
 }
 
-async function loadRelated(current: Campaign, live: boolean): Promise<Campaign[]> {
-  if (!live) return mockCampaigns.filter((item) => item.slug !== current.slug).slice(0, 3);
+async function loadCampaignFaqs(id: string): Promise<CampaignFaq[]> {
   try {
-    const response = await fetchCampaigns({ limit: 12, sort: "popular" });
+    return await fetchCampaignFaqs(id);
+  } catch {
+    return [];
+  }
+}
+
+/** Dự án liên quan: cùng lĩnh vực trước, sau đó các dự án nổi bật khác. */
+async function loadRelated(current: Campaign, live: boolean): Promise<Campaign[]> {
+  if (!live) return mockCampaigns.filter((item) => item.slug !== current.slug).slice(0, RELATED_LIMIT);
+  try {
+    const response = await fetchCampaigns({ limit: 30, sort: "popular" });
     const others = response.items.map(apiCampaignToView).filter((item) => item.slug !== current.slug);
     const same = others.filter((item) => item.category === current.category);
-    return (same.length > 0 ? same : others).slice(0, 3);
+    const rest = others.filter((item) => item.category !== current.category);
+    return [...same, ...rest].slice(0, RELATED_LIMIT);
   } catch {
     return [];
   }
@@ -130,15 +141,17 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   if (!loaded) notFound();
 
   const { campaign, live } = loaded;
-  const [progress, related, rewardTiers] = await Promise.all([
+  const publishedStatus = live && isPublishedStatus(campaign.apiStatus);
+  const [progress, related, rewardTiers, faqs] = await Promise.all([
     live ? loadProgress(campaign.slug) : Promise.resolve(null),
     loadRelated(campaign, live),
-    live && isPublishedStatus(campaign.apiStatus) ? loadRewardTiers(campaign.slug) : Promise.resolve([] as RewardTier[]),
+    publishedStatus ? loadRewardTiers(campaign.slug) : Promise.resolve([] as RewardTier[]),
+    publishedStatus ? loadCampaignFaqs(campaign.slug) : Promise.resolve([] as CampaignFaq[]),
   ]);
   const percent = campaignProgress(campaign);
   const open = campaign.status === "Đang gây quỹ";
   // Hồ sơ chưa công khai: các API theo dõi/lượt xem/sổ cái/bình luận/báo cáo trả 404.
-  const published = live && isPublishedStatus(campaign.apiStatus);
+  const published = publishedStatus;
   const plannedBudget = campaign.milestones.reduce((sum, milestone) => sum + milestone.budget, 0);
   const totalMilestones = progress?.totalMilestones ?? campaign.milestones.length;
   const budget = progress?.totalBudget ?? plannedBudget;
@@ -148,7 +161,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   const stateById = new Map((progress?.milestoneStates ?? []).map((item) => [item.id, item.state]));
   const transparencyScore = progress?.transparencyScore;
 
-  // Thanh tab ngang dưới tiêu đề (như Kickstarter): nhãn ngắn, chỉ các mục thực sự hiển thị.
+  // Thanh tab ngang dưới tiêu đề (như Kickstarter): mỗi tab một nội dung riêng, chỉ các mục thực sự hiển thị.
   const tocItems: DetailTocItem[] = [
     { id: "cau-chuyen", label: "Câu chuyện" },
     { id: "cap-nhat", label: "Cập nhật" },
@@ -158,8 +171,9 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
     ...(published ? [{ id: "loi-dong-vien", label: "Lời động viên" }] : []),
     { id: "ke-hoach-ngan-sach", label: "Ngân sách" },
     { id: "hoi-dap", label: "Bình luận" },
-    { id: "cau-hoi-thuong-gap", label: "Hỏi đáp" },
+    { id: "cau-hoi-thuong-gap", label: "Hỏi đáp", count: faqs.length },
   ];
+  const tabIds = tocItems.map((item) => item.id);
 
   const crumbs = [{ href: "/", label: "Trang chủ" }, { href: "/du-an", label: "Dự án" }, { label: campaign.category }];
   const breadcrumbJsonLd = {
@@ -300,13 +314,15 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
         </aside>
       </div>
 
+      <DetailTabsProvider tabIds={tabIds}>
       <DetailToc
         items={tocItems}
         action={open && published ? <DonateLink className="button button-primary button-sm" href={donateHref}><Icon name="heart" size={15} /> Ủng hộ</DonateLink> : null}
       />
 
-      <div className={`container detail-layout${rewardTiers.length > 0 ? "" : " detail-layout-single"}`}>
+      <div className={`container detail-layout${rewardTiers.length > 0 ? "" : " detail-layout-single"}`} data-detail-tabs-start>
         <div className="detail-main">
+          <DetailTabPanel id="cau-chuyen">
           <section className="detail-story-block" id="cau-chuyen" aria-labelledby="gioi-thieu-du-an">
             <h2 id="gioi-thieu-du-an" className="sr-only">Câu chuyện dự án</h2>
             <CollapsibleStory>
@@ -324,12 +340,13 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             {published && (
               <div className="detail-actions">
                 {open && <DonateLink className="button button-primary" href={donateHref}>Ủng hộ</DonateLink>}
-                <ShareCampaignButton campaignId={campaign.slug} title={campaign.title} />
                 <ContactOrganizerButton campaignId={campaign.slug} />
               </div>
             )}
           </section>
+          </DetailTabPanel>
 
+          <DetailTabPanel id="cap-nhat">
           <section className="detail-section" id="cap-nhat" aria-labelledby="cap-nhat-title">
             {live ? (
               <CampaignPosts
@@ -344,7 +361,9 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               </>
             )}
           </section>
+          </DetailTabPanel>
 
+          <DetailTabPanel id="nhat-ky">
           <section className="detail-section" id="nhat-ky" aria-labelledby="nhat-ky-title">
             {live ? (
               <ProgressTimeline
@@ -361,8 +380,10 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             )}
             <p className="section-note">Mỗi khoản chi kèm ảnh chứng từ; tổng chi không vượt số tiền đã được xác nhận.</p>
           </section>
+          </DetailTabPanel>
 
           {published && (
+            <DetailTabPanel id="chia-se">
             <section className="detail-section" id="chia-se" aria-labelledby="chia-se-title">
               <h2 id="chia-se-title">Chia sẻ giúp nhiều hơn bạn nghĩ</h2>
               <p className="section-lead">
@@ -378,8 +399,10 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                 open={open}
               />
             </section>
+            </DetailTabPanel>
           )}
 
+          <DetailTabPanel id="nguoi-to-chuc">
           <section className="detail-section" id="nguoi-to-chuc" aria-labelledby="nguoi-to-chuc-title">
             <h2 id="nguoi-to-chuc-title">{campaign.organization ? "Người tổ chức và đơn vị thụ hưởng" : "Người tổ chức"}</h2>
             <div className="organizer-pair">
@@ -405,14 +428,23 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
                 </>
               )}
             </div>
+            {published && (
+              <div className="detail-actions">
+                <ContactOrganizerButton campaignId={campaign.slug} />
+              </div>
+            )}
           </section>
+          </DetailTabPanel>
 
           {published && (
+            <DetailTabPanel id="loi-dong-vien">
             <section className="detail-section" id="loi-dong-vien" aria-labelledby="loi-dong-vien-title">
               <WordsOfSupport campaignId={campaign.slug} titleId="loi-dong-vien-title" open={open} />
             </section>
+            </DetailTabPanel>
           )}
 
+          <DetailTabPanel id="ke-hoach-ngan-sach">
           <section className="detail-section" id="ke-hoach-ngan-sach" aria-labelledby="ke-hoach">
             <h2 id="ke-hoach">Kế hoạch và ngân sách</h2>
             {transparencyScore && <TransparencyScoreCard id="minh-bach" score={transparencyScore} />}
@@ -493,9 +525,11 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             )}
             {live && progress && progress.revisionCount > 0 && <MilestoneRevisions campaignId={campaign.slug} />}
           </section>
+          </DetailTabPanel>
 
+          <DetailTabPanel id="hoi-dap">
           <section className="detail-section" id="hoi-dap" aria-labelledby="hoi-dap-title">
-            <h2 id="hoi-dap-title">Hỏi đáp &amp; bình luận</h2>
+            <h2 id="hoi-dap-title">Bình luận</h2>
             {published ? (
               <CampaignComments campaignId={campaign.slug} />
             ) : (
@@ -503,19 +537,41 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
             )}
           </section>
 
+          </DetailTabPanel>
+
+          <DetailTabPanel id="cau-hoi-thuong-gap">
           <section className="detail-section detail-faq" id="cau-hoi-thuong-gap" aria-labelledby="cau-hoi-thuong-gap-title">
             <h2 id="cau-hoi-thuong-gap-title">Câu hỏi thường gặp</h2>
-            {DETAIL_FAQS.map((faq) => (
-              <details key={faq.id}>
-                <summary>
-                  {faq.question}
-                  <Icon name="chevron-down" size={18} />
-                </summary>
-                <p>{faq.answer}</p>
-                {faq.link && <p><Link href={faq.link.href}>{faq.link.label}</Link></p>}
-              </details>
-            ))}
+            {faqs.length > 0 ? (
+              <>
+                <p className="hint">Người tổ chức trả lời sẵn những câu người ủng hộ hay hỏi.</p>
+                {faqs.map((faq) => (
+                  <details key={faq.id}>
+                    <summary>
+                      {faq.question}
+                      <Icon name="chevron-down" size={18} />
+                    </summary>
+                    <p className="detail-faq-answer">{faq.answer}</p>
+                    <p className="detail-faq-updated">Cập nhật {timeAgo(faq.updatedAt)}</p>
+                  </details>
+                ))}
+              </>
+            ) : (
+              <p className="hint">Người tổ chức chưa đăng câu hỏi thường gặp nào.</p>
+            )}
+            <div className="detail-faq-more">
+              <p>Không thấy câu trả lời bạn cần?</p>
+              {published ? (
+                <div className="detail-actions">
+                  <a className="button button-outline" href="#hoi-dap">Hỏi trong Bình luận</a>
+                  <ContactOrganizerButton campaignId={campaign.slug} />
+                </div>
+              ) : (
+                <p className="hint">Hỏi đáp mở khi hồ sơ được duyệt và công khai.</p>
+              )}
+            </div>
           </section>
+          </DetailTabPanel>
 
           <p className="detail-meta">
             {campaign.createdDate && <span>Tạo ngày {campaign.createdDate}</span>}
@@ -551,6 +607,7 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
           </aside>
         )}
       </div>
+      </DetailTabsProvider>
 
       {related.length > 0 && (
         <section className="block block-soft" aria-labelledby="lien-quan">
@@ -562,9 +619,9 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
               </div>
               <Link className="button button-outline button-sm" href="/tim-kiem">Xem tất cả dự án</Link>
             </div>
-            <div className="card-grid">
+            <RelatedCarousel label="Dự án có thể bạn cũng quan tâm">
               {spreadCategoryImages(related).map((item) => <CampaignCard campaign={item} key={item.slug} />)}
-            </div>
+            </RelatedCarousel>
           </div>
         </section>
       )}

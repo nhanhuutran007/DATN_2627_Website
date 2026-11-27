@@ -8,6 +8,7 @@ import { CampaignCard } from "@/components/campaign/CampaignCard";
 import { HeroMarquee } from "@/components/home/HeroMarquee";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { CategoryShowcase } from "@/features/discovery/CategoryShowcase";
+import { FAQ_ITEMS } from "@/features/support/faq";
 import {
   apiCampaignToView,
   fetchCampaigns,
@@ -20,6 +21,10 @@ import { formatVndShort } from "@/lib/format";
 import { siteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
+
+/** Câu hỏi chung của người ủng hộ (lấy từ bộ hỏi đáp của hộp hỗ trợ); trang dự án dùng FAQ riêng của chủ dự án. */
+const HOME_FAQ_IDS = ["cach-ung-ho", "ung-ho-chi-tiet", "thanh-toan", "cho-xac-nhan", "minh-bach", "hoan-tien", "bao-cao"];
+const HOME_FAQS = HOME_FAQ_IDS.flatMap((id) => FAQ_ITEMS.filter((item) => item.id === id));
 
 type HomeData = {
   live: boolean;
@@ -254,6 +259,28 @@ export default async function Home() {
             <p>Soạn hồ sơ từng bước, lưu nháp bất cứ lúc nào và gửi để quản trị viên xét duyệt.</p>
           </div>
           <Link className="button button-white button-lg" href="/tao-chien-dich">Tạo chiến dịch ngay</Link>
+        </div>
+      </section>
+
+      <section className="block home-faq" id="cau-hoi-thuong-gap" aria-labelledby="home-faq-title">
+        <div className="container home-faq-inner">
+          <div className="block-head">
+            <span className="pill">Hỏi đáp</span>
+            <h2 id="home-faq-title">Câu hỏi thường gặp</h2>
+            <p>Những điều người ủng hộ hay thắc mắc khi ủng hộ dự án trên Góp Mầm.</p>
+          </div>
+          <div className="detail-faq">
+            {HOME_FAQS.map((faq) => (
+              <details key={faq.id}>
+                <summary>
+                  {faq.question}
+                  <Icon name="chevron-down" size={18} />
+                </summary>
+                <p>{faq.answer}</p>
+                {faq.link && <p><Link href={faq.link.href}>{faq.link.label}</Link></p>}
+              </details>
+            ))}
+          </div>
         </div>
       </section>
     </main>

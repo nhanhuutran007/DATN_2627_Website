@@ -24,6 +24,7 @@ import { OrganizationsModule } from "./modules/organizations/organizations.modul
 import { PostsModule } from "./modules/posts/posts.module";
 import { ProgressModule } from "./modules/progress/progress.module";
 import { RewardsModule } from "./modules/rewards/rewards.module";
+import { CampaignFaqsModule } from "./modules/campaign-faqs/campaign-faqs.module";
 import { UsersModule } from "./modules/users/users.module";
 import { WalletModule } from "./modules/wallet/wallet.module";
 
@@ -50,6 +51,7 @@ import { WalletModule } from "./modules/wallet/wallet.module";
     CommentsModule,
     FollowsModule,
     RewardsModule,
+    CampaignFaqsModule,
     OrganizationsModule,
     FinanceModule,
     MediaModule,

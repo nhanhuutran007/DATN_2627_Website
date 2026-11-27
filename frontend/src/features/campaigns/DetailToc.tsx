@@ -2,7 +2,9 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-export type DetailTocItem = { id: string; label: string };
+import { useDetailTabs } from "@/features/campaigns/DetailTabs";
+
+export type DetailTocItem = { id: string; label: string; /** Số mục (vd. số câu hỏi FAQ), hiện cạnh nhãn. */ count?: number };
 
 type DetailTocProps = {
   items: DetailTocItem[];
@@ -13,11 +15,12 @@ type DetailTocProps = {
 
 /**
  * Thanh tab ngang dính ngay dưới header trang dự án (như Kickstarter: Campaign · Rewards ·
- * Creator · FAQ…), đặt dưới phần đầu (ảnh bìa + thẻ gây quỹ): bấm để nhảy tới mục, mục đang đọc
- * được gạch chân. Màn hình hẹp thì vuốt ngang.
+ * Creator · FAQ…), đặt dưới phần đầu (ảnh bìa + thẻ gây quỹ). Mỗi tab mở một nội dung riêng
+ * (`DetailTabsProvider`), không tải lại trang. Màn hình hẹp thì vuốt ngang.
  */
 export function DetailToc({ items, action, watchId = "the-gay-quy" }: DetailTocProps) {
-  const [active, setActive] = useState(items[0]?.id ?? "");
+  const tabs = useDetailTabs();
+  const active = tabs?.active ?? items[0]?.id ?? "";
   const [showAction, setShowAction] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
   const hasAction = Boolean(action);
@@ -33,24 +36,7 @@ export function DetailToc({ items, action, watchId = "the-gay-quy" }: DetailTocP
     return () => observer.disconnect();
   }, [hasAction, watchId]);
 
-  useEffect(() => {
-    const sections = items
-      .map((item) => document.getElementById(item.id))
-      .filter((element): element is HTMLElement => element !== null);
-    if (sections.length === 0) return;
-    // Mục "đang đọc" = mục cắt dải ngang khoảng 1/3 trên của màn hình.
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting);
-        if (visible.length > 0) setActive(visible[0].target.id);
-      },
-      { rootMargin: "-30% 0px -60% 0px" },
-    );
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
-  }, [items]);
-
-  // Màn hình hẹp: giữ tab đang đọc trong tầm nhìn của thanh cuộn ngang (không cuộn cả trang).
+  // Màn hình hẹp: giữ tab đang mở trong tầm nhìn của thanh cuộn ngang (không cuộn cả trang).
   useEffect(() => {
     const list = listRef.current;
     const link = list?.querySelector<HTMLElement>(`a[href="#${CSS.escape(active)}"]`);
@@ -64,15 +50,24 @@ export function DetailToc({ items, action, watchId = "the-gay-quy" }: DetailTocP
   return (
     <nav className="detail-tabs" aria-label="Các mục của dự án">
       <div className="container detail-tabs-bar">
-        <ul ref={listRef}>
+        <ul ref={listRef} role="tablist">
           {items.map((item) => (
-            <li key={item.id}>
+            <li key={item.id} role="presentation">
               <a
                 href={`#${item.id}`}
-                aria-current={active === item.id ? "location" : undefined}
-                onClick={() => setActive(item.id)}
+                id={`${item.id}-tab`}
+                role="tab"
+                aria-selected={active === item.id}
+                aria-controls={`${item.id}-panel`}
+                aria-current={active === item.id ? "page" : undefined}
+                onClick={(event) => {
+                  if (!tabs) return;
+                  event.preventDefault();
+                  tabs.select(item.id);
+                }}
               >
                 {item.label}
+                {item.count ? <span className="detail-tabs-count">{item.count}</span> : null}
               </a>
             </li>
           ))}

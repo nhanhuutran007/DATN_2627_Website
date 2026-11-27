@@ -16349,3 +16349,237 @@ html:has(dialog:modal) .admin-sidebar {
     align-items: flex-start;
   }
 }
+
+/* ===== Trang dự án: mỗi tab một nội dung riêng (DetailTabs) ===== */
+.detail-tab-panel[hidden] {
+  display: none !important;
+}
+
+.detail-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: detail-tab-in 0.18s ease-out;
+}
+
+/* Mỗi tab đứng riêng: bỏ đường kẻ phân cách phía trên mục đầu tiên. */
+.detail-tab-panel > .detail-section:first-child {
+  padding-top: 8px;
+  border-top: 0;
+}
+
+.detail-page .detail-tab-panel > section[id] {
+  scroll-margin-top: 140px;
+}
+
+@keyframes detail-tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-tab-panel {
+    animation: none;
+  }
+}
+
+/* Chữ các tab to hơn một chút. */
+.detail-tabs li > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 0 15px;
+  font-size: 1.06rem;
+  font-weight: 600;
+}
+
+.detail-tabs li > a[aria-selected="true"] {
+  border-bottom-color: var(--text);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.detail-tabs-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--text-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+@media (max-width: 960px) {
+  .detail-tabs li > a {
+    padding: 15px 0 13px;
+    font-size: 1rem;
+  }
+}
+
+/* FAQ do chủ dự án soạn */
+.detail-faq-answer {
+  white-space: pre-line;
+}
+
+.detail-faq .detail-faq-updated {
+  margin: -8px 0 16px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.detail-faq-more {
+  margin-top: 24px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: var(--soft);
+}
+
+.detail-faq-more > p {
+  margin: 0 0 12px;
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.detail-faq-more .detail-actions {
+  margin: 0;
+}
+
+/* Trang chủ: câu hỏi thường gặp chung, dưới dải "Bạn có một dự án cần gây quỹ?" */
+.home-faq-inner {
+  max-width: 860px;
+}
+
+.home-faq .block-head {
+  margin-bottom: 20px;
+}
+
+/* Trình quản lý FAQ (trang quản lý dự án) */
+.faq-manager {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.faq-manager-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.faq-manager-list > li {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+
+.faq-manager-list > li > p {
+  margin: 6px 0 10px;
+  color: var(--text-2);
+  white-space: pre-line;
+}
+
+.faq-fields {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.faq-manager-add {
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+/* Băng chuyền "Có thể bạn cũng quan tâm" */
+.related-carousel {
+  position: relative;
+}
+
+.related-carousel-track {
+  display: grid;
+  grid-auto-columns: calc((100% - 2 * 28px) / 3);
+  grid-auto-flow: column;
+  gap: 28px;
+  margin: 0;
+  padding: 4px 2px 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  list-style: none;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.related-carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.related-carousel-item {
+  display: flex;
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+.related-carousel-item > * {
+  width: 100%;
+}
+
+.related-carousel-nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.related-carousel-button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--navy);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.related-carousel-button:hover:not(:disabled) {
+  border-color: var(--navy);
+}
+
+.related-carousel-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.related-carousel-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+@media (max-width: 960px) {
+  .related-carousel-track {
+    grid-auto-columns: calc((100% - 20px) / 2);
+    gap: 20px;
+  }
+}
+
+@media (max-width: 600px) {
+  .related-carousel-track {
+    grid-auto-columns: 86%;
+    gap: 16px;
+  }
+}
