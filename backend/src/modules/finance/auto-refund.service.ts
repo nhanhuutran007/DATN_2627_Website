@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 
 import { FinanceService } from "./finance.service";
+import { ExclusiveJob, JOB_LEASE } from "../../common/scheduler/exclusive-job.decorator";
 
 /**
  * Mỗi 10 phút quét yêu cầu hoàn đang chờ (gồm yêu cầu hệ thống tạo khi chiến dịch thất bại) và tự hoàn
@@ -15,6 +16,7 @@ export class AutoRefundService {
   constructor(private readonly financeService: FinanceService) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
+  @ExclusiveJob("finance.auto-refund", JOB_LEASE.EVERY_10_MINUTES)
   async run(): Promise<void> {
     if (this.running) return;
     this.running = true;

@@ -4,6 +4,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { LessThan, Repository } from "typeorm";
 
 import { Notification } from "./entities/notification.entity";
+import { ExclusiveJob, JOB_LEASE } from "../../common/scheduler/exclusive-job.decorator";
 
 /** Thông báo trong web chỉ giữ chừng này ngày (đã đọc hay chưa); giao dịch, nhật ký kiểm toán lưu riêng. */
 export const NOTIFICATION_RETENTION_DAYS = 90;
@@ -19,6 +20,7 @@ export class NotificationRetentionService {
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  @ExclusiveJob("notification.retention", JOB_LEASE.EVERY_DAY)
   async handleRetention(): Promise<void> {
     const removed = await this.purgeExpired();
     if (removed > 0) {

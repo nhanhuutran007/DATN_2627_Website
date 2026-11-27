@@ -10,6 +10,7 @@ import { NotificationType } from "../notifications/entities/notification.entity"
 import { NotificationsService } from "../notifications/notifications.service";
 import type { User } from "../users/entities/user.entity";
 import { CampaignFollow } from "./entities/campaign-follow.entity";
+import { ExclusiveJob, JOB_LEASE } from "../../common/scheduler/exclusive-job.decorator";
 
 /** Chiến dịch người dùng nhìn thấy được (xem số người theo dõi). */
 const VISIBLE_STATUSES = [
@@ -113,6 +114,7 @@ export class FollowsService {
   }
 
   @Cron(CronExpression.EVERY_HOUR)
+  @ExclusiveJob("follow.ending-reminders", JOB_LEASE.EVERY_HOUR)
   async handleEndingReminders(): Promise<void> {
     const sent = await this.sendEndingReminders();
     if (sent > 0) this.logger.log(`Follow ending reminders sent: ${sent}`);

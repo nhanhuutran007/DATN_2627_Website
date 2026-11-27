@@ -8,6 +8,7 @@ import { Campaign, CampaignStatus } from "../campaigns/entities/campaign.entity"
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { NotificationsService } from "../notifications/notifications.service";
 import { Milestone } from "./entities/milestone.entity";
+import { ExclusiveJob, JOB_LEASE } from "../../common/scheduler/exclusive-job.decorator";
 
 /** Nhắc lại tối đa mỗi 7 ngày cho cùng một mốc còn quá hạn. */
 export const OVERDUE_REMIND_INTERVAL_MS = 7 * 86_400_000;
@@ -43,6 +44,7 @@ export class MilestoneOverdueService {
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
+  @ExclusiveJob("milestone.overdue", JOB_LEASE.EVERY_HOUR)
   async handleOverdueMilestones(): Promise<void> {
     const result = await this.remindOverdueMilestones();
     if (result.reminded > 0) {

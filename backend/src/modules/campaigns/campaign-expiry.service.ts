@@ -7,6 +7,7 @@ import { AuditService } from "../../common/audit/audit.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { campaignStatusNotifications } from "./campaign-notifications";
 import { Campaign, CampaignStatus } from "./entities/campaign.entity";
+import { ExclusiveJob, JOB_LEASE } from "../../common/scheduler/exclusive-job.decorator";
 
 export type ExpiryRunResult = {
   succeeded: number;
@@ -31,6 +32,7 @@ export class CampaignExpiryService {
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
+  @ExclusiveJob("campaign.expiry", JOB_LEASE.EVERY_HOUR)
   async handleExpiredCampaigns(): Promise<void> {
     const result = await this.expireCampaigns();
     if (result.succeeded > 0 || result.failed > 0) {

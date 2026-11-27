@@ -5,6 +5,7 @@ import { LessThan, Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import { Donation, DonationStatus } from "./entities/donation.entity";
+import { ExclusiveJob, JOB_LEASE } from "../../common/scheduler/exclusive-job.decorator";
 
 /** Thời gian chờ thanh toán mặc định trước khi đơn `pending` bị coi là hết hạn. */
 export const DEFAULT_PENDING_TTL_MINUTES = 30;
@@ -32,6 +33,7 @@ export class DonationExpiryService {
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
+  @ExclusiveJob("donation.expiry", JOB_LEASE.EVERY_10_MINUTES)
   async handleExpiredDonations(): Promise<void> {
     const expired = await this.expirePendingDonations();
     if (expired > 0) {

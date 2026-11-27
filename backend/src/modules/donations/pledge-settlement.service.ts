@@ -15,6 +15,7 @@ import {
   PAYMENT_WINDOW_DAYS,
 } from "./donations.service";
 import { Donation, DonationStatus } from "./entities/donation.entity";
+import { ExclusiveJob, JOB_LEASE } from "../../common/scheduler/exclusive-job.decorator";
 
 /** Số khoản tối đa mỗi loại xử lý mỗi lần chạy, tránh một lần quét quá dài. */
 const BATCH_SIZE = 100;
@@ -63,6 +64,7 @@ export class PledgeSettlementService {
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
+  @ExclusiveJob("pledge.settlement", JOB_LEASE.EVERY_10_MINUTES)
   async handleSettlement(): Promise<void> {
     const result = await this.settle();
     if (Object.values(result).some((n) => n > 0)) {

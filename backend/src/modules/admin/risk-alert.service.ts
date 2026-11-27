@@ -26,6 +26,7 @@ import {
   RiskReason,
 } from "./entities/risk-alert.entity";
 import { type PledgeIntegrity, PledgeIntegrityService } from "./pledge-integrity.service";
+import { ExclusiveJob, JOB_LEASE } from "../../common/scheduler/exclusive-job.decorator";
 
 const SCAN_STATUSES = [
   CampaignStatus.PENDING,
@@ -73,6 +74,7 @@ export class RiskAlertService {
 
   /** Quét định kỳ để cảnh báo (và chặn giải ngân) không phụ thuộc admin bấm "Quét". */
   @Cron(CronExpression.EVERY_6_HOURS)
+  @ExclusiveJob("risk-alert.scan", JOB_LEASE.EVERY_6_HOURS)
   async scheduledScan(): Promise<void> {
     try {
       const result = await this.generateWarnings(null, 50);
