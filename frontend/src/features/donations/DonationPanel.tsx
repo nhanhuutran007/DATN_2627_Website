@@ -507,9 +507,8 @@ export function DonationPanel({
         <h2 id={`${amountId}-summary`}>Khoản ủng hộ của bạn</h2>
         <dl>
           <div><dt>Số tiền cam kết</dt><dd className="num">{formatVnd(amount)}</dd></div>
-          {selectedTier && <div><dt>Phần quà</dt><dd>{selectedTier.title} · từ {formatVnd(selectedTier.minAmount)}</dd></div>}
+          {selectedTier && <div><dt>Phần quà</dt><dd>{selectedTier.title}</dd></div>}
           {selectedTier && bonus > 0 && <div><dt>Ủng hộ thêm</dt><dd className="num">{formatVnd(bonus)}</dd></div>}
-          <div className="donate-summary-total"><dt>Thanh toán hôm nay</dt><dd className="num">{formatVnd(0)}</dd></div>
         </dl>
       </section>
 

@@ -26,6 +26,7 @@ import {
   CampaignQueryDto,
   CreateCampaignDto,
   ModerateCampaignDto,
+  CancelCampaignDto,
   PublishCampaignDto,
   UpdateCampaignDto,
 } from "./dto/campaign.dto";
@@ -107,6 +108,17 @@ export class CampaignsController {
     @GetCurrentUser() user: User,
   ) {
     return this.campaignsService.publish(id, user, dto.endDate);
+  }
+
+  /** Chủ dự án tự hủy (không xóa): lý do bắt buộc, công khai; cam kết chưa trả được nhả tự động. */
+  @Post(":id/cancel")
+  @UseGuards(JwtAuthGuard, NonAdminGuard)
+  cancel(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: CancelCampaignDto,
+    @GetCurrentUser() user: User,
+  ) {
+    return this.campaignsService.cancelByOwner(id, dto, user);
   }
 
   @Patch(":id/moderate")

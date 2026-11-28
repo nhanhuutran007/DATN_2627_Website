@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { fetchCampaign, reviewStatusLabel, type ApiCampaign, type ApiCampaignStatus } from "@/lib/api/campaigns";
 import { useAuthUser, useIsAuthenticated } from "@/lib/auth";
 import { formatVnd } from "@/lib/format";
-import { htmlToText } from "@/lib/rich-text";
+import { sanitizeRichText } from "@/lib/rich-text.server";
 
 const EDITABLE: ApiCampaignStatus[] = ["draft", "rejected", "needs_info"];
 
@@ -88,7 +88,8 @@ export function UnpublishedCampaignPreview({ id }: { id: string }) {
         // eslint-disable-next-line @next/next/no-img-element -- ảnh do người dùng tải lên, kích thước không cố định
         <img className="preview-cover" src={campaign.imageUrl} alt="" />
       )}
-      <div className="preview-story">{htmlToText(campaign.description)}</div>
+      {/* Giữ định dạng như trang dự án (bảng dự toán có khung, tiêu đề, danh sách), không làm phẳng thành chữ. */}
+      <div className="preview-story detail-story rich-text" dangerouslySetInnerHTML={{ __html: sanitizeRichText(campaign.description) }} />
       <div className="status-actions">
         {canEdit && (
           <Link className="button button-primary" href={`/tao-chien-dich?sua=${encodeURIComponent(campaign.id)}`}>

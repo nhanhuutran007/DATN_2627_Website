@@ -29,6 +29,8 @@ export type Campaign = {
   status: CampaignStatus;
   /** Trạng thái gốc từ API; dữ liệu mẫu không có. */
   apiStatus?: ApiCampaignStatus;
+  /** Lý do chủ dự án tự hủy (chỉ có khi `apiStatus = cancelled`). */
+  cancelReason?: string | null;
   image:
     | "mangrove"
     | "beach"

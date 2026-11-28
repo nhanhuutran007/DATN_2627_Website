@@ -8,6 +8,7 @@ import {
   MAX_CAMPAIGN_DURATION_DAYS,
   MIN_CAMPAIGN_DURATION_DAYS,
   publishDurationProblem,
+  publishEndDate,
 } from "../src/modules/campaigns/campaign-duration";
 
 const DAY = 86_400_000;
@@ -47,5 +48,23 @@ describe("Thời hạn tính từ lúc phát hành, không tự cộng ngày ch�
     equal(publishDurationProblem(after(30), NOW), null);
     equal(publishDurationProblem(after(61), NOW), null);
     equal(publishDurationProblem(after(63), NOW), "too_long");
+  });
+});
+
+describe("Ngày kết thúc khi phát hành (không chọn lại)", () => {
+  it("should keep the end date chosen at creation while it is still valid", () => {
+    const end = after(25);
+    equal(publishEndDate(end, after(-3), NOW).getTime(), end.getTime());
+  });
+
+  it("should keep the planned duration when a long review left under 7 days", () => {
+    const submitted = after(-26);
+    const end = after(4); // dự định 30 ngày, chờ duyệt 26 ngày
+    equal(publishEndDate(end, submitted, NOW).getTime(), after(30).getTime());
+  });
+
+  it("should clamp the moved end date to 7–60 days", () => {
+    equal(publishEndDate(after(1), after(-2), NOW).getTime(), after(7).getTime());
+    equal(publishEndDate(after(90), null, NOW).getTime(), after(60).getTime());
   });
 });

@@ -21,7 +21,8 @@ import { GetCurrentUser } from "../auth/decorators/get-current-user.decorator";
 import { NonAdminGuard } from "../auth/guards/non-admin.guard";
 import { RefundBankInfoDto } from "../finance/dto/finance.dto";
 import { USER_PRIVATE_GROUP, User, UserRole } from "./entities/user.entity";
-import { UpdateAiConsentDto, UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
+import { AccountDeletionService } from "./account-deletion.service";
+import { DeleteAccountDto, UpdateAiConsentDto, UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
 import { UserBankAccountService } from "./user-bank-account.service";
 import { UsersService } from "./users.service";
 
@@ -33,6 +34,7 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly bankAccountService: UserBankAccountService,
+    private readonly accountDeletion: AccountDeletionService,
   ) {}
 
   @Get()
@@ -71,6 +73,24 @@ export class UsersController {
   @RequireStepUp(StepUpPurpose.ACCOUNT_BANK)
   async removeBankAccount(@GetCurrentUser() user: User) {
     await this.bankAccountService.remove(user);
+    return { ok: true };
+  }
+
+  /** Những việc cần xong trước khi tự xóa tài khoản (hiện ở Cài đặt › Xóa tài khoản). */
+  @Get("me/deletion-check")
+  deletionCheck(@GetCurrentUser() user: User) {
+    return this.accountDeletion.check(user);
+  }
+
+  /**
+   * Tự xóa tài khoản (cần OTP): ẩn danh hóa, giải phóng email, thu hồi mọi phiên; hệ thống giữ
+   * mã băm định danh để chặn tài khoản vi phạm quay lại và mang số lần bỏ cam kết sang tài khoản mới.
+   */
+  @Delete("me")
+  @UseGuards(StepUpGuard)
+  @RequireStepUp(StepUpPurpose.DELETE_ACCOUNT)
+  async deleteMe(@Body() dto: DeleteAccountDto, @GetCurrentUser() user: User) {
+    await this.accountDeletion.deleteSelf(user, dto.reason?.trim() || null);
     return { ok: true };
   }
 

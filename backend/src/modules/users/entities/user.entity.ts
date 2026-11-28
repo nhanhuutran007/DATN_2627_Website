@@ -114,6 +114,15 @@ export class User extends BaseEntity {
   @Column({ name: "pledge_reset_at", type: "datetime", nullable: true })
   pledgeResetAt?: Date | null;
 
+  /** Tài khoản đã xóa (ẩn danh hóa tại chỗ, không đăng nhập được); xem `AccountDeletionService`. */
+  @Column({ name: "deleted_at", type: "datetime", nullable: true })
+  deletedAt?: Date | null;
+
+  /** Số lần bỏ cam kết mang sang từ tài khoản cũ đã xóa có cùng email (tính vào giới hạn cam kết). */
+  @Exclude({ toPlainOnly: true })
+  @Column({ name: "inherited_abandoned_pledges", type: "int", default: 0 })
+  inheritedAbandonedPledges?: number;
+
   @OneToMany("Campaign", "owner")
   campaigns!: Campaign[];
 

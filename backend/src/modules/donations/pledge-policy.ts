@@ -62,7 +62,7 @@ export function tierFor(abandoned: number, policy = pledgePolicy()): PledgeTier 
 /** Đếm từ bảng donations; `pledgeResetAt` (admin mở lại) bỏ qua các lần bỏ trước mốc đó. */
 export async function computePledgeStanding(
   donationRepo: Repository<Donation>,
-  user: Pick<User, "id" | "createdAt"> & { pledgeResetAt?: Date | null },
+  user: Pick<User, "id" | "createdAt"> & { pledgeResetAt?: Date | null; inheritedAbandonedPledges?: number | null },
   now = new Date(),
 ): Promise<PledgeStanding> {
   const policy = pledgePolicy();
@@ -78,7 +78,9 @@ export async function computePledgeStanding(
       where: { userId: user.id, status: In(OPEN_PLEDGE_STATUSES), campaignId: Not(IsNull()) },
     }),
   ]);
-  const abandoned = Math.max(0, expiredCount - paidCount);
+  // Lần bỏ mang sang từ tài khoản cũ đã xóa (cùng email) — bị admin mở lại (`pledgeResetAt`) thì bỏ qua.
+  const inherited = user.pledgeResetAt ? 0 : Math.max(0, Number(user.inheritedAbandonedPledges ?? 0));
+  const abandoned = Math.max(0, expiredCount - paidCount) + inherited;
   const tier = tierFor(abandoned, policy);
   const newAccount =
     !!user.createdAt && now.getTime() - new Date(user.createdAt).getTime() < policy.newAccountDays * DAY_MS;

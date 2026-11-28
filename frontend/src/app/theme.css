@@ -2948,6 +2948,22 @@ h3 {
   padding-block: 40px 80px;
 }
 
+.detail-cancelled {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 14px 18px;
+  border: 1px solid #f3c7bf;
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius);
+  background: var(--primary-soft);
+  color: var(--navy);
+}
+
+.detail-cancelled-reason {
+  color: var(--text-2);
+}
+
 .detail-layout > .notice-sample {
   grid-column: 1 / -1;
   margin: 0;
@@ -15130,8 +15146,8 @@ html:has(dialog:modal) .admin-sidebar {
 
 .preview-story {
   margin-bottom: 28px;
-  white-space: pre-line;
   line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 
 .preview-page .status-actions {
@@ -15809,22 +15825,6 @@ html:has(dialog:modal) .admin-sidebar {
   background: #fdecea;
 }
 
-.review-preview-cta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 18px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--soft);
-}
-
-.review-preview-cta p {
-  margin: 4px 0 0;
-}
-
-.review-preview-cta .button,
 .create-bar-actions .button {
   display: inline-flex;
   align-items: center;
@@ -15833,10 +15833,12 @@ html:has(dialog:modal) .admin-sidebar {
 
 /* Hộp xem trước trang dự án (toàn màn hình) */
 .campaign-preview {
-  width: 100vw;
-  max-width: 100vw;
-  height: 100vh;
-  max-height: 100vh;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
   margin: 0;
   padding: 0;
   border: 0;
@@ -15877,6 +15879,8 @@ html:has(dialog:modal) .admin-sidebar {
 }
 
 .campaign-preview-page {
+  box-sizing: border-box;
+  width: 100%;
   max-width: 1080px;
   margin: 0 auto;
   padding: 28px 24px 64px;
@@ -15930,8 +15934,8 @@ html:has(dialog:modal) .admin-sidebar {
 }
 
 .campaign-preview-body {
-  max-width: 760px;
-  margin-top: 28px;
+  max-width: 820px;
+  margin: 28px auto 0;
 }
 
 .campaign-preview-summary {
@@ -15979,11 +15983,6 @@ html:has(dialog:modal) .admin-sidebar {
 @media (max-width: 860px) {
   .campaign-preview-hero {
     grid-template-columns: 1fr;
-  }
-
-  .review-preview-cta {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }
 
@@ -16048,17 +16047,16 @@ html:has(dialog:modal) .admin-sidebar {
   font-weight: 700;
 }
 
+/* Số mục trên đầu nhãn tab, kiểu số mũ nhỏ như Kickstarter ("Bình luận ¹²"). */
 .detail-tabs-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--soft);
-  color: var(--text-2);
-  font-size: 0.78rem;
+  align-self: flex-start;
+  margin-left: -3px;
+  color: var(--primary);
+  font-size: 0.62em;
   font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  transform: translateY(-0.35em);
 }
 
 @media (max-width: 960px) {
@@ -16228,4 +16226,13 @@ html:has(dialog:modal) .admin-sidebar {
     grid-auto-columns: 86%;
     gap: 16px;
   }
+}
+
+/* Hộp thoại xóa tài khoản: danh sách việc còn dang dở / hệ quả của việc xóa */
+.account-delete-blockers,
+.account-delete-consequences {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding-left: 20px;
 }

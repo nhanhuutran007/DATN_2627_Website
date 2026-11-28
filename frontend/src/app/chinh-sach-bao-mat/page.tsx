@@ -134,7 +134,14 @@ export default function PrivacyPolicyPage() {
             <li>Xem và sửa thông tin cá nhân trong <Link href="/ho-so">Cài đặt tài khoản</Link>.</li>
             <li>Rút lại đồng ý gợi ý cá nhân hóa trong <Link href="/dashboard">Trang quản lý</Link>.</li>
             <li>Xóa dữ liệu Góp Mầm trên trình duyệt bằng cách đăng xuất hoặc xóa dữ liệu trang web trong cài đặt trình duyệt.</li>
-            <li>Yêu cầu khóa hoặc xóa tài khoản qua kênh trên trang <Link href="/lien-he">Liên hệ hỗ trợ</Link>.</li>
+            <li>
+              Tự xóa tài khoản trong <Link href="/ho-so">Cài đặt tài khoản</Link> (cần mã xác minh qua email). Tài khoản được ẩn danh
+              hóa: tên của bạn trên bình luận và danh sách ủng hộ được thay bằng “Người dùng đã xóa”, dữ liệu cá nhân phụ bị xóa.
+              Góp Mầm vẫn giữ chứng từ giao dịch và một dấu vết đã mã hóa (không đọc ngược được) của email, số điện thoại, số tài
+              khoản ngân hàng để giải quyết khiếu nại và chống lách lệnh cấm: tài khoản từng bị khóa vì vi phạm không thể đăng ký
+              lại bằng các thông tin này.
+            </li>
+            <li>Yêu cầu khóa tài khoản hoặc hỗ trợ khác qua kênh trên trang <Link href="/lien-he">Liên hệ hỗ trợ</Link>.</li>
           </ul>
         </section>
       </div>

@@ -9,11 +9,14 @@ import {
   Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Brackets, In, Repository, SelectQueryBuilder } from "typeorm";
+import { Brackets, In, MoreThanOrEqual, Repository, SelectQueryBuilder } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { sanitizeRichText } from "../../common/html/rich-text";
+import { RiskAlert, RiskAlertLevel, RiskAlertStatus, RiskEntityType, RiskMethod } from "../admin/entities/risk-alert.entity";
+import { Donation, DonationStatus } from "../donations/entities/donation.entity";
 import { RefundRequest, RefundRequestStatus } from "../finance/entities/refund-request.entity";
+import { NotificationType } from "../notifications/entities/notification.entity";
 import { NotificationsService } from "../notifications/notifications.service";
 import { Organization, OrganizationStatus } from "../organizations/entities/organization.entity";
 import { AutomationSettingsService } from "../support/automation-settings.service";
@@ -24,11 +27,13 @@ import {
   MAX_CAMPAIGN_DURATION_DAYS,
   MIN_CAMPAIGN_DURATION_DAYS,
   publishDurationProblem,
+  publishEndDate,
 } from "./campaign-duration";
 import { campaignStatusNotifications } from "./campaign-notifications";
 import { CampaignScreeningService, type ScreeningView } from "./campaign-screening.service";
 import {
   CampaignQueryDto,
+  CancelCampaignDto,
   CreateCampaignDto,
   ModerateCampaignDto,
   UpdateCampaignDto,
@@ -63,6 +68,20 @@ const OWNER_EDITABLE_STATUSES = [
   CampaignStatus.REJECTED,
   CampaignStatus.NEEDS_INFO,
 ];
+
+/** Chủ dự án tự hủy được: chờ duyệt, đã duyệt (chưa phát hành), đang gây quỹ. `paused` do admin dừng để xem xét nên không cho tự hủy. */
+const OWNER_CANCELLABLE_STATUSES = [CampaignStatus.PENDING, CampaignStatus.APPROVED, CampaignStatus.ACTIVE];
+
+/** Khoản đã/đang thu tiền thật: còn khoản nào thì phải nhờ admin xử lý (có thể phải hoàn tiền). */
+const MONEY_IN_FLIGHT_STATUSES = [DonationStatus.COMPLETED, DonationStatus.AWAITING_PAYMENT, DonationStatus.CHARGE_FAILED];
+
+/** Chặn hủy phút chót: còn ≤ N ngày mà đã đạt ≥ tỉ lệ này của mục tiêu. */
+export const CANCEL_LOCK_DAYS = 3;
+export const CANCEL_LOCK_PROGRESS = 0.8;
+
+/** Cửa sổ đếm số lần chủ dự án tự hủy để tạo cảnh báo rủi ro. */
+const CANCEL_RISK_WINDOW_DAYS = 180;
+const CANCEL_RISK_MIN_COUNT = 2;
 
 const SUBMITTABLE_STATUSES = [
   CampaignStatus.DRAFT,
@@ -148,6 +167,12 @@ export class CampaignsService {
     @Optional()
     @InjectRepository(CampaignPayoutAccount)
     private readonly payoutRepo: Repository<CampaignPayoutAccount> | null = null,
+    @Optional()
+    @InjectRepository(Donation)
+    private readonly donationRepo: Repository<Donation> | null = null,
+    @Optional()
+    @InjectRepository(RiskAlert)
+    private readonly riskAlertRepo: Repository<RiskAlert> | null = null,
   ) {}
 
   async findAll(
@@ -314,6 +339,10 @@ export class CampaignsService {
     const campaign = await this.findById(id);
     const privileged = viewer !== null && (viewer.id === campaign.ownerId || viewer.role === UserRole.ADMIN);
     if (UNPUBLISHED_STATUSES.includes(campaign.status) && !privileged) {
+      throw new NotFoundException("Campaign not found");
+    }
+    // Hồ sơ bị hủy khi chưa từng công khai (chờ duyệt/đã duyệt) vẫn là hồ sơ riêng.
+    if (campaign.status === CampaignStatus.CANCELLED && campaign.cancelledFrom !== CampaignStatus.ACTIVE && !privileged) {
       throw new NotFoundException("Campaign not found");
     }
     return campaign;
@@ -512,8 +541,8 @@ export class CampaignsService {
 
   /**
    * Chủ dự án phát hành chiến dịch đã được duyệt (approved → active). Thời gian gây quỹ tính từ lúc
-   * này: `startDate` = bây giờ, ngày kết thúc phải còn 7–60 ngày. Nếu duyệt lâu làm ngày đã chọn
-   * không còn hợp lệ, chủ dự án gửi kèm `endDate` mới (chỉ được đổi ngày kết thúc ở bước này).
+   * này: `startDate` = bây giờ, ngày kết thúc phải còn 7–60 ngày. Ngày kết thúc lấy từ lúc tạo; nếu
+   * duyệt lâu làm ngày đó còn dưới 7 ngày thì tự dời, giữ số ngày gây quỹ đã dự định (`publishEndDate`).
    * Chỉ chủ dự án — admin duyệt nhưng không phát hành thay.
    */
   async publish(id: string, currentUser: User, endDate?: string): Promise<Campaign> {
@@ -526,7 +555,10 @@ export class CampaignsService {
     }
 
     const now = new Date();
-    const nextEnd = endDate ? new Date(endDate) : new Date(campaign.endDate);
+    // Chủ dự án chỉ chọn ngày kết thúc lúc tạo; duyệt lâu thì tự dời để giữ số ngày gây quỹ đã dự định.
+    const nextEnd = endDate
+      ? new Date(endDate)
+      : publishEndDate(new Date(campaign.endDate), campaign.submittedAt ?? null, now);
     const problem = publishDurationProblem(nextEnd, now);
     if (problem) throw new BadRequestException(CampaignsService.publishDurationMessage(problem));
 
@@ -654,6 +686,135 @@ export class CampaignsService {
       entityId: campaignId,
       oldValues: snapshot,
     });
+  }
+
+  /**
+   * Chủ dự án tự hủy chiến dịch (không xóa: trang dự án vẫn công khai với nhãn "Đã hủy" + lý do).
+   * Cam kết chưa trả được job tất toán nhả trong vài phút (người ủng hộ không bị trừ tiền, có thông báo).
+   * Không cho tự hủy khi đã có tiền thật (đã thu / đang chờ thanh toán) hoặc phút chót khi sắp đạt mục tiêu.
+   */
+  async cancelByOwner(id: string, dto: CancelCampaignDto, currentUser: User, now = new Date()): Promise<Campaign> {
+    const campaign = await this.findById(id);
+    if (campaign.ownerId !== currentUser.id) {
+      throw new ForbiddenException("Chỉ chủ dự án mới được hủy chiến dịch");
+    }
+    if (campaign.status === CampaignStatus.PAUSED) {
+      throw new ConflictException("Chiến dịch đang bị tạm dừng để quản trị viên xem xét. Vui lòng liên hệ quản trị viên Góp Mầm.");
+    }
+    if (!OWNER_CANCELLABLE_STATUSES.includes(campaign.status)) {
+      throw new ConflictException(
+        "Chỉ hủy được chiến dịch đang chờ duyệt, đã duyệt hoặc đang gây quỹ. Hồ sơ nháp/bị từ chối có thể xóa; chiến dịch đã kết thúc không hủy được.",
+      );
+    }
+    if (campaign.status === CampaignStatus.ACTIVE) {
+      if (this.donationRepo) {
+        const moneyIn = await this.donationRepo.count({
+          where: { campaignId: campaign.id, status: In(MONEY_IN_FLIGHT_STATUSES) },
+        });
+        if (moneyIn > 0) {
+          throw new ConflictException(
+            "Chiến dịch đã có khoản ủng hộ được thanh toán hoặc đang chờ thanh toán nên không tự hủy được. Vui lòng gửi yêu cầu tới quản trị viên để được hỗ trợ hoàn tiền.",
+          );
+        }
+      }
+      const daysLeft = (new Date(campaign.endDate).getTime() - now.getTime()) / 86_400_000;
+      const goal = Number(campaign.goalAmount);
+      const progress = goal > 0 ? Number(campaign.currentAmount) / goal : 0;
+      if (daysLeft <= CANCEL_LOCK_DAYS && progress >= CANCEL_LOCK_PROGRESS) {
+        throw new ConflictException(
+          `Chiến dịch còn ${Math.max(0, Math.ceil(daysLeft))} ngày và đã đạt ${Math.floor(progress * 100)}% mục tiêu nên không thể tự hủy vào phút chót. Vui lòng liên hệ quản trị viên nếu có lý do đặc biệt.`,
+        );
+      }
+    }
+
+    const reason = dto.reason.trim().slice(0, 500);
+    const previous = campaign.status;
+    const result = await this.campaignRepo.update(
+      { id: campaign.id, status: previous },
+      { status: CampaignStatus.CANCELLED, cancelReason: reason, cancelledAt: now, cancelledFrom: previous, isFeatured: false },
+    );
+    if (!result.affected) {
+      throw new ConflictException("Chiến dịch vừa đổi trạng thái. Vui lòng tải lại trang.");
+    }
+    const saved = Object.assign(campaign, {
+      status: CampaignStatus.CANCELLED,
+      cancelReason: reason,
+      cancelledAt: now,
+      cancelledFrom: previous,
+      isFeatured: false,
+    });
+    await this.auditService.record({
+      userId: currentUser.id,
+      action: "campaign.cancel",
+      entity: "campaign",
+      entityId: saved.id,
+      oldValues: { status: previous },
+      newValues: {
+        status: CampaignStatus.CANCELLED,
+        reason,
+        backers: saved.backerCount,
+        currentAmount: Number(saved.currentAmount),
+        goalAmount: Number(saved.goalAmount),
+      },
+    });
+    await this.notificationsService
+      .notify({
+        userId: saved.ownerId,
+        type: NotificationType.CAMPAIGN_ENDED,
+        title: "Bạn đã hủy chiến dịch",
+        message:
+          saved.backerCount > 0
+            ? `Chiến dịch "${saved.title}" đã được hủy. ${saved.backerCount} khoản cam kết sẽ tự hủy trong vài phút và người ủng hộ được thông báo là không bị trừ tiền.`
+            : `Chiến dịch "${saved.title}" đã được hủy.`,
+        link: "/dashboard",
+        relatedId: saved.id,
+        email: true,
+      })
+      .catch(() => undefined);
+    await this.flagRepeatedCancels(currentUser, now).catch((error: unknown) =>
+      this.logger.warn(`Không tạo được cảnh báo hủy nhiều lần: ${(error as Error).message}`),
+    );
+    return saved;
+  }
+
+  /** Chủ dự án tự hủy từ `CANCEL_RISK_MIN_COUNT` chiến dịch trở lên trong 180 ngày: mở/cập nhật cảnh báo rủi ro cho admin. */
+  private async flagRepeatedCancels(owner: User, now: Date): Promise<void> {
+    if (!this.riskAlertRepo) return;
+    const since = new Date(now.getTime() - CANCEL_RISK_WINDOW_DAYS * 86_400_000);
+    const cancelled = await this.campaignRepo.find({
+      where: { ownerId: owner.id, status: CampaignStatus.CANCELLED, cancelledAt: MoreThanOrEqual(since) },
+      select: { id: true, title: true, cancelledAt: true, cancelReason: true },
+      order: { cancelledAt: "DESC" },
+    });
+    if (cancelled.length < CANCEL_RISK_MIN_COUNT) return;
+    const level = cancelled.length > CANCEL_RISK_MIN_COUNT ? RiskAlertLevel.HIGH : RiskAlertLevel.MEDIUM;
+    const score = Math.min(1, cancelled.length / 4);
+    const reasons = cancelled.slice(0, 5).map((c) => ({
+      group: "owner_cancel",
+      label: `Tự hủy "${c.title}"${c.cancelReason ? ` — ${c.cancelReason}` : ""}`,
+      weight: 1,
+    }));
+    const evidences = { cancelled_campaigns_180d: cancelled.length };
+    const existing = await this.riskAlertRepo.findOne({
+      where: { entityType: RiskEntityType.USER, entityId: owner.id, method: RiskMethod.RULE, status: RiskAlertStatus.OPEN },
+    });
+    if (existing) {
+      Object.assign(existing, { level, score, reasons, evidences });
+      await this.riskAlertRepo.save(existing);
+      return;
+    }
+    await this.riskAlertRepo.save(
+      this.riskAlertRepo.create({
+        entityType: RiskEntityType.USER,
+        entityId: owner.id,
+        entityName: owner.name ?? owner.email,
+        level,
+        score,
+        method: RiskMethod.RULE,
+        reasons,
+        evidences,
+      }),
+    );
   }
 
   async getPlatformStats(): Promise<PlatformStats> {

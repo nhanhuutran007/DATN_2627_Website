@@ -273,7 +273,9 @@ export class RiskAlertService {
   }
 
   private async resolveStaleOpenAlerts(admin: Pick<User, "id"> | null, keptIds: string[], scannedIds: string[]): Promise<void> {
+    // Chỉ cảnh báo chiến dịch do lần quét này chấm; cảnh báo người dùng (vd. tự hủy nhiều chiến dịch) do admin tự đóng.
     const stale = await this.riskAlertRepo.findBy({
+      entityType: RiskEntityType.CAMPAIGN,
       method: Not(RiskMethod.RECEIPT),
       status: RiskAlertStatus.OPEN,
     });

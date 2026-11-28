@@ -84,6 +84,9 @@ export type ApiCampaign = {
   backerCount?: number;
   viewCount?: number;
   rejectionReason?: string | null;
+  /** Lý do chủ dự án tự hủy (công khai). */
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
   milestones?: ApiMilestone[];
@@ -194,6 +197,11 @@ export async function publishCampaign(id: string, endDate?: string): Promise<Api
 
 export async function deleteCampaign(id: string): Promise<void> {
   return api.del<void>(`/campaigns/${encodeURIComponent(id)}`);
+}
+
+/** Chủ dự án tự hủy chiến dịch (không xóa): lý do 10–500 ký tự, hiện công khai trên trang dự án. */
+export async function cancelCampaign(id: string, reason: string): Promise<ApiCampaign> {
+  return api.post<ApiCampaign>(`/campaigns/${encodeURIComponent(id)}/cancel`, { reason });
 }
 
 /** Tài khoản ngân hàng nhận tiền gây quỹ (chỉ chủ dự án và admin xem). */
@@ -488,6 +496,7 @@ export function apiCampaignToView(api: ApiCampaign): Campaign {
     daysLeft,
     status: statusToDisplay(api.status),
     apiStatus: api.status,
+    cancelReason: api.cancelReason ?? null,
     image: imageForCampaign({ category: api.category, title: api.title, summary: toSummary(api), id: api.id }),
     imageUrl: api.imageUrl ?? null,
     videoUrl: api.videoUrl ?? null,

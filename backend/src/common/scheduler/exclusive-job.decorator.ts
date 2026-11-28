@@ -2,6 +2,7 @@ import { SchedulerLockService } from "./scheduler-lock.service";
 
 /** Thời hạn khóa theo chu kỳ cron: ngắn hơn chu kỳ một chút để lượt sau luôn giành lại được. */
 export const JOB_LEASE = {
+  EVERY_2_MINUTES: 110,
   EVERY_10_MINUTES: 9 * 60,
   EVERY_HOUR: 55 * 60,
   EVERY_6_HOURS: 5 * 60 * 60 + 50 * 60,

@@ -92,7 +92,7 @@ export default async function SupportContactPage() {
             <li>Vấn đề với một chiến dịch (thông tin sai, nghi lừa đảo): dùng nút <b>Báo cáo chiến dịch</b> ở trang dự án để quản trị viên xử lý nhanh hơn.</li>
             <li>Muốn nhận lại tiền: gửi yêu cầu hoàn tiền từ <Link href="/dashboard">biên nhận khoản ủng hộ</Link> của bạn.</li>
             <li>Hỏi về một dự án cụ thể: bấm <b>Liên hệ</b> ở trang dự án để xem liên hệ của người tổ chức.</li>
-            <li>Yêu cầu khóa hoặc xóa tài khoản: gửi email từ chính địa chỉ email đăng nhập để chúng tôi xác minh.</li>
+            <li>Yêu cầu khóa tài khoản: gửi email từ chính địa chỉ email đăng nhập để chúng tôi xác minh. Muốn xóa tài khoản, bạn tự xóa trong Cài đặt tài khoản.</li>
           </ul>
         </section>
       </div>

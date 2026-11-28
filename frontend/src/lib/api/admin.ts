@@ -109,6 +109,8 @@ export type AdminUser = {
   status: AdminUserStatus;
   emailVerified: boolean;
   createdAt: string;
+  /** Tài khoản đã xóa (ẩn danh hóa). */
+  deletedAt?: string | null;
 };
 
 export type AdminUserDetail = {

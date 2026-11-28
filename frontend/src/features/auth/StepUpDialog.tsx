@@ -27,6 +27,7 @@ const ACTION_LABELS: Record<string, string> = {
   campaign_payout: "khai báo tài khoản nhận tiền của chiến dịch",
   admin_disburse: "giải ngân tiền gây quỹ cho chủ dự án",
   account_bank: "lưu hoặc đổi tài khoản ngân hàng của bạn",
+  delete_account: "xóa tài khoản Góp Mầm của bạn",
   admin_backup: "sao lưu hoặc khôi phục dữ liệu",
   admin_users: "đổi vai trò hoặc xóa tài khoản",
 };

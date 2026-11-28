@@ -1,9 +1,10 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 
 import { AuditService, truncateForAudit } from "../../common/audit/audit.service";
 import { BehaviorEvent } from "../ai/entities/behavior-event.entity";
+import { AccountDeletionService } from "./account-deletion.service";
 import { CreateUserDto, UpdateUserDto, UpdateRoleDto } from "./dto/user.dto";
 import { User, UserRole, UserStatus } from "./entities/user.entity";
 
@@ -50,6 +51,9 @@ export class UsersService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly auditService: AuditService,
+    @Optional()
+    @Inject(AccountDeletionService)
+    private readonly accountDeletion: AccountDeletionService | null = null,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -155,7 +159,8 @@ export class UsersService {
     }
 
     const snapshot = { email: user.email, role: user.role, status: user.status };
-    await this.userRepo.manager.transaction(async (manager) => {
+    // Tài khoản vi phạm (đã khóa) có lịch sử: không xóa hẳn được → ẩn danh hóa + giữ dấu (chặn đăng ký lại).
+    const anonymizeInstead = await this.userRepo.manager.transaction(async (manager) => {
       const blockers: string[] = [];
       for (const ref of USER_HISTORY_REFERENCES) {
         const rows: Array<{ n: number | string }> = await manager.query(
@@ -167,8 +172,9 @@ export class UsersService {
         }
       }
       if (blockers.length > 0) {
+        if (user.status === UserStatus.BANNED && this.accountDeletion) return true;
         throw new ConflictException(
-          `Không xóa được: tài khoản đã có ${blockers.join(", ")}. Hãy khóa tài khoản thay vì xóa để giữ lịch sử.`,
+          `Không xóa được: tài khoản đã có ${blockers.join(", ")}. Hãy khóa tài khoản trước; tài khoản đã khóa sẽ được xóa kiểu ẩn danh hóa (giữ lịch sử, chặn đăng ký lại).`,
         );
       }
       // Dữ liệu phụ không phải lịch sử, khóa ngoại không cascade: dọn trước khi xóa.
@@ -176,7 +182,12 @@ export class UsersService {
         await manager.query(`DELETE FROM \`${table}\` WHERE \`user_id\` = ?`, [id]);
       }
       await manager.delete(User, { id });
+      return false;
     });
+    if (anonymizeInstead) {
+      await this.accountDeletion!.deleteBanned(user, currentUser, "Quản trị viên xóa tài khoản đã bị khóa vì vi phạm");
+      return;
+    }
     await this.auditService.record({
       userId: currentUser.id,
       action: "user.delete",

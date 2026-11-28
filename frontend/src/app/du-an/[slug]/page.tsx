@@ -45,6 +45,9 @@ import {
   type CampaignProgress,
 } from "@/lib/api/progress";
 import { fetchCampaignFaqs, type CampaignFaq } from "@/lib/api/campaign-faqs";
+import { fetchComments } from "@/lib/api/comments";
+import { fetchSupportMessages } from "@/lib/api/donations";
+import { fetchCampaignPosts } from "@/lib/api/posts";
 import { fetchRewardTiers, isRewardAvailable, type RewardTier } from "@/lib/api/rewards";
 import { coverFor } from "@/lib/covers";
 import { campaignProgress, campaigns as mockCampaigns, findCampaign, type Campaign } from "@/lib/data/campaigns";
@@ -99,6 +102,19 @@ async function loadCampaignFaqs(id: string): Promise<CampaignFaq[]> {
   }
 }
 
+type TabCounts = { posts?: number; support?: number; comments?: number };
+
+/** Số mục hiện trên đầu các tab (như Kickstarter: Updates ⁵ · Comments ¹²); lỗi thì không hiện số. */
+async function loadTabCounts(id: string): Promise<TabCounts> {
+  const total = (request: Promise<{ total: number }>) => request.then((page) => page.total).catch(() => undefined);
+  const [posts, support, comments] = await Promise.all([
+    total(fetchCampaignPosts(id, 0, 1)),
+    total(fetchSupportMessages(id, 0, 1)),
+    total(fetchComments(id, 0, 1)),
+  ]);
+  return { posts, support, comments };
+}
+
 /** Dự án liên quan: cùng lĩnh vực trước, sau đó các dự án nổi bật khác. */
 async function loadRelated(current: Campaign, live: boolean): Promise<Campaign[]> {
   if (!live) return mockCampaigns.filter((item) => item.slug !== current.slug).slice(0, RELATED_LIMIT);
@@ -142,11 +158,12 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
 
   const { campaign, live } = loaded;
   const publishedStatus = live && isPublishedStatus(campaign.apiStatus);
-  const [progress, related, rewardTiers, faqs] = await Promise.all([
+  const [progress, related, rewardTiers, faqs, counts] = await Promise.all([
     live ? loadProgress(campaign.slug) : Promise.resolve(null),
     loadRelated(campaign, live),
     publishedStatus ? loadRewardTiers(campaign.slug) : Promise.resolve([] as RewardTier[]),
     publishedStatus ? loadCampaignFaqs(campaign.slug) : Promise.resolve([] as CampaignFaq[]),
+    publishedStatus ? loadTabCounts(campaign.slug) : Promise.resolve({} as TabCounts),
   ]);
   const percent = campaignProgress(campaign);
   const open = campaign.status === "Đang gây quỹ";
@@ -164,13 +181,13 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
   // Thanh tab ngang dưới tiêu đề (như Kickstarter): mỗi tab một nội dung riêng, chỉ các mục thực sự hiển thị.
   const tocItems: DetailTocItem[] = [
     { id: "cau-chuyen", label: "Câu chuyện" },
-    { id: "cap-nhat", label: "Cập nhật" },
+    { id: "cap-nhat", label: "Cập nhật", count: counts.posts },
     { id: "nhat-ky", label: "Chi tiêu" },
     ...(published ? [{ id: "chia-se", label: "Chia sẻ" }] : []),
     { id: "nguoi-to-chuc", label: "Người tổ chức" },
-    ...(published ? [{ id: "loi-dong-vien", label: "Lời động viên" }] : []),
+    ...(published ? [{ id: "loi-dong-vien", label: "Lời động viên", count: counts.support }] : []),
     { id: "ke-hoach-ngan-sach", label: "Ngân sách" },
-    { id: "hoi-dap", label: "Bình luận" },
+    { id: "hoi-dap", label: "Bình luận", count: counts.comments },
     { id: "cau-hoi-thuong-gap", label: "Hỏi đáp", count: faqs.length },
   ];
   const tabIds = tocItems.map((item) => item.id);
@@ -205,7 +222,13 @@ export default async function CampaignDetailPage({ params }: CampaignDetailPageP
       <div className="container detail-hero">
         {published && <CampaignViewTracker campaignId={campaign.slug} />}
         {!live && <p className="notice-sample">Dữ liệu mẫu — không phải chiến dịch thật trên hệ thống.</p>}
-        {live && !published && (
+        {campaign.apiStatus === "cancelled" && (
+          <div className="detail-cancelled" role="status">
+            <b>Dự án đã bị chủ dự án hủy</b> và không còn nhận ủng hộ. Các khoản cam kết đã được hủy, người ủng hộ không bị trừ tiền.
+            {campaign.cancelReason && <span className="detail-cancelled-reason">Lý do: {campaign.cancelReason}</span>}
+          </div>
+        )}
+        {live && !published && campaign.apiStatus !== "cancelled" && (
           <p className="notice-sample" role="status">
             Hồ sơ chưa công khai ({campaign.status.toLowerCase()}): chưa hiển thị trong danh sách dự án, chưa nhận ủng hộ, theo dõi hay bình luận.
           </p>

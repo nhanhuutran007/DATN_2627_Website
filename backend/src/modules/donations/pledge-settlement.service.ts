@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Cron, CronExpression } from "@nestjs/schedule";
+import { Cron } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Between, In, IsNull, LessThan, Repository } from "typeorm";
 
@@ -63,12 +63,21 @@ export class PledgeSettlementService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  @Cron(CronExpression.EVERY_10_MINUTES)
-  @ExclusiveJob("pledge.settlement", JOB_LEASE.EVERY_10_MINUTES)
+  /** Lượt trước chưa xong thì bỏ qua lượt này (chạy 2 phút/lần, tránh hai lượt chồng nhau). */
+  private running = false;
+
+  @Cron("0 */2 * * * *")
+  @ExclusiveJob("pledge.settlement", JOB_LEASE.EVERY_2_MINUTES)
   async handleSettlement(): Promise<void> {
-    const result = await this.settle();
-    if (Object.values(result).some((n) => n > 0)) {
-      this.logger.log(`Pledge settlement: ${JSON.stringify(result)}`);
+    if (this.running) return;
+    this.running = true;
+    try {
+      const result = await this.settle();
+      if (Object.values(result).some((n) => n > 0)) {
+        this.logger.log(`Pledge settlement: ${JSON.stringify(result)}`);
+      }
+    } finally {
+      this.running = false;
     }
   }
 
@@ -122,7 +131,8 @@ export class PledgeSettlementService {
           else if (charged.status === DonationStatus.CHARGE_FAILED) result.chargeFailed += 1;
           else if (charged.status === DonationStatus.AWAITING_PAYMENT) result.paymentRequested += 1;
         } else if (outcome === "missed") {
-          if (await this.donationsService.releasePledge(pledge, pledge.campaign.title)) result.released += 1;
+          const cancelReason = pledge.campaign.status === CampaignStatus.CANCELLED ? (pledge.campaign.cancelReason ?? "") || null : null;
+          if (await this.donationsService.releasePledge(pledge, pledge.campaign.title, cancelReason)) result.released += 1;
         }
       } catch (error) {
         // Lỗi mạng tới cổng thẻ: để nguyên `pledged`, lần chạy sau thử lại cùng khóa idempotency.

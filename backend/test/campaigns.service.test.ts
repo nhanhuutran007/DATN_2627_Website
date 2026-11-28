@@ -660,9 +660,11 @@ describe("CampaignsService", () => {
       await rejects(campaignsService.publish(ID, makeUser()), (err: { status: number }) => err.status === 409);
     });
 
-    it("ngày kết thúc cũ còn dưới 7 ngày hoặc ngày mới quá 60 ngày → từ chối; ngày mới trong 7–60 ngày → phát hành", async () => {
+    it("ngày kết thúc cũ còn dưới 7 ngày → tự dời (tối thiểu 7 ngày); ngày mới quá 60 ngày → từ chối", async () => {
       approved(3);
-      await rejects(campaignsService.publish(ID, makeUser()), (err: { status: number }) => err.status === 400);
+      const moved = await campaignsService.publish(ID, makeUser());
+      ok(moved.endDate.getTime() >= Date.now() + 7 * DAY - 60_000);
+      approved(3);
       await rejects(
         campaignsService.publish(ID, makeUser(), new Date(Date.now() + 62 * DAY).toISOString()),
         (err: { status: number }) => err.status === 400,

@@ -95,3 +95,11 @@ export class UpdateAiConsentDto {
   @IsBoolean()
   consent!: boolean;
 }
+
+/** Tự xóa tài khoản: lý do tùy chọn (giúp Góp Mầm cải thiện), không bắt buộc. */
+export class DeleteAccountDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500, { message: "Lý do tối đa 500 ký tự." })
+  reason?: string;
+}

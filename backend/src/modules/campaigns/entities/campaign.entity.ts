@@ -108,6 +108,17 @@ export class Campaign extends BaseEntity {
   @Column({ name: "rejection_reason", type: "text", nullable: true })
   rejectionReason?: string;
 
+  /** Lý do chủ dự án tự hủy (công khai trên trang dự án). */
+  @Column({ name: "cancel_reason", type: "varchar", length: 500, nullable: true })
+  cancelReason?: string | null;
+
+  @Column({ name: "cancelled_at", type: "datetime", nullable: true })
+  cancelledAt?: Date | null;
+
+  /** Trạng thái ngay trước khi chủ dự án hủy; chỉ `active` (đã công khai) mới còn xem công khai. */
+  @Column({ name: "cancelled_from", type: "varchar", length: 20, nullable: true })
+  cancelledFrom?: string | null;
+
   @OneToMany("Donation", "campaign")
   donations!: Donation[];
 

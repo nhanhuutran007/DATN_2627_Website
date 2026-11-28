@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { CategoriesModule } from "../categories/categories.module";
+import { RiskAlert } from "../admin/entities/risk-alert.entity";
 import { Donation } from "../donations/entities/donation.entity";
 import { CampaignFollow } from "../follows/entities/campaign-follow.entity";
 import { OrganizationsModule } from "../organizations/organizations.module";
@@ -25,7 +26,7 @@ import { Milestone } from "./../progress/entities/milestone.entity";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Campaign, Milestone, CampaignViewDaily, Donation, CampaignFollow, CampaignScreening, CampaignPayoutAccount, CampaignDisbursement, UserBankAccount]),
+    TypeOrmModule.forFeature([Campaign, Milestone, CampaignViewDaily, Donation, CampaignFollow, CampaignScreening, CampaignPayoutAccount, CampaignDisbursement, UserBankAccount, RiskAlert]),
     CategoriesModule,
     OrganizationsModule,
     SupportModule,

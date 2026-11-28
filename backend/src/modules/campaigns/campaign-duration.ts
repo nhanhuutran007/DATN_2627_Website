@@ -43,3 +43,22 @@ export function publishDurationProblem(endDate: Date, now = new Date()): Duratio
   if (days > MAX_CAMPAIGN_DURATION_DAYS + TOLERANCE_DAYS) return "too_long";
   return null;
 }
+
+/**
+ * Ngày kết thúc khi phát hành mà chủ dự án không phải chọn lại: giữ ngày đã chọn lúc tạo nếu vẫn
+ * hợp lệ; nếu chờ duyệt lâu làm thời hạn còn dưới 7 ngày thì giữ nguyên **số ngày gây quỹ đã dự
+ * định** (ngày kết thúc − lúc gửi duyệt), tính lại từ bây giờ, kẹp trong 7–60 ngày.
+ */
+export function publishEndDate(
+  endDate: Date,
+  submittedAt: Date | null | undefined,
+  now = new Date(),
+): Date {
+  const problem = publishDurationProblem(endDate, now);
+  if (!problem) return endDate;
+  if (problem === "too_long") return new Date(now.getTime() + MAX_CAMPAIGN_DURATION_DAYS * DAY_MS);
+  const base = submittedAt && submittedAt.getTime() < endDate.getTime() ? submittedAt : now;
+  const planned = Math.round((endDate.getTime() - base.getTime()) / DAY_MS);
+  const days = Math.min(MAX_CAMPAIGN_DURATION_DAYS, Math.max(MIN_CAMPAIGN_DURATION_DAYS, planned));
+  return new Date(now.getTime() + days * DAY_MS);
+}

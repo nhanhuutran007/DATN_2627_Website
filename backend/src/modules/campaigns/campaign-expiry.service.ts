@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Cron, CronExpression } from "@nestjs/schedule";
+import { Cron } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
 import { LessThanOrEqual, Repository } from "typeorm";
 
@@ -17,7 +17,7 @@ export type ExpiryRunResult = {
 /**
  * Tự động chốt kết quả chiến dịch đã quá hạn: `active` + `endDate` <= hiện tại
  * → `success` nếu đạt mục tiêu (`currentAmount >= goalAmount`), ngược lại
- * `failed`. Chạy mỗi giờ; cũng gọi được trực tiếp `expireCampaigns()` (test,
+ * `failed`. Chạy 2 phút/lần; cũng gọi được trực tiếp `expireCampaigns()` (test,
  * hoặc kích hoạt thủ công) mà không cần chờ lịch cron.
  */
 @Injectable()
@@ -31,8 +31,9 @@ export class CampaignExpiryService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  @Cron(CronExpression.EVERY_HOUR)
-  @ExclusiveJob("campaign.expiry", JOB_LEASE.EVERY_HOUR)
+  // 2 phút/lần, cùng nhịp job tất toán cam kết: dự án hết hạn được chốt và tất toán ngay sau đó.
+  @Cron("30 */2 * * * *")
+  @ExclusiveJob("campaign.expiry", JOB_LEASE.EVERY_2_MINUTES)
   async handleExpiredCampaigns(): Promise<void> {
     const result = await this.expireCampaigns();
     if (result.succeeded > 0 || result.failed > 0) {

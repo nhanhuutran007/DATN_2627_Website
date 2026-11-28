@@ -14,6 +14,7 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
   ValidateIf,
 } from "class-validator";
 
@@ -225,6 +226,15 @@ export class PublishCampaignDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+}
+
+/** Chủ dự án tự hủy chiến dịch: lý do bắt buộc, hiện công khai trên trang dự án. */
+export class CancelCampaignDto {
+  @Transform(({ value }: TransformFnParams) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @MinLength(10, { message: "Vui lòng nêu lý do hủy (ít nhất 10 ký tự)." })
+  @MaxLength(500, { message: "Lý do hủy tối đa 500 ký tự." })
+  reason!: string;
 }
 
 export class ModerateCampaignDto {

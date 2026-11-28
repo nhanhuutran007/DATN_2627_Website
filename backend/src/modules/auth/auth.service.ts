@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Optional,
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -15,6 +16,7 @@ import { LessThan, Repository } from "typeorm";
 import { AuditService } from "../../common/audit/audit.service";
 import type { GoogleIdentityGateway, GoogleProfile } from "../../integrations/identity/google-identity.gateway";
 import { User, UserRole, UserStatus } from "../users/entities/user.entity";
+import { AccountDeletionService } from "../users/account-deletion.service";
 import { isUserLocked, UsersService } from "../users/users.service";
 import { LoginDto, RegisterDto, TokenResponseDto } from "./dto/auth.dto";
 import { RevokedToken } from "./entities/revoked-token.entity";
@@ -59,6 +61,9 @@ export class AuthService {
     private readonly revokedTokenRepo: Repository<RevokedToken>,
     @Inject("GoogleIdentityGateway")
     private readonly googleIdentity: GoogleIdentityGateway,
+    @Optional()
+    @Inject(AccountDeletionService)
+    private readonly accountDeletion: AccountDeletionService | null = null,
   ) {}
 
   async register(dto: RegisterDto): Promise<TokenResponseDto> {
@@ -71,6 +76,7 @@ export class AuthService {
     if (existingUser) {
       throw new UnauthorizedException("Email already registered");
     }
+    await this.accountDeletion?.assertCanRegister({ email: dto.email });
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = await this.usersService.create({
@@ -80,6 +86,7 @@ export class AuthService {
       role: dto.role ?? UserRole.USER,
     });
 
+    await this.accountDeletion?.inheritFromDeleted(user);
     await this.auditService.record({
       userId: user.id,
       action: "auth.register",
@@ -185,6 +192,7 @@ export class AuthService {
         user = await this.usersService.linkGoogleAccount(existing, profile.googleId);
         action = "auth.google.link";
       } else {
+        await this.accountDeletion?.assertCanRegister({ email: profile.email, googleId: profile.googleId });
         const passwordHash = await bcrypt.hash(randomBytes(32).toString("base64url"), 10);
         user = await this.usersService.createFromGoogle({
           name: profile.name.slice(0, 100),
@@ -192,6 +200,7 @@ export class AuthService {
           googleId: profile.googleId,
           passwordHash,
         });
+        await this.accountDeletion?.inheritFromDeleted(user);
         action = "auth.google.register";
       }
     }
@@ -242,6 +251,9 @@ export class AuthService {
 
     if (user.status === UserStatus.BANNED) {
       throw new ForbiddenException("Account has been banned");
+    }
+    if (user.deletedAt) {
+      throw new UnauthorizedException("Account has been deleted");
     }
 
     // Token không có `jti` không xoay vòng được → buộc đăng nhập lại.
@@ -307,6 +319,9 @@ export class AuthService {
     // Kiểm tra mỗi request: tài khoản bị khóa mất quyền ngay, không chờ access token (15 phút) hết hạn.
     if (user.status === UserStatus.BANNED) {
       throw new UnauthorizedException("Account has been banned");
+    }
+    if (user.deletedAt) {
+      throw new UnauthorizedException("Account has been deleted");
     }
     if (issuedBeforeSessionCutoff(user, issuedAt)) {
       throw new UnauthorizedException("Session has been revoked");

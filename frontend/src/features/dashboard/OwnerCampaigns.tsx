@@ -12,7 +12,7 @@ import { PostManager } from "@/features/posts/PostManager";
 import { ProgressManager } from "@/features/progress/ProgressManager";
 import { RewardManager } from "@/features/rewards/RewardManager";
 import { ApiError } from "@/lib/api";
-import { deleteCampaign, submitCampaign, type ApiCampaign, type ApiCampaignStatus } from "@/lib/api/campaigns";
+import { cancelCampaign, deleteCampaign, submitCampaign, type ApiCampaign, type ApiCampaignStatus } from "@/lib/api/campaigns";
 import { formatVnd, formatVndCompact } from "@/lib/format";
 
 const STATUS: Record<ApiCampaignStatus, { label: string; tone: string }> = {
@@ -30,6 +30,8 @@ const STATUS: Record<ApiCampaignStatus, { label: string; tone: string }> = {
 };
 
 const EDITABLE: ApiCampaignStatus[] = ["draft", "rejected", "needs_info"];
+/** Chủ dự án tự hủy được (không xóa); `paused` do admin dừng để xem xét nên không có nút. */
+const CANCELLABLE: ApiCampaignStatus[] = ["pending", "approved", "active"];
 /** Đã phát hành → có lượt xem/giao dịch để thống kê. */
 const PUBLISHED: ApiCampaignStatus[] = ["active", "paused", "success", "failed", "ended"];
 /** Chuẩn bị được bài cập nhật và kế hoạch mốc từ khi được duyệt (trước khi phát hành). */
@@ -100,6 +102,41 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
     { raised: 0, backers: 0, active: 0, pending: 0 },
   ), [campaigns]);
   const tasks = useMemo(() => buildTasks(campaigns), [campaigns]);
+
+  const cancel = async (campaign: ApiCampaign) => {
+    const backers = Number(campaign.backerCount) || 0;
+    const result = await dialog.prompt({
+      title: "Hủy dự án?",
+      message: (
+        <>
+          <b>{campaign.title}</b> sẽ chuyển sang <b>Đã hủy</b> và ngừng nhận ủng hộ. Trang dự án vẫn hiển thị công khai kèm lý do bạn nêu dưới đây.
+          {backers > 0
+            ? ` ${backers.toLocaleString("vi-VN")} khoản cam kết sẽ tự hủy trong vài phút; người ủng hộ được thông báo và không bị trừ tiền.`
+            : ""}{" "}
+          Thao tác này không hoàn tác được.
+        </>
+      ),
+      label: "Lý do hủy (công khai)",
+      placeholder: "Ví dụ: nhóm thay đổi kế hoạch, không thể triển khai như đã cam kết…",
+      minLength: 10,
+      maxLength: 500,
+      confirmLabel: "Hủy dự án",
+      cancelLabel: "Giữ dự án",
+      tone: "danger",
+    });
+    if (!result) return;
+    setBusyId(campaign.id);
+    setMessage(null);
+    try {
+      await cancelCampaign(campaign.id, result.value.trim());
+      await reload();
+      setMessage({ tone: "ok", text: `Đã hủy “${campaign.title}”.` });
+    } catch (err) {
+      setMessage({ tone: "error", text: err instanceof ApiError ? err.message : "Không hủy được dự án, vui lòng thử lại." });
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const act = async (campaign: ApiCampaign, action: "submit" | "delete") => {
     if (action === "delete") {
@@ -176,6 +213,9 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
               <h3><Link href={`/du-an/${c.id}`}>{c.title}</Link></h3>
               {c.rejectionReason && ["rejected", "needs_info", "paused"].includes(c.status) && (
                 <p className="own-reason"><b>Lý do từ quản trị viên:</b> {c.rejectionReason}</p>
+              )}
+              {c.status === "cancelled" && c.cancelReason && (
+                <p className="own-reason"><b>Lý do hủy:</b> {c.cancelReason}</p>
               )}
               <ProgressBar value={percent} label={`Đạt ${percent}% mục tiêu`} />
               <div className="own-figures">
@@ -263,6 +303,11 @@ export function OwnerCampaigns({ campaigns, reload }: OwnerCampaignsProps) {
                 >
                   Tài khoản nhận tiền
                 </button>
+                {CANCELLABLE.includes(c.status) && (
+                  <button className="button button-ghost button-sm own-cancel" type="button" disabled={busyId === c.id} onClick={() => cancel(c)}>
+                    Hủy dự án
+                  </button>
+                )}
               </div>
               {isOpen(c.id, "publish") && (
                 <PublishCampaignPanel

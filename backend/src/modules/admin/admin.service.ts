@@ -513,6 +513,7 @@ export class AdminService {
         status: user.status,
         emailVerified: user.emailVerified,
         createdAt: user.createdAt,
+        deletedAt: user.deletedAt ?? null,
       },
       campaigns: {
         total: campaigns.length,

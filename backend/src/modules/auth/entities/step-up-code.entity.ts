@@ -12,6 +12,7 @@ export enum StepUpPurpose {
   CAMPAIGN_PAYOUT = "campaign_payout",
   ADMIN_DISBURSE = "admin_disburse",
   ACCOUNT_BANK = "account_bank",
+  DELETE_ACCOUNT = "delete_account",
 }
 
 @Entity("step_up_codes")

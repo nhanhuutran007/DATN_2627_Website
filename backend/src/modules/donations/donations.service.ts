@@ -603,8 +603,11 @@ export class DonationsService {
     return this.chargePledge(donation.id, now, user.id);
   }
 
-  /** Chiến dịch không đạt mục tiêu/bị hủy: giải phóng cam kết, không trừ tiền. */
-  async releasePledge(donation: Donation, campaignTitle: string): Promise<boolean> {
+  /**
+   * Chiến dịch không đạt mục tiêu/bị hủy: giải phóng cam kết, không trừ tiền. `cancelReason` có
+   * giá trị khi chủ dự án tự hủy (lời nhắn nói rõ "đã bị hủy" kèm lý do thay vì "không đạt mục tiêu").
+   */
+  async releasePledge(donation: Donation, campaignTitle: string, cancelReason?: string | null): Promise<boolean> {
     const released = await this.uncountPledge(donation, DonationStatus.PLEDGED, DonationStatus.RELEASED);
     if (!released) return false;
     await this.auditService.record({
@@ -618,8 +621,10 @@ export class DonationsService {
       .notify({
         userId: donation.userId,
         type: NotificationType.CAMPAIGN_ENDED,
-        title: "Bạn không bị trừ tiền",
-        message: `Chiến dịch "${campaignTitle}" không đạt mục tiêu nên khoản cam kết ${money(donation.amount)} của bạn đã được hủy. Không có khoản tiền nào bị trừ.`,
+        title: cancelReason ? "Dự án bạn ủng hộ đã bị hủy" : "Bạn không bị trừ tiền",
+        message: cancelReason
+          ? `Chủ dự án đã hủy chiến dịch "${campaignTitle}" (lý do: ${cancelReason}) nên khoản cam kết ${money(donation.amount)} của bạn đã được hủy. Không có khoản tiền nào bị trừ.`
+          : `Chiến dịch "${campaignTitle}" không đạt mục tiêu nên khoản cam kết ${money(donation.amount)} của bạn đã được hủy. Không có khoản tiền nào bị trừ.`,
         link: `/du-an/${donation.campaignId}`,
         relatedId: donation.id,
         email: true,

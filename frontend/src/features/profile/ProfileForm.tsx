@@ -7,6 +7,7 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from
 import { useDialog } from "@/components/ui/DialogProvider";
 import { Icon } from "@/components/ui/Icon";
 import { AiConsentSettings } from "@/features/ai-consent/AiConsentSettings";
+import { AccountDeletionSettings } from "@/features/profile/AccountDeletionSettings";
 import { BankAccountSettings } from "@/features/profile/BankAccountSettings";
 import { ApiError, logoutAllRequest, resolveMediaUrl } from "@/lib/api";
 import { ACCEPTED_IMAGE_TYPES, uploadImage, validateImageFile } from "@/lib/api/media";
@@ -424,11 +425,13 @@ function ProfileView({ profile, onSaved, aiUser }: ProfileViewProps) {
         </section>
 
         {aiUser && <AiConsentSettings user={aiUser} />}
+
+        {!isAdmin && <AccountDeletionSettings />}
       </div>
 
       {!isAdmin && (
         <p className="account-foot">
-          Muốn khóa hoặc xóa tài khoản? Hãy liên hệ quản trị viên Góp Mầm. Xem thêm{" "}
+          Cần hỗ trợ về tài khoản? Hãy liên hệ quản trị viên Góp Mầm. Xem thêm{" "}
           <Link href="/chinh-sach-bao-mat">Chính sách quyền riêng tư</Link>.
         </p>
       )}

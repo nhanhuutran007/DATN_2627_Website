@@ -146,7 +146,14 @@ export function UserDetailDialog({ userId, onClose, currentUserId, onChanged }: 
       title: "Xóa tài khoản",
       message: (
         <>
-          Xóa vĩnh viễn tài khoản <b>{user.name}</b> ({user.email}). Chỉ áp dụng cho tài khoản chưa có hoạt động;
+          {hasHistory ? (
+            <>
+              Tài khoản <b>{user.name}</b> đã bị khóa và có lịch sử nên sẽ được <b>ẩn danh hóa</b> thay vì xóa hẳn: giữ giao dịch,
+              bình luận, nhật ký; email/SĐT/tài khoản ngân hàng được lưu dạng mã hóa để chặn đăng ký lại.
+            </>
+          ) : (
+            <>Xóa vĩnh viễn tài khoản <b>{user.name}</b> ({user.email}). Chỉ áp dụng cho tài khoản chưa có hoạt động;</>
+          )}{" "}
           thao tác không hoàn tác được và cần nhập mã xác minh gửi qua email.
         </>
       ),
@@ -205,7 +212,7 @@ export function UserDetailDialog({ userId, onClose, currentUserId, onChanged }: 
                 <div className="user-detail-tags">
                   <span className="tag">{USER_ROLE_LABEL[user.role]}</span>
                   <span className={`table-status ${user.status === "active" ? "success" : user.status === "banned" ? "failed" : "changes"}`}>
-                    {USER_STATUS_LABEL[user.status]}
+                    {user.deletedAt ? "Đã xóa" : USER_STATUS_LABEL[user.status]}
                   </span>
                   {user.emailVerified ? (
                     <span className="tag tag-green">Email đã xác minh</span>
@@ -340,13 +347,15 @@ export function UserDetailDialog({ userId, onClose, currentUserId, onChanged }: 
               <div className="admin-actions">
                 <button
                   type="button"
-                  disabled={busy || hasHistory || user.role === "admin"}
+                  disabled={busy || Boolean(user.deletedAt) || (hasHistory && user.status !== "banned") || user.role === "admin"}
                   title={
-                    user.role === "admin"
-                      ? "Thu quyền quản trị trước khi xóa"
-                      : hasHistory
-                        ? "Tài khoản đã có chiến dịch hoặc giao dịch: hãy khóa thay vì xóa để giữ lịch sử"
-                        : undefined
+                    user.deletedAt
+                      ? "Tài khoản đã bị xóa"
+                      : user.role === "admin"
+                        ? "Thu quyền quản trị trước khi xóa"
+                        : hasHistory && user.status !== "banned"
+                          ? "Tài khoản đã có chiến dịch hoặc giao dịch: hãy khóa trước, tài khoản đã khóa sẽ được xóa kiểu ẩn danh hóa"
+                          : undefined
                   }
                   onClick={handleDelete}
                 >

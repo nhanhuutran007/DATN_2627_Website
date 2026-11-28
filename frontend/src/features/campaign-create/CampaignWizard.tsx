@@ -1047,15 +1047,6 @@ export function CampaignWizard({ initialCategory, initialOrganization, editId }:
 
               {step === LAST_STEP && (
                 <div className="form">
-                  <div className="review-preview-cta">
-                    <div>
-                      <b>Xem trước trang dự án</b>
-                      <p className="hint">Xem tổng thể dự án như người ủng hộ sẽ thấy trước khi gửi duyệt.</p>
-                    </div>
-                    <button className="button button-outline" type="button" onClick={() => setPreviewOpen(true)}>
-                      <Icon name="eye" size={18} /> Xem trước
-                    </button>
-                  </div>
                   <dl className="review-grid">
                     <div className="review-grid-wide"><dt>Tên dự án</dt><dd>{draft.title || "—"}</dd></div>
                     <div><dt>Gây quỹ cho</dt><dd>{pickedOrganization ? pickedOrganization.name : "Dự án của tôi"}</dd></div>

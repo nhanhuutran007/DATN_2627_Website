@@ -65,3 +65,15 @@ export function saveMyBankAccount(input: BankAccountInput): Promise<MyBankAccoun
 export async function deleteMyBankAccount(): Promise<void> {
   await api.del("/users/me/bank-account");
 }
+
+export type DeletionCheck = { canDelete: boolean; blockers: string[] };
+
+/** Những việc cần xong trước khi tự xóa tài khoản. */
+export function fetchDeletionCheck(): Promise<DeletionCheck> {
+  return api.get<DeletionCheck>("/users/me/deletion-check");
+}
+
+/** Tự xóa tài khoản (cần OTP qua email — hộp nhập mã tự mở). */
+export async function deleteMyAccount(reason?: string): Promise<void> {
+  await api.del("/users/me", { body: JSON.stringify(reason ? { reason } : {}) });
+}

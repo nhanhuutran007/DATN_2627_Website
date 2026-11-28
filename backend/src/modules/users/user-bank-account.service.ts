@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 
 import { AuditService } from "../../common/audit/audit.service";
 import { NotificationType } from "../notifications/entities/notification.entity";
 import { NotificationsService } from "../notifications/notifications.service";
+import { AccountDeletionService } from "./account-deletion.service";
 import { UserBankAccount } from "./entities/user-bank-account.entity";
 import type { User } from "./entities/user.entity";
 
@@ -24,6 +25,9 @@ export class UserBankAccountService {
     private readonly repo: Repository<UserBankAccount>,
     private readonly auditService: AuditService,
     private readonly notificationsService: NotificationsService,
+    @Optional()
+    @Inject(AccountDeletionService)
+    private readonly accountDeletion: AccountDeletionService | null = null,
   ) {}
 
   async get(user: Pick<User, "id">): Promise<BankAccountView | null> {
@@ -31,7 +35,7 @@ export class UserBankAccountService {
     return row ? this.toView(row) : null;
   }
 
-  async set(user: Pick<User, "id">, input: BankAccountInput): Promise<BankAccountView> {
+  async set(user: Pick<User, "id"> & Partial<Pick<User, "name" | "email">>, input: BankAccountInput): Promise<BankAccountView> {
     const previous = await this.repo.findOne({ where: { userId: user.id } });
     await this.repo.save(
       this.repo.create({
@@ -54,6 +58,10 @@ export class UserBankAccountService {
       previous ? "Đã đổi tài khoản ngân hàng" : "Đã lưu tài khoản ngân hàng",
       `Tài khoản ngân hàng của bạn trên Góp Mầm là ${describe(input)}.`,
     );
+    // Trùng tài khoản ngân hàng của tài khoản bị khóa vì vi phạm → cảnh báo admin (không chặn).
+    await this.accountDeletion
+      ?.flagBannedBankReuse({ id: user.id, name: user.name ?? "", email: user.email ?? "" }, input.bankAccountNumber)
+      .catch(() => false);
     const saved = await this.repo.findOneOrFail({ where: { userId: user.id } });
     return this.toView(saved);
   }
